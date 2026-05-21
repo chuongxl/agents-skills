@@ -1,0 +1,31 @@
+# Trivy Configuration — DDM Monorepo
+# https://aquasecurity.github.io/trivy/latest/docs/references/configuration/config-file/
+
+scan:
+  scanners:
+    - vuln
+    - secret
+    - misconfig
+
+severity:
+  - CRITICAL
+  - HIGH
+  - MEDIUM
+
+# Suppress dev-only dependencies (test, lint tooling)
+dependency-tree: false
+include-dev-deps: false
+
+# Ignore unfixed vulnerabilities (no patch available yet)
+ignore-unfixed: false
+
+# Quiet mode — suppress progress bars
+quiet: true
+
+# Cache settings
+cache-dir: ~/.cache/trivy
+skip-db-update: false
+
+# Misconfig scanners
+misconfiguration:
+  include-non-failures: false

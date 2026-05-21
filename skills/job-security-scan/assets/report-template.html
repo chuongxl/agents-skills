@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<!--
+  job-security-scan — HTML Report Template
+  ─────────────────────────────────────────
+  Placeholders replaced at runtime by generate-report.py:
+
+    {{TITLE}}        page <title> text
+    {{TEAM}}         team name (from repository.md)
+    {{ORG}}          GitHub org name
+    {{SCAN_TIME}}    ISO-like timestamp of scan run
+    {{RESULTS_DIR}}  path to the results directory
+    {{REPO_COUNT}}   number of repos scanned
+    {{SCANNERS}}     comma-separated list of scanners used
+    {{TOTAL}}        total findings count
+    {{CARDS}}        severity summary cards HTML
+    {{FILTERS}}      filter dropdowns HTML
+    {{ROWS}}         table body rows HTML
+
+  To customise look & feel: edit the <style> and <script> sections below.
+  Do NOT change {{PLACEHOLDER}} tokens — they are replaced programmatically.
+-->
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{TITLE}}</title>
+  <style>
+/* ── Design tokens ──────────────────────────────────────────────────────── */
+:root {
+  --bg:   #0f1117; --bg2:  #1a1d27; --bg3:  #252836; --border: #2e3147;
+  --text: #e2e8f0; --text2: #94a3b8; --text3: #64748b;
+
+  --critical: #ef4444; --critical-bg: #450a0a; --critical-border: #7f1d1d;
+  --high:     #f97316; --high-bg:     #431407; --high-border:     #7c2d12;
+  --medium:   #eab308; --medium-bg:   #422006; --medium-border:   #713f12;
+  --low:      #22c55e; --low-bg:      #052e16; --low-border:      #14532d;
+  --info:     #3b82f6; --info-bg:     #0c1a3a; --info-border:     #1e3a5f;
+
+  --accent: #6366f1;
+  --radius: 8px;
+  --font: 'Inter', system-ui, sans-serif;
+  --mono: 'JetBrains Mono', 'Fira Code', monospace;
+}
+
+/* ── Reset ──────────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body { background: var(--bg); color: var(--text); font-family: var(--font);
+       font-size: 14px; line-height: 1.6; }
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* ── Header ─────────────────────────────────────────────────────────────── */
+.header { background: var(--bg2); border-bottom: 1px solid var(--border);
+          padding: 24px 32px; position: sticky; top: 0; z-index: 100; }
+.header-top { display: flex; align-items: center; justify-content: space-between; }
+.header h1 { font-size: 20px; font-weight: 700; color: var(--text); }
+.header h1 span { color: var(--accent); }
+.meta { display: flex; gap: 16px; margin-top: 8px; flex-wrap: wrap; }
+.meta-item { color: var(--text2); font-size: 12px; }
+.meta-item strong { color: var(--text); }
+
+/* ── Summary cards ───────────────────────────────────────────────────────── */
+.summary { display: flex; gap: 12px; padding: 24px 32px; flex-wrap: wrap; }
+.card { background: var(--bg2); border: 1px solid var(--border);
+        border-radius: var(--radius); padding: 16px 20px;
+        min-width: 130px; text-align: center; }
+.card-count { font-size: 32px; font-weight: 800; line-height: 1; }
+.card-label { font-size: 11px; color: var(--text2); margin-top: 4px;
+              text-transform: uppercase; letter-spacing: 0.05em; }
+.card.critical { border-color: var(--critical-border); background: var(--critical-bg); }
+.card.critical .card-count { color: var(--critical); }
+.card.high     { border-color: var(--high-border);     background: var(--high-bg); }
+.card.high     .card-count { color: var(--high); }
+.card.medium   { border-color: var(--medium-border);   background: var(--medium-bg); }
+.card.medium   .card-count { color: var(--medium); }
+.card.low      { border-color: var(--low-border);      background: var(--low-bg); }
+.card.low      .card-count { color: var(--low); }
+.card.clean    { border-color: var(--low-border);      background: var(--low-bg); }
+.card.clean    .card-count { color: var(--low); font-size: 24px; }
+
+/* ── Filters ─────────────────────────────────────────────────────────────── */
+.filters { display: flex; gap: 10px; padding: 0 32px 20px; flex-wrap: wrap; align-items: center; }
+.filters label { font-size: 12px; color: var(--text2); }
+select { background: var(--bg3); color: var(--text); border: 1px solid var(--border);
+         border-radius: 6px; padding: 6px 10px; font-size: 13px; cursor: pointer; }
+select:focus { outline: 2px solid var(--accent); }
+.filter-count { color: var(--text3); font-size: 12px; margin-left: auto; }
+.btn-reset { background: var(--bg3); color: var(--text2); border: 1px solid var(--border);
+             border-radius: 6px; padding: 6px 12px; font-size: 12px; cursor: pointer; }
+.btn-reset:hover { border-color: var(--accent); color: var(--text); }
+
+/* ── Table ───────────────────────────────────────────────────────────────── */
+.table-wrap { padding: 0 32px 48px; overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+thead th { background: var(--bg3); color: var(--text2); font-weight: 600;
+           padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--border);
+           white-space: nowrap; font-size: 11px; text-transform: uppercase;
+           letter-spacing: 0.05em; }
+thead th:first-child { border-radius: var(--radius) 0 0 0; }
+thead th:last-child  { border-radius: 0 var(--radius) 0 0; }
+tbody tr { border-bottom: 1px solid var(--border); transition: background 0.1s; }
+tbody tr:hover { background: var(--bg3); }
+tbody tr.hidden { display: none; }
+td { padding: 10px 12px; vertical-align: top; }
+td.sev-col     { width: 90px; }
+td.repo-col    { width: 170px; white-space: nowrap; }
+td.scanner-col { width: 100px; white-space: nowrap; }
+td.file-col    { min-width: 200px; max-width: 300px; word-break: break-all; }
+td.pkg-col     { min-width: 150px; }
+td.id-col      { width: 170px; }
+td.desc-col    { min-width: 220px; color: var(--text2); }
+
+/* ── Severity badges ─────────────────────────────────────────────────────── */
+.badge { display: inline-block; padding: 2px 8px; border-radius: 4px;
+         font-size: 11px; font-weight: 700; text-transform: uppercase;
+         letter-spacing: 0.05em; }
+.badge.CRITICAL { background: var(--critical-bg); color: var(--critical); border: 1px solid var(--critical-border); }
+.badge.HIGH     { background: var(--high-bg);     color: var(--high);     border: 1px solid var(--high-border); }
+.badge.MEDIUM   { background: var(--medium-bg);   color: var(--medium);   border: 1px solid var(--medium-border); }
+.badge.LOW      { background: var(--low-bg);       color: var(--low);     border: 1px solid var(--low-border); }
+.badge.INFO     { background: var(--info-bg);     color: var(--info);     border: 1px solid var(--info-border); }
+
+/* ── Scanner chips ───────────────────────────────────────────────────────── */
+.chip { display: inline-block; padding: 2px 8px; border-radius: 4px;
+        font-size: 11px; background: var(--bg3); border: 1px solid var(--border);
+        color: var(--text2); }
+.chip.gitleaks   { border-color: #7c3aed; color: #a78bfa; }
+.chip.trivy      { border-color: #0284c7; color: #38bdf8; }
+.chip.semgrep    { border-color: #0891b2; color: #22d3ee; }
+.chip.hadolint   { border-color: #0d9488; color: #2dd4bf; }
+.chip.osv        { border-color: #16a34a; color: #4ade80; }
+.chip.trufflehog { border-color: #dc2626; color: #f87171; }
+
+/* ── Package + version ───────────────────────────────────────────────────── */
+.pkg-name    { font-family: var(--mono); font-size: 12px; color: var(--text); }
+.pkg-version { font-family: var(--mono); font-size: 11px; color: var(--text3); }
+.pkg-fix     { font-family: var(--mono); font-size: 11px; color: var(--low); }
+
+/* ── File link ───────────────────────────────────────────────────────────── */
+.file-link { font-family: var(--mono); font-size: 12px; color: var(--accent);
+             display: inline-flex; align-items: center; gap: 4px; }
+.file-link:hover { text-decoration: underline; }
+.cve-link  { font-family: var(--mono); font-size: 12px; }
+.rule-id   { font-family: var(--mono); font-size: 12px; color: var(--text2); }
+
+/* ── Empty state ─────────────────────────────────────────────────────────── */
+.empty { text-align: center; padding: 64px 32px; color: var(--text3); }
+.empty .icon { font-size: 48px; margin-bottom: 12px; }
+
+/* ── Footer ──────────────────────────────────────────────────────────────── */
+.footer { padding: 24px 32px; color: var(--text3); font-size: 12px;
+          border-top: 1px solid var(--border); text-align: center; }
+
+/* ── Print ───────────────────────────────────────────────────────────────── */
+@media print {
+  .filters, .header { position: static; }
+  body { background: white; color: black; }
+  .badge.CRITICAL { background: #fee2e2; color: #dc2626; }
+  .badge.HIGH     { background: #ffedd5; color: #ea580c; }
+  .badge.MEDIUM   { background: #fef9c3; color: #ca8a04; }
+}
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-top">
+    <h1>🔐 Security Scan — <span>{{TEAM}}</span> / {{ORG}}</h1>
+  </div>
+  <div class="meta">
+    <div class="meta-item">📅 <strong>{{SCAN_TIME}}</strong></div>
+    <div class="meta-item">📁 Results: <strong>{{RESULTS_DIR}}</strong></div>
+    <div class="meta-item">🏠 Repos: <strong>{{REPO_COUNT}}</strong></div>
+    <div class="meta-item">🔍 Scanners: <strong>{{SCANNERS}}</strong></div>
+    <div class="meta-item">📊 Total findings: <strong>{{TOTAL}}</strong></div>
+  </div>
+</div>
+
+<div class="summary">
+  {{CARDS}}
+</div>
+
+{{FILTERS}}
+
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>Severity</th>
+        <th>Repo</th>
+        <th>Scanner</th>
+        <th>File : Line</th>
+        <th>Package / Version / Fix</th>
+        <th>CVE / Rule ID</th>
+        <th>Title &amp; Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{ROWS}}
+    </tbody>
+  </table>
+</div>
+
+<div class="footer">
+  Generated by <strong>job-security-scan</strong> skill ·
+  Tools: Gitleaks · Trivy · Semgrep · Hadolint · OSV-Scanner · TruffleHog ·
+  All 100% free &amp; open source
+</div>
+
+<script>
+/* ── Live filter logic ───────────────────────────────────────────────────── */
+function applyFilters() {
+  const sev  = document.getElementById('f-sev').value;
+  const repo = document.getElementById('f-repo').value;
+  const scan = document.getElementById('f-scan').value;
+  const type = document.getElementById('f-type').value;
+  const rows = document.querySelectorAll('tbody tr[data-sev]');
+  let visible = 0;
+
+  rows.forEach(row => {
+    const match =
+      (!sev  || row.dataset.sev  === sev)  &&
+      (!repo || row.dataset.repo === repo) &&
+      (!scan || row.dataset.scan === scan) &&
+      (!type || row.dataset.type === type);
+    row.classList.toggle('hidden', !match);
+    if (match) visible++;
+  });
+
+  document.getElementById('visible-count').textContent =
+    visible + ' of ' + rows.length + ' findings';
+}
+
+function resetFilters() {
+  ['f-sev', 'f-repo', 'f-scan', 'f-type'].forEach(id => {
+    document.getElementById(id).value = '';
+  });
+  applyFilters();
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  ['f-sev', 'f-repo', 'f-scan', 'f-type'].forEach(id => {
+    document.getElementById(id).addEventListener('change', applyFilters);
+  });
+  applyFilters();
+});
+</script>
+</body>
+</html>

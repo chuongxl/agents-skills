@@ -1,0 +1,9 @@
+# Hadolint Configuration — DDM Monorepo
+# https://github.com/hadolint/hadolint
+
+failure-threshold: warning
+
+# Ignore rules that don't apply to our Alpine/Node base images
+ignore:
+  - DL3008  # apt-get version pinning (managed by base image)
+  - DL3018  # apk version pinning (managed by base image)
