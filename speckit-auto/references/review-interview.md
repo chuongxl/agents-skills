@@ -46,22 +46,19 @@ After each `implement` run, execute and maintain the following loop autonomously
 1. Invoke `speckit-code-review` using the correct method for your environment (see compatibility table in SKILL.md).
 2. Receive and read the strict JSON result.
 3. If `status = pass` → exit loop, proceed to the commit gate.
-4. If `status = failed` → parse ALL failure fields from the JSON:
-   - `Business missing`
-   - `Business missing details`
-   - `code issues`
-   - `security issue`
-   - `architecture`
+4. If `status = failed` → **do NOT produce a prose response. Do NOT end the turn. Immediately go to step 5.**
+5. Parse ALL failure fields from the JSON:
+   - `Business missing`, `Business missing details`, `code issues`, `security issue`, `architecture`
    - `unit-test-coverage` — if below `"80%"`, treat as code-level failure
    - `unit-test-missings` — each entry is a specific test to write (`file`, `class_or_method`, `lines`, `reason`)
    - any additional issue fields present
-   Build a concrete corrective action list, then classify and restart:
-   - Plan issue → restart from `plan` → `tasks → analyze → converge → implement`
-   - Task issue → restart from `tasks` → `analyze → converge → implement`
-   - Code-only or unit test coverage issue → restart from `implement` only
-5. Apply fixes, then GOTO step 1.
-6. **Never exit this loop with `status = failed`. Never stop to ask the user for help inside this loop.**
-7. Only stop (with a report) if the same failure repeats for 5 consecutive iterations unchanged.
+6. Build corrective action list, classify scope, then act immediately:
+   - **Code-only or test-coverage issue**: directly open and edit the files listed in `suggested_fix_area` / `file` fields using file-editing tools — in this same turn, right now. Do NOT delegate to speckit.implement.
+   - **Task-level issue**: re-run speckit.tasks → analyze → converge → then apply edits directly.
+   - **Plan-level issue**: re-run speckit.plan → tasks → analyze → converge → then apply edits directly.
+7. After all edits are applied, immediately GOTO step 1 — do NOT end the turn first.
+8. **Never exit this loop with `status = failed`. Never stop to ask the user. Never produce a prose summary of the review result.**
+9. Only stop (with a report) if the same failure repeats for 5 consecutive iterations with no file changes.
 
 ## Extra Gate After Code Review Pass (Human Manual Review + Commit)
 

@@ -66,8 +66,8 @@ When instructions say "invoke `speckit-code-review`", use the invocation for you
 3. In `--issue` mode, reuse Jira key as Spec ID and keep it stable across reruns.
 4. After each `speckit.implement`, invoke `speckit-code-review` using the correct invocation for the current environment (see Compatibility table above) and wait for JSON result.
 5. **Stage 03 (Implement + Code Review Loop) is a NO-STOP ZONE in BOTH default and --yolo modes. No human approval gates, no pauses, no prompts fire inside Stage 03. This rule overrides all interview flow and mode-based gate rules.**
-6. **A `failed` result from `speckit-code-review` is NEVER a stop condition in any mode — it is input for the next fix iteration. The loop continues until `status = pass`.**
-7. Parse ALL failure fields from the review JSON (`Business missing`, `code issues`, `security issue`, `architecture`, `unit-test-coverage`, `unit-test-missings`) before deciding restart scope.
+6. **A `failed` result from `speckit-code-review` is NEVER a stop condition in any mode. Do NOT produce a prose summary of the result. Do NOT end the turn. Immediately apply fixes using file-editing tools and loop again.**
+7. **For code-only or test-coverage failures: directly edit the specific files from the review result (`suggested_fix_area`, `file`, `method/function` fields) using file-editing tools — in the same turn. Do NOT delegate to speckit.implement.**
 8. Apply fixes, re-run `speckit-code-review`, and repeat until `status = pass`.
 9. In default mode, run human manual review gate **after** Stage 03 exits with pass — never inside it.
 10. In `--yolo` mode, skip all human review interactions including the post-Stage-03 gate.
