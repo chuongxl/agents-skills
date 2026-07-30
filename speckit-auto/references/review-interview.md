@@ -1,8 +1,14 @@
 # Review Interview Guide
 
-Use this guide after each stage (`specify`, `clarify`, `plan`, `tasks`, `analyze`, `converge`, `implement`) and for automatic `speckit-code-review` routing.
+Use this guide after each stage (`specify`, `clarify`, `plan`, `tasks`, `analyze`, `converge`).
 
-> **Mode note**: All interview sections apply to **default mode only**. In `--yolo` mode every human interaction is replaced by autonomous self-review (see "YOLO Mode Self-Review" section below).
+> ⚠️ **EXCEPTION — Stage 03 (Implement + Code Review Loop) is a NO-STOP ZONE.**
+> Do NOT run any interview flow, approval gate, or human prompt during Stage 03,
+> regardless of mode (default or --yolo). The loop runs fully autonomously until
+> `speckit-code-review` returns `status = pass`. This applies to every `implement`
+> call inside the loop, including restarts from plan/tasks/implement.
+
+> **Mode note**: Outside Stage 03, all interview sections apply to **default mode only**. In `--yolo` mode every human interaction outside Stage 03 is replaced by autonomous self-review (see "YOLO Mode Self-Review" section below).
 
 ## Intake Interview for Jira Issue Mode
 
@@ -30,8 +36,10 @@ Before starting the first pipeline step, automatically create and switch to a ne
 
 ## Automatic Code Review After Implement
 
-> **speckit-auto owns this loop. Do NOT stop after receiving a failed result.
-> The JSON from speckit-code-review is input to the next iteration, not a terminal event.**
+> ⚠️ **NO-STOP ZONE — both default mode and --yolo mode.**
+> No human approval gates. No "do you approve?" prompts. No pausing.
+> speckit-auto owns this loop entirely. The loop runs until `status = pass`.
+> A `failed` result in any mode means: fix and loop again — never stop and report.
 
 After each `implement` run, execute and maintain the following loop autonomously:
 
@@ -115,7 +123,8 @@ After each stage output is produced:
 
 ## Interview Flow
 
-**Default mode only.**
+**Default mode only. Applies to stages: `specify`, `clarify`, `plan`, `tasks`, `analyze`, `converge`.**
+**Does NOT apply during Stage 03 (implement + review loop) — see NO-STOP ZONE rule above.**
 
 1. Approval gate
    - Ask: "Do you approve the `<stage>` result?"

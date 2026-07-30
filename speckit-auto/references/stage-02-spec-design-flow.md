@@ -26,6 +26,10 @@ Load this only while executing stages:
 - **Default mode**: run post-stage interview and capture feedback/constraints.
 - **YOLO mode**: self-review stage output; if failed, rerun stage (max 2 retries).
 
+> ⚠️ These review behaviors apply **only to the stages in this file** (specify → converge).
+> They do NOT apply to `speckit.implement` or any stage run inside **Stage 03**.
+> Stage 03 is a NO-STOP ZONE — no interviews, no gates, no pauses in either mode.
+
 ## Restart Routing from Human Feedback (Default mode)
 
 - Requirement intent change -> restart from `speckit.specify`

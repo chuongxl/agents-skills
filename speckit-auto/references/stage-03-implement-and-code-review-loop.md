@@ -2,11 +2,18 @@
 
 Load this only when running `speckit.implement` and `speckit-code-review`.
 
-## CRITICAL: speckit-auto Owns This Loop
+## CRITICAL: speckit-auto Owns This Loop — NO STOPS, NO GATES
 
-`speckit-auto` MUST NOT stop, pause, or yield control after receiving a `speckit-code-review`
-result. The JSON result from `speckit-code-review` is an **input to the next iteration**,
-not a terminal event. Keep looping until `status = pass`.
+**This stage is a NO-STOP ZONE. The following are SUSPENDED for the entire duration of Stage 03, regardless of mode (default or --yolo):**
+- Human approval gates
+- Post-stage interview questions
+- "Do you approve?" prompts
+- Any pause waiting for human input
+- Any report-and-stop on failed result
+
+**The only valid exit from Stage 03 is `status = pass` from `speckit-code-review`.**
+A `failed` result is NOT a stop condition in any mode. It is the input for the next fix iteration.
+The agent MUST continue the loop autonomously until pass is received.
 
 ## How to Invoke speckit-code-review
 
