@@ -69,11 +69,14 @@ When instructions say "invoke `speckit-code-review`", use the invocation for you
 6. **A `failed` result from `speckit-code-review` is NEVER a stop condition in any mode. Do NOT produce a prose summary of the result. Do NOT end the turn. Immediately apply fixes using file-editing tools and loop again.**
 7. **For code-only or test-coverage failures: directly edit the specific files from the review result (`suggested_fix_area`, `file`, `method/function` fields) using file-editing tools — in the same turn. Do NOT delegate to speckit.implement.**
 8. Apply fixes, re-run `speckit-code-review`, and repeat until `status = pass`.
-9. In default mode, run human manual review gate **after** Stage 03 exits with pass — never inside it.
-10. In `--yolo` mode, skip all human review interactions including the post-Stage-03 gate.
-11. After successful implementation commit, mark active `spec.md` as `completed` and create follow-up commit for that status change.
-12. If any stage, status update, or required commit fails, stop and report exact failure.
-13. Only abort the review loop if the **exact same failure repeats for 5 consecutive iterations** with no code change — report the stuck state and stop.
+9. After Stage 03 exits with `pass`, routing is mandatory:
+   - default mode (`--yolo` not set): go to Stage 04
+   - `--yolo` mode: go to Stage 05
+10. In default mode, Stage 04 is mandatory and must never be skipped.
+11. In `--yolo` mode, skip all human review interactions including Stage 04.
+12. After successful implementation commit, mark active `spec.md` as `completed` and create follow-up commit for that status change.
+13. If any stage, status update, or required commit fails, stop and report exact failure.
+14. Only abort the review loop if the **exact same failure repeats for 5 consecutive iterations** with no code change — report the stuck state and stop.
 
 ## Output Behavior
 

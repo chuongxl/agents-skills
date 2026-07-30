@@ -15,6 +15,15 @@ Load this only when running `speckit.implement` and `speckit-code-review`.
 A `failed` result is NOT a stop condition in any mode. It is the input for the next fix iteration.
 The agent MUST continue the loop autonomously until pass is received.
 
+## Mandatory Exit Routing from Stage 03
+
+After the loop exits with `status = pass`, stage transition is deterministic:
+
+- If `--yolo` mode is enabled: jump to **Stage 05**.
+- If `--yolo` mode is NOT enabled (default mode): jump to **Stage 04**.
+
+In default mode, Stage 04 is mandatory and must never be skipped.
+
 ## How to Invoke speckit-code-review
 
 `speckit-code-review` is a sub-skill, not an agent or background task.
@@ -35,7 +44,9 @@ LOOP:
   STEP A — Run speckit.implement (or apply targeted fixes — see STEP G)
   STEP B — Invoke speckit-code-review; receive JSON result
   STEP C — Read result.status
-    IF status = "pass"  → EXIT LOOP → proceed to Stage 04 or 05
+    IF status = "pass"  → EXIT LOOP
+                           IF --yolo = true  → jump to Stage 05
+                           IF --yolo = false → jump to Stage 04 (mandatory)
     IF status = "failed" → IMMEDIATELY go to STEP D
                            DO NOT produce a prose summary to the user
                            DO NOT end the turn

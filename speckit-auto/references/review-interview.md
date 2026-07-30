@@ -45,7 +45,9 @@ After each `implement` run, execute and maintain the following loop autonomously
 
 1. Invoke `speckit-code-review` using the correct method for your environment (see compatibility table in SKILL.md).
 2. Receive and read the strict JSON result.
-3. If `status = pass` → exit loop, proceed to the commit gate.
+3. If `status = pass` → exit loop and route by mode:
+   - `--yolo` enabled → jump to Stage 05
+   - default mode (`--yolo` not enabled) → jump to Stage 04 (mandatory, never skip)
 4. If `status = failed` → **do NOT produce a prose response. Do NOT end the turn. Immediately go to step 5.**
 5. Parse the compact result fields:
    - `Business cover` — coverage percentage
