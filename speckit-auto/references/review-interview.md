@@ -47,15 +47,17 @@ After each `implement` run, execute and maintain the following loop autonomously
 2. Receive and read the strict JSON result.
 3. If `status = pass` → exit loop, proceed to the commit gate.
 4. If `status = failed` → **do NOT produce a prose response. Do NOT end the turn. Immediately go to step 5.**
-5. Parse ALL failure fields from the JSON:
-   - `Business missing`, `Business missing details`, `code issues`, `security issue`, `architecture`
-   - `unit-test-coverage` — if below `"80%"`, treat as code-level failure
-   - `unit-test-missings` — each entry is a specific test to write (`file`, `class_or_method`, `lines`, `reason`)
-   - any additional issue fields present
-6. Build corrective action list, classify scope, then act immediately:
-   - **Code-only or test-coverage issue**: directly open and edit the files listed in `suggested_fix_area` / `file` fields using file-editing tools — in this same turn, right now. Do NOT delegate to speckit.implement.
-   - **Task-level issue**: re-run speckit.tasks → analyze → converge → then apply edits directly.
-   - **Plan-level issue**: re-run speckit.plan → tasks → analyze → converge → then apply edits directly.
+5. Parse the compact result fields:
+   - `Business cover` — coverage percentage
+   - `unit-test-coverage` — if below `"80%"`, TEST-* fixes are required
+   - `detail_files` — map of category → file path; load only the category matching the fix you're working on:
+     `FR-*/NFR-*` → `detail_files["business-gap"]`, `ARCH-*` → `detail_files["architecture"]`,
+     `SEC-*` → `detail_files["security"]`, `CODE-*` → `detail_files["code-quality"]`, `TEST-*` → `detail_files["unit-tests"]`
+   - `fixes[]` — THIS is the actionable list; each entry: `id`, `file`, `method`, `lines`, `action`
+6. Group `fixes[]` by ID prefix to classify scope, then act immediately:
+   - **Only SEC-*/CODE-*/TEST-* entries**: directly open and edit the files listed — in this same turn, right now. Do NOT delegate to speckit.implement.
+   - **FR-*/NFR-* or ARCH-* entries present**: re-run speckit.tasks (or speckit.plan if architecture) → analyze → converge → then apply remaining edits directly.
+   - If a `fixes` entry `action` field is not specific enough, load `detail_file` and read that entry before editing.
 7. After all edits are applied, immediately GOTO step 1 — do NOT end the turn first.
 8. **Never exit this loop with `status = failed`. Never stop to ask the user. Never produce a prose summary of the review result.**
 9. Only stop (with a report) if the same failure repeats for 5 consecutive iterations with no file changes.

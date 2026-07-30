@@ -40,23 +40,30 @@ LOOP:
                            DO NOT produce a prose summary to the user
                            DO NOT end the turn
                            DO NOT ask the user what to do
-  STEP D — Parse ALL failure fields from JSON:
-    - Business missing
-    - Business missing details
-    - code issues
-    - security issue
-    - architecture
-    - unit-test-coverage  (if < "80%" → treat as code-level failure)
-    - unit-test-missings  (list of file/method/lines to add tests for)
-    - any other issue fields present
-  STEP E — Build corrective action list from parsed details:
-    - Use requirement_id, suggested_fix_area, file, method/function, line range
-    - For unit-test-missings: each entry = one targeted test to write
-  STEP F — Classify failure scope:
-    - Plan-level issue     → re-run speckit.plan, then tasks → analyze → converge → STEP A
-    - Task-level issue     → re-run speckit.tasks, then analyze → converge → STEP A
-    - Code-only issue      → go directly to STEP G (no sub-skill delegation needed)
-    - Unit test coverage   → go directly to STEP G, write tests per unit-test-missings
+  STEP D — Read compact result fields:
+    - `status` — already checked in STEP C
+    - `Business cover` — business coverage %
+    - `unit-test-coverage` — if < "80%" → all TEST-* fixes apply
+    - `detail_files` — map of category → file path (load only the category you need)
+    - `fixes[]` — flat list of actionable fix targets; THIS is what drives STEP E
+  STEP E — Build corrective action list directly from `fixes[]`:
+    - Each fix entry has: id, file, method, lines, action
+    - Group by ID prefix to classify scope:
+      - FR-*/NFR-* → business gap (may need plan/tasks restart)
+      - ARCH-* → architecture issue (may need plan restart)
+      - SEC-*/CODE-* → code-level fix (direct file edit)
+      - TEST-* → missing test (direct file edit)
+    - If `action` is unclear for an entry, load ONLY the matching category file from `detail_files`:
+      - FR-*/NFR-* entry → load `detail_files["business-gap"]`
+      - ARCH-* entry → load `detail_files["architecture"]`
+      - SEC-* entry → load `detail_files["security"]`
+      - CODE-* entry → load `detail_files["code-quality"]`
+      - TEST-* entry → load `detail_files["unit-tests"]`
+      Do NOT load a category file unless you actually need it for that specific fix.
+  STEP F — Classify and route:
+    - All fixes are FR-*/NFR-*/ARCH-*  → re-run speckit.plan then tasks → analyze → converge → STEP A
+    - Mix of FR-*/ARCH-* + SEC-*/CODE-*/TEST-* → re-run speckit.tasks → analyze → converge → STEP A
+    - Only SEC-*/CODE-*/TEST-* fixes → go directly to STEP G (no sub-skill needed)
   STEP G — Apply fixes DIRECTLY using file-editing tools (this turn, right now):
     For EACH item in corrective action list:
       1. Open the specific file listed in suggested_fix_area / file field

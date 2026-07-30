@@ -48,56 +48,87 @@ If spec path is not provided, resolve it by:
 
 ## Output Contract
 
-- Return exactly one JSON object and no extra text.
-- Always include required fields defined in this file.
+- Return exactly one **compact** JSON object inline (≤ 400 tokens).
+- Write full review details to a file: `.speckit/review-<spec-id>-<timestamp>.json`
+- The inline result contains only what speckit-auto needs to take immediate action.
 - Preserve field names exactly (including spaces and capitalization).
+
+## Two-Tier Output Strategy
+
+### Tier 1 — Compact Inline Result (returned directly)
+
+Contains only:
+- `status` — `pass` or `failed`
+- `Business cover` — percentage string
+- `unit-test-coverage` — percentage string or `"N/A"`
+- `detail_file` — path to the full detail file
+- `fixes` — flat array of actionable fix targets (one entry per issue, no nested objects)
+
+Each `fixes` entry has exactly 5 fields:
+- `id` — unique ID: `FR-001`, `NFR-002`, `ARCH-001`, `SEC-001`, `TEST-001`, `CODE-001`, etc.
+- `file` — relative file path
+- `method` — class::method or function name
+- `lines` — line range (e.g. `"88-140"`) or `"new"` for missing files
+- `action` — one-line imperative instruction: what to write/change/add
+
+`detail_files` map — keys are category names, values are paths to per-category detail files:
+- `"business-gap"` → `.speckit/review-<spec-id>-<ts>/business-gap.json` (FR-*/NFR-* detail)
+- `"architecture"` → `.speckit/review-<spec-id>-<ts>/architecture.json` (ARCH-* detail)
+- `"security"` → `.speckit/review-<spec-id>-<ts>/security.json` (SEC-* detail)
+- `"code-quality"` → `.speckit/review-<spec-id>-<ts>/code-quality.json` (CODE-* detail)
+- `"unit-tests"` → `.speckit/review-<spec-id>-<ts>/unit-tests.json` (TEST-* detail)
+
+Only include a category key in `detail_files` if that category has issues.
+
+### Tier 2 — Per-Category Detail Files (written to disk)
+
+Write one file per category under `.speckit/review-<spec-id>-<timestamp>/`:
+
+| Category | File | Contains fixes with IDs |
+|----------|------|------------------------|
+| Business Gap | `business-gap.json` | FR-*, NFR-* |
+| Architecture | `architecture.json` | ARCH-* |
+| Security | `security.json` | SEC-* |
+| Code Quality | `code-quality.json` | CODE-* |
+| Unit Tests | `unit-tests.json` | TEST-* |
+
+Each category file contains full details for its issues only:
+- Complete requirement checklist entries (business-gap)
+- Full architecture violation descriptions (architecture)
+- Full vulnerability details and OWASP references (security)
+- SonarQube results and complexity metrics (code-quality)
+- Full coverage gap analysis per method (unit-tests)
+
+speckit-auto loads only the category file it needs when a `fixes` entry `action` is insufficient context.
 
 ## Review Procedure (MUST FOLLOW)
 
-Execute all four review areas. Load the matching reference file before performing each area.
+Execute all areas. Load the matching reference file before performing each area.
 
-1. Parse `spec.md` into an explicit requirement checklist:
-   - business goals
-   - functional requirements (assign IDs: `FR-001...`)
-   - non-functional requirements (assign IDs: `NFR-001...`)
-   - acceptance criteria
-   - constraints/non-goals (if present)
+1. Parse `spec.md` into an explicit requirement checklist (FR-001..., NFR-001...).
 
-2. Use git to fetch and define review scope before analysis:
-   - inspect changed files from current branch/worktree (staged + unstaged)
-   - include renamed/moved files and deleted file impact
-   - use this git change set as the primary review scope
+2. Use git to define review scope: changed files from current branch/worktree (staged + unstaged).
 
-3. Execute each review area in order, loading its reference file:
-   - **Business Gap review** → load [references/business-gap.md](references/business-gap.md)
-   - **Code Quality review** (including conditional SonarQube MCP scan) → load [references/code-quality.md](references/code-quality.md)
-   - **Security review** → load [references/security.md](references/security.md)
-   - **Architecture review** → load [references/architecture.md](references/architecture.md)
-   - **Unit Test Coverage** (LAST step) → load [references/unit-test-coverage.md](references/unit-test-coverage.md)
+3. Execute each review area, loading its reference file:
+   - **Business Gap** → load [references/business-gap.md](references/business-gap.md)
+   - **Code Quality** (including conditional SonarQube MCP scan) → load [references/code-quality.md](references/code-quality.md)
+   - **Security** → load [references/security.md](references/security.md)
+   - **Architecture** → load [references/architecture.md](references/architecture.md)
+   - **Unit Test Coverage** (last) → load [references/unit-test-coverage.md](references/unit-test-coverage.md)
 
-4. Compute business coverage:
-   - `Business cover = (covered requirements / total requirements) * 100`
-   - Round to whole percent and format as string with `%`
+4. Compute `Business cover = (covered / total) * 100`, round to whole percent.
 
-5. Assign severity to each issue:
-   - `high` — blocks release: security vulnerability, data loss, missing/conflicting business requirement, crash, broken core functionality
-   - `medium` — should fix: performance degradation, maintainability risk, incomplete error handling
-   - `low` — nice to fix: style, minor refactor, documentation
+5. Write ALL findings to the full detail file at `.speckit/review-<spec-id>-<timestamp>.json`.
 
-6. Decide status:
-   - `pass` only when **every** result category has zero issues
-   - Required pass conditions:
-     - `Business missing` is `[]`
-     - `Business missing details` is `[]`
-     - `architecture` is `[]`
-     - `code issue` is `"none"`
-     - `security issue` is `"none"`
-     - `unit-test-coverage` is ≥ `80%` (or `"N/A"` when no test runner is detected)
-   - If any issue exists in any category, or unit test coverage is below 80%, status must be `failed`
+6. Build compact `fixes` array from findings: one entry per issue, most critical first (high severity → medium → low).
+
+7. Decide status:
+   - `pass` only when `fixes` array is empty AND `unit-test-coverage` ≥ 80%
+   - `failed` if any issue exists or coverage < 80%
 
 ## Output Format (STRICT JSON ONLY)
 
-Return only one JSON object. No markdown. No explanation outside JSON.
+Return only one compact JSON object. No markdown. No explanation outside JSON.
 
 ### Pass Example
 
@@ -105,19 +136,9 @@ Return only one JSON object. No markdown. No explanation outside JSON.
 {
   "status": "pass",
   "Business cover": "100%",
-  "requirements checklist summary": {
-    "functional_total": 12,
-    "non_functional_total": 6,
-    "covered": 18,
-    "missing_or_conflicting": 0
-  },
-  "Business missing": [],
-  "Business missing details": [],
-  "architecture": [],
-  "code issue": "none",
-  "security issue": "none",
   "unit-test-coverage": "87.5%",
-  "unit-test-missings": []
+  "detail_files": {},
+  "fixes": []
 }
 ```
 
@@ -127,59 +148,18 @@ Return only one JSON object. No markdown. No explanation outside JSON.
 {
   "status": "failed",
   "Business cover": "70%",
-  "requirements checklist summary": {
-    "functional_total": 12,
-    "non_functional_total": 6,
-    "covered": 13,
-    "missing_or_conflicting": 5
-  },
-  "Business missing": {
-    "001": "Missing validate password length when creating a new account",
-    "002": "Using the same salt for all users; each user must have a different salt"
-  },
-  "Business missing details": [
-    {
-      "requirement_id": "FR-004",
-      "missing_behavior": "Validate password minimum length during account creation",
-      "suggested_fix_area": "src/account/service.ts::createAccount (lines 88-140)",
-      "why_missing": "Method stores password hash without length validation branch"
-    },
-    {
-      "requirement_id": "NFR-002",
-      "missing_behavior": "Generate unique salt per user",
-      "suggested_fix_area": "src/security/password.ts::hashPassword (lines 12-42)",
-      "why_missing": "Static/shared salt is reused for all users"
-    }
-  ],
-  "architecture": [
-    {
-      "Dependency issue": "Domain layer depends on infrastructure layer, violating clean architecture boundaries"
-    }
-  ],
-  "code issues": [
-    {
-      "n+1 query": "Detected repeated query pattern in account list flow"
-    }
-  ],
-  "security issue": [
-    {
-      "password rule": "The password policy is not strong enough"
-    }
-  ],
   "unit-test-coverage": "61.2%",
-  "unit-test-missings": [
-    {
-      "file": "src/account/service.ts",
-      "class_or_method": "AccountService::createAccount",
-      "lines": "88-120",
-      "reason": "No test covers password validation failure path"
-    },
-    {
-      "file": "src/security/password.ts",
-      "class_or_method": "hashPassword",
-      "lines": "12-42",
-      "reason": "Salt uniqueness per user is not tested"
-    }
+  "detail_files": {
+    "business-gap": ".speckit/review-010-1722348000/business-gap.json",
+    "security": ".speckit/review-010-1722348000/security.json",
+    "unit-tests": ".speckit/review-010-1722348000/unit-tests.json"
+  },
+  "fixes": [
+    {"id": "FR-004", "file": "src/account/service.ts", "method": "AccountService::createAccount", "lines": "88-140", "action": "Add password minimum-length validation (≥8 chars) before calling hashPassword"},
+    {"id": "NFR-002", "file": "src/security/password.ts", "method": "hashPassword", "lines": "12-42", "action": "Generate a unique random salt per call using crypto.randomBytes(16) instead of static salt"},
+    {"id": "SEC-001", "file": "src/auth/password.ts", "method": "validatePassword", "lines": "5-20", "action": "Enforce min 12 chars, 1 uppercase, 1 digit, 1 symbol in password policy"},
+    {"id": "TEST-001", "file": "src/account/service.spec.ts", "method": "AccountService::createAccount", "lines": "new", "action": "Add test case: password shorter than 8 chars should throw ValidationException"},
+    {"id": "TEST-002", "file": "src/security/password.spec.ts", "method": "hashPassword", "lines": "new", "action": "Add test: two calls with same input must produce different salts"}
   ]
 }
 ```
@@ -187,29 +167,20 @@ Return only one JSON object. No markdown. No explanation outside JSON.
 ## Field Rules
 
 - `status`: `pass` or `failed`
-  - `pass` only when every result category is clean (no issues at all)
-  - if any category has one or more issues, status must be `failed`
-- `Business cover`: string percentage (`"0%"` to `"100%"`)
-- `requirements checklist summary`:
-  - required in both pass and failed
-  - must include `functional_total`, `non_functional_total`, `covered`, `missing_or_conflicting`
-- `Business missing`: `[]` when pass; numbered object when failed (`"001"`, `"002"`, ...)
-- `Business missing details`:
-  - `[]` when pass; required array when failed
-  - each item: `requirement_id`, `missing_behavior`, `suggested_fix_area`, `why_missing`
-- `architecture`: required in both; `[]` when clean; array of issue objects when failed
-- `code issue`: `"none"` when pass; omit in failed and use `code issues` array
-- `code issues`: present in failed mode (`[]` if no code issue but failed for other reasons)
-- `security issue`: `"none"` when pass; array of issue objects when failed
-- `unit-test-coverage`: string percentage (e.g. `"87.5%"`) or `"N/A (no test runner detected)"`
-  - if < 80%, status must be `failed`
-  - `"N/A"` is treated as passing (no test runner available to enforce threshold)
-- `unit-test-missings`: `[]` when coverage ≥ 80%; array of uncovered items when < 80%
-  - each item: `file`, `class_or_method`, `lines`, `reason`
+- `Business cover`: string percentage `"0%"` to `"100%"`
+- `unit-test-coverage`: string percentage or `"N/A (no test runner detected)"` — `"N/A"` is treated as passing
+- `detail_files`: object map — `{}` when pass; only include keys for categories with issues
+  - Keys: `"business-gap"`, `"architecture"`, `"security"`, `"code-quality"`, `"unit-tests"`
+  - Values: relative path to that category's detail file
+- `fixes`: `[]` when pass; array when failed — each item must have `id`, `file`, `method`, `lines`, `action`
+  - `action` is a single imperative sentence — no multi-line, no sub-bullets
+  - `lines: "new"` means the file or method does not exist yet and must be created
+  - ID prefix maps to detail category: `FR-*/NFR-*` → business-gap, `ARCH-*` → architecture, `SEC-*` → security, `CODE-*` → code-quality, `TEST-*` → unit-tests
 
 ## Quality Bar
 
-- Do not claim `pass` if any issue exists in any reviewed category.
-- Do not claim `pass` if `unit-test-coverage` is below 80%.
-- Prefer `failed` when evidence is incomplete or ambiguous.
-- Every failed item must be specific and actionable.
+- Inline result MUST stay under 400 tokens. All verbose detail goes into per-category files.
+- Do not claim `pass` if `fixes` is non-empty or coverage < 80%.
+- Every `fixes` entry must be specific enough for an agent to act on without reading a detail file.
+- Write category detail files only for categories that have issues; skip empty categories.
+- On `pass`, write no detail files (`detail_files: {}`) — nothing to fix, no file needed.
