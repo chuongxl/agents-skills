@@ -2,6 +2,12 @@
 
 Load this only when running `speckit.implement` and `speckit-code-review`.
 
+## Source of Implement Skill (Required)
+
+`speckit.implement` in this stage must use the repository-installed GitHub Speckit skill
+from the current repo (`.github/agents/speckit.implement.agent.md` with
+`.github/prompts/speckit.implement.prompt.md`), not a global/fallback variant.
+
 ## CRITICAL: speckit-auto Owns This Loop — NO STOPS, NO GATES
 
 **This stage is a NO-STOP ZONE. The following are SUSPENDED for the entire duration of Stage 03, regardless of mode (default or --yolo):**
@@ -86,8 +92,8 @@ LOOP:
       Do NOT load a category file unless you actually need it for that specific fix.
     - If the current retry loop is already holding too much context, discard prior review prose and rely on `state_file` + the one category file you need for the next fix.
   STEP F — Classify and route:
-    - All fixes are FR-*/NFR-*/ARCH-*  → re-run speckit.plan then tasks → analyze → converge → STEP A
-    - Mix of FR-*/ARCH-* + SEC-*/CODE-*/TEST-* → re-run speckit.tasks → analyze → converge → STEP A
+    - All fixes are FR-*/NFR-*/ARCH-*  → re-run repo `speckit.plan` then repo `speckit.tasks` → repo `speckit.analyze` → repo `speckit.converge` → STEP A
+    - Mix of FR-*/ARCH-* + SEC-*/CODE-*/TEST-* → re-run repo `speckit.tasks` → repo `speckit.analyze` → repo `speckit.converge` → STEP A
     - Only SEC-*/CODE-*/TEST-* fixes → go directly to STEP G (no sub-skill needed)
   STEP G — Apply fixes DIRECTLY using file-editing tools (this turn, right now):
     For EACH item in corrective action list:
@@ -112,6 +118,7 @@ LOOP:
 - speckit-auto NEVER ends a turn after receiving a failed review — the next action after a failed review is always file edits, not a response
 - speckit-auto NEVER retains full failed-review text across retries; keep only `state_file`, the top `fixes[]`, and the one category file needed for the current fix
 - speckit-auto NEVER delegates to speckit.implement for code-only or test-coverage failures — use file-editing tools directly
+- whenever Stage 03 invokes Speckit stages (`speckit.implement`, `speckit.plan`, `speckit.tasks`, `speckit.analyze`, `speckit.converge`), use the repository-installed GitHub Speckit skills only
 - speckit-auto NEVER stops and reports unless:
   - The same failure repeats for **5 consecutive iterations** with no file changes
   - A git or filesystem error prevents code from being written

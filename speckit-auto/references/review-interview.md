@@ -2,6 +2,9 @@
 
 Use this guide after each stage (`specify`, `clarify`, `plan`, `tasks`, `analyze`, `converge`).
 
+All Speckit stages referenced in this guide must use repository-installed GitHub Speckit skills
+from the current repo (`.github/agents/` + `.github/prompts/`), not global/fallback variants.
+
 > ⚠️ **EXCEPTION — Stage 03 (Implement + Code Review Loop) is a NO-STOP ZONE.**
 > Do NOT run any interview flow, approval gate, or human prompt during Stage 03,
 > regardless of mode (default or --yolo). The loop runs fully autonomously until
@@ -59,7 +62,7 @@ After each `implement` run, execute and maintain the following loop autonomously
    - after parsing, discard the verbose failed-review body and start the next retry from a fresh minimal prompt built from `state_file` + `fixes[]`
 6. Group `fixes[]` by ID prefix to classify scope, then act immediately:
    - **Only SEC-*/CODE-*/TEST-* entries**: directly open and edit the files listed — in this same turn, right now. Do NOT delegate to speckit.implement.
-   - **FR-*/NFR-* or ARCH-* entries present**: re-run speckit.tasks (or speckit.plan if architecture) → analyze → converge → then apply remaining edits directly.
+   - **FR-*/NFR-* or ARCH-* entries present**: re-run repo speckit.tasks (or repo speckit.plan if architecture) → repo speckit.analyze → repo speckit.converge → then apply remaining edits directly.
    - If a `fixes` entry `action` field is not specific enough, load the matching category file from `detail_files` and read that entry before editing.
 7. After all edits are applied, immediately GOTO step 1 — do NOT end the turn first.
 8. **Never exit this loop with `status = failed`. Never stop to ask the user. Never produce a prose summary of the review result.**

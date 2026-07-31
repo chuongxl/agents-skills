@@ -25,10 +25,12 @@ Load this only in default mode after `speckit-code-review` returns `pass`.
 
 1. Collect detailed human feedback.
 2. Route restart:
-   - requirement change -> `speckit.specify`
-   - solution change -> `speckit.plan`
-   - task/detail change -> `speckit.tasks`
-   - code-only change -> `speckit.implement`
+   - requirement change -> repo `speckit.specify`
+   - solution change -> repo `speckit.plan`
+   - task/detail change -> repo `speckit.tasks`
+   - code-only change -> repo `speckit.implement`
 3. Apply fixes.
 4. If code changed, invoke `speckit-code-review` again until `pass`.
 5. Return to this gate and repeat until approved.
+
+All Speckit stages above must use the repository-installed GitHub Speckit skills from this repo (`.github/agents/` + `.github/prompts/`), not global/fallback variants.

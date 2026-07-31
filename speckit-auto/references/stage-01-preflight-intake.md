@@ -15,6 +15,31 @@ Load this only when starting the pipeline.
    - Jira mode: include Jira key
    - non-Jira mode: include requirement slug + timestamp
 
+## Preflight Speckit Skill Source Check (Required)
+
+Before Stage 02 or Stage 03 starts, verify repository-installed Speckit skills exist:
+
+- `.github/agents/speckit.specify.agent.md`
+- `.github/agents/speckit.clarify.agent.md`
+- `.github/agents/speckit.plan.agent.md`
+- `.github/agents/speckit.tasks.agent.md`
+- `.github/agents/speckit.analyze.agent.md`
+- `.github/agents/speckit.converge.agent.md`
+- `.github/agents/speckit.implement.agent.md`
+
+And matching prompt files:
+
+- `.github/prompts/speckit.specify.prompt.md`
+- `.github/prompts/speckit.clarify.prompt.md`
+- `.github/prompts/speckit.plan.prompt.md`
+- `.github/prompts/speckit.tasks.prompt.md`
+- `.github/prompts/speckit.analyze.prompt.md`
+- `.github/prompts/speckit.converge.prompt.md`
+- `.github/prompts/speckit.implement.prompt.md`
+
+If any required file is missing, stop and report the missing path(s).
+Do not continue with global/fallback Speckit skills.
+
 ## Intake Mode Selection
 
 - If command includes `--issue`, run Jira intake.

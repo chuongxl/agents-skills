@@ -3,6 +3,19 @@
 Load this only while executing stages:
 `speckit.specify -> speckit.clarify -> speckit.plan -> speckit.tasks -> speckit.analyze -> speckit.converge`
 
+## Source of Stage Skills (Required)
+
+All stages in this file must use the repository-installed GitHub Speckit skills
+from the current repo (`.github/agents/` + `.github/prompts/`).
+
+Do not use global Speckit variants for:
+- `speckit.specify`
+- `speckit.clarify`
+- `speckit.plan`
+- `speckit.tasks`
+- `speckit.analyze`
+- `speckit.converge`
+
 ## Stage Order (must not skip)
 
 1. `speckit.specify`
