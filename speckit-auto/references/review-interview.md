@@ -40,7 +40,6 @@ Before starting the first pipeline step, automatically create and switch to a ne
 > No human approval gates. No "do you approve?" prompts. No pausing.
 > speckit-auto owns this loop entirely. The loop runs until `status = pass`.
 > A `failed` result in any mode means: fix and loop again — never stop and report.
-
 After each `implement` run, execute and maintain the following loop autonomously:
 
 1. Invoke `speckit-code-review` using the correct method for your environment (see compatibility table in SKILL.md).
@@ -52,6 +51,7 @@ After each `implement` run, execute and maintain the following loop autonomously
 5. Parse the compact result fields:
    - `Business cover` — coverage percentage
    - `unit-test-coverage` — if below `"80%"`, TEST-* fixes are required
+   - `state_file` — keep this path and discard the rest of the failed-review body after applying fixes
    - `detail_files` — map of category → file path; load only the category matching the fix you're working on:
      `FR-*/NFR-*` → `detail_files["business-gap"]`, `ARCH-*` → `detail_files["architecture"]`,
      `SEC-*` → `detail_files["security"]`, `CODE-*` → `detail_files["code-quality"]`, `TEST-*` → `detail_files["unit-tests"]`
@@ -59,10 +59,11 @@ After each `implement` run, execute and maintain the following loop autonomously
 6. Group `fixes[]` by ID prefix to classify scope, then act immediately:
    - **Only SEC-*/CODE-*/TEST-* entries**: directly open and edit the files listed — in this same turn, right now. Do NOT delegate to speckit.implement.
    - **FR-*/NFR-* or ARCH-* entries present**: re-run speckit.tasks (or speckit.plan if architecture) → analyze → converge → then apply remaining edits directly.
-   - If a `fixes` entry `action` field is not specific enough, load `detail_file` and read that entry before editing.
+   - If a `fixes` entry `action` field is not specific enough, load the matching category file from `detail_files` and read that entry before editing.
 7. After all edits are applied, immediately GOTO step 1 — do NOT end the turn first.
 8. **Never exit this loop with `status = failed`. Never stop to ask the user. Never produce a prose summary of the review result.**
 9. Only stop (with a report) if the same failure repeats for 5 consecutive iterations with no file changes.
+10. Keep the retry context minimal: use `state_file` for continuity, `fixes[]` for the next action, and do not preserve the full failed review text between retries.
 
 ## Extra Gate After Code Review Pass (Human Manual Review + Commit)
 

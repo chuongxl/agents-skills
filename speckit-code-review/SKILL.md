@@ -61,8 +61,8 @@ Contains only:
 - `status` — `pass` or `failed`
 - `Business cover` — percentage string
 - `unit-test-coverage` — percentage string or `"N/A"`
-- `detail_file` — path to the full detail file
-- `fixes` — flat array of actionable fix targets (one entry per issue, no nested objects)
+- `state_file` — path to the resumable state file
+- `fixes` — flat array of actionable fix targets (limit to the top 3 most critical items)
 
 Each `fixes` entry has exactly 5 fields:
 - `id` — unique ID: `FR-001`, `NFR-002`, `ARCH-001`, `SEC-001`, `TEST-001`, `CODE-001`, etc.
@@ -79,6 +79,11 @@ Each `fixes` entry has exactly 5 fields:
 - `"unit-tests"` → `.speckit/review-<spec-id>-<ts>/unit-tests.json` (TEST-* detail)
 
 Only include a category key in `detail_files` if that category has issues.
+
+`state_file`:
+- `.speckit/review-<spec-id>-<ts>/state.json`
+- Contains the ordered issue inventory and the next fix queue
+- Used by speckit-auto to resume without reloading verbose findings
 
 ### Tier 2 — Per-Category Detail Files (written to disk)
 
@@ -118,9 +123,9 @@ Execute all areas. Load the matching reference file before performing each area.
 
 4. Compute `Business cover = (covered / total) * 100`, round to whole percent.
 
-5. Write ALL findings to the full detail file at `.speckit/review-<spec-id>-<timestamp>.json`.
+5. Write ALL findings to per-category detail files and `state_file`.
 
-6. Build compact `fixes` array from findings: one entry per issue, most critical first (high severity → medium → low).
+6. Build compact `fixes` array from findings: include only the top 3 most critical actionable items (high severity → medium → low).
 
 7. Decide status:
    - `pass` only when `fixes` array is empty AND `unit-test-coverage` ≥ 80%
@@ -137,6 +142,7 @@ Return only one compact JSON object. No markdown. No explanation outside JSON.
   "status": "pass",
   "Business cover": "100%",
   "unit-test-coverage": "87.5%",
+  "state_file": ".speckit/review-010-1722348000/state.json",
   "detail_files": {},
   "fixes": []
 }
@@ -149,6 +155,7 @@ Return only one compact JSON object. No markdown. No explanation outside JSON.
   "status": "failed",
   "Business cover": "70%",
   "unit-test-coverage": "61.2%",
+  "state_file": ".speckit/review-010-1722348000/state.json",
   "detail_files": {
     "business-gap": ".speckit/review-010-1722348000/business-gap.json",
     "security": ".speckit/review-010-1722348000/security.json",
@@ -156,10 +163,8 @@ Return only one compact JSON object. No markdown. No explanation outside JSON.
   },
   "fixes": [
     {"id": "FR-004", "file": "src/account/service.ts", "method": "AccountService::createAccount", "lines": "88-140", "action": "Add password minimum-length validation (≥8 chars) before calling hashPassword"},
-    {"id": "NFR-002", "file": "src/security/password.ts", "method": "hashPassword", "lines": "12-42", "action": "Generate a unique random salt per call using crypto.randomBytes(16) instead of static salt"},
-    {"id": "SEC-001", "file": "src/auth/password.ts", "method": "validatePassword", "lines": "5-20", "action": "Enforce min 12 chars, 1 uppercase, 1 digit, 1 symbol in password policy"},
     {"id": "TEST-001", "file": "src/account/service.spec.ts", "method": "AccountService::createAccount", "lines": "new", "action": "Add test case: password shorter than 8 chars should throw ValidationException"},
-    {"id": "TEST-002", "file": "src/security/password.spec.ts", "method": "hashPassword", "lines": "new", "action": "Add test: two calls with same input must produce different salts"}
+    {"id": "SEC-001", "file": "src/auth/password.ts", "method": "validatePassword", "lines": "5-20", "action": "Enforce min 12 chars, 1 uppercase, 1 digit, 1 symbol in password policy"}
   ]
 }
 ```
@@ -169,6 +174,7 @@ Return only one compact JSON object. No markdown. No explanation outside JSON.
 - `status`: `pass` or `failed`
 - `Business cover`: string percentage `"0%"` to `"100%"`
 - `unit-test-coverage`: string percentage or `"N/A (no test runner detected)"` — `"N/A"` is treated as passing
+- `state_file`: path to the resumable state file; always include in both pass and failed results
 - `detail_files`: object map — `{}` when pass; only include keys for categories with issues
   - Keys: `"business-gap"`, `"architecture"`, `"security"`, `"code-quality"`, `"unit-tests"`
   - Values: relative path to that category's detail file
@@ -176,10 +182,11 @@ Return only one compact JSON object. No markdown. No explanation outside JSON.
   - `action` is a single imperative sentence — no multi-line, no sub-bullets
   - `lines: "new"` means the file or method does not exist yet and must be created
   - ID prefix maps to detail category: `FR-*/NFR-*` → business-gap, `ARCH-*` → architecture, `SEC-*` → security, `CODE-*` → code-quality, `TEST-*` → unit-tests
+  - cap the inline array at 3 items; write the rest to `state_file` and category files
 
 ## Quality Bar
 
-- Inline result MUST stay under 400 tokens. All verbose detail goes into per-category files.
+- Inline result MUST stay under 400 tokens. All verbose detail goes into per-category files and `state_file`.
 - Do not claim `pass` if `fixes` is non-empty or coverage < 80%.
 - Every `fixes` entry must be specific enough for an agent to act on without reading a detail file.
 - Write category detail files only for categories that have issues; skip empty categories.

@@ -37,6 +37,14 @@ Use the invocation appropriate for your environment:
 
 Never launch it as a background agent or task process — it must run inline and return JSON directly.
 
+## Compact Mode
+
+Always keep the review loop on compact payloads:
+
+- retain only `state_file`, the top `fixes[]`, and the one category file needed for the next fix
+- never rehydrate verbose failed-review prose into the loop context
+- if the current tool supports a compact command or command alias, prefer that form; otherwise use the compact JSON/state-file contract above
+
 ## Loop Algorithm (speckit-auto executes this — do not exit until DONE)
 
 ```
@@ -55,6 +63,7 @@ LOOP:
     - `status` — already checked in STEP C
     - `Business cover` — business coverage %
     - `unit-test-coverage` — if < "80%" → all TEST-* fixes apply
+    - `state_file` — resumable state; use this to resume without reloading the full review body
     - `detail_files` — map of category → file path (load only the category you need)
     - `fixes[]` — flat list of actionable fix targets; THIS is what drives STEP E
   STEP E — Build corrective action list directly from `fixes[]`:
@@ -71,6 +80,7 @@ LOOP:
       - CODE-* entry → load `detail_files["code-quality"]`
       - TEST-* entry → load `detail_files["unit-tests"]`
       Do NOT load a category file unless you actually need it for that specific fix.
+    - If the current retry loop is already holding too much context, discard prior review prose and rely on `state_file` + the one category file you need for the next fix.
   STEP F — Classify and route:
     - All fixes are FR-*/NFR-*/ARCH-*  → re-run speckit.plan then tasks → analyze → converge → STEP A
     - Mix of FR-*/ARCH-* + SEC-*/CODE-*/TEST-* → re-run speckit.tasks → analyze → converge → STEP A
@@ -96,6 +106,7 @@ LOOP:
 - speckit-auto NEVER asks the user for help during this loop
 - speckit-auto NEVER produces a prose summary of the review result — the review result is data to act on, not a message to report
 - speckit-auto NEVER ends a turn after receiving a failed review — the next action after a failed review is always file edits, not a response
+- speckit-auto NEVER retains full failed-review text across retries; keep only `state_file`, the top `fixes[]`, and the one category file needed for the current fix
 - speckit-auto NEVER delegates to speckit.implement for code-only or test-coverage failures — use file-editing tools directly
 - speckit-auto NEVER stops and reports unless:
   - The same failure repeats for **5 consecutive iterations** with no file changes
