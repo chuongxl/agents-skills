@@ -77,6 +77,7 @@ When instructions say "invoke `speckit-code-review`", use the invocation for you
 12. After successful implementation commit, mark active `spec.md` as `completed` and create follow-up commit for that status change.
 13. If any stage, status update, or required commit fails, stop and report exact failure.
 14. Only abort the review loop if the **exact same failure repeats for 5 consecutive iterations** with no code change — report the stuck state and stop.
+15. On every failed review retry, rebuild the loop context from `state_file` plus the current `fixes[]` only; do not retain the full prior review body or any earlier category detail files unless they are needed for the next fix.
 
 ## Output Behavior
 

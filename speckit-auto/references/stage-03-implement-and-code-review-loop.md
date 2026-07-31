@@ -44,6 +44,9 @@ Always keep the review loop on compact payloads:
 - retain only `state_file`, the top `fixes[]`, and the one category file needed for the next fix
 - never rehydrate verbose failed-review prose into the loop context
 - if the current tool supports a compact command or command alias, prefer that form; otherwise use the compact JSON/state-file contract above
+- before each retry, rebuild the working context from the latest `state_file` instead of appending prior failed-review output
+- if the next action is unclear, load only one matching `detail_files` category and then discard it again after the fix is applied
+- never carry more than one failed review payload forward; each retry starts from a fresh minimal context snapshot
 
 ## Loop Algorithm (speckit-auto executes this — do not exit until DONE)
 
@@ -66,6 +69,7 @@ LOOP:
     - `state_file` — resumable state; use this to resume without reloading the full review body
     - `detail_files` — map of category → file path (load only the category you need)
     - `fixes[]` — flat list of actionable fix targets; THIS is what drives STEP E
+    - after reading these fields, drop the rest of the failed review body from memory and rebuild the next attempt from `state_file`
   STEP E — Build corrective action list directly from `fixes[]`:
     - Each fix entry has: id, file, method, lines, action
     - Group by ID prefix to classify scope:

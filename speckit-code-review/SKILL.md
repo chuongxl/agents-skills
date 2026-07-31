@@ -52,6 +52,7 @@ If spec path is not provided, resolve it by:
 - Write full review details to a file: `.speckit/review-<spec-id>-<timestamp>.json`
 - The inline result contains only what speckit-auto needs to take immediate action.
 - Preserve field names exactly (including spaces and capitalization).
+- Keep the inline payload small enough to be retried safely; never mirror the verbose findings in the inline JSON when the detail files already contain them.
 
 ## Two-Tier Output Strategy
 

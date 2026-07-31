@@ -56,6 +56,7 @@ After each `implement` run, execute and maintain the following loop autonomously
      `FR-*/NFR-*` → `detail_files["business-gap"]`, `ARCH-*` → `detail_files["architecture"]`,
      `SEC-*` → `detail_files["security"]`, `CODE-*` → `detail_files["code-quality"]`, `TEST-*` → `detail_files["unit-tests"]`
    - `fixes[]` — THIS is the actionable list; each entry: `id`, `file`, `method`, `lines`, `action`
+   - after parsing, discard the verbose failed-review body and start the next retry from a fresh minimal prompt built from `state_file` + `fixes[]`
 6. Group `fixes[]` by ID prefix to classify scope, then act immediately:
    - **Only SEC-*/CODE-*/TEST-* entries**: directly open and edit the files listed — in this same turn, right now. Do NOT delegate to speckit.implement.
    - **FR-*/NFR-* or ARCH-* entries present**: re-run speckit.tasks (or speckit.plan if architecture) → analyze → converge → then apply remaining edits directly.
@@ -64,6 +65,7 @@ After each `implement` run, execute and maintain the following loop autonomously
 8. **Never exit this loop with `status = failed`. Never stop to ask the user. Never produce a prose summary of the review result.**
 9. Only stop (with a report) if the same failure repeats for 5 consecutive iterations with no file changes.
 10. Keep the retry context minimal: use `state_file` for continuity, `fixes[]` for the next action, and do not preserve the full failed review text between retries.
+11. On each retry, rebuild the loop context from scratch; never append the previous failed review text or the full prior JSON result.
 
 ## Extra Gate After Code Review Pass (Human Manual Review + Commit)
 
