@@ -26,10 +26,16 @@ Load only the stage reference needed for the current step.
 
 - Requirement text, or Jira issue link via `--issue {jira link}`
 - Repo with Spec Kit templates
-- Jira credentials in root `.env` when using `--issue`:
+- Jira credentials in root `.env` when using `--issue` (consumed by `jira-to-speckit`):
   - `JIRA_URL`
   - `JIRA_USERNAME`
   - `JIRA_API_TOKEN`
+
+## Jira Intake Dependency
+
+When `--issue` is provided, Jira fetch and compaction is delegated to the **`jira-to-speckit`** skill.
+`speckit-auto` invokes it for steps 1–5 only (fetch + compact brief) and then owns the rest of
+the pipeline. If `jira-to-speckit` is not available, a direct REST API fallback is used (see Stage 01).
 
 ## Required Skill Source (Repository-Installed Speckit)
 

@@ -71,22 +71,74 @@ continues normally without it. Do not block or stop Stage 02 when guidelines are
 
 ## Intake Mode Selection
 
-- If command includes `--issue`, run Jira intake.
+- If command includes `--issue`, run Jira intake via `jira-to-speckit` skill (see below).
 - Otherwise skip Jira intake and start at `speckit.specify` with user requirement text.
 
-## Jira Intake (`--issue`)
+## Jira Intake (`--issue`) — Delegate to jira-to-speckit
 
-1. Parse issue key from URL.
+**Do NOT fetch or parse Jira manually.** Delegate the entire Jira fetch + compaction step to the
+`jira-to-speckit` skill, which handles credentials, ADF normalisation, size truncation, and brief
+compaction correctly.
+
+### Invocation
+
+Invoke `jira-to-speckit` using the method for the current environment:
+
+| Environment | Invocation |
+|-------------|-----------|
+| GitHub Copilot CLI | `skill` tool with name `jira-to-speckit` |
+| Claude Code | `/jira-to-speckit` slash command |
+| OpenCode | `/jira-to-speckit` or `@jira-to-speckit` |
+
+Pass the Jira URL as the input.
+
+### Scope Constraint (Critical)
+
+`jira-to-speckit` is an orchestrator with its own full pipeline. **speckit-auto must override that.**
+
+When invoking `jira-to-speckit`, explicitly instruct it to:
+> "Perform only the Jira fetch and compaction steps (steps 1–5 of your workflow).
+> Produce the compact brief and Jira key. Do NOT run speckit.specify, speckit.plan,
+> speckit.tasks, or any other Speckit stage. speckit-auto will own the rest of the pipeline."
+
+### Extract from jira-to-speckit Output
+
+After `jira-to-speckit` returns its compact output, extract:
+
+| Field | Where to find it | Used for |
+|-------|-----------------|---------|
+| `Jira issue key` | `Jira issue key:` line | Spec ID (reuse as-is, e.g. `FCM-13708`) |
+| `Compact brief` | `Compact brief:` section | Input to `speckit.specify` |
+| `Open questions` | `Open questions:` list | Seed for `speckit.clarify` |
+| `Truncation note` | `Truncation note:` line | Log for context awareness |
+
+### Spec ID and Feature Folder
+
+Use the Jira key directly as the Spec ID — do **not** adopt `jira-to-speckit`'s `US-`/`Task-` prefix:
+
+- Spec ID = Jira key (e.g. `FCM-13708`)
+- Feature folder = `specs/<JIRA-KEY>-<summary-slug>/` (e.g. `specs/FCM-13708-reduce-dar-review-time/`)
+
+This naming is stable across reruns.
+
+### Fallback — jira-to-speckit Not Available
+
+If the `jira-to-speckit` skill cannot be invoked:
+
+1. Log: `[Preflight] jira-to-speckit not available — falling back to direct Jira fetch.`
 2. Read `JIRA_URL`, `JIRA_USERNAME`, `JIRA_API_TOKEN` from root `.env`.
-3. Fetch issue via `{JIRA_URL}/rest/api/3/issue/{issueKey}`.
-4. Extract: key, summary, description, acceptance/business value, labels/priority/assignee, dependencies/blockers.
-5. Build feature folder:
-   - `<ISSUE_KEY>-<summary-slug>`
-6. Lock and reuse:
-   - Spec ID = Jira key
-   - feature folder name = `<ISSUE_KEY>-<summary-slug>`
+3. If any variable is missing, stop and instruct the user to populate `.env`.
+4. Fetch issue: `GET {JIRA_URL}/rest/api/2/issue/{issueKey}?fields=summary,description,issuetype,status,priority,labels,assignee,fixVersions`
+5. On API error:
+   - `401`/`403`: report credentials invalid or insufficient permission.
+   - `404`: ask user to confirm the Jira issue key.
+   - `5xx`: ask user to retry.
+6. Compact manually: extract summary, business goal, acceptance criteria, constraints.
+7. Set Spec ID = Jira key; set feature folder = `specs/<JIRA-KEY>-<summary-slug>/`.
 
 ## Human/YOLO Intake Behavior
 
-- **Default mode**: confirm summary and resolve ambiguities before continuing.
-- **YOLO mode**: skip questions, accept parsed summary, and log assumptions.
+- **Default mode**: after `jira-to-speckit` (or fallback) returns the compact brief, confirm with
+  the user: "Does this summary correctly reflect the Jira requirement?" before proceeding.
+- **YOLO mode**: skip confirmation; accept compact brief autonomously and log any open questions
+  as assumptions in the pipeline log.

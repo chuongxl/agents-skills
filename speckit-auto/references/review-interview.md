@@ -19,14 +19,15 @@ from the current repo (`.github/agents/` + `.github/prompts/`), not global/fallb
 
 When run as `/speckit-auto --issue {jira link}`:
 
-1. Load `JIRA_URL`, `JIRA_USERNAME`, and `JIRA_API_TOKEN` from root `.env`.
-2. Fetch the Jira issue and summarize requirement intent.
+1. `jira-to-speckit` (or the fallback direct fetch) returns a compact brief.
+2. Present the compact brief summary to the user.
 3. Ask: "Does this summary correctly reflect the Jira requirement?"
    - Choices: `Yes`, `No`
 4. If `No`, ask: "What should be corrected or clarified before we start specify?"
-5. Resolve concerns before moving to `specify`.
+5. Resolve concerns, then proceed to `speckit.specify` with the (corrected) compact brief.
 
-**YOLO mode**: skip all interview steps; parse and accept the Jira issue summary autonomously. Document assumptions in pipeline log before proceeding.
+**YOLO mode**: skip all interview steps; accept the compact brief from `jira-to-speckit`
+autonomously. Log any open questions from the brief as assumptions in the pipeline log.
 
 ## Branch Creation Before Pipeline Start
 
