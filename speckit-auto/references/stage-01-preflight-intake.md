@@ -2,6 +2,12 @@
 
 Load this only when starting the pipeline.
 
+## Immediate Start Rule (Critical)
+
+On `/speckit-auto` invocation, execute Stage 01 immediately.
+Do not emit an intent-only acknowledgement and stop.
+Stage 01 must perform preflight + intake actions in the same run, then hand off to `speckit.specify`.
+
 ## Preflight Branch Setup
 
 1. Create/switch to a new branch before any Speckit stage.
