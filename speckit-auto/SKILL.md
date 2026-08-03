@@ -150,6 +150,7 @@ If a stage command fails, report the concrete command/runtime error.
 23. On every failed review retry, rebuild the loop context from `state_file` plus the current `fixes[]` only; do not retain the full prior review body or any earlier category detail files unless they are needed for the next fix.
 24. Never stop with a generic capability disclaimer (for example "environment doesn’t expose those skills"). Attempt the required invocation path first (repo slash stage commands + `skill` for skill dependencies); only stop on concrete tool/runtime errors with exact failing step.
 25. Failure ordering is strict: first run repo install/source checks; only after those pass may runtime stage-agent executability errors be reported.
+26. If implementation modifies git submodule repositories, create/switch branch inside each modified submodule and commit submodule changes first, then commit parent repo pointer updates; if no submodule is modified, behavior stays unchanged.
 
 ## Output Behavior
 

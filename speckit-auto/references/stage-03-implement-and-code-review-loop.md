@@ -38,6 +38,18 @@ When implementation scope is large, split and execute in batches:
 5. Run dependency-linked packages sequentially in topological order.
 6. After each batch, keep only compact progress state (remaining packages, changed files, known blockers).
 
+## Git Submodule Branch Handling (Implementation Stage)
+
+Apply this only when the repo uses git submodules.
+
+1. Detect submodules from `.gitmodules` and track their paths.
+2. During implementation/fix steps, if code changes occur inside a submodule path:
+   - ensure that submodule has a working branch before committing there
+   - branch base priority inside submodule: `develop` → `main` → `master` (local first, then remote-tracking)
+   - branch name should be deterministic and aligned with the parent pipeline branch context
+3. Create/switch submodule branch lazily (only when that submodule is actually modified).
+4. If no submodule exists, or no submodule files are modified, keep current behavior unchanged.
+
 ## CRITICAL: speckit-auto Owns This Loop — NO STOPS, NO GATES
 
 **This stage is a NO-STOP ZONE. The following are SUSPENDED for the entire duration of Stage 03, regardless of mode (default or --yolo):**
