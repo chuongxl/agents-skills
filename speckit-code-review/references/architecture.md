@@ -41,3 +41,5 @@ Each issue object format:
 ```json
 { "<Issue type label>": "<Concise description of violation and impact>" }
 ```
+
+> Discard this file from context after the Architecture review area is complete.

@@ -42,3 +42,5 @@ Populate these JSON fields from this review:
 
 - `security issue` → `"none"` if clean
 - `security issue` → array of issue objects if any found
+
+> Discard this file from context after the Security review area is complete.

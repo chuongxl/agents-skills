@@ -84,3 +84,5 @@ Populate in the final JSON result:
 
 - `unit-test-coverage`: string percent (e.g. `"85.3%"`) or `"N/A (no test runner detected)"`
 - `unit-test-missings`: `[]` when coverage ≥ 80%; array of uncovered items when < 80% (may also be non-empty when coverage is adequate, to guide improvement)
+
+> Discard this file from context after the Unit Test Coverage review area is complete.

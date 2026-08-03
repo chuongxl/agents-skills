@@ -59,3 +59,5 @@ Populate these JSON fields from this review:
 - If no evidence can be found for a requirement, treat it as `missing` (never assume covered).
 - If requirement wording is ambiguous, prefer `failed` and document the missing evidence.
 - Non-functional violations still produce `failed` when impact is high.
+
+> Discard this file from context after the Business Gap review area is complete.
