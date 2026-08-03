@@ -6,41 +6,21 @@ Use this guide during Stage 02 after each stage (`specify`, `clarify`, `plan`, `
 
 > **Mode note**: All interview sections apply to **default mode only**. In `--yolo` mode, human interactions are replaced by autonomous self-review (see Stage 02 YOLO behavior in stage-02-spec-design-flow.md).
 
-## Intake Interview for Jira Issue Mode
+## Specify Clarification Interview (When Spec Is Unclear)
 
-> ⚠️ **INTAKE IS A NO-STOP ZONE.**
-> After `jira-to-speckit` (or fallback) produces the compact brief, do NOT end the turn.
-> Do NOT output the brief as a final response and wait.
-> Immediately run the popup-based interview loop below, collect all answers inline,
-> then continue to Stage 02 — all within the same continuous flow.
+Stage 01 never asks intake interview questions. If requirement clarity is insufficient during
+`speckit.specify`, run this interview with the engineer, then rerun `speckit.specify`.
 
-**Default mode only.** In YOLO mode, skip to the YOLO block below.
+**Default mode only.**
 
-### Default Mode — Intake Interview Loop
+1. Detect unclear areas in `speckit.specify` output (missing acceptance details, ambiguous scope,
+   undefined constraints, unclear non-functional expectations).
+2. Ask clarification questions as popups (`ask_user`) — one question at a time.
+3. Capture answers and append them as requirement clarifications.
+4. Rerun `speckit.specify` using the clarifications.
+5. Repeat until spec is clear enough to proceed, then continue to `speckit.clarify`.
 
-1. **Confirmation popup** (ask_user, one question at a time):
-   - "Does this summary correctly reflect the Jira requirement?"
-   - Choices: `Yes — proceed to specify` | `No — I want to correct something`
-
-2. If `No`:
-   - Popup: "What should be corrected or clarified?" (freeform)
-   - Apply correction to the brief in memory.
-   - Return to step 1 with the updated brief.
-
-3. When brief is confirmed and `open_questions` list is non-empty:
-   - For **each** open question — one popup at a time:
-     - "Open question: `<question>` — your answer?" (freeform)
-     - Incorporate answer into brief notes.
-   - After the last question:
-     - Popup: "Any other clarifications before we start specify?"
-     - Choices: `No — start specify now` | `Yes — one more thing`
-     - If `Yes`: collect it, loop back to this step.
-
-4. When all answers collected → **immediately continue to Stage 02** without ending the turn.
-   Do NOT wait for the user to say "continue" or "proceed".
-
-**YOLO mode**: skip all popups. Accept the compact brief as-is. Log open questions as
-assumptions in the pipeline log. Immediately continue to Stage 02.
+**YOLO mode**: do not interview; infer best-effort assumptions and continue.
 
 ## Interview Flow
 

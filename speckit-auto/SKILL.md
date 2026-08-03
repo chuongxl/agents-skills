@@ -103,21 +103,25 @@ When instructions say "invoke `speckit-code-review`", use the invocation for you
 3. In `--issue` mode, use Jira issue key as spec folder prefix in lowercase (`specs/{issue-id-lowercase}-{short-title}`) and keep it stable across reruns.
 4. For `speckit.specify`, `speckit.clarify`, `speckit.plan`, `speckit.tasks`, `speckit.analyze`, `speckit.converge`, and `speckit.implement`, always use the repository-installed GitHub Speckit skills from this repo.
 5. If repository-installed GitHub Speckit is missing, fetch install guide from `https://github.com/github/spec-kit/blob/main/docs/installation.md`, ask user to `Install` or `Stop`, and only continue pipeline after installation + initialization is complete.
-6. **Stage 01 Intake is a NO-STOP ZONE.** After `jira-to-speckit` (or fallback) returns the compact brief, do NOT end the turn. Run the intake interview loop using popup questions, collect answers inline, then immediately continue to Stage 02 — all without ending the turn or waiting passively for user input.
-6. After each `speckit.implement`, invoke `speckit-code-review` using the correct invocation for the current environment (see Compatibility table above) and wait for JSON result.
-7. **Stage 03 (Implement + Code Review Loop) is a NO-STOP ZONE in BOTH default and --yolo modes. No human approval gates, no pauses, no prompts fire inside Stage 03. This rule overrides all interview flow and mode-based gate rules.**
-8. **A `failed` result from `speckit-code-review` is NEVER a stop condition in any mode. Do NOT produce a prose summary of the result. Do NOT end the turn. Immediately apply fixes using file-editing tools and loop again.**
-9. **For code-only or test-coverage failures: directly edit the specific files from the review result (`suggested_fix_area`, `file`, `method/function` fields) using file-editing tools — in the same turn. Do NOT delegate to speckit.implement.**
-10. Apply fixes, re-run `speckit-code-review`, and repeat until `status = pass`.
-11. After Stage 03 exits with `pass`, routing is mandatory:
+6. **Stage 01 Intake has no interview gate.** After input is collected (`--issue` compact brief or manual requirement text), continue immediately to `speckit.specify` with no intake Q&A stop.
+7. **Heavy payload prevention is mandatory.** For each stage, pass only the minimum required slices (current stage input + relevant section excerpts + compact project context). Never forward full prior stage prose when not needed.
+8. For large scope (large requirement, many tasks, or many workspaces), split work into small packages and invoke repo agents multiple times per package until complete.
+9. For split work: run packages in parallel only when dependency-independent; otherwise run sequentially in dependency order.
+10. In implementation split mode, map user wording `speckit.implementation` to the repo agent `speckit.implement`.
+11. After each `speckit.implement` cycle, invoke `speckit-code-review` using the correct invocation for the current environment (see Compatibility table above) and wait for JSON result.
+12. **Stage 03 (Implement + Code Review Loop) is a NO-STOP ZONE in BOTH default and --yolo modes. No human approval gates, no pauses, no prompts fire inside Stage 03. This rule overrides all interview flow and mode-based gate rules.**
+13. **A `failed` result from `speckit-code-review` is NEVER a stop condition in any mode. Do NOT produce a prose summary of the result. Do NOT end the turn. Immediately apply fixes using file-editing tools and loop again.**
+14. **For code-only or test-coverage failures: directly edit the specific files from the review result (`suggested_fix_area`, `file`, `method/function` fields) using file-editing tools — in the same turn. Do NOT delegate to speckit.implement.**
+15. Apply fixes, re-run `speckit-code-review`, and repeat until `status = pass`.
+16. After Stage 03 exits with `pass`, routing is mandatory:
    - default mode (`--yolo` not set): go to Stage 04
    - `--yolo` mode: go to Stage 05
-12. In default mode, Stage 04 is mandatory and must never be skipped.
-13. In `--yolo` mode, skip all human review interactions including Stage 04.
-14. After successful implementation commit, mark active `spec.md` as `completed` and create follow-up commit for that status change.
-15. If any stage, status update, or required commit fails, stop and report exact failure.
-16. Only abort the review loop if the **exact same failure repeats for 5 consecutive iterations** with no code change — report the stuck state and stop.
-17. On every failed review retry, rebuild the loop context from `state_file` plus the current `fixes[]` only; do not retain the full prior review body or any earlier category detail files unless they are needed for the next fix.
+17. In default mode, Stage 04 is mandatory and must never be skipped.
+18. In `--yolo` mode, skip all human review interactions including Stage 04.
+19. After successful implementation commit, mark active `spec.md` as `completed` and create follow-up commit for that status change.
+20. If any stage, status update, or required commit fails, stop and report exact failure.
+21. Only abort the review loop if the **exact same failure repeats for 5 consecutive iterations** with no code change — report the stuck state and stop.
+22. On every failed review retry, rebuild the loop context from `state_file` plus the current `fixes[]` only; do not retain the full prior review body or any earlier category detail files unless they are needed for the next fix.
 
 ## Output Behavior
 
