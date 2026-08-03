@@ -79,20 +79,21 @@ When instructions say "invoke `speckit-code-review`", use the invocation for you
 2. Base branch priority: `develop -> main -> master` (local first, then remote-tracking).
 3. In `--issue` mode, reuse Jira key as Spec ID and keep it stable across reruns.
 4. For `speckit.specify`, `speckit.clarify`, `speckit.plan`, `speckit.tasks`, `speckit.analyze`, `speckit.converge`, and `speckit.implement`, always use the repository-installed GitHub Speckit skills from this repo.
-5. After each `speckit.implement`, invoke `speckit-code-review` using the correct invocation for the current environment (see Compatibility table above) and wait for JSON result.
-6. **Stage 03 (Implement + Code Review Loop) is a NO-STOP ZONE in BOTH default and --yolo modes. No human approval gates, no pauses, no prompts fire inside Stage 03. This rule overrides all interview flow and mode-based gate rules.**
-7. **A `failed` result from `speckit-code-review` is NEVER a stop condition in any mode. Do NOT produce a prose summary of the result. Do NOT end the turn. Immediately apply fixes using file-editing tools and loop again.**
-8. **For code-only or test-coverage failures: directly edit the specific files from the review result (`suggested_fix_area`, `file`, `method/function` fields) using file-editing tools — in the same turn. Do NOT delegate to speckit.implement.**
-9. Apply fixes, re-run `speckit-code-review`, and repeat until `status = pass`.
-10. After Stage 03 exits with `pass`, routing is mandatory:
+5. If repository-installed GitHub Speckit is missing, fetch install guide from `https://github.com/github/spec-kit/blob/main/docs/installation.md`, ask user to `Install` or `Stop`, and only continue pipeline after installation + initialization is complete.
+6. After each `speckit.implement`, invoke `speckit-code-review` using the correct invocation for the current environment (see Compatibility table above) and wait for JSON result.
+7. **Stage 03 (Implement + Code Review Loop) is a NO-STOP ZONE in BOTH default and --yolo modes. No human approval gates, no pauses, no prompts fire inside Stage 03. This rule overrides all interview flow and mode-based gate rules.**
+8. **A `failed` result from `speckit-code-review` is NEVER a stop condition in any mode. Do NOT produce a prose summary of the result. Do NOT end the turn. Immediately apply fixes using file-editing tools and loop again.**
+9. **For code-only or test-coverage failures: directly edit the specific files from the review result (`suggested_fix_area`, `file`, `method/function` fields) using file-editing tools — in the same turn. Do NOT delegate to speckit.implement.**
+10. Apply fixes, re-run `speckit-code-review`, and repeat until `status = pass`.
+11. After Stage 03 exits with `pass`, routing is mandatory:
    - default mode (`--yolo` not set): go to Stage 04
    - `--yolo` mode: go to Stage 05
-11. In default mode, Stage 04 is mandatory and must never be skipped.
-12. In `--yolo` mode, skip all human review interactions including Stage 04.
-13. After successful implementation commit, mark active `spec.md` as `completed` and create follow-up commit for that status change.
-14. If any stage, status update, or required commit fails, stop and report exact failure.
-15. Only abort the review loop if the **exact same failure repeats for 5 consecutive iterations** with no code change — report the stuck state and stop.
-16. On every failed review retry, rebuild the loop context from `state_file` plus the current `fixes[]` only; do not retain the full prior review body or any earlier category detail files unless they are needed for the next fix.
+12. In default mode, Stage 04 is mandatory and must never be skipped.
+13. In `--yolo` mode, skip all human review interactions including Stage 04.
+14. After successful implementation commit, mark active `spec.md` as `completed` and create follow-up commit for that status change.
+15. If any stage, status update, or required commit fails, stop and report exact failure.
+16. Only abort the review loop if the **exact same failure repeats for 5 consecutive iterations** with no code change — report the stuck state and stop.
+17. On every failed review retry, rebuild the loop context from `state_file` plus the current `fixes[]` only; do not retain the full prior review body or any earlier category detail files unless they are needed for the next fix.
 
 ## Output Behavior
 

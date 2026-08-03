@@ -37,8 +37,27 @@ And matching prompt files:
 - `.github/prompts/speckit.converge.prompt.md`
 - `.github/prompts/speckit.implement.prompt.md`
 
-If any required file is missing, stop and report the missing path(s).
+If any required file is missing, trigger the Missing Speckit Auto-Recovery Flow below.
 Do not continue with global/fallback Speckit skills.
+
+## Missing Speckit Auto-Recovery Flow (Required)
+
+If one or more required repo-installed Speckit files are missing:
+
+1. Fetch install guide from:
+   - `https://github.com/github/spec-kit/blob/main/docs/installation.md`
+2. Present a decision gate:
+   - `Install GitHub Speckit`
+   - `Stop`
+3. If user selects `Stop`, stop immediately and report that Speckit installation is required.
+4. If user selects `Install GitHub Speckit`, follow the fetched installation guide exactly.
+5. After installation, initialize Spec Kit for this repo:
+   - run `specify init . --integration copilot`
+6. Then run:
+   - `/speckit.constitution`
+7. Re-run the preflight source check in this file.
+8. If checks pass, continue the original `speckit-auto` request from the correct stage.
+9. If installation or init fails, stop and report exact failing step.
 
 ## Intake Mode Selection
 
