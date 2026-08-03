@@ -68,6 +68,28 @@ If one or more required repo-installed Speckit files are missing:
 8. If checks pass, continue the original `speckit-auto` request from the correct stage.
 9. If installation or init fails, stop and report exact failing step.
 
+## Preflight Runtime Executability Check (Required, After Source Check)
+
+Run this check **only after** the repository source check above passes (including any auto-recovery).
+
+Execution order is strict:
+1. Verify/install repo Speckit files (`.github/agents` + `.github/prompts`) first.
+2. Only then validate runtime executability of stage agents.
+
+For GitHub Copilot CLI, validate that `task` agent types are executable for:
+- `speckit.specify`
+- `speckit.clarify`
+- `speckit.plan`
+- `speckit.tasks`
+- `speckit.analyze`
+- `speckit.converge`
+- `speckit.implement`
+
+If runtime does not expose executable stage agent types:
+- Report as a **runtime execution failure after install/source check passed**.
+- Do not report it as a missing installation issue.
+- Include exact failing stage agent type and tool error text.
+
 ## Preflight Guidelines Context Load (Required)
 
 After the Speckit source check passes, load the Project Context:

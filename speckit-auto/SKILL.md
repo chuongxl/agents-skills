@@ -149,6 +149,7 @@ an actual execution error.
 22. Only abort the review loop if the **exact same failure repeats for 5 consecutive iterations** with no code change — report the stuck state and stop.
 23. On every failed review retry, rebuild the loop context from `state_file` plus the current `fixes[]` only; do not retain the full prior review body or any earlier category detail files unless they are needed for the next fix.
 24. Never stop with a generic capability disclaimer (for example "environment doesn’t expose those skills"). Attempt the required invocation path first (`task` for repo stage agents, `skill` for skill dependencies); only stop on concrete tool/runtime errors with exact failing step.
+25. Failure ordering is strict: first run repo install/source checks; only after those pass may runtime stage-agent executability errors be reported.
 
 ## Output Behavior
 
