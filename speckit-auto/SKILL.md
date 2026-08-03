@@ -100,7 +100,7 @@ When instructions say "invoke `speckit-code-review`", use the invocation for you
 
 1. Always create/switch a new branch before the first pipeline step.
 2. Base branch priority: `develop -> main -> master` (local first, then remote-tracking).
-3. In `--issue` mode, reuse Jira key as Spec ID and keep it stable across reruns.
+3. In `--issue` mode, use Jira issue key as spec folder prefix in lowercase (`specs/{issue-id-lowercase}-{short-title}`) and keep it stable across reruns.
 4. For `speckit.specify`, `speckit.clarify`, `speckit.plan`, `speckit.tasks`, `speckit.analyze`, `speckit.converge`, and `speckit.implement`, always use the repository-installed GitHub Speckit skills from this repo.
 5. If repository-installed GitHub Speckit is missing, fetch install guide from `https://github.com/github/spec-kit/blob/main/docs/installation.md`, ask user to `Install` or `Stop`, and only continue pipeline after installation + initialization is complete.
 6. **Stage 01 Intake is a NO-STOP ZONE.** After `jira-to-speckit` (or fallback) returns the compact brief, do NOT end the turn. Run the intake interview loop using popup questions, collect answers inline, then immediately continue to Stage 02 — all without ending the turn or waiting passively for user input.

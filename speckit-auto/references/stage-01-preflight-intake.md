@@ -110,17 +110,18 @@ After `jira-to-speckit` returns its compact output, extract:
 
 | Field | Where to find it | Used for |
 |-------|-----------------|---------|
-| `Jira issue key` | `Jira issue key:` line | Spec ID (reuse as-is, e.g. `FCM-13708`) |
+| `Jira issue key` | `Jira issue key:` line | Issue ID for spec folder prefix (normalize to lowercase, e.g. `ddm-6157`) |
 | `Compact brief` | `Compact brief:` section | Input to `speckit.specify` |
 | `Open questions` | `Open questions:` list | Seed for `speckit.clarify` |
 | `Truncation note` | `Truncation note:` line | Log for context awareness |
 
 ### Spec ID and Feature Folder
 
-Use the Jira key directly as the Spec ID — do **not** adopt `jira-to-speckit`'s `US-`/`Task-` prefix:
+For `--issue` mode, use the Jira issue key as the spec folder prefix (normalized to lowercase) —
+do **not** adopt `jira-to-speckit`'s `US-`/`Task-` prefix:
 
-- Spec ID = Jira key (e.g. `FCM-13708`)
-- Feature folder = `specs/<JIRA-KEY>-<summary-slug>/` (e.g. `specs/FCM-13708-reduce-dar-review-time/`)
+- Issue ID (folder prefix) = lowercase Jira key (e.g. `ddm-6157`)
+- Feature folder = `specs/<issue-id-lowercase>-<short-title-slug>/` (e.g. `specs/ddm-6157-map-search-to-table-result/`)
 
 This naming is stable across reruns.
 
@@ -137,7 +138,7 @@ If the `jira-to-speckit` skill cannot be invoked:
    - `404`: ask user to confirm the Jira issue key.
    - `5xx`: ask user to retry.
 6. Compact manually: extract summary, business goal, acceptance criteria, constraints.
-7. Set Spec ID = Jira key; set feature folder = `specs/<JIRA-KEY>-<summary-slug>/`.
+7. Set issue ID from Jira key and normalize to lowercase; set feature folder = `specs/<issue-id-lowercase>-<short-title-slug>/`.
 
 ## Human/YOLO Intake Behavior
 
