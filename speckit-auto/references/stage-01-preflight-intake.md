@@ -53,8 +53,11 @@ If one or more required repo-installed Speckit files are missing:
 4. If user selects `Install GitHub Speckit`, follow the fetched installation guide exactly.
 5. After installation, initialize Spec Kit for this repo:
    - run `specify init . --integration copilot`
-6. Then run:
-   - `/speckit.constitution`
+6. Then run the `speckit.constitution` agent:
+   - Invoke as agent `speckit.constitution` (not a skill — use the agent invocation method for the current environment)
+   - GitHub Copilot CLI: `task` tool with agent type `speckit.constitution`
+   - Claude Code: `/speckit.constitution` slash command
+   - OpenCode: `/speckit.constitution` or `@speckit.constitution`
 7. Re-run the preflight source check in this file.
 8. If checks pass, continue the original `speckit-auto` request from the correct stage.
 9. If installation or init fails, stop and report exact failing step.
