@@ -14,6 +14,14 @@ Also load: [review-interview.md](review-interview.md) (default mode only; discar
 5. `speckit.analyze`
 6. `speckit.converge`
 
+## Invocation Method (Critical)
+
+Use the invocation mapping from `SKILL.md`:
+- GitHub Copilot CLI: call each stage via `task` tool with corresponding `agent_type`.
+- Claude Code / OpenCode: use matching slash/mention invocation.
+
+Do not emit a capability disclaimer before attempting these invocations.
+
 ## Prompt Wiring Rules
 
 - `specify`: requirement text (or normalized Jira intake output) **+ Project Context `summary`**

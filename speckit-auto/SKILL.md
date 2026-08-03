@@ -89,6 +89,20 @@ Invoke it using the method appropriate for your environment:
 
 When instructions say "invoke `speckit-code-review`", use the invocation for your current environment.
 
+## Compatibility — How to Invoke Repo Speckit Stages
+
+For stage agents (`speckit.specify`, `speckit.clarify`, `speckit.plan`, `speckit.tasks`,
+`speckit.analyze`, `speckit.converge`, `speckit.implement`), invoke by environment:
+
+| Environment | Invocation |
+|-------------|-----------|
+| GitHub Copilot CLI | `task` tool with matching `agent_type` (for example `agent_type: "speckit.specify"`) |
+| Claude Code | corresponding slash command (for example `/speckit.specify`) |
+| OpenCode | corresponding slash command or mention (for example `/speckit.specify` or `@speckit.specify`) |
+
+In GitHub Copilot CLI, do **not** claim stage agents are unavailable unless the `task` call returns
+an actual execution error.
+
 ## Stage Router (Load On Demand)
 
 1. **Preflight + Intake** (includes guidelines context load + repo map detection)
@@ -134,6 +148,7 @@ When instructions say "invoke `speckit-code-review`", use the invocation for you
 21. If any stage, status update, or required commit fails, stop and report exact failure.
 22. Only abort the review loop if the **exact same failure repeats for 5 consecutive iterations** with no code change — report the stuck state and stop.
 23. On every failed review retry, rebuild the loop context from `state_file` plus the current `fixes[]` only; do not retain the full prior review body or any earlier category detail files unless they are needed for the next fix.
+24. Never stop with a generic capability disclaimer (for example "environment doesn’t expose those skills"). Attempt the required invocation path first (`task` for repo stage agents, `skill` for skill dependencies); only stop on concrete tool/runtime errors with exact failing step.
 
 ## Output Behavior
 

@@ -16,6 +16,15 @@ Before invoking `speckit.implement`, inject into the prompt:
 When routing fixes in STEP F (plan/tasks/converge reruns), pass the same Project Context
 fields to those sub-skills so workspace assignment and architecture compliance are preserved.
 
+## Invocation Method (Critical)
+
+- `speckit.implement` uses the stage-agent invocation mapping in `SKILL.md`
+  (GitHub Copilot CLI: `task` tool with `agent_type: "speckit.implement"`).
+- `speckit-code-review` uses the skill invocation mapping in `SKILL.md`
+  (GitHub Copilot CLI: `skill` tool with name `speckit-code-review`).
+
+Do not stop with a generic runtime/capability disclaimer unless a concrete tool call fails.
+
 ## Heavy Payload Prevention + Implementation Partitioning
 
 Treat `speckit.implementation` as `speckit.implement` (repo-installed agent name is `speckit.implement`).
