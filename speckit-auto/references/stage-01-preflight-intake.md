@@ -141,7 +141,40 @@ If the `jira-to-speckit` skill cannot be invoked:
 
 ## Human/YOLO Intake Behavior
 
-- **Default mode**: after `jira-to-speckit` (or fallback) returns the compact brief, confirm with
-  the user: "Does this summary correctly reflect the Jira requirement?" before proceeding.
-- **YOLO mode**: skip confirmation; accept compact brief autonomously and log any open questions
-  as assumptions in the pipeline log.
+> ⚠️ **INTAKE IS A NO-STOP ZONE.**
+> After `jira-to-speckit` (or the fallback) returns the compact brief, do NOT end the turn.
+> Do NOT present the brief as a final response and wait for the user to speak.
+> Immediately run the intake interview below using popup questions (`ask_user` tool), collect
+> answers inline, then continue directly to Stage 02 — all within the same continuous flow.
+
+### Default Mode — Intake Interview Loop
+
+After receiving the compact brief, execute this loop **without ending the turn**:
+
+1. **Brief confirmation** — ask one popup question:
+   - "Does this summary correctly reflect the Jira requirement?"
+   - Choices: `Yes — proceed to specify` | `No — I want to correct something`
+
+2. If `No — I want to correct something`:
+   - Ask: "What should be corrected or clarified?" (freeform popup)
+   - Apply the correction to the compact brief in memory.
+   - Return to step 1 (ask confirmation again with the updated brief).
+   - Repeat until user confirms.
+
+3. If open questions exist in the `jira-to-speckit` output and the brief is confirmed:
+   - Ask each open question as a separate popup — **one at a time**.
+   - Format: "Open question: `<question text>`. Your answer?" (freeform popup)
+   - Incorporate each answer into the brief notes before asking the next question.
+   - After the last question, ask: "Any other clarifications before we start specify?"
+     - Choices: `No — start specify now` | `Yes — one more thing`
+   - If `Yes`, collect it and loop back.
+   - Stop when user confirms readiness.
+
+4. **Immediately continue to Stage 02** — invoke `speckit.specify` with the finalized compact brief.
+   Do NOT end the turn. Do NOT wait for user to say "continue" or "proceed".
+
+### YOLO Mode
+
+Skip all interview steps. Accept the compact brief autonomously.
+Log all open questions from the brief as assumptions in the pipeline log.
+Immediately continue to Stage 02 — invoke `speckit.specify` without pausing.

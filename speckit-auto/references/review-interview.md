@@ -8,18 +8,39 @@ Use this guide during Stage 02 after each stage (`specify`, `clarify`, `plan`, `
 
 ## Intake Interview for Jira Issue Mode
 
-**Default mode only.**
+> ⚠️ **INTAKE IS A NO-STOP ZONE.**
+> After `jira-to-speckit` (or fallback) produces the compact brief, do NOT end the turn.
+> Do NOT output the brief as a final response and wait.
+> Immediately run the popup-based interview loop below, collect all answers inline,
+> then continue to Stage 02 — all within the same continuous flow.
 
-When run as `/speckit-auto --issue {jira link}`:
+**Default mode only.** In YOLO mode, skip to the YOLO block below.
 
-1. `jira-to-speckit` (or the fallback direct fetch) returns a compact brief.
-2. Present the compact brief summary to the user.
-3. Ask: "Does this summary correctly reflect the Jira requirement?"
-   - Choices: `Yes`, `No`
-4. If `No`, ask: "What should be corrected or clarified before we start specify?"
-5. Resolve concerns, then proceed to `speckit.specify` with the (corrected) compact brief.
+### Default Mode — Intake Interview Loop
 
-**YOLO mode**: skip all interview steps; accept the compact brief autonomously. Log any open questions as assumptions in the pipeline log.
+1. **Confirmation popup** (ask_user, one question at a time):
+   - "Does this summary correctly reflect the Jira requirement?"
+   - Choices: `Yes — proceed to specify` | `No — I want to correct something`
+
+2. If `No`:
+   - Popup: "What should be corrected or clarified?" (freeform)
+   - Apply correction to the brief in memory.
+   - Return to step 1 with the updated brief.
+
+3. When brief is confirmed and `open_questions` list is non-empty:
+   - For **each** open question — one popup at a time:
+     - "Open question: `<question>` — your answer?" (freeform)
+     - Incorporate answer into brief notes.
+   - After the last question:
+     - Popup: "Any other clarifications before we start specify?"
+     - Choices: `No — start specify now` | `Yes — one more thing`
+     - If `Yes`: collect it, loop back to this step.
+
+4. When all answers collected → **immediately continue to Stage 02** without ending the turn.
+   Do NOT wait for the user to say "continue" or "proceed".
+
+**YOLO mode**: skip all popups. Accept the compact brief as-is. Log open questions as
+assumptions in the pipeline log. Immediately continue to Stage 02.
 
 ## Interview Flow
 
