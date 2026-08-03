@@ -85,6 +85,8 @@ When instructions say "invoke `speckit-code-review`", use the invocation for you
    - Load: [references/preflight-guidelines-context.md](references/preflight-guidelines-context.md)
 2. **Spec/Design Flow (`specify -> clarify -> plan -> tasks -> analyze -> converge`)**
    - Load: [references/stage-02-spec-design-flow.md](references/stage-02-spec-design-flow.md)
+   - Load (default mode only): [references/review-interview.md](references/review-interview.md)
+   - **Discard both files at Stage 03 entry.**
 3. **Implement + Auto Code Review Loop**
    - Load: [references/stage-03-implement-and-code-review-loop.md](references/stage-03-implement-and-code-review-loop.md)
 4. **Human Manual Review + Commit (Default mode only)**

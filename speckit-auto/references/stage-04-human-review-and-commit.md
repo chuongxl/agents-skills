@@ -32,5 +32,3 @@ Load this only in default mode after `speckit-code-review` returns `pass`.
 3. Apply fixes.
 4. If code changed, invoke `speckit-code-review` again until `pass`.
 5. Return to this gate and repeat until approved.
-
-All Speckit stages above must use the repository-installed GitHub Speckit skills from this repo (`.github/agents/` + `.github/prompts/`), not global/fallback variants.

@@ -1,12 +1,7 @@
 # Stage 03: Implement + Auto Code Review Loop
 
 Load this only when running `speckit.implement` and `speckit-code-review`.
-
-## Source of Implement Skill (Required)
-
-`speckit.implement` in this stage must use the repository-installed GitHub Speckit skill
-from the current repo (`.github/agents/speckit.implement.agent.md` with
-`.github/prompts/speckit.implement.prompt.md`), not a global/fallback variant.
+Discard review-interview.md from context at this point — Stage 03 is a NO-STOP ZONE.
 
 ## Repository-Aware Implementation
 
@@ -45,27 +40,8 @@ In default mode, Stage 04 is mandatory and must never be skipped.
 
 ## How to Invoke speckit-code-review
 
-`speckit-code-review` is a sub-skill, not an agent or background task.
-Use the invocation appropriate for your environment:
-
-| Environment | Invocation |
-|-------------|-----------|
-| GitHub Copilot CLI | `skill` tool with name `speckit-code-review` |
-| Claude Code | `/speckit-code-review` slash command |
-| OpenCode | `/speckit-code-review` or `@speckit-code-review` |
-
-Never launch it as a background agent or task process — it must run inline and return JSON directly.
-
-## Compact Mode
-
-Always keep the review loop on compact payloads:
-
-- retain only `state_file`, the top `fixes[]`, and the one category file needed for the next fix
-- never rehydrate verbose failed-review prose into the loop context
-- if the current tool supports a compact command or command alias, prefer that form; otherwise use the compact JSON/state-file contract above
-- before each retry, rebuild the working context from the latest `state_file` instead of appending prior failed-review output
-- if the next action is unclear, load only one matching `detail_files` category and then discard it again after the fix is applied
-- never carry more than one failed review payload forward; each retry starts from a fresh minimal context snapshot
+Use the invocation for your environment from the Compatibility table in SKILL.md.
+Never launch as a background agent or task process — it must run inline and return JSON directly.
 
 ## Loop Algorithm (speckit-auto executes this — do not exit until DONE)
 
@@ -131,7 +107,6 @@ LOOP:
 - speckit-auto NEVER ends a turn after receiving a failed review — the next action after a failed review is always file edits, not a response
 - speckit-auto NEVER retains full failed-review text across retries; keep only `state_file`, the top `fixes[]`, and the one category file needed for the current fix
 - speckit-auto NEVER delegates to speckit.implement for code-only or test-coverage failures — use file-editing tools directly
-- whenever Stage 03 invokes Speckit stages (`speckit.implement`, `speckit.plan`, `speckit.tasks`, `speckit.analyze`, `speckit.converge`), use the repository-installed GitHub Speckit skills only
 - speckit-auto NEVER stops and reports unless:
   - The same failure repeats for **5 consecutive iterations** with no file changes
   - A git or filesystem error prevents code from being written
