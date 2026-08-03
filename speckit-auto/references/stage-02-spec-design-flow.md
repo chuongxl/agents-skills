@@ -27,12 +27,29 @@ Do not use global Speckit variants for:
 
 ## Prompt Wiring Rules
 
-- `specify`: requirement text (or normalized Jira intake output)
+- `specify`: requirement text (or normalized Jira intake output) **+ Project Context `summary`**
 - `clarify`: current `spec.md`
-- `plan`: finalized `spec.md`
-- `tasks`: spec + plan context
+- `plan`: finalized `spec.md` **+ Project Context `summary`, `repo_map`, and any relevant cached guidelines from `loaded_guidelines`**
+- `tasks`: spec + plan context **+ `repo_map`** — every task must declare its target workspace
 - `analyze`: `spec.md`, `plan.md`, `tasks.md`
 - `converge`: artifacts + current codebase, append remaining unbuilt work to `tasks.md`
+
+## Repository-Aware Task Assignment
+
+When `speckit.tasks` runs, each task entry **must** include a `workspace` field derived from `repo_map`:
+
+- Backend tasks (domain, application, infrastructure, API) → target the `backend` workspace
+- Frontend tasks (UI components, pages, state) → target the `frontend` workspace
+- BFF tasks (aggregation, gateway routes) → target the `bff` workspace
+- Database tasks (migrations, schema) → target the `database` workspace
+- Shared tasks (config, utilities, types) → target the `shared` workspace
+- For single-repo projects (`layout = "single-repo"`), all tasks target `.`
+
+Before naming any file, class, method, or API contract in `speckit.plan` or `speckit.tasks`,
+check `linked_guidelines` from the Project Context and load the relevant cached guideline
+(use the stem name to find a match). If it is already in `loaded_guidelines`, use the cached copy.
+
+Never assign a task without consulting `repo_map` from the Project Context loaded in Stage 01.
 
 ## Review Behavior Per Stage
 

@@ -8,6 +8,19 @@ Load this only when running `speckit.implement` and `speckit-code-review`.
 from the current repo (`.github/agents/speckit.implement.agent.md` with
 `.github/prompts/speckit.implement.prompt.md`), not a global/fallback variant.
 
+## Repository-Aware Implementation
+
+Before invoking `speckit.implement`, inject into the prompt:
+
+- The `summary` from the Project Context loaded in Stage 01.
+- The `repo_map` so the skill knows which workspace each file should be created in.
+- Any relevant guideline from `loaded_guidelines` that applies to the current task —
+  match by checking whether the task topic appears in any stem key of `linked_guidelines`.
+  If a match exists and is not yet cached, load it now and add to `loaded_guidelines`.
+
+When routing fixes in STEP F (plan/tasks/converge reruns), pass the same Project Context
+fields to those sub-skills so workspace assignment and architecture compliance are preserved.
+
 ## CRITICAL: speckit-auto Owns This Loop — NO STOPS, NO GATES
 
 **This stage is a NO-STOP ZONE. The following are SUSPENDED for the entire duration of Stage 03, regardless of mode (default or --yolo):**

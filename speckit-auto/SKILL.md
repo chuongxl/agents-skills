@@ -45,6 +45,20 @@ Required repo-installed skills:
 - `speckit.converge`
 - `speckit.implement`
 
+## Project Context (Guidelines + Repo Map)
+
+During Stage 01 preflight, load `docs/guidelines/architecture.md` (if it exists) to build a
+compact in-memory **Project Context** containing: repo layout (mono vs single), `repo_map`
+(which workspace is backend/frontend/BFF/shared/database — parsed from the file or inferred
+from workspace names), architecture pattern, and a map of any `.md` files linked inside
+`architecture.md`.
+
+- The Project Context is built **once** and reused for all stages — never re-read files already loaded.
+- Every stage that creates or assigns tasks must consult `repo_map` to target the correct workspace.
+- Linked guideline files are discovered dynamically from `architecture.md`'s links (not assumed by name).
+  They are loaded **lazily** — only when relevant to the current task — and cached after first load.
+- If `docs/guidelines/` folder does not exist, skip the entire guidelines step and continue normally (no error).
+
 ## Compatibility — How to Invoke speckit-code-review
 
 `speckit-code-review` is a sub-skill called automatically at the review stage.
@@ -60,8 +74,9 @@ When instructions say "invoke `speckit-code-review`", use the invocation for you
 
 ## Stage Router (Load On Demand)
 
-1. **Preflight + Intake**
+1. **Preflight + Intake** (includes guidelines context load + repo map detection)
    - Load: [references/stage-01-preflight-intake.md](references/stage-01-preflight-intake.md)
+   - Load: [references/preflight-guidelines-context.md](references/preflight-guidelines-context.md)
 2. **Spec/Design Flow (`specify -> clarify -> plan -> tasks -> analyze -> converge`)**
    - Load: [references/stage-02-spec-design-flow.md](references/stage-02-spec-design-flow.md)
 3. **Implement + Auto Code Review Loop**

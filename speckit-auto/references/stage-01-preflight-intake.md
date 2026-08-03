@@ -59,6 +59,16 @@ If one or more required repo-installed Speckit files are missing:
 8. If checks pass, continue the original `speckit-auto` request from the correct stage.
 9. If installation or init fails, stop and report exact failing step.
 
+## Preflight Guidelines Context Load (Required)
+
+After the Speckit source check passes, load the Project Context:
+
+- Load: [preflight-guidelines-context.md](preflight-guidelines-context.md)
+
+Execute all steps in that file (detect repo layout, load architecture.md, build in-memory context).
+The guidelines context step is **optional** — if `docs/guidelines/` does not exist the pipeline
+continues normally without it. Do not block or stop Stage 02 when guidelines are absent.
+
 ## Intake Mode Selection
 
 - If command includes `--issue`, run Jira intake.
