@@ -19,7 +19,7 @@ fields to those sub-skills so workspace assignment and architecture compliance a
 ## Invocation Method (Critical)
 
 - `speckit.implement` uses the stage-agent invocation mapping in `SKILL.md`
-  (GitHub Copilot CLI: `task` tool with `agent_type: "speckit.implement"`).
+  (GitHub Copilot CLI: `/speckit.implement`).
 - `speckit-code-review` uses the skill invocation mapping in `SKILL.md`
   (GitHub Copilot CLI: `skill` tool with name `speckit-code-review`).
 
