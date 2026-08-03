@@ -23,6 +23,39 @@ Also load: [review-interview.md](review-interview.md) (default mode only; discar
 - `analyze`: `spec.md`, `plan.md`, `tasks.md`
 - `converge`: artifacts + current codebase, append remaining unbuilt work to `tasks.md`
 
+## Payload Budget Rules (Stage 02)
+
+For every Stage 02 invocation, keep payload compact:
+
+- Include only the current stage input plus the minimal required context from previous artifacts.
+- Prefer section excerpts over full-document dumps.
+- Reuse cached Project Context from Stage 01; do not reload or restate unchanged guideline text.
+- Never carry forward long review prose when a concise delta is enough.
+
+## Large Scope Partitioning (Plan/Tasks/Analyze/Converge)
+
+If requirements are large or task volume is high, split the work into packages and process in batches.
+
+### Package Strategy
+
+1. Build `work_packages[]` by capability and `workspace` from `repo_map`.
+2. For each package, include only:
+   - package goal
+   - relevant spec/plan sections
+   - target workspace and constraints
+3. Invoke the repo stage agent multiple times (one package per invocation) until all packages complete.
+
+### Parallel vs Sequential
+
+- **Parallel**: packages with no dependency links and no shared file ownership.
+- **Sequential**: packages with dependency/order constraints (topological order).
+
+### Stage-specific Application
+
+- `speckit.plan`: create plan slices per package, then merge into one coherent `plan.md` with dependencies.
+- `speckit.tasks`: generate tasks per package, then merge into one `tasks.md` with explicit ordering.
+- `speckit.analyze` / `speckit.converge`: run per package when large; then run one final global reconcile pass.
+
 ## Repository-Aware Task Assignment
 
 When `speckit.tasks` runs, each task entry **must** include a `workspace` field derived from `repo_map`:
@@ -43,6 +76,7 @@ Never assign a task without consulting `repo_map` from the Project Context loade
 ## Review Behavior Per Stage
 
 - **Default mode**: run post-stage interview (review-interview.md) and capture feedback/constraints.
+- **Default mode / specify only**: if `speckit.specify` output is unclear, run the engineer clarification interview from `review-interview.md`, rerun `speckit.specify`, then continue.
 - **YOLO mode**: self-review stage output; if failed, rerun stage (max 2 retries).
 
 > ⚠️ These review behaviors apply **only to the stages in this file**. Stage 03 is a NO-STOP ZONE — no interviews, no gates in either mode.

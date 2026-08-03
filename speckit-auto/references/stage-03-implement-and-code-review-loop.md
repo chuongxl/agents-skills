@@ -16,6 +16,19 @@ Before invoking `speckit.implement`, inject into the prompt:
 When routing fixes in STEP F (plan/tasks/converge reruns), pass the same Project Context
 fields to those sub-skills so workspace assignment and architecture compliance are preserved.
 
+## Heavy Payload Prevention + Implementation Partitioning
+
+Treat `speckit.implementation` as `speckit.implement` (repo-installed agent name is `speckit.implement`).
+
+When implementation scope is large, split and execute in batches:
+
+1. Build `implementation_packages[]` from `tasks.md` grouped by `workspace` + bounded capability.
+2. Keep each package prompt minimal: package-specific tasks + relevant plan/spec excerpts only.
+3. Invoke `speckit.implement` multiple times (one invocation per package) until queue is empty.
+4. Parallelize only independent packages (no dependency edges, no shared file ownership risk).
+5. Run dependency-linked packages sequentially in topological order.
+6. After each batch, keep only compact progress state (remaining packages, changed files, known blockers).
+
 ## CRITICAL: speckit-auto Owns This Loop — NO STOPS, NO GATES
 
 **This stage is a NO-STOP ZONE. The following are SUSPENDED for the entire duration of Stage 03, regardless of mode (default or --yolo):**
@@ -47,7 +60,9 @@ Never launch as a background agent or task process — it must run inline and re
 
 ```
 LOOP:
-  STEP A — Run speckit.implement (or apply targeted fixes — see STEP G)
+  STEP A — Run speckit.implement for the next package/batch (or apply targeted fixes — see STEP G)
+           - Small scope: single invocation
+           - Large scope: multiple invocations, parallel only for independent packages
   STEP B — Invoke speckit-code-review; receive JSON result
   STEP C — Read result.status
     IF status = "pass"  → EXIT LOOP
