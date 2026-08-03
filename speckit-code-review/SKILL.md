@@ -115,20 +115,32 @@ Execute all areas. Load the matching reference file before performing each area.
 
 2. Use git to define review scope: changed files from current branch/worktree (staged + unstaged).
 
-3. Execute each review area, loading its reference file:
+3. **Load project guidelines context** (if available):
+   - Load: [references/project-guidelines-review.md](references/project-guidelines-review.md)
+   - Follow Steps 1–4 in that file to discover and load only the reference files that match the
+     changed file categories. Cache everything — never re-read.
+   - If `docs/guidelines/architecture.md` does not exist, skip this step silently.
+
+4. Execute each standard review area, loading its reference file:
    - **Business Gap** → load [references/business-gap.md](references/business-gap.md)
    - **Code Quality** (including conditional SonarQube MCP scan) → load [references/code-quality.md](references/code-quality.md)
    - **Security** → load [references/security.md](references/security.md)
    - **Architecture** → load [references/architecture.md](references/architecture.md)
    - **Unit Test Coverage** (last) → load [references/unit-test-coverage.md](references/unit-test-coverage.md)
 
-4. Compute `Business cover = (covered / total) * 100`, round to whole percent.
+5. Execute the **Advanced Project Guidelines Review** (Step 5 of project-guidelines-review.md):
+   - Run one additional pass per loaded project reference file.
+   - Merge any new findings into the standard results before writing detail files.
+   - Skip this step if no project reference files were loaded in step 3.
 
-5. Write ALL findings to per-category detail files and `state_file`.
+6. Compute `Business cover = (covered / total) * 100`, round to whole percent.
 
-6. Build compact `fixes` array from findings: include only the top 3 most critical actionable items (high severity → medium → low).
+7. Write ALL findings (standard + project guidelines) to per-category detail files and `state_file`.
+   - Include `guideline_source` field on any finding raised by a project reference file.
 
-7. Decide status:
+8. Build compact `fixes` array from findings: include only the top 3 most critical actionable items (high severity → medium → low).
+
+9. Decide status:
    - `pass` only when `fixes` array is empty AND `unit-test-coverage` ≥ 80%
    - `failed` if any issue exists or coverage < 80%
 
