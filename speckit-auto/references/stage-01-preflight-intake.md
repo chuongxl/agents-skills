@@ -51,7 +51,7 @@ When any required repo Speckit file is missing:
 4. If `Install`, follow guide exactly.
 5. Initialize: `specify init . --integration copilot`
 6. Run `speckit.constitution` as an **agent** (not skill):
-   - GitHub Copilot CLI: `task` with `agent_type: "speckit.constitution"`
+   - GitHub Copilot CLI: `/speckit.constitution`
    - Claude Code: `/speckit.constitution`
    - OpenCode: `/speckit.constitution` or `@speckit.constitution`
 7. Re-run source check.
@@ -64,21 +64,13 @@ Run only after source check/recovery passes.
 
 Execution order is strict:
 1. Verify/install repo Speckit files first.
-2. Then validate runtime stage-agent executability.
+2. Then validate runtime executability by invoking repo stage commands in normal flow
+   (starting with `/speckit.specify`).
 
-For GitHub Copilot CLI, validate executable `task` agent types:
-- `speckit.specify`
-- `speckit.clarify`
-- `speckit.plan`
-- `speckit.tasks`
-- `speckit.analyze`
-- `speckit.converge`
-- `speckit.implement`
-
-If runtime lacks executable types:
+If runtime cannot execute stage commands:
 - Report runtime execution failure **after source check passed**.
 - Do not label as installation-missing.
-- Include exact failing agent type + tool error text.
+- Include exact failing command + runtime error text.
 
 ## Preflight Guidelines Context Load (Required)
 

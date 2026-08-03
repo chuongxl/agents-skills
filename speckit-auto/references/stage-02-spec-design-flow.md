@@ -17,7 +17,7 @@ Also load: [review-interview.md](review-interview.md) (default mode only; discar
 ## Invocation Method (Critical)
 
 Use the invocation mapping from `SKILL.md`:
-- GitHub Copilot CLI: call each stage via `task` tool with corresponding `agent_type`.
+- GitHub Copilot CLI: call each stage via repo-installed slash commands (`/speckit.specify`, `/speckit.clarify`, `/speckit.plan`, `/speckit.tasks`, `/speckit.analyze`, `/speckit.converge`).
 - Claude Code / OpenCode: use matching slash/mention invocation.
 
 Do not emit a capability disclaimer before attempting these invocations.
