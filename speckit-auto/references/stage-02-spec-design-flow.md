@@ -1,7 +1,7 @@
 # Stage 02: Spec/Design Flow
 
 Load this only while executing stages:
-`speckit.specify -> speckit.clarify -> speckit.plan -> speckit.tasks -> speckit.analyze -> speckit.converge`
+`speckit.specify -> speckit.clarify -> speckit.plan -> speckit.checklist -> speckit.tasks -> speckit.analyze`
 
 Also load: [review-interview.md](review-interview.md) (default mode only; discard at Stage 03 entry).
 
@@ -10,14 +10,14 @@ Also load: [review-interview.md](review-interview.md) (default mode only; discar
 1. `speckit.specify`
 2. `speckit.clarify`
 3. `speckit.plan`
-4. `speckit.tasks`
-5. `speckit.analyze`
-6. `speckit.converge`
+4. `speckit.checklist`
+5. `speckit.tasks`
+6. `speckit.analyze`
 
 ## Invocation Method (Critical)
 
 Use the invocation mapping from `SKILL.md`:
-- GitHub Copilot CLI: call each stage via repo-installed slash commands (`/speckit.specify`, `/speckit.clarify`, `/speckit.plan`, `/speckit.tasks`, `/speckit.analyze`, `/speckit.converge`).
+- GitHub Copilot CLI: call each stage via repo-installed slash commands (`/speckit.specify`, `/speckit.clarify`, `/speckit.plan`, `/speckit.checklist`, `/speckit.tasks`, `/speckit.analyze`).
 - Claude Code / OpenCode: use matching slash/mention invocation.
 
 Do not emit a capability disclaimer before attempting these invocations.
@@ -27,9 +27,11 @@ Do not emit a capability disclaimer before attempting these invocations.
 - `specify`: requirement text (or normalized Jira intake output) **+ Project Context `summary`**
 - `clarify`: current `spec.md`
 - `plan`: finalized `spec.md` **+ Project Context `summary`, `repo_map`, and any relevant cached guidelines from `loaded_guidelines`**
+- `checklist`: finalized `spec.md` — generate a quality checklist ("unit tests for your requirements") to confirm the spec is complete, clear, and consistent before task breakdown
 - `tasks`: spec + plan context **+ `repo_map`** — every task must declare its target workspace
-- `analyze`: `spec.md`, `plan.md`, `tasks.md`
-- `converge`: artifacts + current codebase, append remaining unbuilt work to `tasks.md`
+- `analyze`: `spec.md`, `plan.md`, `tasks.md` — read-only consistency check across artifacts; report conflicts/gaps/ambiguities
+
+If `speckit.analyze` reports issues, fix at source (`specify/clarify/plan/checklist/tasks`) and rerun `speckit.analyze` before Stage 03.
 
 ## Payload Budget Rules (Stage 02)
 
@@ -40,7 +42,7 @@ For every Stage 02 invocation, keep payload compact:
 - Reuse cached Project Context from Stage 01; do not reload or restate unchanged guideline text.
 - Never carry forward long review prose when a concise delta is enough.
 
-## Large Scope Partitioning (Plan/Tasks/Analyze/Converge)
+## Large Scope Partitioning (Plan/Checklist/Tasks/Analyze)
 
 If requirements are large or task volume is high, split the work into packages and process in batches.
 
@@ -61,8 +63,9 @@ If requirements are large or task volume is high, split the work into packages a
 ### Stage-specific Application
 
 - `speckit.plan`: create plan slices per package, then merge into one coherent `plan.md` with dependencies.
+- `speckit.checklist`: generate checklist slices per package and merge into one requirement-quality checklist.
 - `speckit.tasks`: generate tasks per package, then merge into one `tasks.md` with explicit ordering.
-- `speckit.analyze` / `speckit.converge`: run per package when large; then run one final global reconcile pass.
+- `speckit.analyze`: run per package when large; then run one final global read-only consistency pass.
 
 ## Repository-Aware Task Assignment
 

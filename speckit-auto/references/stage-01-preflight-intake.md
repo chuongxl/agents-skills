@@ -25,19 +25,21 @@ Agents:
 - `.github/agents/speckit.specify.agent.md`
 - `.github/agents/speckit.clarify.agent.md`
 - `.github/agents/speckit.plan.agent.md`
+- `.github/agents/speckit.checklist.agent.md`
 - `.github/agents/speckit.tasks.agent.md`
 - `.github/agents/speckit.analyze.agent.md`
-- `.github/agents/speckit.converge.agent.md`
 - `.github/agents/speckit.implement.agent.md`
+- `.github/agents/speckit.converge.agent.md`
 
 Prompts:
 - `.github/prompts/speckit.specify.prompt.md`
 - `.github/prompts/speckit.clarify.prompt.md`
 - `.github/prompts/speckit.plan.prompt.md`
+- `.github/prompts/speckit.checklist.prompt.md`
 - `.github/prompts/speckit.tasks.prompt.md`
 - `.github/prompts/speckit.analyze.prompt.md`
-- `.github/prompts/speckit.converge.prompt.md`
 - `.github/prompts/speckit.implement.prompt.md`
+- `.github/prompts/speckit.converge.prompt.md`
 
 If any missing, run recovery below. Do not use global/fallback Speckit.
 

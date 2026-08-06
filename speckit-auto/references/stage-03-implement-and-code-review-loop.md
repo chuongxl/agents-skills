@@ -1,6 +1,6 @@
-# Stage 03: Implement + Auto Code Review Loop
+# Stage 03: Implement + Converge + Auto Code Review Loop
 
-Load this only when running `speckit.implement` and `speckit-code-review`.
+Load this only when running `speckit.implement`, `speckit.converge`, and `speckit-code-review`.
 Discard review-interview.md from context at this point — Stage 03 is a NO-STOP ZONE.
 
 ## Repository-Aware Implementation
@@ -13,13 +13,15 @@ Before invoking `speckit.implement`, inject into the prompt:
   match by checking whether the task topic appears in any stem key of `linked_guidelines`.
   If a match exists and is not yet cached, load it now and add to `loaded_guidelines`.
 
-When routing fixes in STEP F (plan/tasks/converge reruns), pass the same Project Context
+When routing fixes in R5 (plan/checklist/tasks/analyze reruns), pass the same Project Context
 fields to those sub-skills so workspace assignment and architecture compliance are preserved.
 
 ## Invocation Method (Critical)
 
 - `speckit.implement` uses the stage-agent invocation mapping in `SKILL.md`
   (GitHub Copilot CLI: `/speckit.implement`).
+- `speckit.converge` uses the stage-agent invocation mapping in `SKILL.md`
+  (GitHub Copilot CLI: `/speckit.converge`).
 - `speckit-code-review` uses the skill invocation mapping in `SKILL.md`
   (GitHub Copilot CLI: `skill` tool with name `speckit-code-review`).
 
@@ -80,28 +82,37 @@ Never launch as a background agent or task process — it must run inline and re
 ## Loop Algorithm (speckit-auto executes this — do not exit until DONE)
 
 ```
-LOOP:
-  STEP A — Run speckit.implement for the next package/batch (or apply targeted fixes — see STEP G)
-           - Small scope: single invocation
-           - Large scope: multiple invocations, parallel only for independent packages
-  STEP B — Invoke speckit-code-review; receive JSON result
-  STEP C — Read result.status
-    IF status = "pass"  → EXIT LOOP
+PHASE 1 — Convergence loop
+  C1 — Run speckit.implement for next package/batch
+       - Small scope: single invocation
+       - Large scope: multiple invocations, parallel only for independent packages
+  C2 — Run speckit.converge (checks codebase vs spec.md/plan.md/tasks.md)
+  C3 — Read converge result
+       IF gaps found:
+         - converge appends new tasks to tasks.md
+         - immediately return to C1 and implement appended tasks
+       IF converged:
+         - proceed to PHASE 2
+
+PHASE 2 — Code review loop
+  R1 — Invoke speckit-code-review; receive JSON result
+  R2 — Read result.status
+    IF status = "pass"  → EXIT STAGE 03
                            IF --yolo = true  → jump to Stage 05
                            IF --yolo = false → jump to Stage 04 (mandatory)
-    IF status = "failed" → IMMEDIATELY go to STEP D
+    IF status = "failed" → IMMEDIATELY go to R3
                            DO NOT produce a prose summary to the user
                            DO NOT end the turn
                            DO NOT ask the user what to do
-  STEP D — Read compact result fields:
-    - `status` — already checked in STEP C
+  R3 — Read compact result fields:
+    - `status` — already checked in R2
     - `Business cover` — business coverage %
     - `unit-test-coverage` — if < "80%" → all TEST-* fixes apply
     - `state_file` — resumable state; use this to resume without reloading the full review body
     - `detail_files` — map of category → file path (load only the category you need)
-    - `fixes[]` — flat list of actionable fix targets; THIS is what drives STEP E
+    - `fixes[]` — flat list of actionable fix targets; THIS is what drives R4
     - after reading these fields, drop the rest of the failed review body from memory and rebuild the next attempt from `state_file`
-  STEP E — Build corrective action list directly from `fixes[]`:
+  R4 — Build corrective action list directly from `fixes[]`:
     - Each fix entry has: id, file, method, lines, action
     - Group by ID prefix to classify scope:
       - FR-*/NFR-* → business gap (may need plan/tasks restart)
@@ -116,28 +127,29 @@ LOOP:
       - TEST-* entry → load `detail_files["unit-tests"]`
       Do NOT load a category file unless you actually need it for that specific fix.
     - If the current retry loop is already holding too much context, discard prior review prose and rely on `state_file` + the one category file you need for the next fix.
-  STEP F — Classify and route:
-    - All fixes are FR-*/NFR-*/ARCH-*  → re-run repo `speckit.plan` then repo `speckit.tasks` → repo `speckit.analyze` → repo `speckit.converge` → STEP A
-    - Mix of FR-*/ARCH-* + SEC-*/CODE-*/TEST-* → re-run repo `speckit.tasks` → repo `speckit.analyze` → repo `speckit.converge` → STEP A
-    - Only SEC-*/CODE-*/TEST-* fixes → go directly to STEP G (no sub-skill needed)
-  STEP G — Apply fixes DIRECTLY using file-editing tools (this turn, right now):
+  R5 — Classify and route:
+    - All fixes are FR-*/NFR-*/ARCH-*  → re-run repo `speckit.plan` then repo `speckit.checklist` then repo `speckit.tasks` → repo `speckit.analyze` → R6
+    - Mix of FR-*/ARCH-* + SEC-*/CODE-*/TEST-* → re-run repo `speckit.checklist` then repo `speckit.tasks` → repo `speckit.analyze` → R6
+    - Only SEC-*/CODE-*/TEST-* fixes → go directly to R6
+  R6 — Apply fixes DIRECTLY using file-editing tools (this turn, right now):
     For EACH item in corrective action list:
       1. Open the specific file listed in suggested_fix_area / file field
       2. Read the relevant method/lines
       3. Write the fix inline using edit/create file tools
       4. Move to next item
-    Rules for STEP G:
+    Rules for R6:
       - DO NOT delegate to speckit.implement for code-only or test-coverage issues
       - DO NOT produce a prose response to the user — just make the edits
-      - DO NOT end the turn after making edits — immediately GOTO LOOP
+      - DO NOT end the turn after making edits — continue Stage 03 flow immediately
       - If a fix requires a new file, create it with the create file tool
       - If you don't have enough context to fix an item, read the file first, then fix
-  GOTO LOOP
+  R7 — Run speckit.implement to apply broader changes if needed, then return to R1
 ```
 
 ## Loop Invariants
 
 - speckit-auto NEVER exits this stage with `status = failed`
+- speckit-auto MUST run `speckit.converge` until it reports converged before entering the code-review loop
 - speckit-auto NEVER asks the user for help during this loop
 - speckit-auto NEVER produces a prose summary of the review result — the review result is data to act on, not a message to report
 - speckit-auto NEVER ends a turn after receiving a failed review — the next action after a failed review is always file edits, not a response

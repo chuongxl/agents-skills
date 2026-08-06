@@ -3,7 +3,8 @@ name: speckit-auto
 description: |
   Runs the full Spec Kit delivery pipeline end-to-end from a requirement or
   Jira issue: intake, speckit.specify, speckit.clarify, speckit.plan,
-  speckit.tasks, speckit.analyze, speckit.converge, speckit.implement,
+  speckit.checklist, speckit.tasks, speckit.analyze, speckit.implement,
+  speckit.converge,
   and automatic speckit-code-review remediation loops until pass.
   Supports --yolo flag for zero-human-in-the-loop fully automated execution.
 compatibility:
@@ -57,10 +58,11 @@ Required repo-installed skills:
 - `speckit.specify`
 - `speckit.clarify`
 - `speckit.plan`
+- `speckit.checklist`
 - `speckit.tasks`
 - `speckit.analyze`
-- `speckit.converge`
 - `speckit.implement`
+- `speckit.converge`
 
 ## Project Context (Guidelines + Repo Map)
 
@@ -91,8 +93,8 @@ When instructions say "invoke `speckit-code-review`", use the invocation for you
 
 ## Compatibility — How to Invoke Repo Speckit Stages
 
-For stage agents (`speckit.specify`, `speckit.clarify`, `speckit.plan`, `speckit.tasks`,
-`speckit.analyze`, `speckit.converge`, `speckit.implement`), invoke by environment:
+For stage agents (`speckit.specify`, `speckit.clarify`, `speckit.plan`, `speckit.checklist`,
+`speckit.tasks`, `speckit.analyze`, `speckit.implement`, `speckit.converge`), invoke by environment:
 
 | Environment | Invocation |
 |-------------|-----------|
@@ -108,7 +110,7 @@ If a stage command fails, report the concrete command/runtime error.
 1. **Preflight + Intake** (includes guidelines context load + repo map detection)
    - Load: [references/stage-01-preflight-intake.md](references/stage-01-preflight-intake.md)
    - Load: [references/preflight-guidelines-context.md](references/preflight-guidelines-context.md)
-2. **Spec/Design Flow (`specify -> clarify -> plan -> tasks -> analyze -> converge`)**
+2. **Spec/Design Flow (`specify -> clarify -> plan -> checklist -> tasks -> analyze`)**
    - Load: [references/stage-02-spec-design-flow.md](references/stage-02-spec-design-flow.md)
    - Load (default mode only): [references/review-interview.md](references/review-interview.md)
    - **Discard both files at Stage 03 entry.**
@@ -126,7 +128,7 @@ If a stage command fails, report the concrete command/runtime error.
 1. Always create/switch a new branch before the first pipeline step.
 2. Base branch priority: `develop -> main -> master` (local first, then remote-tracking).
 3. In `--issue` mode, use Jira issue key as spec folder prefix in lowercase (`specs/{issue-id-lowercase}-{short-title}`) and keep it stable across reruns.
-4. For `speckit.specify`, `speckit.clarify`, `speckit.plan`, `speckit.tasks`, `speckit.analyze`, `speckit.converge`, and `speckit.implement`, always use the repository-installed GitHub Speckit skills from this repo.
+4. For `speckit.specify`, `speckit.clarify`, `speckit.plan`, `speckit.checklist`, `speckit.tasks`, `speckit.analyze`, `speckit.implement`, and `speckit.converge`, always use the repository-installed GitHub Speckit skills from this repo.
 5. If repository-installed GitHub Speckit is missing, fetch install guide from `https://github.com/github/spec-kit/blob/main/docs/installation.md`, ask user to `Install` or `Stop`, and only continue pipeline after installation + initialization is complete.
 6. **Stage 01 Intake has no interview gate.** After input is collected (`--issue` compact brief or manual requirement text), continue immediately to `speckit.specify` with no intake Q&A stop.
 7. On initial invocation, never stop after announcing plan/intent. Stage 01 must execute in the same run.
@@ -134,7 +136,7 @@ If a stage command fails, report the concrete command/runtime error.
 9. For large scope (large requirement, many tasks, or many workspaces), split work into small packages and invoke repo agents multiple times per package until complete.
 10. For split work: run packages in parallel only when dependency-independent; otherwise run sequentially in dependency order.
 11. In implementation split mode, map user wording `speckit.implementation` to the repo agent `speckit.implement`.
-12. After each `speckit.implement` cycle, invoke `speckit-code-review` using the correct invocation for the current environment (see Compatibility table above) and wait for JSON result.
+12. Stage 03 must first run `speckit.implement -> speckit.converge` repeatedly until converge reports no gaps; then run `speckit-code-review`. After that, use the `speckit.implement -> speckit-code-review` loop until review status is `pass`.
 13. **Stage 03 (Implement + Code Review Loop) is a NO-STOP ZONE in BOTH default and --yolo modes. No human approval gates, no pauses, no prompts fire inside Stage 03. This rule overrides all interview flow and mode-based gate rules.**
 14. **A `failed` result from `speckit-code-review` is NEVER a stop condition in any mode. Do NOT produce a prose summary of the result. Do NOT end the turn. Immediately apply fixes using file-editing tools and loop again.**
 15. **For code-only or test-coverage failures: directly edit the specific files from the review result (`suggested_fix_area`, `file`, `method/function` fields) using file-editing tools — in the same turn. Do NOT delegate to speckit.implement.**
