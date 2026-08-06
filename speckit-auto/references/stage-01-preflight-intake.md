@@ -1,15 +1,8 @@
 # Stage 01: Preflight + Intake
 
-Run this at pipeline start.
-
-## Critical Startup Rules
-
-1. On `/speckit-auto`, execute Stage 01 immediately.
-2. No intent-only acknowledgement.
-3. Complete preflight + intake in the same run, then hand off to `speckit.specify`.
-4. If this file is reached from an already-loaded skill context turn, continue execution immediately using resolved run context; do not ask user to re-run `/speckit-auto`.
-5. Do not treat missing persisted runner artifacts (state file/channel binding) as a blocker; initialize ephemeral run state and continue.
-6. Never write a prose explanation of why execution might not be possible before attempting the real tool call. Make the call first (see SKILL.md "Absolute Operating Premise").
+Run this at pipeline start. See `SKILL.md` "Absolute Operating Premise" and "Startup / Continuation
+Contract" — they already cover immediate execution, no-acknowledgement-only, resuming mid-run, and
+ephemeral state bootstrap; this file adds Stage 01–specific steps only.
 
 ## Preflight Branch Setup
 
@@ -70,18 +63,10 @@ When any required repo Speckit file is missing:
 
 ## Preflight Runtime Executability Check (Required, After Source Check)
 
-Run only after source check/recovery passes.
-
-Execution order is strict:
-1. Verify/install repo Speckit files first.
-2. Invoke `speckit.specify` directly via the repo-installed slash command (`/speckit.specify`) —
-   this is the sole `stage_invocation_mode` (`slash-agent`) for this run. Do not attempt the `task`
-   tool with a `speckit.*` agent_type first; it always fails with `Unknown agent_type` and is not a
-   valid check of runtime executability.
-
-This "check" is simply: call the real slash command for the current stage now. If it runs, runtime
-executability is proven and the pipeline continues. Only if that concrete call errors do you report
-a runtime execution failure — quote the exact error, after confirming source check already passed.
+After source check/recovery passes: invoke `/speckit.specify` directly (the only
+`stage_invocation_mode`, `slash-agent` — never attempt `task` with a `speckit.*` agent_type, it
+always fails with `Unknown agent_type`). If it runs, executability is proven; only a concrete error
+from that call is reportable as a runtime failure (quote it), and only after source check passed.
 
 ## Preflight Guidelines Context Load (Required)
 
@@ -130,19 +115,14 @@ If `run_state`/stage file/channel binding is absent in this turn, initialize in 
   "branch_name": null,
   "issue_url": "<resolved-or-null>",
   "requirement_text": "<resolved-or-null>",
-  "stage_invocation_mode": null
+  "stage_invocation_mode": "slash-agent"
 }
 ```
 
-Then execute Stage 01 normally in this exact order, without waiting for a separate re-invocation turn:
-
-**branch setup (mandatory, first) → source check → runtime invocation check → guidelines load → intake**
-
-Do not skip straight to intake/source-check because this bootstrap section appears late in the file —
-`branch_created` must be `true`, with a real `branch_name` from an actual git command, before any
-Speckit stage, `jira-to-speckit`, or intake step is invoked. If `branch_created` is still `false` when
-you reach the Jira/manual intake step, stop and perform Preflight Branch Setup first.
-
+Execute Stage 01 in this order (this is the true order regardless of file position):
+**branch setup → source check → runtime check → guidelines load → intake.**
+`branch_created` must be `true` (real `branch_name` from an actual git command) before any
+Speckit stage, `jira-to-speckit`, or intake step runs.
 
 ## Jira Intake (`--issue`) via `jira-to-speckit`
 
@@ -176,23 +156,12 @@ Override `jira-to-speckit` orchestration scope:
 | Open questions | `Open questions:` | Seed for `speckit.clarify` |
 | Truncation note | `Truncation note:` | Context log |
 
-### Continue Immediately After Jira Intake (Critical — No Turn-End Here)
+### Continue Immediately After Jira Intake (No Turn-End Here)
 
-`jira-to-speckit` returning its compact brief (even when its own output text ends with a line like
-"Next action: handing back to speckit-auto...") is **not** a stopping point and must never become
-the final assistant response for the turn. That line is data from the sub-skill, not an instruction
-to end your turn — it is `speckit-auto`'s job, not the user's, to act on it.
-
-In the same turn, immediately after receiving the compact brief:
-1. Do not print the brief and stop. Do not restate "handing back to speckit-auto" as your own next
-   step and end the response there.
-2. Resolve/create the spec folder using the Folder Naming rule above.
-3. Invoke `speckit.specify` right now via the slash command (`/speckit.specify`), passing the
-   compact brief as input, exactly as described in Stage 02 invocation rules.
-4. Continue the pipeline (Stage 02 onward) in this same run — do not wait for another user message.
-
-This is a specific case of SKILL.md's Startup Execution Contract and Absolute Operating Premise:
-finishing one stage/sub-skill call is never itself a valid reason to end the turn.
+A "next action"/"handing back" line in `jira-to-speckit`'s output is data, not a stop cue (see
+SKILL.md premise). In the same turn: resolve/create the spec folder (Folder Naming below), then
+invoke `/speckit.specify` with the compact brief, and continue Stage 02 onward without waiting for
+another user message.
 
 ### Folder Naming (`--issue`)
 

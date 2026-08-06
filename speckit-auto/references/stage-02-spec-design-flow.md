@@ -23,7 +23,7 @@ Use the invocation mapping from `SKILL.md`:
   `speckit.*` agent_type.
 - Claude Code / OpenCode: use matching slash/mention invocation.
 
-Never emit a capability disclaimer before attempting these invocations — call the slash command now.
+Never emit a capability disclaimer before attempting these — call the slash command now (SKILL.md premise applies here too).
 
 ## Prompt Wiring Rules
 
