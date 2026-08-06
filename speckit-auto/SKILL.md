@@ -136,27 +136,28 @@ Only fail after both paths fail, and report both concrete errors.
 5. If repository-installed GitHub Speckit is missing, fetch install guide from `https://github.com/github/spec-kit/blob/main/docs/installation.md`, ask user to `Install` or `Stop`, and only continue pipeline after installation + initialization is complete.
 6. **Stage 01 Intake has no interview gate.** After input is collected (`--issue` compact brief or manual requirement text), continue immediately to `speckit.specify` with no intake Q&A stop.
 7. On initial invocation, never stop after announcing plan/intent. Stage 01 must execute in the same run.
-8. **Heavy payload prevention is mandatory.** For each stage, pass only the minimum required slices (current stage input + relevant section excerpts + compact project context). Never forward full prior stage prose when not needed.
-9. For large scope (large requirement, many tasks, or many workspaces), split work into small packages and invoke repo agents multiple times per package until complete.
-10. For split work: run packages in parallel only when dependency-independent; otherwise run sequentially in dependency order.
-11. In implementation split mode, map user wording `speckit.implementation` to the repo agent `speckit.implement`.
-12. Stage 03 must first run `speckit.implement -> speckit.converge` repeatedly until converge reports no gaps; then run `speckit-code-review`. After that, use the `speckit.implement -> speckit-code-review` loop until review status is `pass`.
-13. **Stage 03 (Implement + Code Review Loop) is a NO-STOP ZONE in BOTH default and --yolo modes. No human approval gates, no pauses, no prompts fire inside Stage 03. This rule overrides all interview flow and mode-based gate rules.**
-14. **A `failed` result from `speckit-code-review` is NEVER a stop condition in any mode. Do NOT produce a prose summary of the result. Do NOT end the turn. Immediately apply fixes using file-editing tools and loop again.**
-15. **For code-only or test-coverage failures: directly edit the specific files from the review result (`suggested_fix_area`, `file`, `method/function` fields) using file-editing tools — in the same turn. Do NOT delegate to speckit.implement.**
-16. Apply fixes, re-run `speckit-code-review`, and repeat until `status = pass`.
-17. After Stage 03 exits with `pass`, routing is mandatory:
+8. Stage 01 must auto-resolve `--issue` URL from current command/turn context when present and continue; do not block with "please invoke again" if the Jira URL is already available.
+9. **Heavy payload prevention is mandatory.** For each stage, pass only the minimum required slices (current stage input + relevant section excerpts + compact project context). Never forward full prior stage prose when not needed.
+10. For large scope (large requirement, many tasks, or many workspaces), split work into small packages and invoke repo agents multiple times per package until complete.
+11. For split work: run packages in parallel only when dependency-independent; otherwise run sequentially in dependency order.
+12. In implementation split mode, map user wording `speckit.implementation` to the repo agent `speckit.implement`.
+13. Stage 03 must first run `speckit.implement -> speckit.converge` repeatedly until converge reports no gaps; then run `speckit-code-review`. After that, use the `speckit.implement -> speckit-code-review` loop until review status is `pass`.
+14. **Stage 03 (Implement + Code Review Loop) is a NO-STOP ZONE in BOTH default and --yolo modes. No human approval gates, no pauses, no prompts fire inside Stage 03. This rule overrides all interview flow and mode-based gate rules.**
+15. **A `failed` result from `speckit-code-review` is NEVER a stop condition in any mode. Do NOT produce a prose summary of the result. Do NOT end the turn. Immediately apply fixes using file-editing tools and loop again.**
+16. **For code-only or test-coverage failures: directly edit the specific files from the review result (`suggested_fix_area`, `file`, `method/function` fields) using file-editing tools — in the same turn. Do NOT delegate to speckit.implement.**
+17. Apply fixes, re-run `speckit-code-review`, and repeat until `status = pass`.
+18. After Stage 03 exits with `pass`, routing is mandatory:
    - default mode (`--yolo` not set): go to Stage 04
    - `--yolo` mode: go to Stage 05
-18. In default mode, Stage 04 is mandatory and must never be skipped.
-19. In `--yolo` mode, skip all human review interactions including Stage 04.
-20. After successful implementation commit, mark active `spec.md` as `completed` and create follow-up commit for that status change.
-21. If any stage, status update, or required commit fails, stop and report exact failure.
-22. Only abort the review loop if the **exact same failure repeats for 5 consecutive iterations** with no code change — report the stuck state and stop.
-23. On every failed review retry, rebuild the loop context from `state_file` plus the current `fixes[]` only; do not retain the full prior review body or any earlier category detail files unless they are needed for the next fix.
-24. Never stop with a generic capability disclaimer (for example "environment doesn’t expose those skills"). Attempt required invocation paths first (`task-agent`, then `slash-agent`, plus `skill` for skill dependencies); only stop on concrete tool/runtime errors with exact failing step.
-25. Failure ordering is strict: first run repo install/source checks; only after those pass may runtime stage-agent executability errors be reported.
-26. If implementation modifies git submodule repositories, create/switch branch inside each modified submodule and commit submodule changes first, then commit parent repo pointer updates; if no submodule is modified, behavior stays unchanged.
+19. In default mode, Stage 04 is mandatory and must never be skipped.
+20. In `--yolo` mode, skip all human review interactions including Stage 04.
+21. After successful implementation commit, mark active `spec.md` as `completed` and create follow-up commit for that status change.
+22. If any stage, status update, or required commit fails, stop and report exact failure.
+23. Only abort the review loop if the **exact same failure repeats for 5 consecutive iterations** with no code change — report the stuck state and stop.
+24. On every failed review retry, rebuild the loop context from `state_file` plus the current `fixes[]` only; do not retain the full prior review body or any earlier category detail files unless they are needed for the next fix.
+25. Never stop with a generic capability disclaimer (for example "environment doesn’t expose those skills"). Attempt required invocation paths first (`task-agent`, then `slash-agent`, plus `skill` for skill dependencies); only stop on concrete tool/runtime errors with exact failing step.
+26. Failure ordering is strict: first run repo install/source checks; only after those pass may runtime stage-agent executability errors be reported.
+27. If implementation modifies git submodule repositories, create/switch branch inside each modified submodule and commit submodule changes first, then commit parent repo pointer updates; if no submodule is modified, behavior stays unchanged.
 
 ## Output Behavior
 

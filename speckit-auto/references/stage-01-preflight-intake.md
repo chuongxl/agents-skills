@@ -89,6 +89,21 @@ it must skip and continue (no stop).
 - If command includes `--issue`, run Jira intake via `jira-to-speckit`.
 - Otherwise, start `speckit.specify` from user requirement text.
 
+## Issue Argument Resolution (Critical)
+
+Before deciding intake mode, resolve `issue_url` using this precedence:
+
+1. Explicit CLI flag in current command: `--issue <url>`
+2. Explicit CLI flag variant: `--issue=<url>`
+3. Any Jira browse URL in the current user turn text (for example `https://.../browse/ABC-123`)
+4. Existing in-run state value `issue_url` (if already captured earlier in this same run)
+
+If `issue_url` is resolved by any method above, treat the run as `--issue` mode and execute Jira
+intake immediately. Do not ask the user to re-invoke the skill with the same command.
+
+Only if the user explicitly selected `--issue` mode but no URL can be resolved, ask once for the
+missing Jira URL, then continue Stage 01 in the same run.
+
 ## Jira Intake (`--issue`) via `jira-to-speckit`
 
 Do not manually parse Jira when `jira-to-speckit` is available.
