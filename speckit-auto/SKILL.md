@@ -11,6 +11,9 @@ compatibility:
   github-copilot: "Skill auto-discovered from ~/.agents/skills/. Invoked via skill tool."
   claude-code: "Register SKILL.md as .claude/commands/speckit-auto.md. Invoke as /speckit-auto."
   opencode: "Place SKILL.md in .opencode/instructions/speckit-auto.md. Invoke as /speckit-auto or @speckit-auto."
+metadata:
+  author: Alex Nguyen
+  version: "0.0.1"
 ---
 
 # Speckit Auto Pipeline (Progressive Loading)

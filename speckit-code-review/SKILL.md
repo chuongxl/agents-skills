@@ -13,6 +13,8 @@ compatibility:
 metadata:
   specification: agentskills.io/specification
   output_contract: strict-json
+  author: Alex Nguyen
+  version: "0.0.1"
 ---
 
 # Speckit Code Review

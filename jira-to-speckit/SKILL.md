@@ -4,7 +4,7 @@ description: Fetch a Jira issue or Jira issue URL using credentials from `.env`,
 compatibility: Requires network access, Jira REST API access, and git access via SSH authorization. Requires `.env` entries for `JIRA_URL`, `JIRA_USERNAME`, and `JIRA_API_TOKEN`. Repository detection is automatic via `git remote` or folder name.
 metadata:
   author: Alex Nguyen
-  version: "1.1"
+  version: "0.0.1"
 ---
 
 # Jira to Speckit
