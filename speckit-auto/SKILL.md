@@ -149,7 +149,7 @@ runtime failure if the slash command itself errors with a concrete message.
 ## Non-Negotiable Global Rules
 
 1. Always create/switch a new branch before the first pipeline step — a hard gate via real git commands (not merely described); no source check, intake, or `speckit.*`/`jira-to-speckit` call may run first (see Stage 01 for exact sequencing).
-2. Base branch priority: `develop -> main -> master` (local first, then remote-tracking).
+2. Base branch priority: `develop -> main -> master` (local first, then remote-tracking); always fetch/pull that base branch to latest before branching off it, both for the main repo (Stage 01) and any modified submodule (Stage 03) — see those stages for exact commands.
 3. In `--issue` mode, use Jira issue key as spec folder prefix in lowercase (`specs/{issue-id-lowercase}-{short-title}`) and keep it stable across reruns.
 4. For `speckit.specify`, `speckit.clarify`, `speckit.plan`, `speckit.checklist`, `speckit.tasks`, `speckit.analyze`, `speckit.implement`, and `speckit.converge`, always use the repository-installed GitHub Speckit skills from this repo.
 5. If repository-installed GitHub Speckit is missing, fetch install guide from `https://github.com/github/spec-kit/blob/main/docs/installation.md`, ask user to `Install` or `Stop`, and only continue pipeline after installation + initialization is complete.

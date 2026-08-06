@@ -9,9 +9,13 @@ ephemeral state bootstrap; this file adds Stage 01–specific steps only.
 **Mandatory gate — must complete before any other Stage 01 action** (source check, guidelines
 load, Jira intake, or `speckit.specify`):
 
-1. Create/switch to a new branch before any Speckit stage.
-2. Base branch priority: `develop` → `main` → `master` (local first, then remote-tracking).
-3. If none exists, stop with missing base-branch error.
+1. Base branch priority: `develop` → `main` → `master` (local first, then remote-tracking). If none exists, stop with missing base-branch error.
+2. Sync base branch to latest before branching off it:
+   - `git fetch origin <base-branch>`
+   - `git checkout <base-branch>`
+   - `git pull origin <base-branch>` (fast-forward only)
+   - If fetch/pull fails (no remote, offline, conflict), log a warning and continue with the local copy of `<base-branch>` as-is — this is not a hard stop.
+3. Create/switch to a new branch off the now-synced base branch, before any Speckit stage.
 4. Branch name must be deterministic:
    - Jira mode: include Jira key
    - Non-Jira mode: requirement slug + timestamp

@@ -45,12 +45,13 @@ When implementation scope is large, split and execute in batches:
 Apply this only when the repo uses git submodules.
 
 1. Detect submodules from `.gitmodules` and track their paths.
-2. During implementation/fix steps, if code changes occur inside a submodule path:
-   - ensure that submodule has a working branch before committing there
+2. During implementation/fix steps, the first time code changes are about to occur inside a
+   submodule path (lazily, only for submodules actually modified):
    - branch base priority inside submodule: `develop` → `main` → `master` (local first, then remote-tracking)
+   - sync that base branch first: `git fetch origin <base-branch>` → `git checkout <base-branch>` → `git pull origin <base-branch>` (fast-forward only) inside the submodule; on fetch/pull failure, log a warning and continue with the local copy — not a hard stop
+   - create/switch to a new working branch off the now-synced base, before editing any file in that submodule
    - branch name should be deterministic and aligned with the parent pipeline branch context
-3. Create/switch submodule branch lazily (only when that submodule is actually modified).
-4. If no submodule exists, or no submodule files are modified, keep current behavior unchanged.
+3. If no submodule exists, or no submodule files are modified, keep current behavior unchanged.
 
 ## CRITICAL: speckit-auto Owns This Loop — NO STOPS, NO GATES
 
