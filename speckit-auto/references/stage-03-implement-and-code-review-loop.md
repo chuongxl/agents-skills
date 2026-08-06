@@ -18,10 +18,9 @@ fields to those sub-skills so workspace assignment and architecture compliance a
 
 ## Invocation Method (Critical)
 
-- `speckit.implement` uses the stage-agent invocation mapping in `SKILL.md`
-  (GitHub Copilot CLI: `/speckit.implement`).
-- `speckit.converge` uses the stage-agent invocation mapping in `SKILL.md`
-  (GitHub Copilot CLI: `/speckit.converge`).
+- `speckit.implement` and `speckit.converge` use Stage 01 `stage_invocation_mode`:
+  - `task-agent`: invoke via `task` with matching Speckit `agent_type`
+  - `slash-agent`: invoke via repo-installed slash commands (`/speckit.implement`, `/speckit.converge`)
 - `speckit-code-review` uses the skill invocation mapping in `SKILL.md`
   (GitHub Copilot CLI: `skill` tool with name `speckit-code-review`).
 

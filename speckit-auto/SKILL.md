@@ -98,12 +98,16 @@ For stage agents (`speckit.specify`, `speckit.clarify`, `speckit.plan`, `speckit
 
 | Environment | Invocation |
 |-------------|-----------|
-| GitHub Copilot CLI | repo-installed slash agent command (for example `/speckit.specify`) |
+| GitHub Copilot CLI | **adaptive**: use `task` with matching Speckit `agent_type` when available; otherwise use repo-installed slash command |
 | Claude Code | corresponding slash command (for example `/speckit.specify`) |
 | OpenCode | corresponding slash command or mention (for example `/speckit.specify` or `@speckit.specify`) |
 
-Do **not** use `task` custom `agent_type` values for these stage agents.
-If a stage command fails, report the concrete command/runtime error.
+For GitHub Copilot CLI, select and persist `stage_invocation_mode` for this run:
+- `task-agent` mode: `task` tool with matching Speckit `agent_type`
+- `slash-agent` mode: repo-installed slash command
+
+Try `task-agent` first; if unavailable in this runtime, fall back to `slash-agent`.
+Only fail after both paths fail, and report both concrete errors.
 
 ## Stage Router (Load On Demand)
 
@@ -150,7 +154,7 @@ If a stage command fails, report the concrete command/runtime error.
 21. If any stage, status update, or required commit fails, stop and report exact failure.
 22. Only abort the review loop if the **exact same failure repeats for 5 consecutive iterations** with no code change — report the stuck state and stop.
 23. On every failed review retry, rebuild the loop context from `state_file` plus the current `fixes[]` only; do not retain the full prior review body or any earlier category detail files unless they are needed for the next fix.
-24. Never stop with a generic capability disclaimer (for example "environment doesn’t expose those skills"). Attempt the required invocation path first (repo slash stage commands + `skill` for skill dependencies); only stop on concrete tool/runtime errors with exact failing step.
+24. Never stop with a generic capability disclaimer (for example "environment doesn’t expose those skills"). Attempt required invocation paths first (`task-agent`, then `slash-agent`, plus `skill` for skill dependencies); only stop on concrete tool/runtime errors with exact failing step.
 25. Failure ordering is strict: first run repo install/source checks; only after those pass may runtime stage-agent executability errors be reported.
 26. If implementation modifies git submodule repositories, create/switch branch inside each modified submodule and commit submodule changes first, then commit parent repo pointer updates; if no submodule is modified, behavior stays unchanged.
 

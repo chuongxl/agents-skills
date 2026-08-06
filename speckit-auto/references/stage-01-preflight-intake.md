@@ -66,13 +66,15 @@ Run only after source check/recovery passes.
 
 Execution order is strict:
 1. Verify/install repo Speckit files first.
-2. Then validate runtime executability by invoking repo stage commands in normal flow
-   (starting with `/speckit.specify`).
+2. Then validate runtime executability using adaptive stage invocation:
+   - Try `task-agent` mode first (`task` with matching Speckit `agent_type`, starting with `speckit.specify`)
+   - If unavailable, fall back to `slash-agent` mode (starting with `/speckit.specify`)
+   - Persist selected mode as `stage_invocation_mode` for all remaining stage calls in this run.
 
 If runtime cannot execute stage commands:
 - Report runtime execution failure **after source check passed**.
 - Do not label as installation-missing.
-- Include exact failing command + runtime error text.
+- Include exact failing attempts + runtime error text (both modes if both were tried).
 
 ## Preflight Guidelines Context Load (Required)
 
