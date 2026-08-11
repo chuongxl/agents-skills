@@ -31,6 +31,28 @@ each skill name using the precedence in [provider-rules.md](provider-rules.md).
 Never emit a capability disclaimer before attempting these — make the `skill` call now (the
 SKILL.md Absolute Operating Premise applies here too).
 
+## Artifact Path Guard (Run After Every Skill Call In This Stage)
+
+`brainstorming` and `writing-plans` expose **no path parameter** — each hardcodes its output path
+inside its own SKILL.md (`docs/superpowers/specs/YYYY-MM-DD-<topic>-design.md` and
+`docs/superpowers/plans/YYYY-MM-DD-<feature-name>.md`). Passing the pipeline path is an instruction
+they may or may not follow, and every downstream stage keys off the pipeline path, so the
+instruction alone is never enough.
+
+After each of the two skill calls below, before doing anything else:
+
+1. Check the pipeline path (`specs/<feature_folder>/spec.md` or `.../plan.md`). If the file is
+   there, continue.
+2. If it is not, look for the skill's default output — the newest matching file under
+   `docs/superpowers/specs/` or `docs/superpowers/plans/` created during this run.
+3. If found, move it to the pipeline path (`mkdir -p` the folder first) and log the relocation.
+   Remove the now-empty default directory only if this run created it.
+4. If neither path holds a file, the skill did not produce its artifact — re-run it once with the
+   path stated more explicitly. Only a second failure is reportable.
+
+This guard is deterministic and mandatory. Never assume the path instruction was honored, and never
+carry a "the skill said it saved it" claim forward without checking the file.
+
 ## Step 1 — `brainstorming`
 
 Pass into the skill:
@@ -39,6 +61,8 @@ Pass into the skill:
 - open questions from Jira intake, as clarification seeds
 - Project Context `summary` from Stage 01
 - **the exact output path**: `specs/<feature_folder>/spec.md`
+- an instruction **not to commit** the design document — the pipeline owns commits (Stage 04/05).
+  If it commits anyway, log it and continue; never treat that as an error.
 
 Interaction mode:
 
@@ -48,8 +72,14 @@ Interaction mode:
   brief, choose the recommended option at each decision point, and skip all approval gates.
   State this explicitly in the skill input.
 
-Exit criteria: the design spec file exists at the exact path above and its self-review found no
-placeholders or contradictions.
+`brainstorming` carries a `<HARD-GATE>` blocking implementation until a human approves the design.
+It is honored, not bypassed. In `--yolo`, `speckit-auto` is the approver: auto-approval **is** the
+approval event, and the gate is satisfied once the design document is written and its self-review
+is clean. State that in the skill input so it does not wait for a human message. Never end a
+`--yolo` turn waiting on this gate.
+
+Exit criteria: the design spec file exists at the exact path above (verified by the Artifact Path
+Guard, not assumed) and its self-review found no placeholders or contradictions.
 
 ## Step 2 — `writing-plans`
 
@@ -60,10 +90,14 @@ Pass into the skill:
 - **the exact output path**: `specs/<feature_folder>/plan.md`
 - an instruction to choose the execution style at Stage 03 (do not let it start implementing here)
 
-Interaction mode: in `--yolo`, skip its "subagent-driven vs inline" user choice — Stage 03 decides.
+Interaction mode: `writing-plans` ends with an "Execution Handoff" that asks the user to pick
+between subagent-driven and inline execution, then invokes the chosen skill. Suppress that handoff
+in **both** modes — Stage 03 owns the choice (see its Execution Style Selection) and must not be
+entered from inside `writing-plans`. Treat the handoff text as data, not as a question to relay.
 
-Exit criteria: the plan file exists at the exact path, every task names its target workspace from
-`repo_map`, and the mandatory self-review below has passed.
+Exit criteria: the plan file exists at the exact path (verified by the Artifact Path Guard above,
+not assumed), every task names its target workspace from `repo_map`, and the mandatory self-review
+below has passed.
 
 ## Mandatory Self-Review Gate (checklist + analyze equivalent)
 

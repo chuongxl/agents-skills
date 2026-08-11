@@ -20,6 +20,13 @@ the `task` tool with a `superpowers:*` agent_type. Resolve each skill name using
 [provider-rules.md](provider-rules.md) (session skill list → `superpowers:<name>` → bare `<name>`
 → file-read fallback).
 
+**This does not restrict the subagents those skills dispatch themselves.**
+`subagent-driven-development` dispatches a fresh implementer and a task reviewer per task, and
+`requesting-code-review` dispatches a `general-purpose` code reviewer — all through built-in agent
+types. Those dispatches are required for Stage 03 to work at all. Never suppress them, and never
+read the rule above as "no subagents in Stage 03". See the Task Tool section in
+[provider-rules.md](provider-rules.md).
+
 | Step | Skill |
 |------|-------|
 | Implementation (subagents available) | `subagent-driven-development` |
@@ -49,6 +56,45 @@ Choose once, at Stage 03 entry, and keep it for the whole run:
 - Prefer `subagent-driven-development` (fresh implementer per task, two-stage review).
 - Fall back to `executing-plans` if subagent dispatch is unavailable or fails.
 
+State the choice in the skill input. `writing-plans` may have printed its own "two execution
+options" handoff at the end of Stage 02 — that was suppressed there and does not decide anything
+here.
+
+## Implementation Skill Boundaries (Both Styles)
+
+Pass these into the implementation skill as explicit constraints. Each one overrides a step the
+skill would otherwise take on its own:
+
+1. **Workspace** — the current branch (from Stage 01) is the isolated workspace.
+   `subagent-driven-development` opens by requiring an isolated workspace, "created or verified";
+   the verify arm is satisfied. Do not create or enter a git worktree, and do not stop to ask which
+   workspace to use.
+2. **No branch finish** — the skill's terminal step ("final review clean → delete this plan's
+   workspace → use `finishing-a-development-branch`") is **suspended**. Returning means "continue
+   Stage 03", never "the branch is done". No PR, no merge, no branch deletion, no workspace
+   deletion here. Stage 04/05 owns all of that.
+3. **Commits are expected** — the implementer subagents commit per task. That is normal and must
+   not be suppressed; Stage 04/05 handles an already-clean tree (see those stages). Record the SHA
+   of the branch point before the first dispatch (below) so the review range stays correct.
+4. **No completion claim ends the stage** — the skill reporting "all tasks complete" is input to
+   PHASE 1 step C2, not an exit.
+
+## Review Range (`BASE_SHA` / `HEAD_SHA`)
+
+Record once, at Stage 03 entry, before any implementation dispatch:
+
+```bash
+BASE_SHA=$(git merge-base HEAD <base-branch>)   # base-branch from shared/branching.md
+```
+
+`HEAD_SHA=$(git rev-parse HEAD)` is re-read fresh at each R0.
+
+Never use `HEAD~1` as `BASE_SHA` — `requesting-code-review` suggests it as a default, but it
+silently drops every commit but the last, and with `executing-plans` (which may not commit per
+task) it can produce an **empty diff**, yielding a "clean" review that reviewed nothing.
+If `BASE_SHA` and `HEAD_SHA` resolve to the same commit at R0, no code has been committed yet:
+do not run the review — return to PHASE 1 and finish the implementation first.
+
 ## Mandatory TDD
 
 Every implementation step runs `test-driven-development`:
@@ -60,8 +106,10 @@ apply a fix without an identified root cause.
 
 ## Worktrees Are Skipped
 
-Stay on the branch created in Stage 01; ignore any superpowers instruction to create or enter a
-worktree. See global rule 3 and [../shared/branching.md](../shared/branching.md).
+Stay on the branch created in Stage 01 — it **is** the isolated workspace the implementation skill
+asks for. Ignore any superpowers instruction to create or enter a worktree, and never treat the
+absence of a worktree as a missing prerequisite. See global rule 3,
+[provider-rules.md](provider-rules.md) rule 3, and [../shared/branching.md](../shared/branching.md).
 
 ## Git Submodule Branch Handling
 
@@ -100,6 +148,9 @@ Superpowers' own gates are subordinated here:
 - `requesting-code-review` produces advisory findings; its verdict never exits Stage 03.
 - `receiving-code-review` governs how findings are evaluated, but never authorizes
   ending the turn.
+- `subagent-driven-development` reporting all tasks complete, and its terminal
+  "finish the branch" handoff, are neither an exit nor a completion — see Implementation Skill
+  Boundaries above.
 
 ## Mandatory Exit Routing from Stage 03
 
@@ -128,6 +179,8 @@ PHASE 1 — Implementation + verification loop
 PHASE 2 — Code review loop
   R0 — Run requesting-code-review (native pass, advisory)
        - inputs: description, plan excerpt, BASE_SHA, HEAD_SHA
+         (BASE_SHA = the merge-base recorded at stage entry, never HEAD~1 — see Review Range;
+          if BASE_SHA == HEAD_SHA, nothing is committed yet → return to C1)
        - apply Critical and Important findings immediately via file edits
          (evaluate them through receiving-code-review discipline)
        - log Minor findings; do not stop for any of them

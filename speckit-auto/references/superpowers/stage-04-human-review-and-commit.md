@@ -18,17 +18,35 @@ Load this only in default mode after `speckit-code-review` returns `pass`.
 
 ## If Approved
 
+**Stage 03 usually already committed.** `subagent-driven-development`'s implementer subagents
+commit after each task, so the working tree is often clean by the time this stage runs. An empty
+commit attempt exits non-zero, and global rule 19 would turn that into a false pipeline failure at
+the very last step. So every commit below is conditional.
+
 1. Ask for the commit message.
-2. If git submodules exist and were modified:
-   - For each modified submodule, commit inside that submodule first:
+2. Check what is actually uncommitted, in each repo before committing there:
+   - `git status --porcelain`
+   - **Empty output → skip the commit for that repo and log
+     `already committed during Stage 03 (<n> commits on <branch>)`.** This is a success path, not
+     a failure. Verify with `git log <base-branch>..HEAD --oneline` that the work is really there.
+   - Non-empty → commit as below.
+3. If git submodules exist and were modified:
+   - For each modified submodule, commit inside that submodule first (when its status is dirty):
      - `git add -A`
      - `git commit -m "<commit-message>"`
-   - Then commit in the parent repo to record the submodule pointer update (and any parent changes):
+   - Then, in the parent repo, commit the submodule pointer update and any parent changes. Check
+     the parent's status **after** the submodule commits — a submodule commit dirties the parent
+     pointer, so the parent may need a commit even when it looked clean a moment earlier:
      - `git add -A`
      - `git commit -m "<commit-message>"`
-3. If no submodules were modified:
+4. If no submodules were modified and the tree is dirty:
    - `git add -A`
    - `git commit -m "<commit-message>"`
+5. Report the resulting commits (hash + subject). If nothing needed committing, report the Stage 03
+   commits instead — never report "no commit" as a failure.
+
+Do not `git add -A` review scratch: `.speckit/` (review detail files and state) and `.superpowers/`
+(the implementation ledger and briefs) must be ignored before this point — Stage 01 ensures that.
 
 ## Optional PR Creation
 
