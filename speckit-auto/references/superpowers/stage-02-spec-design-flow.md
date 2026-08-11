@@ -38,7 +38,7 @@ Pass into the skill:
 - the compact Jira brief (or requirement text) from Stage 01
 - open questions from Jira intake, as clarification seeds
 - Project Context `summary` from Stage 01
-- **the exact output path**: `docs/superpowers/specs/<issue_id>-<short_title>-design.md`
+- **the exact output path**: `specs/<feature_folder>/spec.md`
 
 Interaction mode:
 
@@ -57,7 +57,7 @@ Pass into the skill:
 
 - the finalized design spec path from Step 1
 - Project Context `summary`, `repo_map`, and any relevant cached guidelines from `loaded_guidelines`
-- **the exact output path**: `docs/superpowers/plans/<issue_id>-<short_title>.md`
+- **the exact output path**: `specs/<feature_folder>/plan.md`
 - an instruction to choose the execution style at Stage 03 (do not let it start implementing here)
 
 Interaction mode: in `--yolo`, skip its "subagent-driven vs inline" user choice — Stage 03 decides.

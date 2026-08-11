@@ -73,6 +73,10 @@ In default mode, Stage 04 is mandatory and must never be skipped.
 Invoke via the `skill` tool with name `speckit-code-review`.
 Never launch as a background agent or task process — it must run inline and return JSON directly.
 
+Always pass the spec path explicitly: `specs/<issue_id>-<short_title>/spec.md` (or the manual-mode
+folder resolved in Stage 01). Never let the skill guess — an ambiguous match makes it ask the user,
+which is a turn-ending stop inside this NO-STOP ZONE.
+
 ## Loop Algorithm (speckit-auto executes this — do not exit until DONE)
 
 ```
@@ -89,7 +93,8 @@ PHASE 1 — Convergence loop
          - proceed to PHASE 2
 
 PHASE 2 — Code review loop
-  R1 — Invoke speckit-code-review; receive JSON result
+  R1 — Invoke speckit-code-review with spec path specs/<issue_id>-<short_title>/spec.md;
+       receive JSON result
   R2 — Read result.status
     IF status = "pass"  → EXIT STAGE 03
                            IF --yolo = true  → jump to Stage 05

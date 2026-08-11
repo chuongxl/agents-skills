@@ -103,3 +103,6 @@ htmlcov/
 # .python-version
 speckit-auto-0.0.1.zip
 speckit-code-review-001.zip
+
+### speckit-auto runtime state (machine-local, not versioned)
+speckit-auto/.state/

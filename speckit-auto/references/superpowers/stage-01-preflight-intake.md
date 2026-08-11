@@ -79,23 +79,36 @@ If `docs/guidelines/` or `architecture.md` is missing, skip and continue — nev
 [../shared/branching.md](../shared/branching.md) is the working branch for the whole run. See
 global rule 3 and [provider-rules.md](provider-rules.md) rule 3.
 
-## Artifact Paths (Superpowers Layout + Jira Traceability)
+## Artifact Paths (`specs/` Layout — Same Place as Spec Kit Output)
 
-Using `issue_id` and `short_title` from [../shared/intake.md](../shared/intake.md):
+Superpowers artifacts live under `specs/`, one folder per feature, so SpecKit Companion renders
+them and `speckit-auto` finds them in the same place as `github-speckit` output.
 
-| Artifact | Path |
-|----------|------|
-| Design spec | `docs/superpowers/specs/<issue_id>-<short_title>-design.md` |
-| Implementation plan | `docs/superpowers/plans/<issue_id>-<short_title>.md` |
+Resolve `<feature_folder>` using `issue_id` and `short_title` from
+[../shared/intake.md](../shared/intake.md):
 
-In manual (non-Jira) mode, substitute a stable requirement slug for `<issue_id>-<short_title>`.
+| Mode | `<feature_folder>` |
+|------|--------------------|
+| `--issue` | `<issue_id>-<short_title>` (example: `specs/ddm-6157-user-login/`) |
+| manual | `<NNN>-<slug>` — `<NNN>` = next unused three-digit prefix under `specs/` (`001`, `002`, …), `<slug>` = feature name in kebab-case |
 
-These paths override the superpowers default `YYYY-MM-DD-<topic>` naming. Pass the exact target
-path into `brainstorming` and `writing-plans` as an explicit user
-instruction, since both skills accept a path override. Paths must stay stable across reruns of the
+| Artifact | Path | Superpowers default it replaces |
+|----------|------|---------------------------------|
+| Design spec (`brainstorming`) | `specs/<feature_folder>/spec.md` | `docs/superpowers/specs/<date>-<topic>-design.md` |
+| Implementation plan (`writing-plans`) | `specs/<feature_folder>/plan.md` | `docs/superpowers/plans/<date>-<feature>.md` |
+
+Both skills write into the **same** folder for a given feature — `brainstorming` creates it,
+`writing-plans` adds to it. Pass the exact target path into each skill as an explicit user
+instruction, since both accept a path override. The folder must stay stable across reruns of the
 same issue.
 
-Create `docs/superpowers/specs/` and `docs/superpowers/plans/` if missing.
+Keep the plan's task checkboxes (`- [ ]`) exactly as `writing-plans` specifies:
+`subagent-driven-development` and the Companion viewer both read them for progress.
+
+This path override is the only deviation from the superpowers skills — everything else in them
+applies unchanged.
+
+Create `specs/<feature_folder>/` if missing.
 
 ## Stage 02 Entry Step
 

@@ -11,7 +11,7 @@ Before invoking the implementation skill, inject into its input:
 - the `repo_map`, so each file lands in the correct workspace
 - any relevant guideline from `loaded_guidelines` matching the task topic (match by stem key in
   `linked_guidelines`; if matched and not yet cached, load it now and add it to `loaded_guidelines`)
-- the plan path `docs/superpowers/plans/<issue_id>-<short_title>.md`
+- the plan path `specs/<feature_folder>/plan.md`
 
 ## Invocation Method (Critical)
 
@@ -32,6 +32,12 @@ the `task` tool with a `superpowers:*` agent_type. Resolve each skill name using
 
 `speckit-code-review` is invoked via the `skill` tool with name `speckit-code-review`.
 Never launch it as a background agent or task process — it must run inline and return JSON directly.
+
+Always pass the spec path explicitly: `specs/<feature_folder>/spec.md`. Never let the skill guess —
+an ambiguous match makes it ask the user, which is a turn-ending stop inside this NO-STOP ZONE.
+The spec is a `brainstorming` design document, so it usually has no `FR-*`/`NFR-*` IDs;
+`speckit-code-review` synthesizes the requirement checklist from it. Do not pre-convert or rewrite
+the design spec to add IDs.
 
 Never stop with a generic runtime/capability disclaimer before attempting the real call. Only stop
 if a concrete tool call fails with a quoted error message.
@@ -125,7 +131,8 @@ PHASE 2 — Code review loop
        - apply Critical and Important findings immediately via file edits
          (evaluate them through receiving-code-review discipline)
        - log Minor findings; do not stop for any of them
-  R1 — Invoke speckit-code-review; receive the JSON result (AUTHORITATIVE GATE)
+  R1 — Invoke speckit-code-review with spec path specs/<feature_folder>/spec.md;
+       receive the JSON result (AUTHORITATIVE GATE)
   R2 — Read result.status
     IF status = "pass"  → EXIT STAGE 03
                            IF --yolo = true  → jump to Stage 05

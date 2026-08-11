@@ -53,11 +53,15 @@ accepts fixed built-in agent types and will fail with `Unknown agent_type`.
 4. `superpowers:finishing-a-development-branch` is **not** used for branch lifecycle or worktree
    cleanup. It may only be used at Stage 04/05 to open a PR, and only after the pipeline's own
    commit rules have run.
-5. Artifacts keep Jira traceability:
-   - design spec → `docs/superpowers/specs/<issue_id>-<short_title>-design.md`
-   - plan → `docs/superpowers/plans/<issue_id>-<short_title>.md`
-   In manual (non-Jira) mode, substitute the requirement slug for `<issue_id>-<short_title>`.
-   The superpowers default `YYYY-MM-DD-` prefix is replaced by this rule.
+5. Artifacts live under `specs/`, one folder per feature (same place as Spec Kit output):
+   - design spec → `specs/<feature_folder>/spec.md`
+   - plan → `specs/<feature_folder>/plan.md`
+   `<feature_folder>` = `<issue_id>-<short_title>` in `--issue` mode, or `<NNN>-<slug>` (next
+   unused three-digit prefix under `specs/`) in manual mode. See Stage 01.
+   This replaces the superpowers defaults `docs/superpowers/specs/<date>-<topic>-design.md` and
+   `docs/superpowers/plans/<date>-<feature>.md`, and is the **only** deviation from those skills.
+   Preserve the plan's task checkboxes (`- [ ]`) exactly as `writing-plans` emits them —
+   `subagent-driven-development` and the Companion viewer read them for progress.
 6. `superpowers:brainstorming` replaces Spec Kit's `specify` + `clarify`. Its interactive Q&A is
    **allowed in default mode** (it is the clarification interview) and **suppressed in `--yolo`
    mode**, where it must auto-answer from the intake brief and skip section approvals.

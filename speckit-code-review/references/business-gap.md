@@ -8,6 +8,10 @@ Validate that every functional and non-functional requirement extracted from `sp
 
 ## Step-by-Step
 
+0. Obtain the requirement checklist from SKILL.md **Requirement Checklist Extraction**. If the spec
+   carried no IDs (typical for `superpowers:brainstorming` design docs), the checklist is
+   synthesized — review against it exactly as if the IDs were declared, and record
+   `requirements_source` plus `synthesized_requirements` in this category's detail file.
 1. For each requirement in the checklist (`FR-*` / `NFR-*`), review the implementation line-by-line and method-by-method.
 2. Map each requirement to concrete code evidence:
    - `file`
@@ -51,6 +55,8 @@ Populate these JSON fields from this review:
 
 - `Business cover`
 - `requirements checklist summary`
+- `requirements_source` — `declared` or `synthesized`
+- `synthesized_requirements` — present only when `requirements_source` is `synthesized`
 - `Business missing`
 - `Business missing details`
 
@@ -59,5 +65,7 @@ Populate these JSON fields from this review:
 - If no evidence can be found for a requirement, treat it as `missing` (never assume covered).
 - If requirement wording is ambiguous, prefer `failed` and document the missing evidence.
 - Non-functional violations still produce `failed` when impact is high.
+- A design-style spec with no requirement IDs is **never** a reason to report 100% coverage —
+  synthesize the checklist first; if nothing testable can be extracted, emit `FR-000` per SKILL.md.
 
 > Discard this file from context after the Business Gap review area is complete.
