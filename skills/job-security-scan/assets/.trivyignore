@@ -1,0 +1,7 @@
+# .trivyignore — CVEs accepted as risk or pending fix
+# Format: CVE-ID [expiry-date] [comment]
+# https://aquasecurity.github.io/trivy/latest/docs/configuration/filtering/#by-vulnerability-ids
+
+# Add entries here when a CVE has no fix available and has been risk-accepted.
+# Example:
+# CVE-2023-XXXXX exp:2025-12-31 # no fix, risk accepted by security team

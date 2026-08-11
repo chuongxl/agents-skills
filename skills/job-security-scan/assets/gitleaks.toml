@@ -1,0 +1,36 @@
+# Gitleaks Configuration — DDM Monorepo
+# Allowlists test/example files that contain non-production credentials
+
+[allowlist]
+  description = "DDM non-production allowlists"
+
+  # Allow placeholder values in .env.example files
+  paths = [
+    '''\.env\.example$''',
+    '''\.env\.sample$''',
+  ]
+
+  # Allow test JWT in automation test config (non-production env)
+  [[allowlist.commits]]
+    # Specific files that may contain test tokens
+    paths = ['''cypress\.env\.json$''']
+    regexes = ['''eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+''']
+
+  # Allow known placeholder strings
+  [[allowlist.regexes]]
+    description = "Placeholder values"
+    regex = '''(your_token_here|your_password_here|placeholder|changeme|example|dummy|fake|test-only)'''
+
+[[rules]]
+  id = "github-pat-fine-grained"
+  description = "GitHub Fine-Grained Personal Access Token"
+  regex = '''github_pat_[0-9a-zA-Z_]{82}'''
+  tags = ["github", "pat", "token"]
+  severity = "CRITICAL"
+
+[[rules]]
+  id = "figma-token"
+  description = "Figma API Key or Access Token"
+  regex = '''figd_[0-9a-zA-Z\-_]{40,}'''
+  tags = ["figma", "token"]
+  severity = "HIGH"
