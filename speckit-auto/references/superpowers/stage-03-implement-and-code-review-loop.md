@@ -54,8 +54,8 @@ apply a fix without an identified root cause.
 
 ## Worktrees Are Skipped
 
-Stay on the branch created in Stage 01. Ignore any instruction from a superpowers skill to create
-or enter a git worktree. See [../shared/branching.md](../shared/branching.md).
+Stay on the branch created in Stage 01; ignore any superpowers instruction to create or enter a
+worktree. See global rule 3 and [../shared/branching.md](../shared/branching.md).
 
 ## Git Submodule Branch Handling
 
@@ -84,7 +84,9 @@ regardless of mode (default or `--yolo`):**
 - Any pause waiting for human input
 - Any report-and-stop on a failed result
 
-**The only valid exit from Stage 03 is `status = pass` from `speckit-code-review`.**
+**The only valid success exit from Stage 03 is `status = pass` from `speckit-code-review`.**
+The only other permitted exit is the circuit breaker in global rule 20 (identical failure 5×
+with no file change in between, or a git/filesystem write error).
 A `failed` result is NOT a stop condition in any mode — it is the input for the next fix iteration.
 
 Superpowers' own gates are subordinated here:
@@ -171,7 +173,11 @@ PHASE 2 — Code review loop
       - DO NOT end the turn after making edits — continue the Stage 03 flow immediately
       - If a fix needs a new file, create it
       - If context is insufficient, read the file first, then fix
-  R7 — Run the implementation skill for broader changes if needed, then return to R1
+  R7 — Run the implementation skill for broader changes if needed.
+       Then re-run the full gate sequence before the next authoritative review:
+       verification-before-completion → R0 (requesting-code-review) → R1.
+       Never jump straight from a fix back to R1 — every authoritative review iteration must be
+       preceded by fresh verification evidence and a native review pass.
 ```
 
 ## Loop Invariants
@@ -185,8 +191,6 @@ PHASE 2 — Code review loop
   `fixes[]`, and the one category file needed for the current fix
 - speckit-auto NEVER delegates to the implementation skill for code-only or test-coverage failures
 - speckit-auto NEVER treats a superpowers gate skill as an exit point
-- speckit-auto NEVER stops and reports unless:
-  - the same failure repeats for **5 consecutive iterations** with no file changes
-  - a git or filesystem error prevents code from being written
+- speckit-auto NEVER stops and reports except via the global rule 20 circuit breaker (identical failure 5× with no file change in between, or a git/filesystem write error)
 - On iteration 3+ with the same failure, escalate fix depth (rewrite the method, not patch a line)
 - Log each iteration: `[Review loop #N] status=failed, scope=<code|tasks|plan>, fixing: <summary>`

@@ -3,13 +3,14 @@
 Provider: **github-speckit** — repo-installed GitHub Spec Kit agents.
 
 Load with this file:
+- [provider-rules.md](provider-rules.md) — provider-specific rules and invocation
 - [../shared/branching.md](../shared/branching.md) — branch gate (runs first)
 - [../shared/intake.md](../shared/intake.md) — issue resolution, run state, Jira intake
 - [../shared/preflight-guidelines-context.md](../shared/preflight-guidelines-context.md) — project context
 
 Execution order for this stage:
-**branch setup (shared) → Speckit source check → install recovery if missing → runtime executability
-check → guidelines load → intake (shared) → artifact path → Stage 02.**
+**branch setup (shared) → Speckit source check → install recovery if missing → guidelines load →
+intake (shared) → artifact path → `/speckit.specify` (Stage 02 entry, also the executability proof).**
 
 Only the Speckit-specific steps are described below; everything else lives in the shared files.
 
@@ -39,13 +40,15 @@ abandon the run:
 8. If it passes, continue the pipeline in the same turn.
 9. Only if install or init fails, stop and report the exact failing step with quoted error output.
 
-## Preflight Runtime Executability Check (Required, After Source Check)
+## Runtime Executability (No Separate Probe)
 
-Invoke `/speckit.specify` directly. `stage_invocation_mode` is always `slash-agent` — never attempt
-the `task` tool with a `speckit.*` agent_type, it always fails with `Unknown agent_type`.
+Do **not** invoke `/speckit.specify` as a standalone probe before intake — it is a mutating call
+and would start Stage 02 without the resolved artifact path. Executability is proven by the real
+post-intake `/speckit.specify` invocation at the end of this stage.
 
-If it runs, executability is proven. Only a concrete error from that call is reportable as a
-runtime failure (quote it), and only after the source check has passed.
+`stage_invocation_mode` is always `slash-agent` — never attempt the `task` tool with a `speckit.*`
+agent_type, it always fails with `Unknown agent_type`. Only a concrete error from the real
+invocation is reportable as a runtime failure (quote it), and only after the source check passed.
 
 ## Preflight Guidelines Context Load (Required)
 

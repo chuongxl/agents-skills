@@ -3,10 +3,10 @@
 Provider: **superpowers** — the `obra/superpowers` skills library.
 
 Load with this file:
+- [provider-rules.md](provider-rules.md) — skill names, invocation precedence, provider rules
 - [../shared/branching.md](../shared/branching.md) — branch gate (runs first)
 - [../shared/intake.md](../shared/intake.md) — issue resolution, run state, Jira intake
 - [../shared/preflight-guidelines-context.md](../shared/preflight-guidelines-context.md) — project context
-- [provider-rules.md](provider-rules.md) — skill names and provider rules
 
 Execution order for this stage:
 **branch setup (shared) → superpowers availability check → install recovery if missing →
@@ -75,9 +75,9 @@ If `docs/guidelines/` or `architecture.md` is missing, skip and continue — nev
 
 ## Worktrees Are Skipped (Critical)
 
-`using-git-worktrees` is **not** invoked. The branch created by
-[../shared/branching.md](../shared/branching.md) is the working branch for the entire run. If any
-superpowers skill instructs creating a worktree, ignore that instruction and stay on the branch.
+`using-git-worktrees` is **not** invoked — the branch from
+[../shared/branching.md](../shared/branching.md) is the working branch for the whole run. See
+global rule 3 and [provider-rules.md](provider-rules.md) rule 3.
 
 ## Artifact Paths (Superpowers Layout + Jira Traceability)
 

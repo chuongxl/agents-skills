@@ -1,6 +1,7 @@
 # Preflight: Guidelines Context Loading
 
-Load during Stage 01 after Speckit source check passes.
+Load during Stage 01, after the selected provider's framework availability/source check passes.
+Provider-agnostic — used by both `github-speckit` and `superpowers`.
 
 ## Goal
 

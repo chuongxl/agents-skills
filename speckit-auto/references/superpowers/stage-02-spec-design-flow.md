@@ -114,8 +114,9 @@ already cached. Never assign a task without consulting `repo_map`.
 
 ## Review Behavior Per Step
 
-- **Default mode**: `brainstorming`'s own interactive approval is the review gate. After
-  `writing-plans`, run the post-step interview (review-interview.md) and capture feedback.
+- **Default mode**: `brainstorming`'s own interactive approval is the design-spec review gate — no
+  separate interview for it. After `writing-plans`, run the post-step interview
+  (review-interview.md) and capture feedback.
 - **YOLO mode**: no interviews. Self-review the step output; if it fails, re-run the step
   (max 2 retries).
 

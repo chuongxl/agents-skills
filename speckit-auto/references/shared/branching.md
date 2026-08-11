@@ -15,15 +15,20 @@ framework install, guidelines load, intake, or any provider stage call):
    - `git pull origin <base-branch>` (fast-forward only)
    - If fetch/pull fails (no remote, offline, conflict), log a warning and continue with the local
      copy of `<base-branch>` as-is — this is not a hard stop.
-3. Create/switch to a new branch off the now-synced base branch.
+3. Create or switch to the working branch off the now-synced base branch:
+   - if the deterministic branch name does not exist → create it from the synced base
+   - if it already exists (a rerun) → check it out and **continue on it**; never reset, force-move,
+     or recreate it, and never append a suffix to make a new one
 4. Branch name must be deterministic:
-   - Jira mode: include the Jira key
+   - Jira mode: include the Jira key (use the `issue_id`/`short_title` resolved in
+     [intake.md](intake.md) so branch and artifact names stay aligned across reruns)
    - Non-Jira mode: requirement slug + timestamp
-5. Actually run the git command(s) now (do not describe the plan) and confirm the new branch is
-   checked out before proceeding. Set `branch_created: true` and `branch_name` in run state.
+5. Actually run the git command(s) now (do not describe the plan) and confirm the working branch is
+   checked out before proceeding. Set `branch_created: true` and `branch_name` in run state
+   (`branch_created` means "the working branch is now checked out", whether created or reused).
 
-Git worktrees are **not** used by any provider. If a provider's native workflow prescribes
-worktrees, that part is skipped in favor of the plain-branch flow above.
+Git worktrees are **not** used by any provider — see global rule 3. If a provider's native workflow
+prescribes worktrees, that part is skipped in favor of the plain-branch flow above.
 
 ## Git Submodule Branch Handling (Implementation Stage)
 

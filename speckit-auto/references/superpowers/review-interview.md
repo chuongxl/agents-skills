@@ -7,23 +7,26 @@ Use this guide during Stage 02, after `writing-plans`.
 > **Mode note**: every section here is **default mode only**. In `--yolo` mode, human interactions
 > are replaced by autonomous self-review (see the YOLO behavior in stage-02-spec-design-flow.md).
 
-## Clarification Is Owned by `brainstorming`
+## Scope: There Is No Separate Design-Spec Approval Interview
 
-Unlike the github-speckit provider, do **not** run a separate specify-clarification interview.
-`brainstorming` already asks clarifying questions one at a time and takes
-section-by-section approval — that *is* the clarification interview.
+`brainstorming` already runs its own interactive clarification and section-by-section approval —
+that **is** the design-spec review gate. Do not run the Interview Flow below against the design
+spec as a routine step, and do not repeat questions `brainstorming` already asked.
 
-- **Default mode**: let it run interactively; do not duplicate its questions.
-- **`--yolo` mode**: instruct it to auto-answer from the intake brief and skip approvals.
+- **Default mode**: let `brainstorming` run interactively.
+- **`--yolo` mode**: instruct it to auto-answer from the intake brief and skip approvals; run no
+  interview at all.
 
-Only if `brainstorming` finishes and the design spec is still unclear (missing acceptance detail,
-ambiguous scope, undefined constraints) do you run the Interview Flow below against the spec, then
-re-run `brainstorming` with the captured answers.
+The Interview Flow below applies to:
+1. the **plan**, after `writing-plans` (routine, default mode only), and
+2. the **design spec**, *only* as an exception — when `brainstorming` has finished and the spec
+   still has a concrete clarity defect (missing acceptance detail, ambiguous scope, undefined
+   constraint). Capture the answers, re-run `brainstorming`, and continue.
 
 ## Interview Flow
 
-**Default mode only. Applies to: the design spec (post-`brainstorming`) and the plan
-(post-`writing-plans`).**
+**Default mode only. Routine use: the plan (post-`writing-plans`). Exception use: the design spec,
+only per the Scope section above.**
 
 1. Approval gate
    - Ask: "Do you approve the `<design spec | plan>` result?"

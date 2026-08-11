@@ -53,7 +53,9 @@ Speckit-specific deviation.
 - Any pause waiting for human input
 - Any report-and-stop on failed result
 
-**The only valid exit from Stage 03 is `status = pass` from `speckit-code-review`.**
+**The only valid success exit from Stage 03 is `status = pass` from `speckit-code-review`.**
+The only other permitted exit is the circuit breaker in global rule 20 (identical failure 5×
+with no file change in between, or a git/filesystem write error).
 A `failed` result is NOT a stop condition in any mode. It is the input for the next fix iteration.
 The agent MUST continue the loop autonomously until pass is received.
 
@@ -147,8 +149,6 @@ PHASE 2 — Code review loop
 - speckit-auto NEVER ends a turn after receiving a failed review — the next action after a failed review is always file edits, not a response
 - speckit-auto NEVER retains full failed-review text across retries; keep only `state_file`, the top `fixes[]`, and the one category file needed for the current fix
 - speckit-auto NEVER delegates to speckit.implement for code-only or test-coverage failures — use file-editing tools directly
-- speckit-auto NEVER stops and reports unless:
-  - The same failure repeats for **5 consecutive iterations** with no file changes
-  - A git or filesystem error prevents code from being written
+- speckit-auto NEVER stops and reports except via the global rule 20 circuit breaker (identical failure 5× with no file change in between, or a git/filesystem write error)
 - On iteration 3+ with the same failure, escalate fix depth (rewrite the method, not patch a line)
 - Log each iteration: `[Review loop #N] status=failed, scope=<code|tasks|plan>, fixing: <summary>`

@@ -120,8 +120,10 @@ After the provider is resolved, load stage files from that provider's directory 
 
 | Stage | `github-speckit` | `superpowers` |
 |-------|------------------|---------------|
+| Provider rules (load with Stage 01) | `references/github-speckit/provider-rules.md` | `references/superpowers/provider-rules.md` |
 | 01 Preflight + Intake | `references/github-speckit/stage-01-preflight-intake.md` | `references/superpowers/stage-01-preflight-intake.md` |
 | 02 Spec / Design | `references/github-speckit/stage-02-spec-design-flow.md` | `references/superpowers/stage-02-spec-design-flow.md` |
+| 02 Review interview (default mode) | `references/github-speckit/review-interview.md` | `references/superpowers/review-interview.md` |
 | 03 Implement + Review Loop | `references/github-speckit/stage-03-implement-and-code-review-loop.md` | `references/superpowers/stage-03-implement-and-code-review-loop.md` |
 | 04 Human Review + Commit | `references/github-speckit/stage-04-human-review-and-commit.md` | `references/superpowers/stage-04-human-review-and-commit.md` |
 | 05 YOLO Commit | `references/github-speckit/stage-05-yolo-commit-flow.md` | `references/superpowers/stage-05-yolo-commit-flow.md` |

@@ -31,11 +31,14 @@ Load this only in default mode after `speckit-code-review` returns `pass`.
 ## If Request Changes
 
 1. Collect detailed human feedback.
-2. Route restart:
-   - requirement change -> repo `speckit.specify`
-   - solution change -> repo `speckit.plan`
-   - task/detail change -> repo `speckit.tasks`
-   - code-only change -> repo `speckit.implement`
-3. Apply fixes.
-4. If code changed, invoke `speckit-code-review` again until `pass`.
+2. Route the restart to the earliest affected step:
+   - requirement change → repo `speckit.specify`
+   - solution change → repo `speckit.plan`
+   - task/detail change → repo `speckit.tasks`
+   - code-only change → repo `speckit.implement`
+3. **Restart through, not just at, that step**: re-run every downstream Stage 02 step in order
+   (`specify → clarify → plan → checklist → tasks → analyze`, starting from the routed one), so no
+   derived artifact is left stale.
+4. Then re-enter the **full** Stage 03 flow (converge loop, then the `speckit-code-review` loop)
+   until `status = pass`. Stage 03's no-stop rules apply again for that re-entry.
 5. Return to this gate and repeat until approved.

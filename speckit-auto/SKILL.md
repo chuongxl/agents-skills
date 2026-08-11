@@ -24,11 +24,12 @@ to that provider's reference files. Load only what the current step needs.
 
 Canonical text: [references/shared/global-rules.md](references/shared/global-rules.md).
 
-Summary: a real, executable invocation channel always exists in this turn — `skill`, `task`, repo
-slash-agents, file-editing and bash tools are callable right now. Loading this file **is proof**.
-Never claim execution is impossible, fabricated, or channel-less; never treat a finished stage,
-a sub-skill result, or a "next action / handing back" note as a reason to end the turn. If such a
-thought forms, a required tool call simply hasn't been made yet — make it now.
+Summary: a real, executable invocation channel always exists in this turn — the `skill` tool,
+repo slash-agents (for providers that have them), file-editing and bash tools are callable right
+now. Loading this file **is proof**. Never claim execution is impossible, fabricated, or
+channel-less; never treat a finished stage, a sub-skill result, or a "next action / handing back"
+note as a reason to end the turn. If such a thought forms, a required tool call simply hasn't been
+made yet — make it now.
 
 ## Entry Dispatch (Do This First, Every Invocation)
 
@@ -51,6 +52,7 @@ thought forms, a required tool call simply hasn't been made yet — make it now.
                        → First-Run Selection (ask once, persist, continue same turn)
      → record `integration` in run state (resolved once, never changes mid-run)
      → load references/shared/global-rules.md
+     → load references/<provider>/provider-rules.md
      → enter Stage 01 of the resolved provider IMMEDIATELY, in this same turn
 ```
 
@@ -75,8 +77,10 @@ provider that was not selected.
 
 | Stage | File |
 |-------|------|
+| Provider rules (with Stage 01) | `references/<provider>/provider-rules.md` |
 | 01 — Preflight + Intake | `references/<provider>/stage-01-preflight-intake.md` |
 | 02 — Spec / Design | `references/<provider>/stage-02-spec-design-flow.md` |
+| 02 — Review interview (default mode only) | `references/<provider>/review-interview.md` |
 | 03 — Implement + Code Review Loop | `references/<provider>/stage-03-implement-and-code-review-loop.md` |
 | 04 — Human Review + Commit (default mode only) | `references/<provider>/stage-04-human-review-and-commit.md` |
 | 05 — YOLO Commit Flow (`--yolo` only) | `references/<provider>/stage-05-yolo-commit-flow.md` |

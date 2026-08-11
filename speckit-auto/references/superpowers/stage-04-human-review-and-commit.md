@@ -39,11 +39,15 @@ clean up worktrees — no worktree exists in this pipeline.
 ## If Request Changes
 
 1. Collect detailed human feedback.
-2. Route the restart:
+2. Route the restart to the earliest affected step:
    - requirement change → `brainstorming`
    - solution/architecture change → `writing-plans` (structure)
    - task/detail change → `writing-plans` (task breakdown)
    - code-only change → direct file edits following the TDD cycle
-3. Apply the fixes.
-4. If code changed, invoke `speckit-code-review` again until `pass`.
+3. **Restart through, not just at, that step**: if `brainstorming` re-runs, `writing-plans` must
+   re-run after it, and the Stage 02 mandatory self-review gate must pass again — no derived
+   artifact may be left stale.
+4. Then re-enter the **full** Stage 03 flow (implementation + verification loop, then R0 native
+   review, then the `speckit-code-review` loop) until `status = pass`. Stage 03's no-stop rules
+   apply again for that re-entry.
 5. Return to this gate and repeat until approved.

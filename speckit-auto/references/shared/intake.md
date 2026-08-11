@@ -46,7 +46,7 @@ If `run_state`/stage file/channel binding is absent in this turn, initialize in 
 ```
 
 Execute Stage 01 in this order (this is the true order regardless of file position):
-**branch setup → framework source check / auto-install → guidelines load → intake.**
+**branch setup → framework source/availability check + install recovery → guidelines load → intake.**
 `branch_created` must be `true` (real `branch_name` from an actual git command) before any
 framework stage call, `jira-to-speckit` call, or intake step runs.
 
@@ -105,7 +105,17 @@ Regardless of provider, when in `--issue` mode:
 
 - `issue_id` = Jira key, lowercased (example: `ddm-6157`)
 - `short_title` = short slug derived from the Jira issue title
-- Both must stay **stable across reruns** of the same issue.
+
+**Stability across reruns is mandatory and must be resolved, not assumed.** Before deriving a new
+slug, search the provider's artifact location for an existing artifact whose name starts with
+`<issue_id>-`:
+
+1. If exactly one match exists, reuse its `short_title` verbatim — even if the Jira title has since
+   changed. Never rename or create a parallel artifact.
+2. If several match, use the most recently modified one and log the ambiguity.
+3. Only if none matches, derive `short_title` from the current Jira title.
+
+The same resolution applies to the branch name, so branch and artifact stay aligned across reruns.
 
 Each provider's Stage 01 defines how `issue_id` and `short_title` compose into its artifact path.
 
