@@ -133,21 +133,24 @@ runtime failure if the slash command itself errors with a concrete message.
 
 ## Stage Router (Load On Demand)
 
+> Paths below are provider-scoped. `github-speckit` is the current provider; the factory
+> dispatch that selects a provider directory is introduced in a later refactor step.
+
 1. **Preflight + Intake** (includes guidelines context load + repo map detection)
-   - Load: [references/stage-01-preflight-intake.md](references/stage-01-preflight-intake.md)
-   - Load: [references/preflight-guidelines-context.md](references/preflight-guidelines-context.md)
+   - Load: [references/github-speckit/stage-01-preflight-intake.md](references/github-speckit/stage-01-preflight-intake.md)
+   - Load: [references/shared/preflight-guidelines-context.md](references/shared/preflight-guidelines-context.md)
 2. **Spec/Design Flow (`specify -> clarify -> plan -> checklist -> tasks -> analyze`)**
-   - Load: [references/stage-02-spec-design-flow.md](references/stage-02-spec-design-flow.md)
-   - Load (default mode only): [references/review-interview.md](references/review-interview.md)
+   - Load: [references/github-speckit/stage-02-spec-design-flow.md](references/github-speckit/stage-02-spec-design-flow.md)
+   - Load (default mode only): [references/github-speckit/review-interview.md](references/github-speckit/review-interview.md)
    - **Discard both files at Stage 03 entry.**
 3. **Implement + Auto Code Review Loop**
-   - Load: [references/stage-03-implement-and-code-review-loop.md](references/stage-03-implement-and-code-review-loop.md)
+   - Load: [references/github-speckit/stage-03-implement-and-code-review-loop.md](references/github-speckit/stage-03-implement-and-code-review-loop.md)
 4. **Human Manual Review + Commit (Default mode only)**
-   - Load: [references/stage-04-human-review-and-commit.md](references/stage-04-human-review-and-commit.md)
+   - Load: [references/github-speckit/stage-04-human-review-and-commit.md](references/github-speckit/stage-04-human-review-and-commit.md)
 5. **YOLO Commit Flow (`--yolo` only)**
-   - Load: [references/stage-05-yolo-commit-flow.md](references/stage-05-yolo-commit-flow.md)
+   - Load: [references/github-speckit/stage-05-yolo-commit-flow.md](references/github-speckit/stage-05-yolo-commit-flow.md)
 6. **Mark Spec Completed + Follow-up Commit**
-   - Load: [references/stage-06-spec-completion.md](references/stage-06-spec-completion.md)
+   - Load: [references/github-speckit/stage-06-spec-completion.md](references/github-speckit/stage-06-spec-completion.md)
 
 ## Non-Negotiable Global Rules
 

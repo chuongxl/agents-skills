@@ -75,7 +75,7 @@ from that call is reportable as a runtime failure (quote it), and only after sou
 ## Preflight Guidelines Context Load (Required)
 
 After source check passes, load:
-- [preflight-guidelines-context.md](preflight-guidelines-context.md)
+- [../shared/preflight-guidelines-context.md](../shared/preflight-guidelines-context.md)
 
 This step remains optional internally: if `docs/guidelines/` or `architecture.md` is missing,
 it must skip and continue (no stop).
