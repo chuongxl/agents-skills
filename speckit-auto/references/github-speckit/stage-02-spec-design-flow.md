@@ -16,12 +16,9 @@ Also load: [review-interview.md](review-interview.md) (default mode only; discar
 
 ## Invocation Method (Critical)
 
-Use the invocation mapping from `SKILL.md`:
-- GitHub Copilot CLI: call stages directly via repo-installed slash commands
-  (`/speckit.specify`, `/speckit.clarify`, `/speckit.plan`, `/speckit.checklist`, `/speckit.tasks`,
-  `/speckit.analyze`) — `stage_invocation_mode` is always `slash-agent`; never attempt `task` with a
-  `speckit.*` agent_type.
-- Claude Code / OpenCode: use matching slash/mention invocation.
+Call stages directly via repo-installed slash commands (`/speckit.specify`, `/speckit.clarify`,
+`/speckit.plan`, `/speckit.checklist`, `/speckit.tasks`, `/speckit.analyze`) —
+`stage_invocation_mode` is always `slash-agent`; never attempt `task` with a `speckit.*` agent_type.
 
 Never emit a capability disclaimer before attempting these — call the slash command now (SKILL.md premise applies here too).
 

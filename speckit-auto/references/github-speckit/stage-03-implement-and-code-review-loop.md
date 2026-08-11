@@ -21,8 +21,7 @@ fields to those sub-skills so workspace assignment and architecture compliance a
 - `speckit.implement` and `speckit.converge`: call directly via repo-installed slash commands
   (`/speckit.implement`, `/speckit.converge`) — `stage_invocation_mode` is always `slash-agent`;
   never attempt `task` with a `speckit.*` agent_type.
-- `speckit-code-review` uses the skill invocation mapping in `SKILL.md`
-  (GitHub Copilot CLI: `skill` tool with name `speckit-code-review`).
+- `speckit-code-review`: invoke via the `skill` tool with name `speckit-code-review`.
 
 Never stop with a generic runtime/capability disclaimer before attempting the real call. Only stop
 if a concrete tool call fails with a quoted error message.
@@ -42,16 +41,8 @@ When implementation scope is large, split and execute in batches:
 
 ## Git Submodule Branch Handling (Implementation Stage)
 
-Apply this only when the repo uses git submodules.
-
-1. Detect submodules from `.gitmodules` and track their paths.
-2. During implementation/fix steps, the first time code changes are about to occur inside a
-   submodule path (lazily, only for submodules actually modified):
-   - branch base priority inside submodule: `develop` → `main` → `master` (local first, then remote-tracking)
-   - sync that base branch first: `git fetch origin <base-branch>` → `git checkout <base-branch>` → `git pull origin <base-branch>` (fast-forward only) inside the submodule; on fetch/pull failure, log a warning and continue with the local copy — not a hard stop
-   - create/switch to a new working branch off the now-synced base, before editing any file in that submodule
-   - branch name should be deterministic and aligned with the parent pipeline branch context
-3. If no submodule exists, or no submodule files are modified, keep current behavior unchanged.
+See [../shared/branching.md](../shared/branching.md) — "Git Submodule Branch Handling". No
+Speckit-specific deviation.
 
 ## CRITICAL: speckit-auto Owns This Loop — NO STOPS, NO GATES
 
@@ -77,7 +68,7 @@ In default mode, Stage 04 is mandatory and must never be skipped.
 
 ## How to Invoke speckit-code-review
 
-Use the invocation for your environment from the Compatibility table in SKILL.md.
+Invoke via the `skill` tool with name `speckit-code-review`.
 Never launch as a background agent or task process — it must run inline and return JSON directly.
 
 ## Loop Algorithm (speckit-auto executes this — do not exit until DONE)
