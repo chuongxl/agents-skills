@@ -98,17 +98,21 @@ Never re-read the file mid-run and never switch provider mid-run.
 
 ## First-Run Selection (No Stored Mode Anywhere)
 
-When neither file exists, do not fail and do not silently default.
+Provider detection is driven **solely** by `integration.json`. Never infer the provider from repo
+contents (do not probe for `.github/agents/speckit.*`, superpowers skill files, or any other
+artifact) — a missing provider installation is not a selection signal, it is handled by that
+provider's Stage 01 preflight, which auto-installs the missing framework.
 
-1. Ask the user **once**, with these choices:
-   - `github-speckit` — repo-installed GitHub Spec Kit agents
-   - `superpowers` — obra/superpowers skills library
-   If repo evidence clearly points at one provider, present it first and label it recommended:
-   - `.github/agents/speckit.specify.agent.md` exists → recommend `github-speckit`
-   - superpowers skills are available and no Spec Kit agents exist → recommend `superpowers`
+When neither the repo-local nor the global file exists:
+
+1. Ask the user **once** to choose, with exactly these two choices and no recommendation:
+   - `github-speckit`
+   - `superpowers`
 2. Persist the answer using the Persistence rules above (repo-local when in a git repo).
 3. **Continue the pipeline immediately in the same turn** with that provider. Do not ask the user
    to re-run the command — this ask is a required-input ask, not a stop condition.
+4. Stage 01 preflight of the selected provider then verifies that framework is installed and
+   auto-installs it if missing. Provider selection never depends on that outcome.
 
 ## Dispatch (Factory)
 
