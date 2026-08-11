@@ -11,7 +11,7 @@ Before invoking the implementation skill, inject into its input:
 - the `repo_map`, so each file lands in the correct workspace
 - any relevant guideline from `loaded_guidelines` matching the task topic (match by stem key in
   `linked_guidelines`; if matched and not yet cached, load it now and add it to `loaded_guidelines`)
-- the plan path `docs/superpowers/plans/<issue_id>-<short_title>.md`
+- the plan path `specs/<feature_folder>/plan.md`
 
 ## Invocation Method (Critical)
 

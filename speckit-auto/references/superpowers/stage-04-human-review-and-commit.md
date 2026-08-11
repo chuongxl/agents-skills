@@ -5,8 +5,8 @@ Load this only in default mode after `speckit-code-review` returns `pass`.
 ## Human Manual Review Gate
 
 1. AI provides a concise summary from the design spec + plan
-   (`docs/superpowers/specs/<issue_id>-<short_title>-design.md`,
-   `docs/superpowers/plans/<issue_id>-<short_title>.md`):
+   (`specs/<feature_folder>/spec.md`,
+   `specs/<feature_folder>/plan.md`):
    - key use cases
    - expected usage scenarios
 2. AI recommends the reviewer:

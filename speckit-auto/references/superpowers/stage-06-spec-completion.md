@@ -5,12 +5,12 @@ Load this only after a successful implementation commit (default or YOLO mode).
 ## Design Spec Completion
 
 1. Update the active design spec
-   `docs/superpowers/specs/<issue_id>-<short_title>-design.md`:
+   `specs/<feature_folder>/spec.md`:
    - if a status field exists → set `completed`
    - else add `Status: completed`
 
 2. Commit this status update:
-   - `git add docs/superpowers/specs/<issue_id>-<short_title>-design.md`
+   - `git add specs/<feature_folder>/spec.md`
    - `git commit -m "chore(spec): mark <issue_id> completed"`
 
 ## Wait for Graphify Post-Commit Hook
