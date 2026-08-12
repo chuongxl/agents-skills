@@ -1,10 +1,10 @@
 ---
 name: jira-to-speckit
-description: Fetch a Jira issue or Jira issue URL using credentials from `.env`, then compact the ticket into a Speckit-ready feature brief (title, business goal, acceptance criteria, constraints, open questions) plus a Jira-key-based feature name. Use when work starts from Jira and a caller (typically `speckit-auto`) needs a clean, size-bounded intake payload to drive its own spec/plan/task pipeline. This skill only reads Jira and produces that brief — it does not run Speckit stages, review loops, git operations, or track execution progress.
+description: Fetch a Jira issue or Jira issue URL using credentials from `.env`, then compact the ticket into a Speckit-ready feature brief (title, business goal, acceptance criteria, constraints, open questions) plus a Jira-key-based feature name, and optionally write a full-fidelity ticket snapshot markdown file for traceability. Use when work starts from Jira and a caller (typically `speckit-auto`) needs a clean, size-bounded intake payload to drive its own spec/plan/task pipeline. This skill only reads Jira, produces that brief, and writes that one snapshot file — it does not run Speckit stages, review loops, git operations, or track execution progress.
 compatibility: Requires network access and Jira REST API access. Requires `.env` entries for `JIRA_URL`, `JIRA_USERNAME`, and `JIRA_API_TOKEN`.
 metadata:
   author: Alex Nguyen
-  version: "0.1.0"
+  version: "0.2.0"
 ---
 
 # Jira to Speckit
@@ -13,8 +13,9 @@ Use this skill when a Jira ticket is the source of truth for a new feature, task
 request and a caller needs it turned into a Speckit-ready brief.
 
 This skill is a **pure Jira reader**, not an orchestrator: it fetches one Jira issue, compacts it
-under strict size budgets, and returns a structured brief plus a Jira-key-based feature name. It
-never invokes `speckit.specify` or any other Speckit/Spec Kit command, never runs clarification or
+under strict size budgets, optionally persists a full-fidelity snapshot of the ticket to a file the
+caller names, and returns a structured brief plus a Jira-key-based feature name. It never invokes
+`speckit.specify` or any other Speckit/Spec Kit command, never runs clarification or
 review loops, never performs git operations, and never tracks an execution report — all of that is
 owned by the caller (`speckit-auto`'s stage files, see
 [../speckit-auto/references/shared/intake.md](../speckit-auto/references/shared/intake.md) and its
@@ -25,6 +26,7 @@ provider `stage-01-preflight-intake.md` files).
 - Reads Jira issue content from a Jira issue key or URL.
 - Uses Jira credentials from the local repository `.env` file.
 - Compacts the Jira ticket into a Speckit-friendly feature brief.
+- Writes a full-fidelity ticket snapshot to `ticket_output_path` when the caller supplies one.
 - Chooses a Speckit-style prefix (`US-`/`Task-`) and builds a Jira-key-based feature name.
 - Applies a size-aware Jira compaction pipeline to prevent context overflow on large issues.
 - Returns the brief in the fixed output template below and stops.
@@ -36,6 +38,8 @@ provider `stage-01-preflight-intake.md` files).
 - Does not run spec/plan/tasks clarification or review loops.
 - Does not resolve the target repository, create branches, commit, push, or open pull requests.
 - Does not create or update an execution report.
+- Does not write any file other than the single `ticket_output_path` snapshot, and does not choose
+  that path itself — no snapshot is written when the caller omits it.
 
 If a caller needs any of the above, it is responsible for performing it itself after receiving this
 skill's output.
@@ -49,12 +53,18 @@ skill's output.
   - `JIRA_USERNAME`
   - `JIRA_API_TOKEN`
 
+## Optional Inputs
+
+- `ticket_output_path` — a file path to write the full ticket snapshot to (see step 5b). When
+  omitted, no file is written and `Ticket snapshot:` reports `not requested`.
+
 Optional `.env` tuning for large Jira tickets:
 - `JIRA_MAX_INPUT_CHARS` (default `12000`)
 - `JIRA_MAX_DESCRIPTION_CHARS` (default `6000`)
 - `JIRA_MAX_OUTPUT_CHARS` (default `2500`)
-- `JIRA_FETCH_COMMENTS` (default `false`)
+- `JIRA_FETCH_COMMENTS` (default `false`) — comments feeding the compact brief
 - `JIRA_MAX_COMMENTS` (default `5`)
+- `JIRA_SNAPSHOT_COMMENTS` (default `true`) — comments included in the ticket snapshot file
 
 ## Guardrails
 
@@ -63,8 +73,12 @@ Optional `.env` tuning for large Jira tickets:
 - Keep the result business-focused; remove implementation noise, vendor chatter, and duplicate ticket text.
 - Preserve exact Jira IDs, business terms, office codes, acceptance criteria, and dependencies.
 - Never print tokens or `.env` values in logs or chat output.
-- Never pass raw Jira payloads, full comment threads, or full ADF trees back to the caller.
-- Always enforce character budgets before producing the compact brief.
+- Never pass raw Jira payloads, full comment threads, or full ADF trees back to the caller. Writing
+  them to the `ticket_output_path` snapshot is the one permitted destination — the file goes to
+  disk, its contents never go into the return value.
+- Always enforce character budgets before producing the compact brief. The budgets apply to the
+  brief only, never to the snapshot file.
+- Write no file other than `ticket_output_path`, and only when the caller supplies it.
 
 ## Workflow
 
@@ -96,6 +110,64 @@ If the Jira API returns an error:
 - `401` or `403`: inform the user that credentials may be invalid or they may not have permission.
 - `404`: ask the user to confirm the Jira issue key.
 - `5xx`: ask the user to retry after a brief wait.
+
+### 2b. Write the ticket snapshot (only when `ticket_output_path` is given)
+
+Run this **before compaction**, while the fetched content is still complete. Compaction is lossy by
+design; the snapshot exists so the caller can trace a spec decision back to what the ticket actually
+said, so it must not inherit the compact brief's budgets.
+
+1. Add `attachments,comment,created,updated,duedate` to the stage-1 field list for this fetch.
+2. Fetch comments for the snapshot (cap 50) unless `.env` sets `JIRA_SNAPSHOT_COMMENTS=false`.
+   This is independent of `JIRA_FETCH_COMMENTS`, which governs only what feeds the compact brief.
+3. Convert ADF/wiki markup to readable markdown. Do **not** trim, summarize, deduplicate, or drop
+   sections — this file is written straight to disk and never enters the caller's context.
+4. Create parent directories if missing, and write this shape:
+
+```markdown
+---
+jira_key: DDM-1234
+jira_url: https://example.atlassian.net/browse/DDM-1234
+title: Create and save customized filter
+issue_type: Story
+status: In Progress
+priority: Medium
+labels: [reporting, filters]
+components: [web-app]
+assignee: Jane Doe
+reporter: John Smith
+parent: DDM-1200
+fix_versions: [2026.09]
+created: 2026-07-30T09:12:00.000+0700
+updated: 2026-08-11T16:40:00.000+0700
+fetched_at: <ISO timestamp of this fetch>
+---
+
+# DDM-1234 — Create and save customized filter
+
+## Description
+
+<full converted description>
+
+## Acceptance Criteria
+
+<verbatim AC as written in the ticket, if a distinct section or field exists>
+
+## Comments
+
+### Jane Doe — 2026-08-05T11:02:00+0700
+<comment body>
+
+## Attachments
+
+- report-mockup.png (204 KB, uploaded by Jane Doe, 2026-08-01)
+```
+
+Omit any section whose source data is absent — never emit a section with placeholder text.
+Return only the path in the output template; never echo the file's contents.
+
+If the write fails (unwritable path, permission error), report the failure in `Truncation note:`
+and continue — a failed snapshot does not abort the brief.
 
 ### 3. Compact the Jira ticket
 
@@ -176,9 +248,10 @@ Always return the result in this exact shape:
 - Jira type:
 - Spec prefix:
 - Suggested Speckit name:
+- Ticket snapshot: (path written, or `not requested`)
 - Compact brief:
 - Open questions:
-- Truncation note: (state what was truncated/sampled when budgets were applied)
+- Truncation note: (state what was truncated/sampled when budgets were applied; also report a failed snapshot write here)
 
 ## Common Edge Cases
 

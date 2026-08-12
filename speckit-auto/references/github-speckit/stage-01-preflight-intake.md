@@ -66,6 +66,24 @@ Using `issue_id` and `short_title` from [../shared/intake.md](../shared/intake.m
 
 The folder must stay stable across reruns of the same issue.
 
+| Artifact | Path | Written by |
+|----------|------|------------|
+| Ticket snapshot (`--issue` only) | `specs/<issue_id>-<short_title>/ticket.md` | `jira-to-speckit` (staged), relocated here by this stage |
+| Spec / plan / tasks / checklist | `specs/<issue_id>-<short_title>/` | the `speckit.*` stages |
+| Execution report (`--issue` only) | `specs/<issue_id>-<short_title>/execution-report.md` | this pipeline |
+
+## Ticket Snapshot Relocation (Required, `--issue` Mode)
+
+Right after the artifact folder is created, **move** the staged snapshot
+`.speckit/intake/<issue_id>-ticket.md` → `specs/<issue_id>-<short_title>/ticket.md` and record
+`ticket_path` in run state. Overwrite an existing `ticket.md` on a rerun. Full rules:
+[../shared/intake.md](../shared/intake.md) → "Ticket Snapshot".
+
+`ticket.md` is the traceback record of the original request; the Spec Kit artifacts remain the
+source of truth for what gets built. It is committed alongside them by Stage 04/05 (`git add -A`) —
+do not add it to `.gitignore` and do not commit it separately. Pass only the compact brief into
+`/speckit.specify`, never the snapshot's contents.
+
 ## Stage 02 Entry Step
 
 After intake completes, invoke `/speckit.specify` with the compact brief (or requirement text) in

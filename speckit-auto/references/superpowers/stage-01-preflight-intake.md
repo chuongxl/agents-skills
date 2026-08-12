@@ -99,7 +99,7 @@ feature commit. Two are produced during a run:
 
 | Path | Written by | Contents |
 |---|---|---|
-| `.speckit/` | `speckit-code-review` | per-category detail files, `state.json`, review dirs |
+| `.speckit/` | `speckit-code-review`, Stage 01 intake | per-category detail files, `state.json`, review dirs, the staged ticket snapshot |
 | `.superpowers/` | `subagent-driven-development` | the plan's ledger, briefs, review packages |
 
 Before Stage 03, ensure both are ignored in the repo whose tree will be committed:
@@ -141,6 +141,7 @@ Resolve `<feature_folder>` using `issue_id` and `short_title` from
 
 | Artifact | Path | Superpowers default it replaces |
 |----------|------|---------------------------------|
+| Ticket snapshot (`--issue` only) | `specs/<feature_folder>/ticket.md` | — (new; written by `jira-to-speckit`, relocated here) |
 | Design spec (`brainstorming`) | `specs/<feature_folder>/spec.md` | `docs/superpowers/specs/<date>-<topic>-design.md` |
 | Implementation plan (`writing-plans`) | `specs/<feature_folder>/plan.md` | `docs/superpowers/plans/<date>-<feature>.md` |
 
@@ -160,6 +161,18 @@ This path override is the only deviation from the superpowers skills — everyth
 applies unchanged.
 
 Create `specs/<feature_folder>/` if missing.
+
+## Ticket Snapshot Relocation (Required, `--issue` Mode)
+
+Right after the feature folder is created, **move** the staged snapshot
+`.speckit/intake/<issue_id>-ticket.md` → `specs/<feature_folder>/ticket.md` and record
+`ticket_path` in run state. Overwrite an existing `ticket.md` on a rerun. Full rules:
+[../shared/intake.md](../shared/intake.md) → "Ticket Snapshot".
+
+`ticket.md` is the traceback record of the original request; `spec.md`/`plan.md` remain the source
+of truth for what gets built. It is committed alongside them by Stage 04/05 (`git add -A`) — do not
+add it to `.gitignore` and do not commit it separately. Pass only the compact brief into
+`brainstorming`, never the snapshot's contents.
 
 ## Stage 02 Entry Step
 
