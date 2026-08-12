@@ -130,6 +130,8 @@ PHASE 2 — Code review loop
     - All fixes are FR-*/NFR-*/ARCH-*  → re-run repo `speckit.plan` then repo `speckit.checklist` then repo `speckit.tasks` → repo `speckit.analyze` → R6
     - Mix of FR-*/ARCH-* + SEC-*/CODE-*/TEST-* → re-run repo `speckit.checklist` then repo `speckit.tasks` → repo `speckit.analyze` → R6
     - Only SEC-*/CODE-*/TEST-* fixes → go directly to R6
+    - Whenever a Stage 02 artifact was regenerated above, re-run the Stage 02 Mandatory
+      Self-Review Gate (read-only, no interview) before R6 — global rule 10a
   R6 — Apply fixes DIRECTLY using file-editing tools (this turn, right now):
     For EACH item in corrective action list:
       1. Open the specific file listed in suggested_fix_area / file field

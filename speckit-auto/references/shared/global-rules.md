@@ -18,7 +18,10 @@ The only valid ways to end a turn anywhere in this pipeline are:
 - a concrete tool/runtime error with quoted error text
 - a genuinely missing required input, after one ask
 - the user explicitly choosing `Stop` at the framework install-recovery ask (rule 7)
-- a mandatory human checkpoint in default mode (Stage 04)
+- a mandatory human checkpoint in default mode: any Stage 02 approval interaction (a provider
+  post-stage interview, `brainstorming`'s own approval and its delegation fallback, and the
+  Stage 02 → Stage 03 start-implementation confirmation), or Stage 04
+- Stage 02 retry exhaustion: the same self-review or stage check fails 3 consecutive times
 - the Stage 03 circuit breaker in rule 20 (identical failure 5× with no file change)
 - full pipeline completion
 - a completed **setup invocation** (`--integration`), which by design does not run the pipeline
@@ -40,6 +43,8 @@ data and immediately invoke the next required step, in the same turn.
 8. **Heavy payload prevention is mandatory.** For each stage, pass only the minimum required slices (current stage input + relevant excerpts + compact project context). Never forward full prior stage prose when not needed.
 9. For large scope (large requirement, many tasks, or many workspaces), split work into small packages and invoke the provider's implementation step multiple times per package until complete.
 10. For split work, run packages in parallel only when dependency-independent; otherwise run sequentially in dependency order.
+10a. Before leaving Stage 02, the provider's **Mandatory Self-Review Gate** must pass in **both** modes (spec coverage, placeholder scan, consistency, workspace assignment). A failing gate is fixed at the source and re-verified. Re-run it after **any** Stage 02 artifact regeneration, including regenerations triggered from Stage 03 or Stage 04. The gate is read-only and never fires an interview, so it does not violate rule 11. Retry exhaustion is provider-independent: the same check failing 3 consecutive times stops and reports.
+10b. Entering Stage 03 is a **mandatory handoff**, never a stop. In default mode, ask the single Stage 02 → Stage 03 start-implementation confirmation, then enter Stage 03 in the same turn on approval. In `--yolo` mode, skip that confirmation and enter Stage 03 directly. Finishing Stage 02 is never by itself a reason to end the turn. See the provider's Stage 03 Entry Step.
 11. **Stage 03 is a NO-STOP ZONE in BOTH default and `--yolo` modes.** No human approval gates, no pauses, no prompts fire inside Stage 03. This overrides all interview-flow and mode-based gate rules. The only *success* exit is `status = pass` from `speckit-code-review`; the only other permitted exit is the rule 20 circuit breaker. This is the canonical statement of the no-stop rule — stage files reference it rather than restating exceptions.
 12. **A `failed` result from `speckit-code-review` is NEVER a stop condition in any mode.** Do NOT produce a prose summary of the result. Do NOT end the turn. Immediately apply fixes and loop again.
 13. For code-only or test-coverage failures, directly edit the specific files named in the review result (`suggested_fix_area`, `file`, `method/function`) using file-editing tools, in the same turn. Do NOT delegate to the provider's implementation step.

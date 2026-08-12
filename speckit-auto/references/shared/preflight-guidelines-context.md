@@ -24,6 +24,17 @@ If `docs/guidelines/` is missing, log skip and stop this guide (pipeline continu
 If folder exists but `docs/guidelines/architecture.md` is missing, log skip and stop this guide.
 Otherwise continue.
 
+**Before stopping in either skip case, always build a fallback `repo_map` from Step 1** so
+downstream workspace assignment is never impossible:
+
+- `layout = "single-repo"` → `repo_map = { ".": "root", "inferred": true }`
+- `layout = "monorepo"` → one entry per resolved workspace folder, role inferred from its path
+  (`api`/`server`/`backend` → `backend`, `web`/`app`/`ui`/`frontend` → `frontend`, `bff` → `bff`,
+  `db`/`database`/`prisma` → `database`, anything else → `shared`), plus `"inferred": true`
+
+Also set `summary` to a one-line layout description and leave `linked_guidelines` /
+`loaded_guidelines` empty. `repo_map` is therefore always present after Stage 01.
+
 ## Step 3 — Parse `architecture.md` Once
 
 Extract:

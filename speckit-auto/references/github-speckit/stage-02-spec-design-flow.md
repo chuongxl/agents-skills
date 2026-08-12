@@ -88,6 +88,8 @@ Never assign a task without consulting `repo_map` from the Project Context loade
 
 - **Default mode**: run post-stage interview (review-interview.md) and capture feedback/constraints.
 - **Default mode / specify only**: if `speckit.specify` output is unclear, run the engineer clarification interview from `review-interview.md`, rerun `speckit.specify`, then continue.
+- **Default mode / analyze only**: do **not** run a separate post-stage interview. Its approval is
+  subsumed by the Stage 03 Entry Step confirmation below — never ask both back-to-back.
 - **YOLO mode**: self-review stage output; if failed, rerun stage (max 2 retries).
 
 > ⚠️ These review behaviors apply **only to the stages in this file**. Stage 03 is a NO-STOP ZONE — no interviews, no gates in either mode.
@@ -97,3 +99,46 @@ Never assign a task without consulting `repo_map` from the Project Context loade
 - Requirement intent change -> restart from `speckit.specify`
 - Solution/architecture change -> restart from `speckit.plan`
 - Task/detail change -> restart from `speckit.tasks`
+
+## Mandatory Self-Review Gate (both modes, before leaving Stage 02)
+
+Runs in **default and `--yolo` mode**, after `speckit.analyze` and after any restart routing.
+This is a read-only check on the produced artifacts — it is not an interview.
+
+1. **Spec coverage** — every requirement in `spec.md` maps to at least one task in `tasks.md`.
+2. **Placeholder scan** — no `TODO`, `TBD`, `...`, or stub content in `spec.md`, `plan.md`,
+   or `tasks.md`.
+3. **Consistency** — no conflicts, gaps, or ambiguities between spec, plan, and tasks
+   (types, names, API contracts, file paths agree). `speckit.analyze` output must be clean.
+4. **Workspace assignment** — every task in `tasks.md` has a `workspace` from `repo_map`.
+
+If any check fails, fix it at the source (`specify`/`clarify`/`plan`/`checklist`/`tasks`), re-run
+`speckit.analyze`, and re-verify. Retry exhaustion follows global rule 10a: the same check failing
+3 consecutive times stops and reports.
+
+Re-run this gate after **any** Stage 02 artifact regeneration, including one triggered from
+Stage 03 or Stage 04. It is read-only and fires no interview, so it never violates the Stage 03
+no-stop rule.
+
+Record the result. Do not enter Stage 03 with a failing check in either mode.
+
+## Stage 03 Entry Step (mandatory handoff)
+
+Reaching the end of Stage 02 is **never** a stop condition on its own.
+
+**Default mode** — one confirmation, and only this one. Never add a follow-up question after
+`Start implementation`:
+
+1. Ask via `ask_user`: "Stage 02 complete (spec, plan, tasks, analyze). Start implementation
+   (Stage 03)?" Choices: `Start implementation`, `Request changes`.
+2. `Start implementation` → discard Stage 02 files and `review-interview.md` from context and
+   invoke [stage-03-implement-and-code-review-loop.md](stage-03-implement-and-code-review-loop.md)
+   **immediately, in the same turn**. Do not summarize, do not ask anything else, do not wait for
+   another user message.
+3. `Request changes` → capture the feedback (including any forward constraints the user states
+   here — this is where constraints are collected, not after approval), apply Restart Routing
+   above, re-run the affected stages through to `speckit.analyze` and the self-review gate, then
+   ask this question again.
+
+**`--yolo` mode** — skip the confirmation entirely. Once the self-review gate passes, enter
+Stage 03 immediately in the same turn.

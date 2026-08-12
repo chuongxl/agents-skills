@@ -1,6 +1,8 @@
 # Review Interview Guide
 
-Use this guide during Stage 02 after each stage (`specify`, `clarify`, `plan`, `checklist`, `tasks`, `analyze`).
+Use this guide during Stage 02 after each stage (`specify`, `clarify`, `plan`, `checklist`, `tasks`).
+`analyze` is excluded — its approval is subsumed by the Stage 03 Entry Step confirmation in
+[stage-02-spec-design-flow.md](stage-02-spec-design-flow.md). Never ask both back-to-back.
 
 > ⚠️ **Stage 03 is a NO-STOP ZONE.** Do NOT run any interview flow during Stage 03 in any mode.
 
@@ -24,7 +26,7 @@ Stage 01 never asks intake interview questions. If requirement clarity is insuff
 
 ## Interview Flow
 
-**Default mode only. Applies to stages: `specify`, `clarify`, `plan`, `checklist`, `tasks`, `analyze`.**
+**Default mode only. Applies to stages: `specify`, `clarify`, `plan`, `checklist`, `tasks`.**
 
 1. Approval gate
    - Ask: "Do you approve the `<stage>` result?"

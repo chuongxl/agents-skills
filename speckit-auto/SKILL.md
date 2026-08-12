@@ -12,7 +12,7 @@ compatibility:
   github-copilot: "Skill auto-discovered from ~/.agents/skills/. Invoked via skill tool."
 metadata:
   author: Alex Nguyen
-  version: "0.0.2"
+  version: "0.0.3"
 ---
 
 # Speckit Auto — Provider Factory
@@ -111,8 +111,12 @@ provider-specific rules on top; it may never weaken a shared rule.
 
 ## Modes
 
-- **Default**: human-in-the-loop checkpoint at Stage 04 (mandatory).
-- **YOLO** (`--yolo`): no human checkpoints; Stage 04 skipped, Stage 05 used instead.
+- **Default**: human-in-the-loop. Pipeline-boundary checkpoints are the Stage 02 → Stage 03
+  start-implementation confirmation and Stage 04 (both mandatory). The selected provider also runs
+  its own Stage 02 approval interactions (post-stage interviews, or `brainstorming`'s approval) —
+  see that provider's `review-interview.md`.
+- **YOLO** (`--yolo`): no human checkpoints at all; every Stage 02 interaction, the Stage 03
+  confirmation, and Stage 04 are skipped, and Stage 05 is used instead.
 
 Stage 03 is a NO-STOP ZONE in both modes.
 
