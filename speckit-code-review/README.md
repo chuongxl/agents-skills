@@ -79,7 +79,7 @@ This separation keeps the inline response small and safe for retry logic, while 
 
 ```bash
 # Automatic discovery (Copilot CLI)
-# Place this skill in ~/.agents/skills/ and it's automatically available
+# Place this skill in ~/.agents/skills/ or .github/skills/ and it's automatically available
 
 # Manual installation
 cp -r speckit-code-review ~/.agents/skills/

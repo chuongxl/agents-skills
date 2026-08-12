@@ -307,6 +307,12 @@ The full workflow from Jira to pull request:
 - **Network**: Requires outbound access to Jira API endpoint and your git repository host
 - **Agents**: GitHub Copilot, Claude Code, and compatible Copilot agents
 
+### Installation Paths
+
+- GitHub Copilot: `.github/skills/` or `~/.agents/skills/`
+- Claude Code: `~/.claude/skills/`
+- Local: `~/.agents/skills/`
+
 ---
 
 ## References

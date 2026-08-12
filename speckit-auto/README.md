@@ -68,10 +68,10 @@ Each provider includes stage-specific reference files that implement the pipelin
 ### Installation
 
 #### GitHub Copilot CLI
-Speckit Auto is auto-discovered from `~/.agents/skills/`. No manual installation required.
+Speckit Auto is auto-discovered from `~/.agents/skills/` or the repository's `.github/skills/` path, depending on how the skill is installed. No manual setup is required after copying the skill into one of those locations.
 
 #### Claude Code
-Install the skill from the Superpowers skills library, or copy the skill directory to your workspace.
+Install the skill from the Superpowers skills library, or copy the skill directory to `~/.claude/skills/`.
 
 #### Local Usage (Standalone)
 Clone the skill and ensure `.env` credentials are configured if using `--issue` with Jira.
@@ -215,7 +215,7 @@ skill speckit-auto "Your requirement here"
 
 **Installation**: Add the skill from the Superpowers library, or install manually:
 ```bash
-cp -r speckit-auto ~/.agents/skills/
+cp -r speckit-auto ~/.claude/skills/
 ```
 
 **Invocation**: Use the skill tool within Claude Code:
