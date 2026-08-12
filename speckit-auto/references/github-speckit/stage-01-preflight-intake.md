@@ -70,3 +70,25 @@ The folder must stay stable across reruns of the same issue.
 
 After intake completes, invoke `/speckit.specify` with the compact brief (or requirement text) in
 the same turn, then continue to [stage-02-spec-design-flow.md](stage-02-spec-design-flow.md).
+
+## Execution Report (Jira-Sourced Runs)
+
+`jira-to-speckit` only fetches and compacts the Jira issue (workflow steps 1–5) — it does not run
+or track any downstream stage. `speckit-auto` owns the running execution report for the whole
+pipeline whenever the run started from `--issue` mode.
+
+- Initialize once, right after Jira intake returns, from
+  [../../assets/execution-report-template.md](../../assets/execution-report-template.md).
+- Recommended path: `specs/<issue_id>-<short_title>/execution-report.md` (same folder as the
+  Spec Kit artifact path above).
+- Populate metadata from the `jira-to-speckit` output: Jira issue key, Jira title, resolved
+  Speckit/artifact name, repository.
+- Update the report in place after every stage in this run (Jira intake, `specify`, `clarify`,
+  `plan`, `checklist`, `tasks`, `analyze`, Stage 03 implement/review loop, Stage 04/05 commit,
+  Stage 06 completion): progress, current blocker/issue, cumulative Copilot requests, and
+  input/response token estimates. Label token counts as estimates when exact counts are
+  unavailable from the active tools.
+- Keep the report current until the pipeline ends; do not skip updates because a stage "handed
+  back" — a finished stage is not a stop condition (see
+  [../shared/global-rules.md](../shared/global-rules.md)).
+- Skip this section entirely for manual (non-`--issue`) runs — there is no Jira metadata to track.
