@@ -1,70 +1,58 @@
 # agents-skills
 
-This repository contains the necessary agent skills used to support the development workstream.
-
-It is intended to be a central place to define, organize, and maintain reusable skill instructions that help coding agents perform software engineering tasks consistently and efficiently.
+A collection of reusable, production-grade skills for software engineering workflows. These skills provide consistent, efficient task execution across development, testing, security, and documentation workflows.
 
 ## Purpose
 
-- Provide essential, reusable skills for day-to-day development activities.
-- Standardize how agents approach coding, debugging, refactoring, testing, and documentation.
-- Reduce repeated prompt engineering by capturing proven workflows as versioned skill assets.
-- Improve delivery quality by making agent behavior more predictable across projects.
+This repository contains skill definitions for common engineering tasks:
+- **Security scanning** — comprehensive vulnerability and secret detection
+- **Spec-driven delivery** — end-to-end pipeline from requirements to implementation
+- **Code review** — deep line-by-line review against specifications
+- **Jira integration** — fetch and convert Jira tickets to Speckit-ready specs
 
-## What This Repository Is For
+Each skill is designed to work across multiple platforms and coding agents.
 
-- Building and curating skill definitions for engineering workflows.
-- Supporting implementation tasks such as feature development and bug fixing.
-- Supporting quality workflows such as review, testing, and validation.
-- Supporting knowledge workflows such as architecture exploration and documentation generation.
+## Quick Install
 
-## Typical Development Workstream Coverage
+Copy the skill folder you need into your agent's skill location:
 
-- Codebase exploration and architecture understanding.
-- Debugging and root cause analysis.
-- Safe refactoring and impact analysis.
-- Pull request review guidance.
-- Documentation and onboarding content generation.
+| Platform | Location | Example |
+|----------|----------|---------|
+| GitHub Copilot | `.github/skills/` (in your repo) | `cp -r job-security-scan .github/skills/` |
+| Claude Local | `~/.claude/skills/` | `cp -r job-security-scan ~/.claude/skills/` |
+| Local/Git Storage | `~/.agents/skills/` | `cp -r job-security-scan ~/.agents/skills/` |
 
-## Why It Matters
+After copying, restart your IDE or agent session to discover the skill.
 
-By keeping necessary agent skills in one repository, teams can:
+## Skills Overview
 
-- Reuse high-quality development patterns.
-- Onboard contributors faster.
-- Evolve agent capabilities with clear version history.
-- Align development practices across multiple repositories and teams.
+### Security & Compliance
+- **job-security-scan** — Scan repositories for vulnerabilities, secrets, and misconfigurations using industry-standard tools (Gitleaks, Trivy, Semgrep, Hadolint, OSV-Scanner, TruffleHog)
 
-## Install Skills Locally
+### Spec-Driven Delivery
+- **speckit-auto** — End-to-end delivery pipeline from requirements to implementation with automatic code review
+- **speckit-code-review** — Deep code review comparing implementation against specifications
+- **jira-to-speckit** — Convert Jira tickets into Speckit-ready feature specifications
 
-Copy the skill folder you need from this repository's `skills/` directory into one of the following locations:
+## Comprehensive Skills Table
 
-- GitHub Copilot skill location: `.github/skills/` (inside your target repository)
-- Claude skill location: `~/.claude/skills/`
-
-Example:
-
-```bash
-# From the root of this repository
-cp -R skills/<skill-name> /path/to/your-target-repo/.github/skills/
-
-# Or install for Claude local usage
-cp -R skills/<skill-name> ~/.claude/skills/
-```
-
-After copying, restart your IDE/agent session so the new skill is discovered.
-
-## Skills Summary
-
-| Skill | Description | Guide |
-|-------|-------------|-------|
-| `job-security-scan` | Comprehensive multi-tool security scanning workflow for development repositories. | [job-security-scan.md](job-security-scan.md) |
+| Skill | Description | Install Path | Compatibility | Triggers | Status |
+|-------|-------------|---------------|----------------|----------|--------|
+| [job-security-scan](./job-security-scan/README.md) | Comprehensive multi-tool security scanner. Combines Gitleaks, Trivy, Semgrep, Hadolint, OSV-Scanner, TruffleHog. Produces structured HTML reports with severity filtering and VS Code deep-links. | `.github/skills/` or `~/.agents/skills/` | GitHub Copilot, Claude, Local | "scan for vulnerabilities", "check for secrets", "security pipeline" | v2.0 / one-om-ddm-team |
+| [speckit-auto](./speckit-auto/README.md) | End-to-end spec-driven delivery orchestrator. Runs intake, spec creation, design, implementation, code review loop, and commit—all in one turn. Supports `--yolo` mode for zero-human automation. | `.github/skills/` or `~/.agents/skills/` | GitHub Copilot, Claude, Local | Requirement text, `--issue <jira-url>`, `--yolo`, `--integration` | v0.0.2 / Alex Nguyen |
+| [speckit-code-review](./speckit-code-review/README.md) | Spec-to-code validation gate. Extracts requirements from specification and validates implementation against each requirement. Produces JSON with coverage %, business gaps, security issues, architecture issues, and unit test coverage. | `.github/skills/` or `~/.agents/skills/` | GitHub Copilot, Claude, Local | "speckit code review", "review with spec", "spec coverage audit" | v0.0.2 / Alex Nguyen |
+| [jira-to-speckit](./jira-to-speckit/README.md) | Jira-to-spec orchestrator. Fetches Jira issues, compacts content, runs clarification loops for spec/plan/test/tasks phases, then hands off to implementation. Maintains execution reports with token usage and cost estimates. | `.github/skills/` or `~/.agents/skills/` | GitHub Copilot, Claude, Local | Jira key (e.g., `DDM-1234`), Jira URL, `--issue <url>` | v0.0.1 / Alex Nguyen |
 
 ## Contributing
 
-When adding or updating skills, aim for:
+When adding or updating skills:
 
-- Clear scope and trigger conditions.
-- Practical, testable instructions.
-- Minimal ambiguity in expected outcomes.
-- Backward-compatible changes when possible.
+1. **Create a `SKILL.md` file** in the skill directory with frontmatter (name, description, compatibility, metadata)
+2. **Create a `README.md` file** alongside SKILL.md with comprehensive documentation (500-1000 words)
+3. **Structure your README** with: Overview, Quick Start, Features, Installation, Compatibility, Examples, Configuration, Troubleshooting
+4. **Test the skill** across intended platforms (GitHub Copilot, Claude, local)
+5. **Document all triggers and use cases** for discoverability
+6. **Keep SKILL.md as the source of truth** — README expands on it
+
+For new security skills, add test configurations to prevent false positives.
+For new spec-delivery skills, ensure compatibility with all supported integration providers.
