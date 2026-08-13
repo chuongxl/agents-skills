@@ -20,7 +20,7 @@ Copy the skill folder you need into your agent's skill location:
 |----------|----------|---------|
 | GitHub Copilot | `.github/skills/` (in your repo) | `cp -r job-security-scan .github/skills/` |
 | Claude Local | `~/.claude/skills/` | `cp -r job-security-scan ~/.claude/skills/` |
-| Local/Git Storage | `~/.agents/skills/` | `cp -r job-security-scan ~/.agents/skills/` |
+| Local | `~/.agents/skills/` | `cp -r job-security-scan ~/.agents/skills/` |
 
 After copying, restart your IDE or agent session to discover the skill.
 
