@@ -61,6 +61,11 @@ Using `issue_id` and `short_title` from [../shared/intake.md](../shared/intake.m
 
 The folder must stay stable across reruns of the same issue.
 
+As soon as this path is resolved, apply the branch rename step from
+[../shared/branching.md](../shared/branching.md) (`git branch -m` to the same
+`<issue_id>-<short_title>`/`<NNN>-<slug>` string) if the checked-out branch is still on its
+provisional name.
+
 | Artifact | Path | Written by |
 |----------|------|------------|
 | Ticket snapshot (`--issue` only) | `specs/<issue_id>-<short_title>/ticket.md` | `jira-to-speckit` (staged), relocated here by this stage |

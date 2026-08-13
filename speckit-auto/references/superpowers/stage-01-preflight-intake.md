@@ -118,6 +118,10 @@ applies unchanged.
 
 Create `specs/<feature_folder>/` if missing.
 
+As soon as `<feature_folder>` is resolved, apply the branch rename step from
+[../shared/branching.md](../shared/branching.md) (`git branch -m` to the same `<feature_folder>`
+string) if the checked-out branch is still on its provisional name.
+
 ## Ticket Snapshot Relocation (Required, `--issue` Mode)
 
 Right after the feature folder is created, **move** `.speckit/intake/<issue_id>-ticket.md` →
