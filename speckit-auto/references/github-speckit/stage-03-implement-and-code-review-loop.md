@@ -28,16 +28,11 @@ if a concrete tool call fails with a quoted error message.
 
 ## Heavy Payload Prevention + Implementation Partitioning
 
-Treat `speckit.implementation` as `speckit.implement` (repo-installed agent name is `speckit.implement`).
+Treat `speckit.implementation` as `speckit.implement` (the repo-installed agent name).
 
-When implementation scope is large, split and execute in batches:
-
-1. Build `implementation_packages[]` from `tasks.md` grouped by `workspace` + bounded capability.
-2. Keep each package prompt minimal: package-specific tasks + relevant plan/spec excerpts only.
-3. Invoke `speckit.implement` multiple times (one invocation per package) until queue is empty.
-4. Parallelize only independent packages (no dependency edges, no shared file ownership risk).
-5. Run dependency-linked packages sequentially in topological order.
-6. After each batch, keep only compact progress state (remaining packages, changed files, known blockers).
+When implementation scope is large, load [../shared/partitioning.md](../shared/partitioning.md) and
+apply it, building `implementation_packages[]` from `tasks.md` grouped by `workspace` + bounded
+capability, and invoking `speckit.implement` once per package until the queue is empty.
 
 ## Git Submodule Branch Handling (Implementation Stage)
 
@@ -149,13 +144,11 @@ PHASE 2 — Code review loop
 
 ## Loop Invariants
 
-- speckit-auto NEVER exits this stage with `status = failed`
-- speckit-auto MUST run `speckit.converge` until it reports converged before entering the code-review loop
-- speckit-auto NEVER asks the user for help during this loop
-- speckit-auto NEVER produces a prose summary of the review result — the review result is data to act on, not a message to report
-- speckit-auto NEVER ends a turn after receiving a failed review — the next action after a failed review is always file edits, not a response
-- speckit-auto NEVER retains full failed-review text across retries; keep only `state_file`, the top `fixes[]`, and the one category file needed for the current fix
-- speckit-auto NEVER delegates to speckit.implement for code-only or test-coverage failures — use file-editing tools directly
-- speckit-auto NEVER stops and reports except via the global rule 20 circuit breaker (identical failure 5× with no file change in between, or a git/filesystem write error)
-- On iteration 3+ with the same failure, escalate fix depth (rewrite the method, not patch a line)
+- Never exit this stage with `status = failed`; never end a turn or write a prose summary after
+  one — the review result is data to act on and the next action is always file edits.
+- Never ask the user for help during this loop; the only stop is the global rule 20 circuit breaker.
+- Run `speckit.converge` until it reports converged before entering the code-review loop.
+- Retain only `state_file`, the top `fixes[]`, and the one category file needed for the current fix.
+- Never delegate to `speckit.implement` for code-only or test-coverage failures — edit files directly.
+- On iteration 3+ with the same failure, escalate fix depth (rewrite the method, not patch a line).
 - Log each iteration: `[Review loop #N] status=failed, scope=<code|tasks|plan>, fixing: <summary>`

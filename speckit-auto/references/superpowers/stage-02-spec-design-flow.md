@@ -120,24 +120,14 @@ follows global rule 10a: the same check failing 3 consecutive times stops and re
 Re-run this gate after **any** Stage 02 artifact regeneration, including one triggered from
 Stage 03 or Stage 04. It fires no interview, so it never violates the Stage 03 no-stop rule.
 
-## Prompt / Payload Budget Rules (Stage 02)
+## Payload Budget + Large Scope Partitioning
 
-- Include only the current step's input plus minimal context from prior artifacts.
-- Prefer section excerpts over full-document dumps.
-- Reuse cached Project Context from Stage 01; never reload or restate unchanged guideline text.
-- Never carry forward long review prose when a concise delta is enough.
+Payload budget: global rule 8 ([../shared/global-rules.md](../shared/global-rules.md)).
 
-## Large Scope Partitioning
-
-If the requirement is large or task volume is high, split into packages.
-
-1. Build `work_packages[]` by capability and `workspace` from `repo_map`.
-2. For each package include only: package goal, relevant spec sections, target workspace, constraints.
-3. Invoke `writing-plans` once per package, then merge the slices into one coherent
-   plan file at the single target path, with explicit cross-package ordering and dependencies.
-4. Parallel only for packages with no dependency links and no shared file ownership; otherwise
-   sequential in topological order.
-5. Run the self-review gate once globally after the merge, not only per package.
+If the requirement is large or task volume is high, load
+[../shared/partitioning.md](../shared/partitioning.md) and apply it: invoke `writing-plans` once per
+package, merge the slices into the single plan file, then run the self-review gate once globally
+after the merge (not per package).
 
 ## Repository-Aware Task Assignment
 

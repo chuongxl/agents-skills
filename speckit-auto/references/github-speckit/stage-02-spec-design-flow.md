@@ -33,39 +33,17 @@ Never emit a capability disclaimer before attempting these — call the slash co
 
 If `speckit.analyze` reports issues, fix at source (`specify/clarify/plan/checklist/tasks`) and rerun `speckit.analyze` before Stage 03.
 
-## Payload Budget Rules (Stage 02)
+## Payload Budget + Large Scope Partitioning
 
-For every Stage 02 invocation, keep payload compact:
+Payload budget: global rule 8 ([../shared/global-rules.md](../shared/global-rules.md)).
 
-- Include only the current stage input plus the minimal required context from previous artifacts.
-- Prefer section excerpts over full-document dumps.
-- Reuse cached Project Context from Stage 01; do not reload or restate unchanged guideline text.
-- Never carry forward long review prose when a concise delta is enough.
+If requirements are large or task volume is high, load
+[../shared/partitioning.md](../shared/partitioning.md) and apply it, with these stage bindings:
 
-## Large Scope Partitioning (Plan/Checklist/Tasks/Analyze)
-
-If requirements are large or task volume is high, split the work into packages and process in batches.
-
-### Package Strategy
-
-1. Build `work_packages[]` by capability and `workspace` from `repo_map`.
-2. For each package, include only:
-   - package goal
-   - relevant spec/plan sections
-   - target workspace and constraints
-3. Invoke the repo stage agent multiple times (one package per invocation) until all packages complete.
-
-### Parallel vs Sequential
-
-- **Parallel**: packages with no dependency links and no shared file ownership.
-- **Sequential**: packages with dependency/order constraints (topological order).
-
-### Stage-specific Application
-
-- `speckit.plan`: create plan slices per package, then merge into one coherent `plan.md` with dependencies.
-- `speckit.checklist`: generate checklist slices per package and merge into one requirement-quality checklist.
-- `speckit.tasks`: generate tasks per package, then merge into one `tasks.md` with explicit ordering.
-- `speckit.analyze`: run per package when large; then run one final global read-only consistency pass.
+- `speckit.plan` → plan slices per package, merged into one `plan.md`.
+- `speckit.checklist` → checklist slices merged into one requirement-quality checklist.
+- `speckit.tasks` → tasks per package merged into one `tasks.md` with explicit ordering.
+- `speckit.analyze` → run per package when large, then one final global read-only pass.
 
 ## Repository-Aware Task Assignment
 
@@ -105,11 +83,13 @@ Never assign a task without consulting `repo_map` from the Project Context loade
 Runs in **default and `--yolo` mode**, after `speckit.analyze` and after any restart routing.
 This is a read-only check on the produced artifacts — it is not an interview.
 
-1. **Spec coverage** — every requirement in `spec.md` maps to at least one task in `tasks.md`.
-2. **Placeholder scan** — no `TODO`, `TBD`, `...`, or stub content in `spec.md`, `plan.md`,
+1. **Consistency** — assert the last `speckit.analyze` run reported no conflicts, gaps, or
+   ambiguities. Do not re-derive that analysis here.
+2. **Spec coverage** — every requirement in `spec.md` maps to at least one task in `tasks.md`
+   (required by global rule 10a; `speckit.analyze` is a consistency check and does not
+   guarantee this).
+3. **Placeholder scan** — no `TODO`, `TBD`, `...`, or stub content in `spec.md`, `plan.md`,
    or `tasks.md`.
-3. **Consistency** — no conflicts, gaps, or ambiguities between spec, plan, and tasks
-   (types, names, API contracts, file paths agree). `speckit.analyze` output must be clean.
 4. **Workspace assignment** — every task in `tasks.md` has a `workspace` from `repo_map`.
 
 If any check fails, fix it at the source (`specify`/`clarify`/`plan`/`checklist`/`tasks`), re-run

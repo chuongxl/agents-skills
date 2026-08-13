@@ -107,9 +107,11 @@ subagents dispatched from inside a superpowers skill.
    are the checklist/analyze equivalents.
 8. `superpowers:test-driven-development` is mandatory for every implementation step: RED (watch it
    fail) → GREEN (watch it pass) → REFACTOR.
-9. Code review is two-tier and ordered: run `superpowers:requesting-code-review` first, then
-   `speckit-code-review`. **`speckit-code-review` is the authoritative pass/fail gate** that drives
-   the Stage 03 fix loop. A superpowers review verdict never ends Stage 03.
+9. Code review is two-tier and ordered: run `superpowers:requesting-code-review` once, on first
+   entry to the Stage 03 review phase, then `speckit-code-review`. Fix iterations go straight back
+   to `speckit-code-review` — the advisory pass is not repeated.
+   **`speckit-code-review` is the authoritative pass/fail gate** that drives the Stage 03 fix loop.
+   A superpowers review verdict never ends Stage 03.
 10. `superpowers:verification-before-completion` must run before any completion claim or commit.
 11. `superpowers:systematic-debugging` is used whenever a test fails or a bug is found — no fix
     without an identified root cause.

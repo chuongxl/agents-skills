@@ -20,22 +20,19 @@ Verify the superpowers skills are invocable. Check in this order and stop at the
 
 1. Superpowers skills appear in this session's available-skills list (names may be surfaced as
    `superpowers:<name>` or bare `<name>`) — record which form is used and reuse it all run.
-2. The skills exist on disk. Superpowers is distributed several ways, and a repository may vendor
-   its own copy, so probe **all** of these before concluding it is missing (`<name>` = any skill
-   from the minimum set below):
+2. The skills exist on disk. Probe both shapes before concluding it is missing
+   (`<name>` = any skill from the minimum set below):
 
    | Install shape | Skills path |
    |---|---|
-   | Repo-vendored (project-local) | `<repo-root>/.agents/skills/<name>/SKILL.md`, `<repo-root>/.claude/skills/<name>/SKILL.md` |
-   | User-level skills dir | `~/.agents/skills/<name>/SKILL.md`, `~/.claude/skills/<name>/SKILL.md` |
-   | Claude Code plugin | `~/.claude/plugins/cache/<marketplace>/superpowers/<version>/skills/<name>/SKILL.md` |
+   | Repo-vendored (project-local) | `<repo-root>/.agents/skills/<name>/SKILL.md` |
+   | User-level skills dir | `~/.agents/skills/<name>/SKILL.md` |
    | Copilot CLI plugin | `~/.copilot/installed-plugins/<marketplace>/superpowers/skills/<name>/SKILL.md` |
 
-   `<marketplace>` is typically `superpowers-marketplace` (obra's) or `claude-plugins-official`;
-   glob it rather than hardcoding. `<version>` is a version directory — take the highest.
-   For a plugin install, also confirm it is enabled where the harness records that
-   (Copilot CLI: `~/.copilot/settings.json` → `enabledPlugins["superpowers@superpowers-marketplace"]`).
-   Record the resolved directory once and reuse it for the file-read fallback all run.
+   Glob `<marketplace>` (typically `superpowers-marketplace`) rather than hardcoding it, and confirm
+   the plugin is enabled in `~/.copilot/settings.json` →
+   `enabledPlugins["superpowers@superpowers-marketplace"]`. Record the resolved directory once and
+   reuse it for the file-read fallback all run.
 3. Direct probe: invoke `using-superpowers` via the `skill` tool. If it returns content,
    superpowers is available and the bootstrap step below is already satisfied.
 
@@ -54,31 +51,8 @@ If none of the three checks succeed, run install recovery below.
 
 ## Missing Superpowers Recovery (Required)
 
-When superpowers is not available:
-
-1. Fetch the install guide: `https://github.com/obra/superpowers`.
-2. Ask the user once: `Install superpowers` or `Stop`.
-3. If `Stop`, halt and report that installation is required.
-4. If `Install`, use the installation method for the **current harness** — never run another
-   harness's command:
-
-   | Harness | How to install |
-   |---|---|
-   | GitHub Copilot CLI | Run both, in order: `copilot plugin marketplace add obra/superpowers-marketplace`, then `copilot plugin install superpowers@superpowers-marketplace` |
-   | Claude Code | Plugin install is an interactive slash command the agent cannot run itself. Ask the user to run `/plugin marketplace add obra/superpowers-marketplace` then `/plugin install superpowers@superpowers-marketplace` (superpowers is also in the official marketplace), and continue in the same turn once they confirm. |
-   | Other / unknown | Clone the repo and copy `skills/*` into the harness's skills directory (`~/.agents/skills/` or `~/.claude/skills/`), then re-check. |
-
-   Detect the harness from what is present: a `~/.copilot/` tree and a working `copilot` binary →
-   Copilot CLI; a `~/.claude/` tree → Claude Code. If both exist, prefer the one whose skills
-   directory the session's other skills resolve from.
-5. Confirm the install landed by re-running availability check 2 against the paths above.
-6. Re-run the availability check. Newly installed skills may not be surfaced in the current
-   session's skill list — if so, use the file-read fallback for this run rather than stopping.
-7. If it passes, continue the pipeline in the same turn.
-8. Only if install fails, stop and report the exact failing step with quoted error output.
-
-Never fall back to the `github-speckit` provider because superpowers is missing — the provider is
-fixed for the run (see [../integration-mode.md](../integration-mode.md)).
+When superpowers is not available, load [install-recovery.md](install-recovery.md) and follow it.
+Never fall back to the `github-speckit` provider — the provider is fixed for the run.
 
 ## Bootstrap (Required, After Availability Check)
 
@@ -86,34 +60,16 @@ Invoke `using-superpowers` once per run. This is the superpowers skill-disciplin
 also proves runtime executability. Only a concrete error from this call is reportable as a runtime
 failure (quote it), and only after the availability check passed.
 
-Note: on Copilot CLI, superpowers also injects this bootstrap through its session-start hook. If it
-is already present in the session context, that satisfies this step — do not re-invoke it.
+Note: superpowers also injects this bootstrap through its session-start hook. If it is already
+present in the session context, that satisfies this step — do not re-invoke it.
 
 Do not let the bootstrap's "check for a relevant skill before every action" instruction override
 this pipeline's stage order or its no-stop rules — `speckit-auto` owns the control flow.
 
 ## Scratch Path Hygiene (Required, Before Any Implementation)
 
-Stage 04/05 commit with `git add -A`, so any scratch directory left untracked ends up inside the
-feature commit. Two are produced during a run:
-
-| Path | Written by | Contents |
-|---|---|---|
-| `.speckit/` | `speckit-code-review`, Stage 01 intake | per-category detail files, `state.json`, review dirs, the staged ticket snapshot |
-| `.superpowers/` | `subagent-driven-development` | the plan's ledger, briefs, review packages |
-
-Before Stage 03, ensure both are ignored in the repo whose tree will be committed:
-
-1. Read `.gitignore` at the repo root.
-2. Append any of the two entries that is missing (`.speckit/`, `.superpowers/`), each on its own
-   line under a short comment.
-3. If `.gitignore` does not exist, create it with just those two entries.
-4. This edit is part of the feature commit — do not commit it separately.
-
-`.superpowers/` may already be excluded by the implementation skill through
-`.git/info/exclude`; adding it to `.gitignore` anyway is harmless and survives a fresh clone.
-Note that `integration-mode.md` only writes a `.gitignore` entry during a **setup** invocation
-(`--integration`), which a normal pipeline run never performs — this step is what covers that case.
+Load [../shared/scratch-hygiene.md](../shared/scratch-hygiene.md) and apply it. Both `.speckit/`
+and `.superpowers/` are produced in this provider.
 
 ## Preflight Guidelines Context Load (Required)
 
@@ -164,15 +120,11 @@ Create `specs/<feature_folder>/` if missing.
 
 ## Ticket Snapshot Relocation (Required, `--issue` Mode)
 
-Right after the feature folder is created, **move** the staged snapshot
-`.speckit/intake/<issue_id>-ticket.md` → `specs/<feature_folder>/ticket.md` and record
-`ticket_path` in run state. Overwrite an existing `ticket.md` on a rerun. Full rules:
+Right after the feature folder is created, **move** `.speckit/intake/<issue_id>-ticket.md` →
+`specs/<feature_folder>/ticket.md` and record `ticket_path` in run state. Full rules (rerun
+overwrite, never gitignore, never commit separately, never read back):
 [../shared/intake.md](../shared/intake.md) → "Ticket Snapshot".
-
-`ticket.md` is the traceback record of the original request; `spec.md`/`plan.md` remain the source
-of truth for what gets built. It is committed alongside them by Stage 04/05 (`git add -A`) — do not
-add it to `.gitignore` and do not commit it separately. Pass only the compact brief into
-`brainstorming`, never the snapshot's contents.
+Pass only the compact brief into `brainstorming`, never the snapshot's contents.
 
 ## Stage 02 Entry Step
 
@@ -182,22 +134,5 @@ text) and the target design-spec path in the same turn, then continue to
 
 ## Execution Report (Jira-Sourced Runs)
 
-`jira-to-speckit` only fetches and compacts the Jira issue (workflow steps 1–5) — it does not run
-or track any downstream stage. `speckit-auto` owns the running execution report for the whole
-pipeline whenever the run started from `--issue` mode.
-
-- Initialize once, right after Jira intake returns, from
-  [../../assets/execution-report-template.md](../../assets/execution-report-template.md).
-- Recommended path: `specs/<feature_folder>/execution-report.md` (same folder as `spec.md`/
-  `plan.md` above).
-- Populate metadata from the `jira-to-speckit` output: Jira issue key, Jira title, resolved
-  feature name, repository.
-- Update the report in place after every stage in this run (Jira intake, `brainstorming`,
-  `writing-plans`, Stage 03 implement/review loop, Stage 04/05 commit, Stage 06 completion):
-  progress, current blocker/issue, cumulative Copilot requests, and input/response token
-  estimates. Label token counts as estimates when exact counts are unavailable from the active
-  tools.
-- Keep the report current until the pipeline ends; do not skip updates because a stage "handed
-  back" — a finished stage is not a stop condition (see
-  [../shared/global-rules.md](../shared/global-rules.md)).
-- Skip this section entirely for manual (non-`--issue`) runs — there is no Jira metadata to track.
+In `--issue` mode, load [../shared/execution-report.md](../shared/execution-report.md) and
+initialize the report at `specs/<feature_folder>/execution-report.md`.

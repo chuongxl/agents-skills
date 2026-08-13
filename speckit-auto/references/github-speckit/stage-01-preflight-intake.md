@@ -28,17 +28,7 @@ variant — the repo-installed agents are the only valid source.
 ## Missing Speckit Auto-Recovery (Required)
 
 When any required repo Speckit file is missing, run recovery — do not silently skip and do not
-abandon the run:
-
-1. Fetch the install guide: `https://github.com/github/spec-kit/blob/main/docs/installation.md`
-2. Ask the user once: `Install GitHub Speckit` or `Stop`.
-3. If `Stop`, halt and report that installation is required.
-4. If `Install`, follow the guide exactly to install the Spec Kit CLI.
-5. Initialize in this repo: `specify init . --integration copilot`
-6. Run `/speckit.constitution` as an agent.
-7. Re-run the source check.
-8. If it passes, continue the pipeline in the same turn.
-9. Only if install or init fails, stop and report the exact failing step with quoted error output.
+abandon the run. Load [install-recovery.md](install-recovery.md) and follow it.
 
 ## Runtime Executability (No Separate Probe)
 
@@ -54,6 +44,11 @@ invocation is reportable as a runtime failure (quote it), and only after the sou
 
 Load [../shared/preflight-guidelines-context.md](../shared/preflight-guidelines-context.md).
 If `docs/guidelines/` or `architecture.md` is missing, skip and continue — never a stop.
+
+## Scratch Path Hygiene (Required, Before Any Implementation)
+
+Load [../shared/scratch-hygiene.md](../shared/scratch-hygiene.md) and apply it. Only `.speckit/`
+applies in this provider.
 
 ## Artifact Path (Spec Kit Layout)
 
@@ -74,15 +69,11 @@ The folder must stay stable across reruns of the same issue.
 
 ## Ticket Snapshot Relocation (Required, `--issue` Mode)
 
-Right after the artifact folder is created, **move** the staged snapshot
-`.speckit/intake/<issue_id>-ticket.md` → `specs/<issue_id>-<short_title>/ticket.md` and record
-`ticket_path` in run state. Overwrite an existing `ticket.md` on a rerun. Full rules:
+Right after the artifact folder is created, **move** `.speckit/intake/<issue_id>-ticket.md` →
+`specs/<issue_id>-<short_title>/ticket.md` and record `ticket_path` in run state. Full rules
+(rerun overwrite, never gitignore, never commit separately, never read back):
 [../shared/intake.md](../shared/intake.md) → "Ticket Snapshot".
-
-`ticket.md` is the traceback record of the original request; the Spec Kit artifacts remain the
-source of truth for what gets built. It is committed alongside them by Stage 04/05 (`git add -A`) —
-do not add it to `.gitignore` and do not commit it separately. Pass only the compact brief into
-`/speckit.specify`, never the snapshot's contents.
+Pass only the compact brief into `/speckit.specify`, never the snapshot's contents.
 
 ## Stage 02 Entry Step
 
@@ -91,22 +82,5 @@ the same turn, then continue to [stage-02-spec-design-flow.md](stage-02-spec-des
 
 ## Execution Report (Jira-Sourced Runs)
 
-`jira-to-speckit` only fetches and compacts the Jira issue (workflow steps 1–5) — it does not run
-or track any downstream stage. `speckit-auto` owns the running execution report for the whole
-pipeline whenever the run started from `--issue` mode.
-
-- Initialize once, right after Jira intake returns, from
-  [../../assets/execution-report-template.md](../../assets/execution-report-template.md).
-- Recommended path: `specs/<issue_id>-<short_title>/execution-report.md` (same folder as the
-  Spec Kit artifact path above).
-- Populate metadata from the `jira-to-speckit` output: Jira issue key, Jira title, resolved
-  Speckit/artifact name, repository.
-- Update the report in place after every stage in this run (Jira intake, `specify`, `clarify`,
-  `plan`, `checklist`, `tasks`, `analyze`, Stage 03 implement/review loop, Stage 04/05 commit,
-  Stage 06 completion): progress, current blocker/issue, cumulative Copilot requests, and
-  input/response token estimates. Label token counts as estimates when exact counts are
-  unavailable from the active tools.
-- Keep the report current until the pipeline ends; do not skip updates because a stage "handed
-  back" — a finished stage is not a stop condition (see
-  [../shared/global-rules.md](../shared/global-rules.md)).
-- Skip this section entirely for manual (non-`--issue`) runs — there is no Jira metadata to track.
+In `--issue` mode, load [../shared/execution-report.md](../shared/execution-report.md) and
+initialize the report at `specs/<issue_id>-<short_title>/execution-report.md`.

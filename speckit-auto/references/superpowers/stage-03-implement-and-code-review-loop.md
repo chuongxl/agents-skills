@@ -15,17 +15,10 @@ Before invoking the implementation skill, inject into its input:
 
 ## Invocation Method (Critical)
 
-All superpowers steps are invoked via the `skill` tool — no slash commands, no agents, and never
-the `task` tool with a `superpowers:*` agent_type. Resolve each skill name using the precedence in
-[provider-rules.md](provider-rules.md) (session skill list → `superpowers:<name>` → bare `<name>`
-→ file-read fallback).
-
-**This does not restrict the subagents those skills dispatch themselves.**
-`subagent-driven-development` dispatches a fresh implementer and a task reviewer per task, and
-`requesting-code-review` dispatches a `general-purpose` code reviewer — all through built-in agent
-types. Those dispatches are required for Stage 03 to work at all. Never suppress them, and never
-read the rule above as "no subagents in Stage 03". See the Task Tool section in
-[provider-rules.md](provider-rules.md).
+Invoke every superpowers step and `speckit-code-review` through the `skill` tool, per
+[provider-rules.md](provider-rules.md) (name resolution + Task Tool section). The skills these steps
+dispatch subagents from — `subagent-driven-development`, `requesting-code-review` — are required
+here; never suppress them.
 
 | Step | Skill |
 |------|-------|
@@ -37,17 +30,13 @@ read the rule above as "no subagents in Stage 03". See the Task Tool section in
 | Review response discipline | `receiving-code-review` |
 | Completion evidence gate | `verification-before-completion` |
 
-`speckit-code-review` is invoked via the `skill` tool with name `speckit-code-review`.
-Never launch it as a background agent or task process — it must run inline and return JSON directly.
+`speckit-code-review` must run **inline** (never as a background agent/task) and must always be
+given the spec path explicitly: `specs/<feature_folder>/spec.md` — an ambiguous match makes it ask
+the user, a turn-ending stop inside this NO-STOP ZONE. That spec is a `brainstorming` design
+document with no `FR-*`/`NFR-*` IDs; the review skill synthesizes the checklist itself, so never
+pre-convert the spec to add IDs.
 
-Always pass the spec path explicitly: `specs/<feature_folder>/spec.md`. Never let the skill guess —
-an ambiguous match makes it ask the user, which is a turn-ending stop inside this NO-STOP ZONE.
-The spec is a `brainstorming` design document, so it usually has no `FR-*`/`NFR-*` IDs;
-`speckit-code-review` synthesizes the requirement checklist from it. Do not pre-convert or rewrite
-the design spec to add IDs.
-
-Never stop with a generic runtime/capability disclaimer before attempting the real call. Only stop
-if a concrete tool call fails with a quoted error message.
+Never stop with a generic runtime/capability disclaimer before attempting the real call.
 
 ## Execution Style Selection
 
@@ -92,8 +81,14 @@ BASE_SHA=$(git merge-base HEAD <base-branch>)   # base-branch from shared/branch
 Never use `HEAD~1` as `BASE_SHA` — `requesting-code-review` suggests it as a default, but it
 silently drops every commit but the last, and with `executing-plans` (which may not commit per
 task) it can produce an **empty diff**, yielding a "clean" review that reviewed nothing.
-If `BASE_SHA` and `HEAD_SHA` resolve to the same commit at R0, no code has been committed yet:
-do not run the review — return to PHASE 1 and finish the implementation first.
+If `BASE_SHA` and `HEAD_SHA` resolve to the same commit at R0, nothing is committed yet. Check
+`git status --porcelain`:
+- **Dirty tree** (the `executing-plans` case — it may not commit per task): the work exists but is
+  uncommitted. Commit it as `chore(<feature>): checkpoint implementation` so the diff is reviewable,
+  re-read `HEAD_SHA`, and continue with R0. Never return to PHASE 1 over this.
+- **Clean tree**: nothing was implemented — return to PHASE 1 step C1 once. If PHASE 1 completes
+  again and the range is still empty with a clean tree, that is a stalled implementation: apply the
+  global rule 20 circuit breaker rather than looping C1 → R0 indefinitely.
 
 ## Mandatory TDD
 
@@ -104,13 +99,6 @@ Code written before its test must be deleted and redone. This applies to fix ite
 When a test fails unexpectedly or a bug appears, run `systematic-debugging` — never
 apply a fix without an identified root cause.
 
-## Worktrees Are Skipped
-
-Stay on the branch created in Stage 01 — it **is** the isolated workspace the implementation skill
-asks for. Ignore any superpowers instruction to create or enter a worktree, and never treat the
-absence of a worktree as a missing prerequisite. See global rule 3,
-[provider-rules.md](provider-rules.md) rule 3, and [../shared/branching.md](../shared/branching.md).
-
 ## Git Submodule Branch Handling
 
 See [../shared/branching.md](../shared/branching.md) — "Git Submodule Branch Handling". No
@@ -118,15 +106,10 @@ superpowers-specific deviation.
 
 ## Heavy Payload Prevention + Implementation Partitioning
 
-When implementation scope is large, split and execute in batches:
-
-1. Build `implementation_packages[]` from the plan's tasks, grouped by `workspace` + bounded capability.
-2. Keep each package input minimal: package-specific tasks + relevant plan/spec excerpts only.
-3. Invoke the implementation skill once per package until the queue is empty.
-4. Parallelize only independent packages (no dependency edges, no shared file ownership risk).
-   Use `dispatching-parallel-agents` when parallelizing.
-5. Run dependency-linked packages sequentially in topological order.
-6. After each batch, keep only compact progress state (remaining packages, changed files, blockers).
+When implementation scope is large, load [../shared/partitioning.md](../shared/partitioning.md) and
+apply it, building `implementation_packages[]` from the plan's tasks grouped by `workspace` +
+bounded capability, and invoking the implementation skill once per package until the queue is empty.
+Use `dispatching-parallel-agents` when parallelizing.
 
 ## CRITICAL: speckit-auto Owns This Loop — NO STOPS, NO GATES
 
@@ -177,7 +160,11 @@ PHASE 1 — Implementation + verification loop
          - proceed to PHASE 2
 
 PHASE 2 — Code review loop
-  R0 — Run requesting-code-review (native pass, advisory)
+  R0 — Run requesting-code-review (native pass, advisory) — FIRST PHASE-2 ENTRY ONLY
+       Set `r0_completed = true` only after the review actually returns findings. While
+       `r0_completed` is false (e.g. R0 was deferred for an empty range), R0 still runs on the
+       next PHASE-2 entry. Once true, skip R0 on every re-entry from R7 — speckit-code-review is
+       the authoritative gate and repeating a full-diff advisory review duplicates it at high cost.
        - inputs: description, plan excerpt, BASE_SHA, HEAD_SHA
          (BASE_SHA = the merge-base recorded at stage entry, never HEAD~1 — see Review Range;
           if BASE_SHA == HEAD_SHA, nothing is committed yet → return to C1)
@@ -234,23 +221,20 @@ PHASE 2 — Code review loop
       - If a fix needs a new file, create it
       - If context is insufficient, read the file first, then fix
   R7 — Run the implementation skill for broader changes if needed.
-       Then re-run the full gate sequence before the next authoritative review:
-       verification-before-completion → R0 (requesting-code-review) → R1.
-       Never jump straight from a fix back to R1 — every authoritative review iteration must be
-       preceded by fresh verification evidence and a native review pass.
+       Then re-run verification-before-completion, scoped to the tasks and tests touched by this
+       iteration's fixes (not the whole plan), and go DIRECTLY to R1 (never to R0/R2 — R0 is
+       first-entry only and is skipped whenever `r0_completed` is true).
+       Never jump straight from a fix back to R1 without that fresh verification evidence.
 ```
 
 ## Loop Invariants
 
-- speckit-auto NEVER exits this stage with `status = failed`
-- speckit-auto MUST reach clean `verification-before-completion` evidence before entering the code-review loop
-- speckit-auto NEVER asks the user for help during this loop
-- speckit-auto NEVER produces a prose summary of the review result — it is data to act on
-- speckit-auto NEVER ends a turn after a failed review — the next action is always file edits
-- speckit-auto NEVER retains full failed-review text across retries; keep only `state_file`, the top
-  `fixes[]`, and the one category file needed for the current fix
-- speckit-auto NEVER delegates to the implementation skill for code-only or test-coverage failures
-- speckit-auto NEVER treats a superpowers gate skill as an exit point
-- speckit-auto NEVER stops and reports except via the global rule 20 circuit breaker (identical failure 5× with no file change in between, or a git/filesystem write error)
-- On iteration 3+ with the same failure, escalate fix depth (rewrite the method, not patch a line)
+- Never exit this stage with `status = failed`; never end a turn or write a prose summary after
+  one — the review result is data to act on and the next action is always file edits.
+- Never ask the user for help during this loop; the only stop is the global rule 20 circuit breaker.
+- Never treat a superpowers gate skill as an exit point.
+- Reach clean `verification-before-completion` evidence before first entering PHASE 2.
+- Retain only `state_file`, the top `fixes[]`, and the one category file needed for the current fix.
+- Never delegate to the implementation skill for code-only or test-coverage failures.
+- On iteration 3+ with the same failure, escalate fix depth (rewrite the method, not patch a line).
 - Log each iteration: `[Review loop #N] status=failed, scope=<code|tasks|plan>, fixing: <summary>`

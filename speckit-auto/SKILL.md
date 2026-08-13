@@ -12,7 +12,7 @@ compatibility:
   github-copilot: "Skill auto-discovered from ~/.agents/skills/. Invoked via skill tool."
 metadata:
   author: Alex Nguyen
-  version: "0.0.3"
+  version: "0.0.2"
 ---
 
 # Speckit Auto — Provider Factory
@@ -41,7 +41,7 @@ made yet — make it now.
      free text               → requirement pipeline intent
 
 2. IF --integration is present:
-     → load references/integration-mode.md
+     → load references/integration-setup.md
      → perform SETUP ONLY: normalize, validate, persist, report
      → END TURN (this is the one legitimate no-pipeline turn end)
 
@@ -60,20 +60,10 @@ Never return an acknowledgement-only response. If this skill is already loaded m
 contains `<skill-context name="speckit-auto">`), resume from the current stage using available run
 context — never block asking the user to re-run `/speckit-auto`.
 
-## Providers
+## Providers + Stage Router (Load On Demand)
 
-| `integration` | Provider | Stage directory | Provider rules |
-|---------------|----------|-----------------|----------------|
-| `github-speckit` | Repo-installed GitHub Spec Kit agents | `references/github-speckit/` | [provider-rules.md](references/github-speckit/provider-rules.md) |
-| `superpowers` | `obra/superpowers` skills library | `references/superpowers/` | [provider-rules.md](references/superpowers/provider-rules.md) |
-
-Selection, persistence, resolution precedence, first-run ask, and the full dispatch table:
-[references/integration-mode.md](references/integration-mode.md).
-
-## Stage Router (Load On Demand)
-
-Replace `<provider>` with the resolved `integration` value. Never load a stage file from the
-provider that was not selected.
+Replace `<provider>` with the resolved `integration` value (`github-speckit` or `superpowers`).
+Never load a stage file from the provider that was not selected.
 
 | Stage | File |
 |-------|------|
@@ -85,6 +75,10 @@ provider that was not selected.
 | 04 — Human Review + Commit (default mode only) | `references/<provider>/stage-04-human-review-and-commit.md` |
 | 05 — YOLO Commit Flow (`--yolo` only) | `references/<provider>/stage-05-yolo-commit-flow.md` |
 | 06 — Mark Completed + Follow-up Commit | `references/<provider>/stage-06-spec-completion.md` |
+| Install recovery (only if preflight fails) | `references/<provider>/install-recovery.md` |
+
+- `github-speckit` = repo-installed GitHub Spec Kit agents.
+- `superpowers` = the `obra/superpowers` skills library.
 
 Shared references, loaded by every provider:
 
@@ -94,6 +88,10 @@ Shared references, loaded by every provider:
 | [references/shared/branching.md](references/shared/branching.md) | Stage 01 gate, Stage 03 submodules |
 | [references/shared/intake.md](references/shared/intake.md) | Stage 01 |
 | [references/shared/preflight-guidelines-context.md](references/shared/preflight-guidelines-context.md) | Stage 01 |
+| [references/shared/scratch-hygiene.md](references/shared/scratch-hygiene.md) | Stage 01 |
+| [references/shared/execution-report.md](references/shared/execution-report.md) | Stage 01 (`--issue` only) |
+| [references/shared/partitioning.md](references/shared/partitioning.md) | Stage 02/03 when scope is large |
+| [references/shared/commit.md](references/shared/commit.md) | Stage 04/05 |
 
 Discard Stage 02 files (and any interview reference) at Stage 03 entry.
 
@@ -131,15 +129,9 @@ Both are provider-independent and used by every provider.
 
 ## Project Context (Guidelines + Repo Map)
 
-During Stage 01, build a compact in-memory **Project Context** from `docs/guidelines/architecture.md`
-if present: repo layout (mono vs single), `repo_map` (which workspace is backend/frontend/BFF/
-shared/database), architecture pattern, and links to other guideline `.md` files.
-
-- Built **once**, reused for all stages — never re-read a loaded file.
-- Every stage that creates or assigns tasks must consult `repo_map` to target the correct workspace.
-- Linked guideline files are discovered from `architecture.md`'s links, loaded **lazily**, cached after first load.
-- If `docs/guidelines/` does not exist, skip entirely and continue (no error).
-
+Built once in Stage 01 from `docs/guidelines/architecture.md` (repo layout, `repo_map`, architecture
+pattern, links to other guideline files), cached, and reused by every stage that creates or assigns
+tasks. Skipped silently when `docs/guidelines/` is absent.
 Details: [references/shared/preflight-guidelines-context.md](references/shared/preflight-guidelines-context.md).
 
 ## Output Behavior
