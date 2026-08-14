@@ -8,6 +8,8 @@ description: |
   "invoke speckit-code-review", "run speckit-code-review".
 compatibility:
   github-copilot: "Skill auto-discovered from ~/.agents/skills/. Invoked via skill tool."
+license: MIT
+allowed-tools: bash glob grep view create edit
 metadata:
   specification: agentskills.io/specification
   output_contract: strict-json

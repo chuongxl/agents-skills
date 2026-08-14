@@ -2,6 +2,8 @@
 name: jira-to-speckit
 description: Fetch a Jira issue or Jira issue URL using credentials from `.env`, then compact the ticket into a Speckit-ready feature brief (title, business goal, acceptance criteria, constraints, open questions) plus a Jira-key-based feature name, and optionally write a full-fidelity ticket snapshot markdown file for traceability. Use when work starts from Jira and a caller (typically `speckit-auto`) needs a clean, size-bounded intake payload to drive its own spec/plan/task pipeline. This skill only reads Jira, produces that brief, and writes that one snapshot file — it does not run Speckit stages, review loops, git operations, or track execution progress.
 compatibility: Requires network access and Jira REST API access. Requires `.env` entries for `JIRA_URL`, `JIRA_USERNAME`, and `JIRA_API_TOKEN`.
+license: MIT
+allowed-tools: bash view create
 metadata:
   author: Alex Nguyen
   version: "0.2.0"
@@ -17,9 +19,8 @@ under strict size budgets, optionally persists a full-fidelity snapshot of the t
 caller names, and returns a structured brief plus a Jira-key-based feature name. It never invokes
 `speckit.specify` or any other Speckit/Spec Kit command, never runs clarification or
 review loops, never performs git operations, and never tracks an execution report — all of that is
-owned by the caller (`speckit-auto`'s stage files, see
-[../speckit-auto/references/shared/intake.md](../speckit-auto/references/shared/intake.md) and its
-provider `stage-01-preflight-intake.md` files).
+owned by the caller (`speckit-auto`'s shared intake reference and its provider
+`stage-01-preflight-intake.md` files).
 
 ## What This Skill Does
 

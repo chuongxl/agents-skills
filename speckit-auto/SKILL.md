@@ -10,6 +10,8 @@ description: |
   Use --yolo for zero-human-in-the-loop fully automated execution.
 compatibility:
   github-copilot: "Skill auto-discovered from ~/.agents/skills/. Invoked via skill tool."
+license: MIT
+allowed-tools: bash glob grep view create edit skill
 metadata:
   author: Alex Nguyen
   version: "0.0.2"
