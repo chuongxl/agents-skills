@@ -305,12 +305,13 @@ The full workflow from Jira to pull request:
 - **Jira versions**: Jira Cloud and Server (7.0+) with REST API access
 - **Git**: SSH-authorized remotes only (no HTTPS tokens)
 - **Network**: Requires outbound access to Jira API endpoint and your git repository host
-- **Agents**: GitHub Copilot, Claude Code, and compatible Copilot agents
+- **Agents**: GitHub Copilot, Claude Code, OpenCode, and compatible Copilot agents
 
 ### Installation Paths
 
 - GitHub Copilot: `.github/skills/` or `~/.agents/skills/`
 - Claude Code: `~/.claude/skills/`
+- OpenCode: `~/.config/opencode/skills/` or `.opencode/skills/`
 - Local: `~/.agents/skills/`
 
 ---
