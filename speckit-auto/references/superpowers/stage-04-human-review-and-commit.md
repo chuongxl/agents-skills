@@ -19,16 +19,7 @@ Load this only in default mode after `speckit-code-review` returns `pass`.
 ## If Approved
 
 1. Ask for the commit message.
-2. If git submodules exist and were modified:
-   - For each modified submodule, commit inside that submodule first:
-     - `git add -A`
-     - `git commit -m "<commit-message>"`
-   - Then commit in the parent repo to record the submodule pointer update (and any parent changes):
-     - `git add -A`
-     - `git commit -m "<commit-message>"`
-3. If no submodules were modified:
-   - `git add -A`
-   - `git commit -m "<commit-message>"`
+2. Run the commit procedure in [../shared/commit.md](../shared/commit.md) with that message.
 
 ## Optional PR Creation
 

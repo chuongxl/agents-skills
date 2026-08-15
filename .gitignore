@@ -106,3 +106,8 @@ speckit-code-review-001.zip
 
 ### speckit-auto runtime state (machine-local, not versioned)
 speckit-auto/.state/
+
+### agent scratch directories
+.superpowers/
+.speckit/
+.security-scan-results/

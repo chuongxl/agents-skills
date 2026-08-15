@@ -8,6 +8,8 @@ description: |
   "invoke speckit-code-review", "run speckit-code-review".
 compatibility:
   github-copilot: "Skill auto-discovered from ~/.agents/skills/. Invoked via skill tool."
+license: MIT
+allowed-tools: bash glob grep view create edit
 metadata:
   specification: agentskills.io/specification
   output_contract: strict-json
@@ -17,187 +19,101 @@ metadata:
 
 # Speckit Code Review
 
-Perform a deep code review by comparing implementation code to the feature specification at
-`specs/<feature-folder>/spec.md`. The spec may be produced by either supported framework:
+Compare implementation code to `specs/<feature-folder>/spec.md` and return a strict JSON verdict.
+The spec may come from `speckit.specify` (usually already has `FR-*`/`NFR-*` IDs) or from
+`superpowers:brainstorming` (narrative design doc, usually no IDs) — both are reviewed identically.
 
-| Producer | Spec shape |
-|----------|-----------|
-| `speckit.specify` (GitHub Spec Kit) | numbered requirements, usually already `FR-*` / `NFR-*` |
-| `superpowers:brainstorming` | narrative design document, usually **no** requirement IDs |
+**Always run inline.** Never dispatch as a background task or sub-agent; the caller needs the JSON in-band.
 
-Both are reviewed the same way — see **Requirement Checklist Extraction** below.
+## Inputs
 
-> This skill must **always run inline** and return JSON directly to the caller. Never run it as a background task or agent process.
+- `spec.md` for the target feature. If no path is given, resolve from `specs/*/spec.md` using the
+  current branch name or changed files; ask the user only if still ambiguous.
+- Review scope = current git change set (staged + unstaged, incl. renames/deletes).
 
-## Required Inputs
+## Spec ID
 
-- `spec.md` path for the target feature (`specs/<feature-folder>/spec.md`)
-- The generated implementation code to review (usually current git changes or target files)
+`<spec-id>` drives all output paths. Derive it from the feature folder name — never invent one, so
+reruns resolve to the same paths:
 
-If spec path is not provided, resolve it by:
-1. Looking for the most relevant feature in `specs/*/spec.md` from current task context
-2. If exactly one candidate matches the current branch name or the changed files, use it
-3. Only if still ambiguous, ask user for the exact spec path before proceeding
-
-## Spec ID Derivation
-
-`<spec-id>` is used in all output paths (`.speckit/review-<spec-id>-<timestamp>/`).
-Derive it from the feature folder name, never invent one:
-
-| Folder name | `<spec-id>` | Rule |
-|-------------|-------------|------|
+| Folder | `<spec-id>` | Rule |
+|---|---|---|
 | `010-user-login` | `010` | leading numeric prefix |
 | `ddm-6157-user-login` | `ddm-6157` | leading issue key (`<letters>-<digits>`) |
-| `some-feature` | `some-feature` | whole folder name, lowercased |
+| `some-feature` | `some-feature` | whole folder name |
 
-Strip any character outside `[a-z0-9-]`. The same feature folder must always yield the same
-`<spec-id>` so speckit-auto can resume across reruns.
+Lowercase; strip any character outside `[a-z0-9-]`.
 
-## Requirement Checklist Extraction
+## Requirement Checklist
 
-Step 1 of the review procedure must always produce a numbered checklist.
+Step 1 must always yield a numbered checklist.
 
-**Case A — the spec already has requirement IDs** (`FR-001`, `NFR-002`, or equivalent):
-use them verbatim.
+- **IDs present** → use verbatim; set `requirements_source: "declared"`.
+- **No IDs** → synthesize; set `requirements_source: "synthesized"`:
+  1. Extract one testable statement per requirement, in priority order: acceptance criteria,
+     requirements/behaviour sections, user stories, explicit constraints, any must/should sentence.
+  2. Classify `FR-` (functional) vs `NFR-` (performance, reliability, security posture, scalability,
+     maintainability, compliance, UX).
+  3. Number in document order so IDs stay stable across reruns.
+  4. Record each as `{id, statement, spec_anchor}` under `synthesized_requirements` in the
+     `business-gap` detail file, so findings trace back to the spec.
 
-**Case B — no requirement IDs** (typical for `superpowers:brainstorming` design docs):
-synthesize the checklist. Never skip the review and never report coverage against an empty list.
+If zero requirements are extractable, return `failed` with one `FR-000` fix telling the user to add
+testable requirements to the spec. Never return `pass` against an empty checklist.
 
-1. Extract one testable statement per requirement from, in priority order: acceptance criteria,
-   requirements/behaviour sections, user stories, explicit constraints, and any "must/should"
-   sentence in the design narrative.
-2. Classify each as functional (`FR-`) or non-functional (`NFR-`: performance, reliability,
-   security posture, scalability, maintainability, compliance, UX).
-3. Number them in **document order** — `FR-001`, `FR-002`, … `NFR-001`, … — so IDs are stable
-   across reruns as long as the spec is unchanged.
-4. Write the synthesized checklist into the `business-gap` detail file under
-   `synthesized_requirements`, each entry carrying `id`, `statement`, and `spec_anchor`
-   (heading or line number it came from) so a human can trace it back.
-5. Set `"requirements_source": "synthesized"` in the `business-gap` detail file
-   (`"declared"` in Case A).
+## Procedure
 
-If the spec yields **zero** extractable requirements, return `status: "failed"` with a single
-`FR-000` fix whose `action` is to add testable requirements to the spec. Never return `pass` with
-an empty checklist.
+1. Build the requirement checklist (see above).
+2. Resolve the git change set as review scope.
+3. **Project guidelines (conditional)** — if `docs/guidelines/architecture.md` exists, load
+   [references/project-guidelines-review.md](references/project-guidelines-review.md) and follow its
+   Steps 1–4 to load only the guideline files matching the changed-file categories. Skip silently
+   if that file is absent.
+4. Run each standard area — load its reference file, run the review, then **discard it from context**
+   before loading the next:
+
+   | Area | Reference | Issue IDs |
+   |---|---|---|
+   | Business Gap | [business-gap.md](references/business-gap.md) | `FR-*`, `NFR-*` |
+   | Code Quality (incl. conditional SonarQube MCP scan) | [code-quality.md](references/code-quality.md) | `CODE-*` |
+   | Security | [security.md](references/security.md) | `SEC-*` |
+   | Architecture | [architecture.md](references/architecture.md) | `ARCH-*` |
+   | Unit Test Coverage (last) | [unit-test-coverage.md](references/unit-test-coverage.md) | `TEST-*` |
+
+5. If guideline files were loaded in step 3, run the advanced pass (Step 5 of
+   project-guidelines-review.md) and merge its findings into the standard results, tagging each with
+   `guideline_source`.
+6. `Business cover = round(covered / total * 100)`.
+7. Write `state_file`, plus one detail file **per category that has issues**. Skip empty categories;
+   on `pass` write only `state_file`.
+8. Build `fixes` from all findings ordered high → medium → low severity, then keep only the **top 3**
+   inline. The rest live in `state_file` and the category detail files.
+9. `status` = `pass` only if `fixes` is empty **and** coverage ≥ 80% (or `N/A`) **and** the checklist
+   is non-empty; otherwise `failed`.
 
 ## Output Contract
 
-- Return exactly one **compact** JSON object inline (≤ 400 tokens).
-- Write full review details to a file: `.speckit/review-<spec-id>-<timestamp>.json`
-- The inline result contains only what speckit-auto needs to take immediate action.
-- Preserve field names exactly (including spaces and capitalization).
-- Keep the inline payload small enough to be retried safely; never mirror the verbose findings in the inline JSON when the detail files already contain them.
+Return **exactly one compact JSON object**, ≤ 400 tokens, no markdown, no prose outside the JSON.
+Field names are literal (keep spaces and capitalization). Never mirror verbose findings inline —
+they already live in the files.
 
-## Two-Tier Output Strategy
+| Field | Value |
+|---|---|
+| `status` | `"pass"` or `"failed"` |
+| `Business cover` | percent string, `"0%"`–`"100%"` |
+| `unit-test-coverage` | percent string, or `"N/A (no test runner detected)"` — `N/A` counts as passing |
+| `state_file` | `.speckit/review-<spec-id>-<ts>/state.json` — ordered issue inventory + next fix queue, so speckit-auto can resume without reloading findings |
+| `detail_files` | map of category → path; `{}` on pass. Keys: `business-gap`, `architecture`, `security`, `code-quality`, `unit-tests`, each at `.speckit/review-<spec-id>-<ts>/<key>.json` |
+| `fixes` | `[]` on pass; else ≤ 3 objects with exactly `id`, `file`, `method`, `lines`, `action` |
 
-### Tier 1 — Compact Inline Result (returned directly)
+`fixes` entry fields:
 
-Contains only:
-- `status` — `pass` or `failed`
-- `Business cover` — percentage string
-- `unit-test-coverage` — percentage string or `"N/A"`
-- `state_file` — path to the resumable state file
-- `fixes` — flat array of actionable fix targets (limit to the top 3 most critical items)
-
-Each `fixes` entry has exactly 5 fields:
-- `id` — unique ID: `FR-001`, `NFR-002`, `ARCH-001`, `SEC-001`, `TEST-001`, `CODE-001`, etc.
-- `file` — relative file path
-- `method` — class::method or function name
-- `lines` — line range (e.g. `"88-140"`) or `"new"` for missing files
-- `action` — one-line imperative instruction: what to write/change/add
-
-`detail_files` map — keys are category names, values are paths to per-category detail files:
-- `"business-gap"` → `.speckit/review-<spec-id>-<ts>/business-gap.json` (FR-*/NFR-* detail)
-- `"architecture"` → `.speckit/review-<spec-id>-<ts>/architecture.json` (ARCH-* detail)
-- `"security"` → `.speckit/review-<spec-id>-<ts>/security.json` (SEC-* detail)
-- `"code-quality"` → `.speckit/review-<spec-id>-<ts>/code-quality.json` (CODE-* detail)
-- `"unit-tests"` → `.speckit/review-<spec-id>-<ts>/unit-tests.json` (TEST-* detail)
-
-Only include a category key in `detail_files` if that category has issues.
-
-`state_file`:
-- `.speckit/review-<spec-id>-<ts>/state.json`
-- Contains the ordered issue inventory and the next fix queue
-- Used by speckit-auto to resume without reloading verbose findings
-
-### Tier 2 — Per-Category Detail Files (written to disk)
-
-Write one file per category under `.speckit/review-<spec-id>-<timestamp>/`:
-
-| Category | File | Contains fixes with IDs |
-|----------|------|------------------------|
-| Business Gap | `business-gap.json` | FR-*, NFR-* |
-| Architecture | `architecture.json` | ARCH-* |
-| Security | `security.json` | SEC-* |
-| Code Quality | `code-quality.json` | CODE-* |
-| Unit Tests | `unit-tests.json` | TEST-* |
-
-Each category file contains full details for its issues only:
-- Complete requirement checklist entries (business-gap)
-- Full architecture violation descriptions (architecture)
-- Full vulnerability details and OWASP references (security)
-- SonarQube results and complexity metrics (code-quality)
-- Full coverage gap analysis per method (unit-tests)
-
-speckit-auto loads only the category file it needs when a `fixes` entry `action` is insufficient context.
-
-## Review Procedure (MUST FOLLOW)
-
-Execute all areas. Load the matching reference file before performing each area.
-
-1. Parse `spec.md` into an explicit requirement checklist (FR-001..., NFR-001...), following
-   **Requirement Checklist Extraction** above — synthesize IDs when the spec has none.
-
-2. Use git to define review scope: changed files from current branch/worktree (staged + unstaged).
-
-3. **Load project guidelines context** (if available):
-   - Load: [references/project-guidelines-review.md](references/project-guidelines-review.md)
-   - Follow Steps 1–4 in that file to discover and load only the reference files that match the
-     changed file categories. Cache everything — never re-read.
-   - If `docs/guidelines/architecture.md` does not exist, skip this step silently.
-
-4. Execute each standard review area by loading its reference file, then **discarding it from context** before loading the next:
-   - **Business Gap** → load [references/business-gap.md](references/business-gap.md), run review, discard
-   - **Code Quality** (including conditional SonarQube MCP scan) → load [references/code-quality.md](references/code-quality.md), run review, discard
-   - **Security** → load [references/security.md](references/security.md), run review, discard
-   - **Architecture** → load [references/architecture.md](references/architecture.md), run review, discard
-   - **Unit Test Coverage** (last) → load [references/unit-test-coverage.md](references/unit-test-coverage.md), run review, discard
-
-5. Execute the **Advanced Project Guidelines Review** (Step 5 of project-guidelines-review.md):
-   - Run one additional pass per loaded project reference file.
-   - Merge any new findings into the standard results before writing detail files.
-   - Skip this step if no project reference files were loaded in step 3.
-
-6. Compute `Business cover = (covered / total) * 100`, round to whole percent.
-
-7. Write ALL findings (standard + project guidelines) to per-category detail files and `state_file`.
-   - Include `guideline_source` field on any finding raised by a project reference file.
-
-8. Build compact `fixes` array from findings: include only the top 3 most critical actionable items (high severity → medium → low).
-
-9. Decide status:
-   - `pass` only when `fixes` array is empty AND `unit-test-coverage` ≥ 80% AND the requirement
-     checklist is non-empty
-   - `failed` if any issue exists, coverage < 80%, or the checklist is empty
-
-## Output Format (STRICT JSON ONLY)
-
-Return only one compact JSON object. No markdown. No explanation outside JSON.
-
-### Pass Example
-
-```json
-{
-  "status": "pass",
-  "Business cover": "100%",
-  "unit-test-coverage": "87.5%",
-  "state_file": ".speckit/review-010-1722348000/state.json",
-  "detail_files": {},
-  "fixes": []
-}
-```
-
-### Failed Example
+- `id` — prefix selects the detail file: `FR-*`/`NFR-*` → business-gap, `ARCH-*` → architecture,
+  `SEC-*` → security, `CODE-*` → code-quality, `TEST-*` → unit-tests
+- `file` — relative path · `method` — `Class::method` or function name
+- `lines` — range like `"88-140"`, or `"new"` when the file/method must be created
+- `action` — one imperative sentence, no sub-bullets, specific enough to act on **without** opening
+  the detail file
 
 ```json
 {
@@ -211,16 +127,19 @@ Return only one compact JSON object. No markdown. No explanation outside JSON.
     "unit-tests": ".speckit/review-010-1722348000/unit-tests.json"
   },
   "fixes": [
-    {"id": "FR-004", "file": "src/account/service.ts", "method": "AccountService::createAccount", "lines": "88-140", "action": "Add password minimum-length validation (≥8 chars) before calling hashPassword"},
-    {"id": "TEST-001", "file": "src/account/service.spec.ts", "method": "AccountService::createAccount", "lines": "new", "action": "Add test case: password shorter than 8 chars should throw ValidationException"},
-    {"id": "SEC-001", "file": "src/auth/password.ts", "method": "validatePassword", "lines": "5-20", "action": "Enforce min 12 chars, 1 uppercase, 1 digit, 1 symbol in password policy"}
+    {"id": "FR-004", "file": "src/account/service.ts", "method": "AccountService::createAccount", "lines": "88-140", "action": "Add password minimum-length validation (>=8 chars) before calling hashPassword"},
+    {"id": "SEC-001", "file": "src/auth/password.ts", "method": "validatePassword", "lines": "5-20", "action": "Enforce min 12 chars, 1 uppercase, 1 digit, 1 symbol in password policy"},
+    {"id": "TEST-001", "file": "src/account/service.spec.ts", "method": "AccountService::createAccount", "lines": "new", "action": "Add test: password shorter than 8 chars throws ValidationException"}
   ]
 }
 ```
 
-## Non-Obvious Field Rules
+A passing result is the same shape with `"status": "pass"`, `detail_files: {}`, `fixes: []`.
 
-- `lines: "new"` — the file or method does not exist yet and must be created
-- `unit-test-coverage: "N/A"` — treated as passing (not failed); use when no test runner is detected
-- `action` — one imperative sentence only; no multi-line, no sub-bullets
-- Inline `fixes` array is capped at 3 items; remaining items go to `state_file` and category detail files
+## Quality Bar
+
+- Never report `pass` while `fixes` is non-empty, coverage < 80%, or the checklist is empty.
+- Keep verbose analysis in the category files; the inline object stays under 400 tokens.
+- Severity scale for every area: `high` = exploitable or breaks a requirement/invariant;
+  `medium` = degrades correctness, security posture, or maintainability; `low` = cosmetic or
+  non-exploitable.

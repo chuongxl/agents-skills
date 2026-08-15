@@ -28,17 +28,7 @@ variant — the repo-installed agents are the only valid source.
 ## Missing Speckit Auto-Recovery (Required)
 
 When any required repo Speckit file is missing, run recovery — do not silently skip and do not
-abandon the run:
-
-1. Fetch the install guide: `https://github.com/github/spec-kit/blob/main/docs/installation.md`
-2. Ask the user once: `Install GitHub Speckit` or `Stop`.
-3. If `Stop`, halt and report that installation is required.
-4. If `Install`, follow the guide exactly to install the Spec Kit CLI.
-5. Initialize in this repo: `specify init . --integration copilot`
-6. Run `/speckit.constitution` as an agent.
-7. Re-run the source check.
-8. If it passes, continue the pipeline in the same turn.
-9. Only if install or init fails, stop and report the exact failing step with quoted error output.
+abandon the run. Load [install-recovery.md](install-recovery.md) and follow it.
 
 ## Runtime Executability (No Separate Probe)
 
@@ -55,6 +45,11 @@ invocation is reportable as a runtime failure (quote it), and only after the sou
 Load [../shared/preflight-guidelines-context.md](../shared/preflight-guidelines-context.md).
 If `docs/guidelines/` or `architecture.md` is missing, skip and continue — never a stop.
 
+## Scratch Path Hygiene (Required, Before Any Implementation)
+
+Load [../shared/scratch-hygiene.md](../shared/scratch-hygiene.md) and apply it. Only `.speckit/`
+applies in this provider.
+
 ## Artifact Path (Spec Kit Layout)
 
 Using `issue_id` and `short_title` from [../shared/intake.md](../shared/intake.md):
@@ -66,7 +61,31 @@ Using `issue_id` and `short_title` from [../shared/intake.md](../shared/intake.m
 
 The folder must stay stable across reruns of the same issue.
 
+As soon as this path is resolved, apply the branch rename step from
+[../shared/branching.md](../shared/branching.md) (`git branch -m` to the same
+`<issue_id>-<short_title>`/`<NNN>-<slug>` string) if the checked-out branch is still on its
+provisional name.
+
+| Artifact | Path | Written by |
+|----------|------|------------|
+| Ticket snapshot (`--issue` only) | `specs/<issue_id>-<short_title>/ticket.md` | `jira-to-speckit` (staged), relocated here by this stage |
+| Spec / plan / tasks / checklist | `specs/<issue_id>-<short_title>/` | the `speckit.*` stages |
+| Execution report (`--issue` only) | `specs/<issue_id>-<short_title>/execution-report.md` | this pipeline |
+
+## Ticket Snapshot Relocation (Required, `--issue` Mode)
+
+Right after the artifact folder is created, **move** `.speckit/intake/<issue_id>-ticket.md` →
+`specs/<issue_id>-<short_title>/ticket.md` and record `ticket_path` in run state. Full rules
+(rerun overwrite, never gitignore, never commit separately, never read back):
+[../shared/intake.md](../shared/intake.md) → "Ticket Snapshot".
+Pass only the compact brief into `/speckit.specify`, never the snapshot's contents.
+
 ## Stage 02 Entry Step
 
 After intake completes, invoke `/speckit.specify` with the compact brief (or requirement text) in
 the same turn, then continue to [stage-02-spec-design-flow.md](stage-02-spec-design-flow.md).
+
+## Execution Report (Jira-Sourced Runs)
+
+In `--issue` mode, load [../shared/execution-report.md](../shared/execution-report.md) and
+initialize the report at `specs/<issue_id>-<short_title>/execution-report.md`.

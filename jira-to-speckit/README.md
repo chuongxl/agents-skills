@@ -317,8 +317,9 @@ The full workflow from Jira to pull request:
 
 ## References
 
-- **Jira API Guide**: See `references/JIRA_API.md` for detailed API usage
-- **Execution Report Template**: See `assets/execution-report-template.md` for report structure
-- **Git Workflow Discipline**: See `../../WORKFLOW.md` for branching, commit, and PR rules
-- **Speckit Workflow**: See `../speckit-auto/` for the full spec-driven delivery pipeline
-- **Copilot Instructions**: See `../../.github/copilot-instructions.md` for agent-specific guidelines
+- **Jira API Guide**: See [`references/JIRA_API.md`](references/JIRA_API.md) for detailed API usage
+- **Speckit Workflow**: The `speckit-auto` skill consumes this skill's brief and owns every
+  stage that follows — spec, plan, tasks, implementation, review, and commit.
+
+This skill is self-contained: it reads nothing outside its own folder except the project `.env`,
+so it works when installed on its own.

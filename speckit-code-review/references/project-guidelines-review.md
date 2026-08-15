@@ -1,73 +1,36 @@
 # Project Guidelines Advanced Review
 
-Load this reference file during the review procedure when `docs/guidelines/architecture.md` exists.
+Loaded when `docs/guidelines/architecture.md` exists. Uses the project's own architecture doc and the
+files it links as the authoritative ruleset for a project-specific review layer on top of the
+standard areas.
 
-## Purpose
+Everything loaded here is cached and **never re-read**: the architecture context, each guideline file
+(in `loaded_guidelines[<stem>]`), the `reference_map`, and the active category set.
 
-Use the project's own `architecture.md` (and the reference files it links to) as the authoritative
-ruleset for an advanced, project-specific review layer — on top of the standard review areas.
+## Step 1 — Load or Reuse architecture.md
 
----
+- **Inside the speckit-auto pipeline**: the Project Context (`arch_pattern`, `repo_map`,
+  `linked_guidelines`, `loaded_guidelines`) is already in memory — reuse it, do not re-read.
+- **Standalone**: read `docs/guidelines/architecture.md` once and cache it. If it does not exist,
+  skip this entire file and run the standard review only.
 
-## Step 1 — Load (or Reuse) architecture.md
+Log `[Code Review] architecture.md loaded from docs/guidelines/` (or `reused from context`).
 
-Check whether the Project Context was already loaded by `speckit-auto` preflight:
+## Step 2 — Build the Reference Map
 
-- **Inside speckit-auto pipeline**: the Project Context (including `arch_pattern`, `repo_map`,
-  `linked_guidelines`, `loaded_guidelines`) is already in memory. Reuse it directly — do NOT
-  re-read `architecture.md`.
-- **Standalone invocation**: check whether `docs/guidelines/architecture.md` exists.
-  - If it does **not** exist → skip this entire file; proceed with standard review only.
-  - If it **exists** → read it once and cache it as the architecture context.
+Scan `architecture.md` for a `References` section at any heading level and collect its relative `.md`
+links as `{"<file stem>": "docs/guidelines/<filename>.md"}`. For example
+`- [Database Rules](database.md)` yields `{"database": "docs/guidelines/database.md"}`.
 
-Log: `[Code Review] architecture.md loaded from docs/guidelines/` (or `reused from context`).
+If there is no `References` section, fall back to scanning the whole file for relative `.md` links.
+If the map is still empty, skip Steps 3–6.
 
----
+## Step 3 — Classify Changed Files
 
-## Step 2 — Discover Reference Links in architecture.md
+Tag each changed file from the git diff (a file may take several tags); collect the union as
+`active_categories`.
 
-Scan `architecture.md` for a section named **`References`** (any heading level,
-e.g. `## References`, `### References`, `### 3.7 References`).
-
-If such a section exists, collect all relative `.md` links from it into a reference map:
-
-```
-reference_map = {
-  "<stem>": "docs/guidelines/<filename>.md",
-  ...
-}
-```
-
-Example — if References section contains:
-```
-- [Database Rules](database.md)
-- [Naming Conventions](naming-convention.md)
-- [Workflow Rules](workflow-rule.md)
-```
-
-Then:
-```json
-{
-  "database": "docs/guidelines/database.md",
-  "naming-convention": "docs/guidelines/naming-convention.md",
-  "workflow-rule": "docs/guidelines/workflow-rule.md"
-}
-```
-
-If no `References` section exists, also scan the **entire file** for relative `.md` links and
-collect them all into `reference_map` as a fallback. Use the file stem as the key.
-
-If `reference_map` is empty after both passes → skip Steps 3–5; proceed with standard review only.
-
----
-
-## Step 3 — Classify Changed Files into Categories
-
-Inspect the changed files from the git diff (same scope used by the standard review):
-
-For each changed file, assign one or more category tags based on:
-
-| File path pattern | Category tag |
+| Path pattern | Tag |
 |---|---|
 | `**/repositories/**`, `**/prisma/**`, `**/migrations/**`, `**/*.schema.*`, `**/*.entity.*` | `database` |
 | `**/domain/**`, `**/aggregates/**`, `**/entities/**`, `**/value-objects/**` | `domain` |
@@ -77,58 +40,31 @@ For each changed file, assign one or more category tags based on:
 | `**/*.spec.*`, `**/*.test.*`, `**/tests/**` | `testing` |
 | `**/config/**`, `**/env/**` | `config` |
 
-A single changed file may belong to multiple category tags.
+## Step 4 — Load Matching Guideline Files
 
-Collect the full set of category tags from all changed files into `active_categories`.
+For each tag in `active_categories`, load the `reference_map` entry whose key contains the tag, is
+contained by it, or shares its stem. Load only matched files, and only once — check
+`loaded_guidelines` first. Never load a guideline with no matching category in the current diff.
 
----
+## Step 5 — Advanced Review Pass
 
-## Step 4 — Match Categories to Reference Files
+For each loaded guideline file, check every changed file in its category against its rules, then map
+violations onto the standard issue prefixes:
 
-For each tag in `active_categories`, find the best matching key in `reference_map`:
+| Violation | Prefix |
+|---|---|
+| Database / domain / workflow rules | `ARCH-*` |
+| Naming conventions | `CODE-*` |
+| API or contract rules | `CODE-*` or `FR-*` |
 
-```
-FOR each tag in active_categories:
-  find reference_map key where:
-    key contains tag  OR  tag contains key  OR  key starts with tag stem
-  IF match found AND file not yet loaded:
-    load the matched reference file
-    cache it in loaded_guidelines[key]
-```
+Create a fix entry per violation using the next free ID in that prefix sequence, with `action`
+naming the specific project rule broken. Merge these into the standard results **before** writing the
+detail files.
 
-Load only the files that match at least one active category.
-Never load a reference file that has no matching category in the current diff.
-Never load the same file twice — check `loaded_guidelines` first.
+## Step 6 — Attribute the Source
 
----
-
-## Step 5 — Execute Advanced Review Pass
-
-For each loaded reference file, run an additional review pass against the changed code:
-
-1. Read the rules and constraints defined in the reference file.
-2. Check every changed file that belongs to the matching category against those rules.
-3. Record any violations as additional findings under the appropriate review category:
-   - Database/domain violations → add to `ARCH-*` findings
-   - Naming violations → add to `CODE-*` findings
-   - Workflow violations → add to `ARCH-*` findings
-   - API/contract violations → add to `CODE-*` or `FR-*` findings
-
-4. For each violation found, create a fix entry with:
-   - `id` — next available ID in the matching prefix sequence
-   - `file` — the violating file
-   - `method` — the class::method or function where the violation occurs
-   - `lines` — line range
-   - `action` — one-line imperative fix referencing the specific project rule violated
-
-5. Merge these findings into the standard review results before writing detail files.
-
----
-
-## Step 6 — Include Guidelines Source in Detail Files
-
-When writing per-category detail files (e.g. `architecture.json`, `code-quality.json`),
-for each finding that was raised by a project guideline, add a `guideline_source` field:
+Every finding raised by a guideline carries a `guideline_source` in its detail file so the developer
+can trace it back:
 
 ```json
 {
@@ -140,14 +76,3 @@ for each finding that was raised by a project guideline, add a `guideline_source
   "guideline_source": "docs/guidelines/database.md § Repository Return Types"
 }
 ```
-
-This lets the developer trace the finding back to the exact project rule.
-
----
-
-## Caching Contract
-
-- `architecture.md` content: cached in Project Context or local variable — never re-read.
-- Each loaded reference file: cached in `loaded_guidelines[<stem>]` — never re-read.
-- `reference_map`: built once per review run from `architecture.md` — never rebuilt.
-- Active categories: computed once from the git diff — never recomputed.

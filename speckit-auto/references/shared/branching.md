@@ -19,10 +19,24 @@ framework install, guidelines load, intake, or any provider stage call):
    - if the deterministic branch name does not exist → create it from the synced base
    - if it already exists (a rerun) → check it out and **continue on it**; never reset, force-move,
      or recreate it, and never append a suffix to make a new one
-4. Branch name must be deterministic:
-   - Jira mode: include the Jira key (use the `issue_id`/`short_title` resolved in
-     [intake.md](intake.md) so branch and artifact names stay aligned across reruns)
-   - Non-Jira mode: requirement slug + timestamp
+4. Branch name must exactly match the feature name the run will use for its `specs/` artifact folder
+   (`<issue_id>-<short_title>` in `--issue` mode, `<NNN>-<slug>` in manual mode — see
+   [intake.md](intake.md) → "Artifact Identity"). Branch and artifact folder are always the same
+   string, never two different deterministic schemes.
+   - `short_title` (Jira mode) and the final `<NNN>-<slug>` (manual mode) are only fully resolved
+     during intake, which runs *after* this branch gate. If the full name is not yet known:
+     - Jira mode: create/checkout a provisional branch named `<issue_id>` only.
+     - Manual mode: create/checkout a provisional branch named from the requirement slug (best
+       guess at this point, no timestamp — a timestamp would never match the feature name).
+   - **Rename step (required once intake resolves the final feature name):** as soon as the
+     provider's Stage 01 resolves `<issue_id>-<short_title>` or `<NNN>-<slug>`, and if the current
+     branch name differs from it, run `git branch -m <final-name>` to rename the checked-out branch
+     in place (do not create a second branch, do not delete/recreate). This must happen before any
+     push or PR creation (Stage 04/05) — nothing upstream has been pushed yet at this point, so the
+     rename is local-only and safe. Update `branch_name` in run state to the final name.
+   - If [intake.md](intake.md)'s artifact-identity resolution finds an **existing** artifact folder
+     from a prior run (a rerun), skip the provisional-name step and use that resolved final name
+     directly when first creating/checking out the branch.
 5. Actually run the git command(s) now (do not describe the plan) and confirm the working branch is
    checked out before proceeding. Set `branch_created: true` and `branch_name` in run state
    (`branch_created` means "the working branch is now checked out", whether created or reused).

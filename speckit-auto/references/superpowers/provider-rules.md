@@ -37,8 +37,21 @@ Resolve the skill name using this precedence, per step:
 | Branch finish / PR | `finishing-a-development-branch` |
 | Parallel independent work | `dispatching-parallel-agents` |
 
-Never attempt these via the `task` tool with a `superpowers:*` agent_type — the `task` tool only
-accepts fixed built-in agent types and will fail with `Unknown agent_type`.
+### Task Tool: What Is Forbidden vs What Is Required
+
+The two are easy to confuse. Read both lines before Stage 03.
+
+- **Forbidden** — invoking a *superpowers skill* through the `task` tool by passing its name as
+  `agent_type` (`superpowers:brainstorming`, `superpowers:subagent-driven-development`, …). The
+  `task` tool only accepts fixed built-in agent types and fails with `Unknown agent_type`. Skills
+  are invoked through the `skill` tool, per the precedence above.
+- **Required** — the *built-in* subagent dispatch that superpowers skills themselves perform.
+  `subagent-driven-development` dispatches a fresh implementer and a task reviewer per task, and
+  `requesting-code-review` dispatches a `general-purpose` code reviewer. Those dispatches use the
+  built-in agent types and are a normal, expected part of Stage 03. Never suppress them.
+
+In one sentence: never a `superpowers:*` name as `agent_type`; always allow `general-purpose`
+subagents dispatched from inside a superpowers skill.
 
 ## Rules
 
@@ -49,10 +62,22 @@ accepts fixed built-in agent types and will fail with `Unknown agent_type`.
    `Stop`, then install and re-check). See Stage 01.
 3. `superpowers:using-git-worktrees` is **never used**. Branching follows
    [../shared/branching.md](../shared/branching.md) — plain branch off `develop → main → master`.
-   Any superpowers instruction to create a worktree is overridden.
+   **The Stage 01 branch IS the isolated workspace.** `subagent-driven-development` opens with
+   "ensure the work happens in an isolated workspace: use `superpowers:using-git-worktrees` to
+   create one **or verify the existing one**" — the verify arm is what applies here, and it is
+   already satisfied by the checked-out Stage 01 branch. State that to the skill, do not create a
+   worktree, and never stop to ask which workspace to use. The same skill's "never start
+   implementation on main/master without consent" is satisfied for the same reason: the pipeline
+   never implements on a base branch.
 4. `superpowers:finishing-a-development-branch` is **not** used for branch lifecycle or worktree
    cleanup. It may only be used at Stage 04/05 to open a PR, and only after the pipeline's own
    commit rules have run.
+   **`subagent-driven-development`'s terminal handoff is suspended along with it.** That skill
+   ends with "final review clean → delete this plan's workspace → use
+   `superpowers:finishing-a-development-branch`". Both of those steps are Stage 04/05 territory and
+   must not run inside Stage 03: no PR, no merge, no branch deletion, no workspace deletion when
+   the implementation skill reports done. Returning from the implementation skill means "go to the
+   next Stage 03 phase", never "the branch is finished".
 5. Artifacts live under `specs/`, one folder per feature (same place as Spec Kit output):
    - design spec → `specs/<feature_folder>/spec.md`
    - plan → `specs/<feature_folder>/plan.md`
@@ -60,19 +85,33 @@ accepts fixed built-in agent types and will fail with `Unknown agent_type`.
    unused three-digit prefix under `specs/`) in manual mode. See Stage 01.
    This replaces the superpowers defaults `docs/superpowers/specs/<date>-<topic>-design.md` and
    `docs/superpowers/plans/<date>-<feature>.md`, and is the **only** deviation from those skills.
+   **These skills expose no path parameter** — `brainstorming` and `writing-plans` each hardcode
+   their output path in their own SKILL.md. Passing the target path is an instruction they may or
+   may not follow, so it is never sufficient on its own: after each skill returns, Stage 02 must
+   verify the file exists at the pipeline path and relocate it if the skill used its default. See
+   the Artifact Path Guard in [stage-02-spec-design-flow.md](stage-02-spec-design-flow.md).
    Preserve the plan's task checkboxes (`- [ ]`) exactly as `writing-plans` emits them —
    `subagent-driven-development` and the Companion viewer read them for progress.
 6. `superpowers:brainstorming` replaces Spec Kit's `specify` + `clarify`. Its interactive Q&A is
    **allowed in default mode** (it is the clarification interview) and **suppressed in `--yolo`
    mode**, where it must auto-answer from the intake brief and skip section approvals.
+   `brainstorming` carries a `<HARD-GATE>` forbidding any implementation action before a human
+   approves the design. That gate is honored, not bypassed: in `--yolo` the pipeline is the
+   approver, so auto-approval **is** the approval event and the gate is satisfied the moment the
+   design document is written and self-reviewed. Never wait for a human message in `--yolo`.
+   `brainstorming` also commits the design document itself. Instruct it not to commit (the pipeline
+   owns commits); if it commits anyway, that is harmless — log it and continue, never treat it as
+   an error or re-commit the same file.
 7. `superpowers:writing-plans` replaces Spec Kit's `plan` + `checklist` + `tasks` + `analyze`.
    Its self-review must explicitly cover spec coverage, placeholder scan, and consistency — these
    are the checklist/analyze equivalents.
 8. `superpowers:test-driven-development` is mandatory for every implementation step: RED (watch it
    fail) → GREEN (watch it pass) → REFACTOR.
-9. Code review is two-tier and ordered: run `superpowers:requesting-code-review` first, then
-   `speckit-code-review`. **`speckit-code-review` is the authoritative pass/fail gate** that drives
-   the Stage 03 fix loop. A superpowers review verdict never ends Stage 03.
+9. Code review is two-tier and ordered: run `superpowers:requesting-code-review` once, on first
+   entry to the Stage 03 review phase, then `speckit-code-review`. Fix iterations go straight back
+   to `speckit-code-review` — the advisory pass is not repeated.
+   **`speckit-code-review` is the authoritative pass/fail gate** that drives the Stage 03 fix loop.
+   A superpowers review verdict never ends Stage 03.
 10. `superpowers:verification-before-completion` must run before any completion claim or commit.
 11. `superpowers:systematic-debugging` is used whenever a test fails or a bug is found — no fix
     without an identified root cause.

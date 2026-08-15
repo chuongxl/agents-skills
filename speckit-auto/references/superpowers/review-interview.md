@@ -1,6 +1,8 @@
 # Review Interview Guide (superpowers)
 
-Use this guide during Stage 02, after `writing-plans`.
+Use this guide during Stage 02: as the question set for the Stage 03 Entry Step confirmation
+(the plan's approval gate), and after `brainstorming` in the two design-spec cases listed under
+Scope below.
 
 > ⚠️ **Stage 03 is a NO-STOP ZONE.** Do NOT run any interview flow during Stage 03 in any mode.
 
@@ -18,15 +20,21 @@ spec as a routine step, and do not repeat questions `brainstorming` already aske
   interview at all.
 
 The Interview Flow below applies to:
-1. the **plan**, after `writing-plans` (routine, default mode only), and
+1. the **plan** — not as a standalone step: its approval gate is the Stage 03 Entry Step
+   confirmation in [stage-02-spec-design-flow.md](stage-02-spec-design-flow.md), which uses the
+   questions below. Never run a separate post-`writing-plans` interview on top of it,
 2. the **design spec**, *only* as an exception — when `brainstorming` has finished and the spec
    still has a concrete clarity defect (missing acceptance detail, ambiguous scope, undefined
-   constraint). Capture the answers, re-run `brainstorming`, and continue.
+   constraint). Capture the answers, re-run `brainstorming`, and continue, and
+3. the **design spec**, as the delegation fallback — when `brainstorming` never actually ran its
+   interactive approval in default mode (see the Fallback note in
+   [stage-02-spec-design-flow.md](stage-02-spec-design-flow.md) Step 1). A design spec must never
+   reach Stage 03 unapproved in default mode.
 
 ## Interview Flow
 
-**Default mode only. Routine use: the plan (post-`writing-plans`). Exception use: the design spec,
-only per the Scope section above.**
+**Default mode only. Routine use: as the question set for the Stage 03 Entry Step confirmation
+(the plan's approval gate). Exception use: the design spec, only per the Scope section above.**
 
 1. Approval gate
    - Ask: "Do you approve the `<design spec | plan>` result?"

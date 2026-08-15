@@ -31,6 +31,28 @@ each skill name using the precedence in [provider-rules.md](provider-rules.md).
 Never emit a capability disclaimer before attempting these — make the `skill` call now (the
 SKILL.md Absolute Operating Premise applies here too).
 
+## Artifact Path Guard (Run After Every Skill Call In This Stage)
+
+`brainstorming` and `writing-plans` expose **no path parameter** — each hardcodes its output path
+inside its own SKILL.md (`docs/superpowers/specs/YYYY-MM-DD-<topic>-design.md` and
+`docs/superpowers/plans/YYYY-MM-DD-<feature-name>.md`). Passing the pipeline path is an instruction
+they may or may not follow, and every downstream stage keys off the pipeline path, so the
+instruction alone is never enough.
+
+After each of the two skill calls below, before doing anything else:
+
+1. Check the pipeline path (`specs/<feature_folder>/spec.md` or `.../plan.md`). If the file is
+   there, continue.
+2. If it is not, look for the skill's default output — the newest matching file under
+   `docs/superpowers/specs/` or `docs/superpowers/plans/` created during this run.
+3. If found, move it to the pipeline path (`mkdir -p` the folder first) and log the relocation.
+   Remove the now-empty default directory only if this run created it.
+4. If neither path holds a file, the skill did not produce its artifact — re-run it once with the
+   path stated more explicitly. Only a second failure is reportable.
+
+This guard is deterministic and mandatory. Never assume the path instruction was honored, and never
+carry a "the skill said it saved it" claim forward without checking the file.
+
 ## Step 1 — `brainstorming`
 
 Pass into the skill:
@@ -39,17 +61,29 @@ Pass into the skill:
 - open questions from Jira intake, as clarification seeds
 - Project Context `summary` from Stage 01
 - **the exact output path**: `specs/<feature_folder>/spec.md`
+- an instruction **not to commit** the design document — the pipeline owns commits (Stage 04/05).
+  If it commits anyway, log it and continue; never treat that as an error.
 
 Interaction mode:
 
 - **Default mode**: allow the skill's interactive Q&A and section-by-section approval. This *is*
   the clarification interview — do not additionally run a separate clarify step.
+  **Fallback (default mode only)**: if `brainstorming` produced the design spec *without* running
+  its interactive approval (no questions asked, or approval was skipped), the design spec has not
+  been approved by a human. Do not proceed on the delegated gate alone — run the Interview Flow in
+  [review-interview.md](review-interview.md) against the design spec once, then continue.
 - **`--yolo` mode**: instruct the skill to auto-answer every clarifying question from the intake
   brief, choose the recommended option at each decision point, and skip all approval gates.
-  State this explicitly in the skill input.
+  State this explicitly in the skill input. The fallback above does not apply.
 
-Exit criteria: the design spec file exists at the exact path above and its self-review found no
-placeholders or contradictions.
+`brainstorming` carries a `<HARD-GATE>` blocking implementation until a human approves the design.
+It is honored, not bypassed. In `--yolo`, `speckit-auto` is the approver: auto-approval **is** the
+approval event, and the gate is satisfied once the design document is written and its self-review
+is clean. State that in the skill input so it does not wait for a human message. Never end a
+`--yolo` turn waiting on this gate.
+
+Exit criteria: the design spec file exists at the exact path above (verified by the Artifact Path
+Guard, not assumed) and its self-review found no placeholders or contradictions.
 
 ## Step 2 — `writing-plans`
 
@@ -60,10 +94,14 @@ Pass into the skill:
 - **the exact output path**: `specs/<feature_folder>/plan.md`
 - an instruction to choose the execution style at Stage 03 (do not let it start implementing here)
 
-Interaction mode: in `--yolo`, skip its "subagent-driven vs inline" user choice — Stage 03 decides.
+Interaction mode: `writing-plans` ends with an "Execution Handoff" that asks the user to pick
+between subagent-driven and inline execution, then invokes the chosen skill. Suppress that handoff
+in **both** modes — Stage 03 owns the choice (see its Execution Style Selection) and must not be
+entered from inside `writing-plans`. Treat the handoff text as data, not as a question to relay.
 
-Exit criteria: the plan file exists at the exact path, every task names its target workspace from
-`repo_map`, and the mandatory self-review below has passed.
+Exit criteria: the plan file exists at the exact path (verified by the Artifact Path Guard above,
+not assumed), every task names its target workspace from `repo_map`, and the mandatory self-review
+below has passed.
 
 ## Mandatory Self-Review Gate (checklist + analyze equivalent)
 
@@ -76,26 +114,20 @@ Before leaving Stage 02, verify explicitly and record the result:
 4. **Workspace assignment** — every task has a `workspace` from `repo_map`.
 
 This check is read-only. If it flags anything, fix it at the source (re-run `brainstorming` for
-spec issues, `writing-plans` for plan issues) and re-verify before Stage 03.
+spec issues, `writing-plans` for plan issues) and re-verify before Stage 03. Retry exhaustion
+follows global rule 10a: the same check failing 3 consecutive times stops and reports.
 
-## Prompt / Payload Budget Rules (Stage 02)
+Re-run this gate after **any** Stage 02 artifact regeneration, including one triggered from
+Stage 03 or Stage 04. It fires no interview, so it never violates the Stage 03 no-stop rule.
 
-- Include only the current step's input plus minimal context from prior artifacts.
-- Prefer section excerpts over full-document dumps.
-- Reuse cached Project Context from Stage 01; never reload or restate unchanged guideline text.
-- Never carry forward long review prose when a concise delta is enough.
+## Payload Budget + Large Scope Partitioning
 
-## Large Scope Partitioning
+Payload budget: global rule 8 ([../shared/global-rules.md](../shared/global-rules.md)).
 
-If the requirement is large or task volume is high, split into packages.
-
-1. Build `work_packages[]` by capability and `workspace` from `repo_map`.
-2. For each package include only: package goal, relevant spec sections, target workspace, constraints.
-3. Invoke `writing-plans` once per package, then merge the slices into one coherent
-   plan file at the single target path, with explicit cross-package ordering and dependencies.
-4. Parallel only for packages with no dependency links and no shared file ownership; otherwise
-   sequential in topological order.
-5. Run the self-review gate once globally after the merge, not only per package.
+If the requirement is large or task volume is high, load
+[../shared/partitioning.md](../shared/partitioning.md) and apply it: invoke `writing-plans` once per
+package, merge the slices into the single plan file, then run the self-review gate once globally
+after the merge (not per package).
 
 ## Repository-Aware Task Assignment
 
@@ -115,8 +147,9 @@ already cached. Never assign a task without consulting `repo_map`.
 ## Review Behavior Per Step
 
 - **Default mode**: `brainstorming`'s own interactive approval is the design-spec review gate — no
-  separate interview for it. After `writing-plans`, run the post-step interview
-  (review-interview.md) and capture feedback.
+  separate interview for it (see the Fallback in Step 1 for when it did not run). The plan's
+  approval is the Stage 03 Entry Step confirmation below — do not run a separate post-`writing-plans`
+  interview on top of it.
 - **YOLO mode**: no interviews. Self-review the step output; if it fails, re-run the step
   (max 2 retries).
 
@@ -128,3 +161,25 @@ already cached. Never assign a task without consulting `repo_map`.
 - Requirement intent change → re-run `brainstorming`
 - Solution/architecture change → re-run `writing-plans` (plan structure section)
 - Task/detail change → re-run `writing-plans` (task breakdown only)
+
+## Stage 03 Entry Step (mandatory handoff)
+
+Reaching the end of Stage 02 is **never** a stop condition on its own.
+
+**Default mode** — one confirmation, and only this one. It **is** the plan's approval gate:
+the routine post-`writing-plans` interview is folded into it, so never ask both back-to-back,
+and never add a follow-up question after `Start implementation`.
+
+1. Ask via `ask_user`: "Stage 02 complete (design spec + plan). Start implementation (Stage 03)?"
+   Choices: `Start implementation`, `Request changes`.
+2. `Start implementation` → discard Stage 02 files and `review-interview.md` from context and
+   invoke [stage-03-implement-and-code-review-loop.md](stage-03-implement-and-code-review-loop.md)
+   **immediately, in the same turn**. Do not summarize, do not ask anything else, do not wait for
+   another user message.
+3. `Request changes` → capture the feedback (including any forward constraints the user states
+   here — this is where constraints are collected, not after approval), apply Restart Routing
+   above, re-run the affected step and the Mandatory Self-Review Gate, then ask this question
+   again.
+
+**`--yolo` mode** — skip the confirmation entirely. Once the self-review gate passes, enter
+Stage 03 immediately in the same turn.
