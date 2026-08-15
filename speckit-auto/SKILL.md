@@ -8,7 +8,7 @@ description: |
   remediation loops until pass, then commit and completion.
   Use --integration <github-speckit|superpowers> to set the provider (setup only, no pipeline).
   Use --yolo for zero-human-in-the-loop fully automated execution.
-compatibility: Runs on GitHub Copilot, Claude Code, and OpenCode. Discovered from ~/.agents/skills/, ~/.claude/skills/, or ~/.config/opencode/skills/. Requires git and bash; network access for Jira intake via --issue. Providers: github-speckit (Copilot/Claude/OpenCode) or superpowers.
+compatibility: "Runs on GitHub Copilot, Claude Code, and OpenCode. Discovered from ~/.agents/skills/, ~/.claude/skills/, or ~/.config/opencode/skills/. Requires git and bash; network access for Jira intake via --issue. Providers: github-speckit (Copilot/Claude/OpenCode) or superpowers."
 license: MIT
 allowed-tools: bash glob grep view create edit skill
 metadata:
