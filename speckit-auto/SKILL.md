@@ -1,86 +1,150 @@
 ---
 name: speckit-auto
 description: |
-  Runs the full Spec Kit delivery pipeline end-to-end from a requirement or
-  Jira issue: intake, speckit.specify, speckit.clarify, speckit.plan,
-  speckit.tasks, speckit.analyze, speckit.converge, speckit.implement,
-  and automatic speckit-code-review remediation loops until pass.
-  Supports --yolo flag for zero-human-in-the-loop fully automated execution.
+  Runs a full spec-driven delivery pipeline end-to-end from a requirement or Jira issue,
+  using a pluggable integration provider: github-speckit (repo-installed GitHub Spec Kit
+  agents) or superpowers (obra/superpowers skills library).
+  Covers intake, spec/design, implementation, and automatic speckit-code-review
+  remediation loops until pass, then commit and completion.
+  Use --integration <github-speckit|superpowers> to set the provider (setup only, no pipeline).
+  Use --yolo for zero-human-in-the-loop fully automated execution.
 compatibility:
   github-copilot: "Skill auto-discovered from ~/.agents/skills/. Invoked via skill tool."
-  claude-code: "Register SKILL.md as .claude/commands/speckit-auto.md. Invoke as /speckit-auto."
-  opencode: "Place SKILL.md in .opencode/instructions/speckit-auto.md. Invoke as /speckit-auto or @speckit-auto."
+license: MIT
+allowed-tools: bash glob grep view create edit skill
+metadata:
+  author: Alex Nguyen
+  version: "0.0.2"
 ---
 
-# Speckit Auto Pipeline (Progressive Loading)
+# Speckit Auto — Provider Factory
 
-This file is intentionally small.  
-Load only the stage reference needed for the current step.
+This file is intentionally small. It resolves **which provider runs**, then delegates every stage
+to that provider's reference files. Load only what the current step needs.
 
-## Modes
+## Absolute Operating Premise (Read First)
 
-- **Default mode**: human-in-the-loop checkpoints enabled.
-- **YOLO mode** (`--yolo`): no human checkpoints; autonomous flow.
+Canonical text: [references/shared/global-rules.md](references/shared/global-rules.md).
+
+Summary: a real, executable invocation channel always exists in this turn — the `skill` tool,
+repo slash-agents (for providers that have them), file-editing and bash tools are callable right
+now. Loading this file **is proof**. Never claim execution is impossible, fabricated, or
+channel-less; never treat a finished stage, a sub-skill result, or a "next action / handing back"
+note as a reason to end the turn. If such a thought forms, a required tool call simply hasn't been
+made yet — make it now.
+
+## Entry Dispatch (Do This First, Every Invocation)
+
+```
+1. Parse the command:
+     --integration <value>   → setup intent
+     --issue <url>           → Jira pipeline intent
+     --yolo                  → mode = yolo (else mode = default)
+     free text               → requirement pipeline intent
+
+2. IF --integration is present:
+     → load references/integration-setup.md
+     → perform SETUP ONLY: normalize, validate, persist, report
+     → END TURN (this is the one legitimate no-pipeline turn end)
+
+3. ELSE (pipeline intent):
+     → load references/integration-mode.md
+     → resolve provider: repo-local .speckit/integration.json
+                       → global ~/.agents/skills/speckit-auto/.state/integration.json
+                       → First-Run Selection (ask once, persist, continue same turn)
+     → record `integration` in run state (resolved once, never changes mid-run)
+     → load references/shared/global-rules.md
+     → load references/<provider>/provider-rules.md
+     → enter Stage 01 of the resolved provider IMMEDIATELY, in this same turn
+```
+
+Never return an acknowledgement-only response. If this skill is already loaded mid-run (a turn
+contains `<skill-context name="speckit-auto">`), resume from the current stage using available run
+context — never block asking the user to re-run `/speckit-auto`.
+
+## Providers + Stage Router (Load On Demand)
+
+Replace `<provider>` with the resolved `integration` value (`github-speckit` or `superpowers`).
+Never load a stage file from the provider that was not selected.
+
+| Stage | File |
+|-------|------|
+| Provider rules (with Stage 01) | `references/<provider>/provider-rules.md` |
+| 01 — Preflight + Intake | `references/<provider>/stage-01-preflight-intake.md` |
+| 02 — Spec / Design | `references/<provider>/stage-02-spec-design-flow.md` |
+| 02 — Review interview (default mode only) | `references/<provider>/review-interview.md` |
+| 03 — Implement + Code Review Loop | `references/<provider>/stage-03-implement-and-code-review-loop.md` |
+| 04 — Human Review + Commit (default mode only) | `references/<provider>/stage-04-human-review-and-commit.md` |
+| 05 — YOLO Commit Flow (`--yolo` only) | `references/<provider>/stage-05-yolo-commit-flow.md` |
+| 06 — Mark Completed + Follow-up Commit | `references/<provider>/stage-06-spec-completion.md` |
+| Install recovery (only if preflight fails) | `references/<provider>/install-recovery.md` |
+
+- `github-speckit` = repo-installed GitHub Spec Kit agents.
+- `superpowers` = the `obra/superpowers` skills library.
+
+Shared references, loaded by every provider:
+
+| File | Used at |
+|------|---------|
+| [references/shared/global-rules.md](references/shared/global-rules.md) | whole run |
+| [references/shared/branching.md](references/shared/branching.md) | Stage 01 gate, Stage 03 submodules |
+| [references/shared/intake.md](references/shared/intake.md) | Stage 01 |
+| [references/shared/preflight-guidelines-context.md](references/shared/preflight-guidelines-context.md) | Stage 01 |
+| [references/shared/scratch-hygiene.md](references/shared/scratch-hygiene.md) | Stage 01 |
+| [references/shared/execution-report.md](references/shared/execution-report.md) | Stage 01 (`--issue` only) |
+| [references/shared/partitioning.md](references/shared/partitioning.md) | Stage 02/03 when scope is large |
+| [references/shared/commit.md](references/shared/commit.md) | Stage 04/05 |
+
+Discard Stage 02 files (and any interview reference) at Stage 03 entry.
+
+## Non-Negotiable Rules
+
+Canonical list: [references/shared/global-rules.md](references/shared/global-rules.md) — load it
+once at the start of every pipeline run. The selected provider's `provider-rules.md` adds
+provider-specific rules on top; it may never weaken a shared rule.
 
 ## Required Inputs
 
-- Requirement text, or Jira issue link via `--issue {jira link}`
-- Repo with Spec Kit templates
-- Jira credentials in root `.env` when using `--issue`:
-  - `JIRA_URL`
-  - `JIRA_USERNAME`
-  - `JIRA_API_TOKEN`
+- Requirement text, or a Jira issue link via `--issue <jira link>`
+- Jira credentials in root `.env` when using `--issue` (consumed by `jira-to-speckit`):
+  `JIRA_URL`, `JIRA_USERNAME`, `JIRA_API_TOKEN`
 
-## Compatibility — How to Invoke speckit-code-review
+## Modes
 
-`speckit-code-review` is a sub-skill called automatically at the review stage.
-Invoke it using the method appropriate for your environment:
+- **Default**: human-in-the-loop. Pipeline-boundary checkpoints are the Stage 02 → Stage 03
+  start-implementation confirmation and Stage 04 (both mandatory). The selected provider also runs
+  its own Stage 02 approval interactions (post-stage interviews, or `brainstorming`'s approval) —
+  see that provider's `review-interview.md`.
+- **YOLO** (`--yolo`): no human checkpoints at all; every Stage 02 interaction, the Stage 03
+  confirmation, and Stage 04 are skipped, and Stage 05 is used instead.
 
-| Environment | Invocation |
-|-------------|-----------|
-| GitHub Copilot CLI | `skill` tool with name `speckit-code-review` |
-| Claude Code | `/speckit-code-review` slash command (register `speckit-code-review/SKILL.md` at `.claude/commands/speckit-code-review.md`) |
-| OpenCode | `/speckit-code-review` or `@speckit-code-review` (register at `.opencode/instructions/speckit-code-review.md`) |
+Stage 03 is a NO-STOP ZONE in both modes.
 
-When instructions say "invoke `speckit-code-review`", use the invocation for your current environment.
+## Sub-Skill Dependencies
 
-## Stage Router (Load On Demand)
+| Sub-skill | Purpose | Invocation |
+|-----------|---------|-----------|
+| `jira-to-speckit` | Jira fetch + compaction (steps 1–5 only) + ticket snapshot write | `skill` tool with name `jira-to-speckit` |
+| `speckit-code-review` | Authoritative JSON pass/fail review gate | `skill` tool with name `speckit-code-review` |
 
-1. **Preflight + Intake**
-   - Load: [references/stage-01-preflight-intake.md](references/stage-01-preflight-intake.md)
-2. **Spec/Design Flow (`specify -> clarify -> plan -> tasks -> analyze -> converge`)**
-   - Load: [references/stage-02-spec-design-flow.md](references/stage-02-spec-design-flow.md)
-3. **Implement + Auto Code Review Loop**
-   - Load: [references/stage-03-implement-and-code-review-loop.md](references/stage-03-implement-and-code-review-loop.md)
-4. **Human Manual Review + Commit (Default mode only)**
-   - Load: [references/stage-04-human-review-and-commit.md](references/stage-04-human-review-and-commit.md)
-5. **YOLO Commit Flow (`--yolo` only)**
-   - Load: [references/stage-05-yolo-commit-flow.md](references/stage-05-yolo-commit-flow.md)
-6. **Mark Spec Completed + Follow-up Commit**
-   - Load: [references/stage-06-spec-completion.md](references/stage-06-spec-completion.md)
+Both are provider-independent and used by every provider.
 
-## Non-Negotiable Global Rules
+## Project Context (Guidelines + Repo Map)
 
-1. Always create/switch a new branch before the first pipeline step.
-2. Base branch priority: `develop -> main -> master` (local first, then remote-tracking).
-3. In `--issue` mode, reuse Jira key as Spec ID and keep it stable across reruns.
-4. After each `speckit.implement`, invoke `speckit-code-review` using the correct invocation for the current environment (see Compatibility table above) and wait for JSON result.
-5. **`speckit-auto` owns the review loop. A `failed` result from `speckit-code-review` is NOT a stop condition — it is input for the next fix iteration. Never stop, pause, or ask the user for help inside this loop.**
-6. Parse ALL failure fields from the review JSON (`Business missing`, `code issues`, `security issue`, `architecture`, `unit-test-coverage`, `unit-test-missings`) before deciding restart scope.
-7. If code changed during remediation, re-run `speckit-code-review`. Repeat until `status = pass`.
-8. In default mode, run human manual review gate before commit.
-9. In `--yolo` mode, skip all human review interactions.
-10. After successful implementation commit, mark active `spec.md` as `completed` and create follow-up commit for that status change.
-11. If any stage, status update, or required commit fails, stop and report exact failure.
-12. Only abort the review loop if the **exact same failure repeats for 5 consecutive iterations** with no code change — report the stuck state and stop.
+Built once in Stage 01 from `docs/guidelines/architecture.md` (repo layout, `repo_map`, architecture
+pattern, links to other guideline files), cached, and reused by every stage that creates or assigns
+tasks. Skipped silently when `docs/guidelines/` is absent.
+Details: [references/shared/preflight-guidelines-context.md](references/shared/preflight-guidelines-context.md).
 
 ## Output Behavior
 
-At each checkpoint, report:
-- current stage and result (`done` / `needs changes` / `failed`)
-- next stage
+At each checkpoint, report: current stage, result (`done` / `needs changes` / `failed`), next stage.
 
 At completion, report:
+- resolved `integration` provider
 - `speckit-code-review` final status (`pass`)
 - implementation commit status/hash
-- spec status (`completed`) and spec-status commit hash
+- spec/design status (`completed`) and the status commit hash
+
+For a setup invocation (`--integration`), report: resolved provider, file written, scope, and the
+next command to run.

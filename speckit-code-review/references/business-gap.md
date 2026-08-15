@@ -1,61 +1,57 @@
-# Business Gap Review
+# Business Gap Review — `FR-*` / `NFR-*`
 
-Load this file when performing the Business Gap review area.
+Validate that every requirement in the checklist is fully implemented in the changed code.
 
-## Goal
+## Steps
 
-Validate that every functional and non-functional requirement extracted from `spec.md` is fully implemented in the changed code.
-
-## Step-by-Step
-
-1. For each requirement in the checklist (`FR-*` / `NFR-*`), review the implementation line-by-line and method-by-method.
-2. Map each requirement to concrete code evidence:
-   - `file`
-   - `method/function`
-   - `line range`
-   - short explanation of how the code satisfies the requirement
+1. Take the checklist from SKILL.md **Requirement Checklist**. If it was synthesized (spec had no
+   IDs), review against it exactly as if the IDs were declared.
+2. For each requirement, review the implementation line-by-line and map it to concrete evidence:
+   `file`, `method/function`, `line range`, and a short explanation of how the code satisfies it.
 3. Classify each requirement:
    - `covered` — fully implemented with clear evidence
    - `partially_covered` — some logic exists but incomplete
    - `missing` — no implementation evidence found
    - `conflicting` — implementation contradicts the requirement
-4. For any `missing`, `partially_covered`, or `conflicting` requirement, produce a `Business missing details` entry:
-   - `requirement_id` (`FR-*` / `NFR-*`)
-   - `missing_behavior` — exact behavior the spec requires but is absent
-   - `suggested_fix_area` — file + method/function + line range when possible
-   - `why_missing` — concrete reason (e.g., method exists but validation branch absent)
+4. For every non-`covered` requirement, record in the detail file: `requirement_id`,
+   `missing_behavior` (exact required behavior that is absent), `suggested_fix_area`
+   (file + method + line range), and `why_missing` (concrete reason, e.g. method exists but the
+   validation branch is absent). Emit a matching `fixes` entry.
 
-## Checklist: Functional Issues
+## Functional Checklist
 
 - Missing requirements (specified behavior not implemented)
-- Conflicting requirements (implementation contradicts spec or other requirements)
-- Incorrect business logic (wrong calculations, wrong rules, wrong workflow order)
+- Conflicting requirements (contradicts spec or another requirement)
+- Incorrect business logic (wrong calculations, rules, or workflow order)
 - Edge cases and boundary conditions not handled per spec
-- Data integrity (invalid state transitions, missing validation of business invariants)
-- Backward compatibility / breaking changes (API contract changes, data migration risks)
+- Data integrity — invalid state transitions, unvalidated business invariants
+- Backward compatibility — API contract changes, data migration risks
 - Acceptance criteria not met
-- Scope creep (changes beyond stated requirements)
+- Scope creep — changes beyond the stated requirements
 
-## Checklist: Non-Functional Issues
+## Non-Functional Checklist
 
-- Performance NFRs not met (latency, throughput, pagination, caching)
-- Reliability NFRs not met (retries, circuit-breakers, fallback behaviour)
-- Scalability NFRs not met (sharding, partitioning, horizontal scaling)
-- Maintainability NFRs not met (observability hooks, structured logging)
-- Compliance NFRs not met (GDPR, HIPAA, audit trail, data retention)
-- UX NFRs not met (response time, accessibility, error message clarity)
+- Performance — latency, throughput, pagination, caching
+- Reliability — retries, circuit breakers, fallback behaviour
+- Scalability — sharding, partitioning, horizontal scaling
+- Maintainability — observability hooks, structured logging
+- Compliance — GDPR, HIPAA, audit trail, data retention
+- UX — response time, accessibility, error message clarity
 
-## Output Fields Produced
+## Detail File — `business-gap.json`
 
-Populate these JSON fields from this review:
+Beyond the standard finding fields, include:
 
-- `Business cover`
-- `requirements checklist summary`
-- `Business missing`
-- `Business missing details`
+- `Business cover`, `requirements checklist summary`, and the per-requirement classification
+- `requirements_source` — `declared` or `synthesized`
+- `synthesized_requirements` — only when synthesized; each `{id, statement, spec_anchor}`
 
 ## Edge Cases
 
-- If no evidence can be found for a requirement, treat it as `missing` (never assume covered).
-- If requirement wording is ambiguous, prefer `failed` and document the missing evidence.
-- Non-functional violations still produce `failed` when impact is high.
+- No evidence found → `missing`. Never assume covered.
+- Ambiguous wording → treat as not covered and document the missing evidence.
+- A high-impact non-functional violation still forces `failed`.
+- A design-style spec with no IDs is **never** grounds for 100% coverage — synthesize first; if
+  nothing testable exists, emit `FR-000` per SKILL.md.
+
+> Discard this file from context after the Business Gap review area is complete.

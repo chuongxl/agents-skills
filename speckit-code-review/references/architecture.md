@@ -1,43 +1,32 @@
-# Architecture Review
+# Architecture Review — `ARCH-*`
 
-Load this file when performing the Architecture review area.
+Detect violations of layering rules, DDD invariants, dependency direction, and structural contracts
+defined or implied by the spec and the project's established architecture.
 
-## Goal
+## Steps
 
-Detect violations of layering rules, DDD invariants, dependency direction, and structural contracts defined or implied by the spec and the project's established architecture.
-
-## Step-by-Step
-
-1. Identify the architecture style in use (Clean Architecture, Hexagonal, Layered MVC, DDD, etc.) from existing project structure and spec constraints.
+1. Identify the architecture style in use (Clean, Hexagonal, Layered MVC, DDD, …) from the existing
+   project structure and any spec constraints.
 2. Review the git change set for violations of that style's rules.
-3. For each issue: record `file`, `class/module`, `line range`, violation type, and description.
+3. Record per issue: `file`, `class/module`, `line range`, violation type, description, and severity
+   (scale in SKILL.md — `high` covers domain depending on infrastructure or an aggregate root
+   exposing mutable internals).
 
 ## Checklist
 
-- **Layer dependency violations** — e.g., domain layer importing infrastructure types; application layer bypassing domain
-- **Boundary leaks** — UI reaching into domain directly; data layer exposing persistence models to outer layers
-- **DDD aggregate / root rule violations** — aggregate invariants bypassed, sensitive data leaked through aggregate boundary, entities mutated outside their aggregate root
-- **Repository / service ownership violations** — wrong layer handling persistence logic or business rules
-- **Circular dependencies** — modules/packages depending on each other creating cycles
-- **Cross-context leakage in bounded contexts** — one bounded context directly referencing internal types of another instead of using published interfaces
-- **Architecture drift from spec** — spec states architectural constraints (e.g., "no direct DB access from controllers") and code violates them
+- **Layer dependency violations** — domain importing infrastructure types; application bypassing domain
+- **Boundary leaks** — UI reaching into domain; data layer exposing persistence models outward
+- **DDD aggregate / root violations** — invariants bypassed, sensitive data leaked across the
+  aggregate boundary, entities mutated outside their root
+- **Ownership violations** — the wrong layer handling persistence logic or business rules
+- **Circular dependencies** between modules or packages
+- **Cross-context leakage** — a bounded context referencing another's internal types instead of its
+  published interface
+- **Drift from spec** — code violating an architectural constraint the spec states (e.g. "no direct
+  DB access from controllers")
 
-## Severity Guidance
+## Detail File — `architecture.json`
 
-| Severity | Examples |
-|----------|----------|
-| `high`   | Domain layer depends on infrastructure; aggregate root exposes mutable internals externally |
-| `medium` | Service layer bypasses repository abstraction; circular dependency between two modules |
-| `low`    | Minor naming inconsistency that weakens conceptual boundary |
+Full violation descriptions and their impact for `ARCH-*` findings.
 
-## Output Fields Produced
-
-Populate these JSON fields from this review:
-
-- `architecture` → `[]` if clean
-- `architecture` → array of issue objects if any found
-
-Each issue object format:
-```json
-{ "<Issue type label>": "<Concise description of violation and impact>" }
-```
+> Discard this file from context after the Architecture review area is complete.

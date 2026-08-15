@@ -1,0 +1,69 @@
+{
+  "speckit.aiProvider": "copilot",
+  "speckit.telemetry": false,
+  "speckit.companion.installPrompt": false,
+  "speckit.customWorkflows": [
+    {
+      "name": "superpowers",
+      "displayName": "Superpowers",
+      "description": "Brainstorm the design, write the plan, execute it with TDD subagents, verify before completion",
+      "steps": [
+        {
+          "name": "specify",
+          "label": "Brainstorm",
+          "command": "superpowers:brainstorming",
+          "file": "spec.md"
+        },
+        {
+          "name": "plan",
+          "label": "Plan",
+          "command": "superpowers:writing-plans",
+          "file": "plan.md",
+          "includeRelatedDocs": true
+        },
+        {
+          "name": "implement",
+          "label": "Execute (TDD)",
+          "command": "superpowers:subagent-driven-development",
+          "actionOnly": true
+        },
+        {
+          "name": "verify",
+          "label": "Verify",
+          "command": "superpowers:verification-before-completion",
+          "actionOnly": true
+        }
+      ]
+    }
+  ],
+  "speckit.customCommands": [
+    {
+      "name": "worktree",
+      "title": "Isolate in Worktree",
+      "command": "/superpowers:using-git-worktrees",
+      "step": "plan",
+      "tooltip": "Create an isolated workspace before executing the plan"
+    },
+    {
+      "name": "debug",
+      "title": "Systematic Debugging",
+      "command": "/superpowers:systematic-debugging",
+      "step": "implement",
+      "tooltip": "Root-cause a failure before proposing a fix"
+    },
+    {
+      "name": "review",
+      "title": "Request Code Review",
+      "command": "/superpowers:requesting-code-review",
+      "step": "verify",
+      "tooltip": "Independent review against the plan's requirements"
+    },
+    {
+      "name": "finish",
+      "title": "Finish Branch",
+      "command": "/superpowers:finishing-a-development-branch",
+      "step": "verify",
+      "tooltip": "Decide how to integrate the completed work"
+    }
+  ]
+}

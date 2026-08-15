@@ -1,0 +1,33 @@
+name: validate-skills
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate skill definitions
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Validate skills against SKILL_SPEC.md
+        run: python3 tools/validate_skills.py
+
+      - name: Self-test the validator
+        run: python3 tools/test_validate_skills.py
+
+      - name: Shell script syntax check
+        run: find . -name '*.sh' -not -path './.git/*' -exec bash -n {} +
+
+      - name: Python script syntax check
+        run: python3 -m compileall -q tools */scripts
