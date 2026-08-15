@@ -395,7 +395,7 @@ Both sub-skills are **provider-independent** and invoked the same way by every p
 4. **Review generated specs carefully**: Specs are auto-authored; human feedback at Stage 02 prevents wasted implementation cycles.
 5. **Maintain docs/guidelines/architecture.md**: Project context improves workspace targeting and architectural consistency.
 6. **Keep Jira credentials in .env, never in code**: Rotate tokens regularly and never commit .env.
-7. **Chain multiple features with repos**: Each pipeline run is independent; git worktrees avoid merge conflicts if running in parallel.
+7. **Run parallel sessions safely**: Stage 01 provisions a per-run git worktree so concurrent features do not collide in one working directory.
 
 ---
 
