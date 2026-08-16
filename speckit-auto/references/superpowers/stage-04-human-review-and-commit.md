@@ -12,6 +12,9 @@ Load this only in default mode after `speckit-code-review` returns `pass`.
 2. AI recommends the reviewer:
    - run the app
    - execute manual self-tests for those scenarios
+   - when `submodule_workspaces{}` is non-empty, open
+     `.worktrees/<feature>/<feature>.code-workspace` to review the umbrella and every grafted
+     submodule side by side — no single `git status` covers them all. Report that path here.
 3. Ask for the manual result:
    - `Approve implementation`
    - `Request changes`

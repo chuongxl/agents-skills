@@ -152,6 +152,8 @@ happens.
    created, and is what makes the leak guard safe on an already-dirty checkout.
 4. `git -C <repo-root>/apps/<name> worktree add <repo-root>/.worktrees/<feature>/apps/<name> -b <branch> <resolved-base>`
 5. Record the mapping in run state `submodule_workspaces{}`.
+6. Write a multi-root editor workspace file at
+   `<repo-root>/.worktrees/<feature>/<feature>.code-workspace` (see "Multi-Root Workspace File").
 
 Scope is enforced structurally, not predicted: a submodule that is never named is never
 initialized, so it cannot be pulled in. No `repo_map` lookup or heuristic is involved.
@@ -167,7 +169,26 @@ read or write, whenever `<name>` has an entry. Paths for submodules with no entr
 non-`apps/` paths, resolve against the repo root unchanged.
 
 **Fallback.** If a write targets a submodule with no entry — the plan missed it — graft it at that
-moment, add the mapping, and continue. This is never a stop.
+moment, add the mapping, regenerate the workspace file below, and continue. This is never a stop.
+
+### Multi-Root Workspace File
+
+Changes for one feature are spread across the umbrella and N submodule worktrees, so a single
+`git status` never shows the whole picture. Write a multi-root workspace file so the user can review
+all of them side by side in one editor window:
+
+- path: `<repo-root>/.worktrees/<feature>/<feature>.code-workspace`
+- it lives inside the feature's worktree directory, so it is already ignored and is removed together
+  with the worktree
+- `folders[0]` is the umbrella at `../..`; one entry per grafted submodule at `apps/<name>`, in the
+  order the plan names them, each path relative to the file's own directory
+- name entries so the umbrella sorts first and the order is stable
+- settings: `git.detectSubmodules: false` (otherwise the editor also lists all submodules of the
+  *original* checkout, mixed in with the grafted ones), `scm.alwaysShowRepositories: true`, and
+  `git.openRepositoryInParentFolders: "always"`
+
+Regenerate the file whenever `submodule_workspaces{}` changes. Report its path at the Stage 04
+review checkpoint so the user knows where to open it.
 
 **Leak guard (required).** The failure mode this design defends against is silent: an agent writes
 to `<repo-root>/apps/<name>/…` out of habit, landing changes on the original checkout while it sits
