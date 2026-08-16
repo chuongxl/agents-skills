@@ -7,14 +7,15 @@ Discard review-interview.md from context at this point — Stage 03 is a NO-STOP
 
 Before invoking `speckit.implement`, inject into the prompt:
 
-- The `summary` from the Project Context loaded in Stage 01.
+- The artifact digest (≤500 tokens, see [../shared/artifact-digest.md](../shared/artifact-digest.md)):
+  summary, ACs, architecture, task status — in place of the full spec/plan.
 - The `repo_map` so the skill knows which workspace each file should be created in.
 - Any relevant guideline from `loaded_guidelines` that applies to the current task —
   match by checking whether the task topic appears in any stem key of `linked_guidelines`.
   If a match exists and is not yet cached, load it now and add to `loaded_guidelines`.
 
-When routing fixes in R5 (plan/checklist/tasks/analyze reruns), pass the same Project Context
-fields to those sub-skills so workspace assignment and architecture compliance are preserved.
+When routing fixes in R5 (scoped plan/tasks rerun), pass the same artifact digest fields
+to those sub-skills so workspace assignment and architecture compliance are preserved.
 
 ## Invocation Method (Critical)
 
@@ -117,10 +118,16 @@ PHASE 2 — Code review loop
       - TEST-* entry → load `detail_files["unit-tests"]`
       Do NOT load a category file unless you actually need it for that specific fix.
     - If the current retry loop is already holding too much context, discard prior review prose and rely on `state_file` + the one category file you need for the next fix.
-  R5 — Classify and route:
-    - All fixes are FR-*/NFR-*/ARCH-*  → re-run repo `speckit.plan` then repo `speckit.checklist` then repo `speckit.tasks` → repo `speckit.analyze` → R6
-    - Mix of FR-*/ARCH-* + SEC-*/CODE-*/TEST-* → re-run repo `speckit.checklist` then repo `speckit.tasks` → repo `speckit.analyze` → R6
-    - Only SEC-*/CODE-*/TEST-* fixes → go directly to R6
+  R5 — Classify and route (scoped regeneration — load [../shared/partitioning.md](../shared/partitioning.md) first):
+    - Identify the affected `workspace` + `capability` scope from the fix entries' file paths
+      (match against `implementation_packages[]` from the original task breakdown).
+    - All fixes are FR-*/NFR-*/ARCH-* → re-run only `speckit.plan` for the affected
+      package/slice, then `speckit.checklist` + `speckit.tasks` + `speckit.analyze` scoped to
+      that slice; merge updated slice back into the full artifacts. Do NOT regenerate unaffected
+      packages.
+    - Mix of FR-*/ARCH-* + SEC-*/CODE-*/TEST-* → re-run `speckit.checklist` + `speckit.tasks`
+      scoped to the affected workspace only; `speckit.analyze` once globally.
+    - Only SEC-*/CODE-*/TEST-* fixes → go directly to R6 (no artifact regeneration).
     - Whenever a Stage 02 artifact was regenerated above, re-run the Stage 02 Mandatory
       Self-Review Gate (read-only, no interview) before R6 — global rule 10a
   R6 — Apply fixes DIRECTLY using file-editing tools (this turn, right now):

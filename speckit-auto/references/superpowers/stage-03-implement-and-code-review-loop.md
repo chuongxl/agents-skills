@@ -7,7 +7,8 @@ Discard review-interview.md from context at this point — Stage 03 is a NO-STOP
 
 Before invoking the implementation skill, inject into its input:
 
-- the `summary` from the Project Context loaded in Stage 01
+- the artifact digest (≤500 tokens, see [../shared/artifact-digest.md](../shared/artifact-digest.md)):
+  summary, ACs, architecture, task status — in place of the full spec/plan
 - the `repo_map`, so each file lands in the correct workspace
 - any relevant guideline from `loaded_guidelines` matching the task topic (match by stem key in
   `linked_guidelines`; if matched and not yet cached, load it now and add it to `loaded_guidelines`)
@@ -195,12 +196,14 @@ PHASE 2 — Code review loop
       FR-*/NFR-* → "business-gap", ARCH-* → "architecture", SEC-* → "security",
       CODE-* → "code-quality", TEST-* → "unit-tests"
       Never load a category file you do not need for that specific fix.
-  R5 — Classify and route:
-    - All fixes are FR-*/NFR-*/ARCH-* → re-run writing-plans for the affected slice,
-      re-run the Stage 02 self-review gate (spec coverage / placeholders / consistency), then R6
-    - Mix of FR-*/ARCH-* + SEC-*/CODE-*/TEST-* → re-run writing-plans for the task
-      breakdown only, re-run the self-review gate, then R6
-    - Only SEC-*/CODE-*/TEST-* fixes → go directly to R6
+  R5 — Classify and route (scoped regeneration — load [../shared/partitioning.md](../shared/partitioning.md) first):
+    - Identify the affected `workspace` + `capability` scope from the fix entries' file paths
+      (match against the original task/plan structure).
+    - All fixes are FR-*/NFR-*/ARCH-* → re-run `writing-plans` for the affected slice only,
+      re-run the Stage 02 self-review gate, then R6. Do NOT regenerate unaffected slices.
+    - Mix of FR-*/ARCH-* + SEC-*/CODE-*/TEST-* → re-run `writing-plans` (task breakdown only)
+      for the affected workspace, re-run the self-review gate, then R6.
+    - Only SEC-*/CODE-*/TEST-* fixes → go directly to R6 (no artifact regeneration).
   R6 — Apply fixes DIRECTLY using file-editing tools (this turn, right now):
     For EACH item in the corrective action list:
       1. Open the file named in suggested_fix_area / file

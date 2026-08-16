@@ -1,11 +1,9 @@
 ---
 name: speckit-code-review
 description: |
-  Deep line-by-line code review against the feature spec at specs/<feature-folder>/spec.md,
-  produced by either speckit.specify (GitHub Spec Kit) or superpowers:brainstorming.
-  Produces strict JSON pass/fail with business coverage, missing requirements, code issues, security issues, architecture issues, and unit test coverage.
-  Triggers: "speckit code review", "review with spec", "compare code to spec.md", "spec coverage audit",
-  "invoke speckit-code-review", "run speckit-code-review".
+  Line-by-line code review against a feature spec, producing strict JSON pass/fail
+  with business coverage, code/security/architecture issues, and test coverage.
+  Triggers: "speckit code review", "review with spec", "spec coverage audit".
 compatibility: Runs on GitHub Copilot, Claude Code, and OpenCode. Discovered from ~/.agents/skills/, ~/.claude/skills/, or ~/.config/opencode/skills/. Requires git, bash, and a spec at specs/<feature-folder>/spec.md.
 license: MIT
 allowed-tools: bash glob grep view create edit

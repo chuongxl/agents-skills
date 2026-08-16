@@ -32,12 +32,17 @@ Never emit a capability disclaimer before attempting these — make the stage in
 
 ## Prompt Wiring Rules
 
+Use the artifact digest (≤500 tokens, see [../shared/artifact-digest.md](../shared/artifact-digest.md))
+as the prompt shortcut for every stage call below. The digest carries summary, ACs, architecture,
+and task status. Only `speckit.clarify` and `speckit.analyze` need the full spec on disk; the
+others work from the digest alone.
+
 - `specify`: requirement text (or normalized Jira intake output) **+ Project Context `summary`**
-- `clarify`: current `spec.md`
-- `plan`: finalized `spec.md` **+ Project Context `summary`, `repo_map`, and any relevant cached guidelines from `loaded_guidelines`**
-- `checklist`: finalized `spec.md` — generate a quality checklist ("unit tests for your requirements") to confirm the spec is complete, clear, and consistent before task breakdown
-- `tasks`: spec + plan context **+ `repo_map`** — every task must declare its target workspace
-- `analyze`: `spec.md`, `plan.md`, `tasks.md` — read-only consistency check across artifacts; report conflicts/gaps/ambiguities
+- `clarify`: current `spec.md` (full read — needs detail for clarification)
+- `plan`: artifact digest **+ Project Context `summary`, `repo_map`, and any relevant cached guidelines from `loaded_guidelines`**
+- `checklist`: artifact digest — quality checklist against the summarized requirements
+- `tasks`: artifact digest **+ `repo_map`** — every task must declare its target workspace
+- `analyze`: `spec.md`, `plan.md`, `tasks.md` — full read-only consistency check; report conflicts/gaps/ambiguities
 
 If `speckit.analyze` reports issues, fix at source (`specify/clarify/plan/checklist/tasks`) and rerun `speckit.analyze` before Stage 03.
 
