@@ -10,20 +10,27 @@ Load with this file:
 
 Execution order for this stage:
 **branch setup (shared) → Speckit source check → install recovery if missing → guidelines load →
-intake (shared) → artifact path → `/speckit.specify` (Stage 02 entry, also the executability proof).**
+intake (shared) → artifact path → Stage 02 entry (`speckit.specify`, also the executability proof).**
 
 Only the Speckit-specific steps are described below; everything else lives in the shared files.
 
 ## Preflight Speckit Source Check (Required)
 
-Verify these repo-installed files exist for each of the eight stages
-(`specify`, `clarify`, `plan`, `checklist`, `tasks`, `analyze`, `implement`, `converge`):
+Probe the repo for the eight stages (`specify`, `clarify`, `plan`, `checklist`, `tasks`, `analyze`,
+`implement`, `converge`) using the layout for the resolved host (see
+[../shared/host-adaptation.md](../shared/host-adaptation.md)):
 
-- `.github/agents/speckit.<stage>.agent.md`
-- `.github/prompts/speckit.<stage>.prompt.md`
+- **GitHub Copilot** — `.github/skills/speckit-<stage>/SKILL.md` (skills mode) **or**
+  `.github/agents/speckit.<stage>.agent.md` + `.github/prompts/speckit.<stage>.prompt.md`
+  (commands mode). Either complete set satisfies the check.
+- **Claude Code** — `.claude/skills/speckit-<stage>/SKILL.md`.
+- **OpenCode** — `.opencode/skills/speckit-<stage>/SKILL.md`, then `.agents/skills/`, then
+  `.claude/skills/` (first complete set wins).
 
-If any file is missing, run install recovery below. Never fall back to a global or external Speckit
-variant — the repo-installed agents are the only valid source.
+Record the resolved layout and its invocation channel (`slash-agent` for Copilot/Claude Code,
+`skill` tool for OpenCode) in run state. If no complete set exists, run install recovery below.
+Never fall back to a global or external Speckit variant — the repo-installed agents are the only
+valid source.
 
 ## Missing Speckit Auto-Recovery (Required)
 
@@ -32,13 +39,16 @@ abandon the run. Load [install-recovery.md](install-recovery.md) and follow it.
 
 ## Runtime Executability (No Separate Probe)
 
-Do **not** invoke `/speckit.specify` as a standalone probe before intake — it is a mutating call
-and would start Stage 02 without the resolved artifact path. Executability is proven by the real
-post-intake `/speckit.specify` invocation at the end of this stage.
+Do **not** invoke the Stage 02 entry stage as a standalone probe before intake — it is a mutating
+call and would start Stage 02 without the resolved artifact path. Executability is proven by the
+real post-intake Stage 02 entry invocation at the end of this stage.
 
-`stage_invocation_mode` is always `slash-agent` — never attempt the `task` tool with a `speckit.*`
-agent_type, it always fails with `Unknown agent_type`. Only a concrete error from the real
-invocation is reportable as a runtime failure (quote it), and only after the source check passed.
+`stage_invocation_mode` is host-dependent (see
+[../shared/host-adaptation.md](../shared/host-adaptation.md)): repo slash commands (`/speckit.specify`)
+on Copilot and Claude Code, the `skill` tool by the stage's resolved skill name on OpenCode. Never
+attempt the `task` tool with a `speckit.*` agent_type — it always fails with `Unknown agent_type`.
+Only a concrete error from the real invocation is reportable as a runtime failure (quote it), and
+only after the source check passed.
 
 ## Preflight Guidelines Context Load (Required)
 
@@ -78,12 +88,14 @@ Right after the artifact folder is created, **move** `.speckit/intake/<issue_id>
 `specs/<issue_id>-<short_title>/ticket.md` and record `ticket_path` in run state. Full rules
 (rerun overwrite, never gitignore, never commit separately, never read back):
 [../shared/intake.md](../shared/intake.md) → "Ticket Snapshot".
-Pass only the compact brief into `/speckit.specify`, never the snapshot's contents.
+Pass only the compact brief into the Stage 02 entry stage, never the snapshot's contents.
 
 ## Stage 02 Entry Step
 
-After intake completes, invoke `/speckit.specify` with the compact brief (or requirement text) in
-the same turn, then continue to [stage-02-spec-design-flow.md](stage-02-spec-design-flow.md).
+After intake completes, invoke the `speckit.specify` stage — via `/speckit.specify` on Copilot and
+Claude Code, or the `skill` tool by the resolved `speckit.specify` skill name on OpenCode — with the
+compact brief (or requirement text) in the same turn, then continue to
+[stage-02-spec-design-flow.md](stage-02-spec-design-flow.md).
 
 ## Execution Report (Jira-Sourced Runs)
 

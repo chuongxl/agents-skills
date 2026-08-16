@@ -35,7 +35,7 @@ can re-run it.
 | Scope | Path | Meaning |
 |-------|------|---------|
 | Repo-local | `<repo-root>/.speckit/integration.json` | This repository's provider |
-| Global | `~/.agents/skills/speckit-auto/.state/integration.json` | Default for repos with no local file |
+| Global | `<skill-dir>/.state/integration.json` — the directory this `SKILL.md` was discovered from (e.g. `~/.agents/skills/speckit-auto/` on Copilot, `~/.claude/skills/speckit-auto/` on Claude Code, `~/.config/opencode/skills/speckit-auto/` on OpenCode) | Default for repos with no local file |
 
 File format (identical for both scopes):
 

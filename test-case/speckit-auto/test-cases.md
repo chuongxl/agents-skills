@@ -1,6 +1,7 @@
 # speckit-auto test cases
 
-Scope: decision flow and outputs only, covering both `github-speckit` and `superpowers`.
+Scope: decision flow and outputs only, covering both `github-speckit` and `superpowers`, across
+all three host agents (GitHub Copilot, Claude Code, OpenCode).
 
 | ID | Scenario | Preconditions | Steps | Expected result | Provider coverage |
 |---|---|---|---|---|---|
@@ -29,6 +30,22 @@ Scope: decision flow and outputs only, covering both `github-speckit` and `super
 | T23 | Provider-specific stage routing | Provider resolved | Run pipeline | Loads stage files only from selected provider tree | Both |
 | T24 | Missing provider config + no selection | No persisted provider anywhere | Run pipeline | Asks once, persists selection, continues without restart | Both |
 | T25 | Unsupported stored provider | Corrupt `integration.json` | Run pipeline | Ignores bad value, falls through to next precedence or selection | Both |
+
+## Host-specific checks
+
+| ID | Scenario | Preconditions | Steps | Expected result | Provider coverage |
+|---|---|---|---|---|---|
+| H01 | Host detection from discovery dir | Skill installed in `~/.claude/skills/` (Claude) or `~/.config/opencode/skills/` (OpenCode) | Invoke the skill | Detects the host, records it, and keeps it fixed for the whole run | Both |
+| H02 | Flag parsing without slash commands (OpenCode) | OpenCode host | Message: "run speckit-auto --yolo on this requirement: …" | Parses `--yolo` from natural language and enters pipeline in YOLO mode | Both |
+| H03 | Slash-command flag parsing (Copilot/Claude) | Copilot or Claude host | `/speckit-auto --issue <url> --yolo` | Parses flags from slash body and enters Jira pipeline in YOLO mode | Both |
+| H04 | Mid-run resume marker per host | Pipeline interrupted mid-Stage 02 | New turn contains `<available_skills>` (OpenCode) or `<skill-context>` (Claude) | Resumes from current stage without asking the user to re-trigger the skill | Both |
+| H05 | github-speckit source check per host | `github-speckit` selected | Run normal pipeline | Probes `.github/skills/speckit-*/SKILL.md` (Copilot), `.claude/skills/speckit-*/SKILL.md` (Claude), `.opencode/skills/speckit-*/SKILL.md` (OpenCode); records resolved layout | github-speckit |
+| H06 | github-speckit install key per host | `github-speckit` selected, repo files missing | Accept install during recovery | Runs `specify init . --integration <host-key>` (`copilot` / `claude` / `opencode`); never a mismatched key | github-speckit |
+| H07 | Invocation channel per host | `github-speckit` selected | Stage 02/03 | Slash commands on Copilot/Claude Code; `skill` tool by resolved name on OpenCode; never `task` with `speckit.*` agent_type | github-speckit |
+| H08 | superpowers availability probe per host | `superpowers` selected | Run normal pipeline | Probes host skill dirs (`~/.claude/skills/`, `.claude/skills/`, `~/.config/opencode/skills/`, `.opencode/skills/` in addition to Copilot paths) | superpowers |
+| H09 | superpowers install on OpenCode | OpenCode host, superpowers missing | Accept install during recovery | Asks Install/Stop, then git-clones superpowers and copies `skills/*` into the opencode skills dir | superpowers |
+| H10 | Host ask tool naming | Default mode | Stage 02 interview / Stage 03 confirmation | Uses `ask_user` (Copilot), `question` (OpenCode), `AskUser` (Claude Code); one question at a time | Both |
+| H11 | Tool names vary by host | Any host | Any file/git operation | Performs the action via the host's equivalent tool name; never refuses because `allowed-tools` lists different names | Both |
 
 ## Provider-specific checks
 

@@ -1,15 +1,16 @@
 # superpowers: Provider-Specific Rules
 
 Adds to [../shared/global-rules.md](../shared/global-rules.md). Never weakens it.
+Also loads [../shared/host-adaptation.md](../shared/host-adaptation.md) for the per-host layout.
 
 Provider: **superpowers** — the `obra/superpowers` skills library.
 
 ## Invocation
 
 Superpowers ships **no agents, no slash commands, and no prompt files** — verified: the repo
-contains only `skills/<name>/SKILL.md`, and its own porting docs list GitHub Copilot CLI as using
-the *native Skill tool* with "no adapter file needed". So every step is invoked through the
-`skill` tool.
+contains only `skills/<name>/SKILL.md`, and its own porting docs list GitHub Copilot, Claude Code,
+and OpenCode as using the *native skill tool* with "no adapter file needed". So every step is
+invoked through the `skill` tool on all three hosts.
 
 Resolve the skill name using this precedence, per step:
 
@@ -17,10 +18,12 @@ Resolve the skill name using this precedence, per step:
 2. `superpowers:<name>` (the namespaced form used throughout superpowers' own docs).
 3. Bare `<name>` (for example `brainstorming`).
 4. **Sanctioned fallback** — if the skill tool cannot resolve it at all, read the file directly at
-   `~/.copilot/installed-plugins/<marketplace>/superpowers/skills/<name>/SKILL.md` and follow it.
-   Superpowers' porting guide explicitly designates file-reading as the valid mechanism on a
-   harness where the skill tool does not surface it. This is a real execution path, never a reason
-   to stop.
+   the on-disk path recorded by the Stage 01 availability check (host-dependent, see
+   [../shared/host-adaptation.md](../shared/host-adaptation.md): `~/.claude/skills/` on Claude Code,
+   `~/.config/opencode/skills/` on OpenCode, `~/.agents/skills/` or the Copilot plugin path on
+   Copilot) at `<skills-dir>/<name>/SKILL.md` and follow it. Superpowers' porting guide explicitly
+   designates file-reading as the valid mechanism on a harness where the skill tool does not surface
+   it. This is a real execution path, never a reason to stop.
 
 | Purpose | Skill |
 |---------|-------|

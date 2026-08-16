@@ -12,7 +12,7 @@
 
 The skill acts as a **provider factory**, delegating each pipeline stage to a pluggable integration provider (GitHub Spec Kit or Superpowers skills library). This architecture ensures compatibility with multiple AI agents and delivery workflows while maintaining a consistent, battle-tested execution model.
 
-Whether you're working with GitHub Copilot CLI, Claude Code, or running locally, Speckit Auto provides a single, unified interface for spec-driven delivery that eliminates context-switching and ensures every feature follows the same high-quality, requirements-focused process.
+Whether you're working with GitHub Copilot CLI, Claude Code, OpenCode, or running locally, Speckit Auto provides a single, unified interface for spec-driven delivery that eliminates context-switching and ensures every feature follows the same high-quality, requirements-focused process.
 
 ---
 
@@ -36,7 +36,10 @@ Speckit Auto orchestrates delivery across six distinct stages:
 Speckit Auto resolves a **provider** at the start of each run using a precedence chain:
 
 1. **Repo-local config**: `.speckit/integration.json` in the repository root
-2. **User home config**: `~/.agents/skills/speckit-auto/.state/integration.json`
+2. **User home config**: `<skill-dir>/.state/integration.json` — the directory this `SKILL.md` was
+   discovered from (e.g. `~/.agents/skills/speckit-auto/` on Copilot,
+   `~/.claude/skills/speckit-auto/` on Claude Code, `~/.config/opencode/skills/speckit-auto/` on
+   OpenCode)
 3. **First-run ask**: If neither exists, prompt once, persist, and continue
 
 Supported providers:
@@ -72,6 +75,11 @@ Speckit Auto is auto-discovered from `~/.agents/skills/` or the repository's `.g
 
 #### Claude Code
 Install the skill from the Superpowers skills library, or copy the skill directory to `~/.claude/skills/`.
+
+#### OpenCode
+Copy the skill directory to `~/.config/opencode/skills/` (user-wide) or `.opencode/skills/` (one
+repository). OpenCode has no skill slash commands — invoke the skill by naming it in a message, and
+pass flags (`--issue <url>`, `--yolo`) embedded in that message text.
 
 #### Local Usage (Standalone)
 Clone the skill and ensure `.env` credentials are configured if using `--issue` with Jira.
@@ -223,6 +231,17 @@ cp -r speckit-auto ~/.claude/skills/
 skill speckit-auto --yolo "Your requirement"
 ```
 
+### OpenCode
+
+**Installation**: Copy the skill directory to `~/.config/opencode/skills/` (or `.opencode/skills/`
+for one repository), then restart the session.
+
+**Invocation**: OpenCode loads the skill by its description — there is no slash command. Invoke it
+with the flags embedded in your message:
+```
+Run speckit-auto with --yolo on this requirement: "Your requirement"
+```
+
 ### Local Usage (Standalone)
 
 **Prerequisites**:
@@ -254,7 +273,7 @@ bash speckit-auto/run.sh "Your requirement here"
 }
 ```
 
-**User home config** (`~/.agents/skills/speckit-auto/.state/integration.json`):
+**User home config** (`<skill-dir>/.state/integration.json` — e.g. `~/.agents/skills/speckit-auto/` on Copilot):
 ```json
 {
   "integration": "superpowers"
@@ -273,7 +292,8 @@ skill speckit-auto --integration superpowers
 | Platform | Supported | Notes |
 |----------|-----------|-------|
 | GitHub Copilot CLI | ✅ Yes | Auto-discovered from `~/.agents/skills/` |
-| Claude Code | ✅ Yes | Skill invocation via Superpowers library |
+| Claude Code | ✅ Yes | Skill invocation via `~/.claude/skills/` |
+| OpenCode | ✅ Yes | `~/.config/opencode/skills/`; flags embedded in the trigger message |
 | Local Bash | ✅ Yes | Standalone shell scripts; requires .env for Jira |
 | GitHub Actions | ✅ Yes | Via github-speckit provider |
 | VS Code (local) | ✅ Yes | Via bash or Claude Code extension |
