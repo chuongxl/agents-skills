@@ -32,9 +32,10 @@ here; never suppress them.
 
 `speckit-code-review` must run **inline** (never as a background agent/task) and must always be
 given the spec path explicitly: `specs/<feature_folder>/spec.md` — an ambiguous match makes it ask
-the user, a turn-ending stop inside this NO-STOP ZONE. That spec is a `brainstorming` design
-document with no `FR-*`/`NFR-*` IDs; the review skill synthesizes the checklist itself, so never
-pre-convert the spec to add IDs.
+the user, a turn-ending stop inside this NO-STOP ZONE. On retry iterations, also pass the previous
+review's `state_file` path so the review runs in its selective area-loading mode. That spec is a
+`brainstorming` design document with no `FR-*`/`NFR-*` IDs; the review skill synthesizes the
+checklist itself, so never pre-convert the spec to add IDs.
 
 Never stop with a generic runtime/capability disclaimer before attempting the real call.
 

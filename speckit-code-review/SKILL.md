@@ -13,7 +13,7 @@ metadata:
   specification: agentskills.io/specification
   output_contract: strict-json
   author: Alex Nguyen
-  version: "0.0.2"
+  version: "0.0.3"
 ---
 
 # Speckit Code Review
@@ -35,6 +35,10 @@ Claude Code and OpenCode expose the same capabilities under their own names (`Ba
 - Review scope = current git change set (staged + unstaged, incl. renames/deletes). This is
   evaluated in the current working directory — when invoked from `speckit-auto`, the caller must
   run this skill inline from inside the Stage 01 linked worktree, never from the base checkout.
+- **Retry runs**: the `state_file` path from the previous failed review of the same feature
+  (supplied by the caller, e.g. speckit-auto Stage 03 re-entry, or the newest existing
+  `.speckit/review-<spec-id>-*/state.json`). Its presence switches area loading to the selective
+  mode below.
 
 ## Spec ID
 
@@ -85,12 +89,26 @@ testable requirements to the spec. Never return `pass` against an empty checklis
    | Architecture | [architecture.md](references/architecture.md) | `ARCH-*` |
    | Unit Test Coverage (last) | [unit-test-coverage.md](references/unit-test-coverage.md) | `TEST-*` |
 
+   **Area loading modes:**
+   - **First review** (no prior `state_file`): full pass over all five areas, serial load/discard.
+   - **Retry** (prior `state_file` exists): load **only** the area refs whose categories have
+     open (unresolved) findings in `state_file`; categories with no open findings carry their
+     prior verdicts forward from `state_file` — do not reload their refs. Recompute
+     `Business cover` from the checklist in `state_file`, re-checking only open `FR-*`/`NFR-*`
+     items now.
+   - **Test-runner skip**: before loading `unit-test-coverage.md`, probe for a test runner
+     (package.json `scripts.test`, `*.spec.*`/`*.test.*` files, `tests/`, `pytest.ini`/
+     `pyproject.toml [tool.pytest]`, `go.mod` + `*_test.go`, surefire in `pom.xml`, a `test`
+     target in `Makefile`). If none exists, report `unit-test-coverage: "N/A (no test runner
+     detected)"` without loading the ref.
+
 5. If guideline files were loaded in step 3, run the advanced pass (Step 5 of
    project-guidelines-review.md) and merge its findings into the standard results, tagging each with
    `guideline_source`.
 6. `Business cover = round(covered / total * 100)`.
-7. Write `state_file`, plus one detail file **per category that has issues**. Skip empty categories;
-   on `pass` write only `state_file`.
+7. Write `state_file` (each finding carries `status: open|resolved` so retry runs can carry
+   verified verdicts forward), plus one detail file **per category that has issues**. Skip empty
+   categories; on `pass` write only `state_file`.
 8. Build `fixes` from all findings ordered high → medium → low severity, then keep only the **top 3**
    inline. The rest live in `state_file` and the category detail files.
 9. `status` = `pass` only if `fixes` is empty **and** coverage ≥ 80% (or `N/A`) **and** the checklist

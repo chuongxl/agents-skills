@@ -64,7 +64,8 @@ Never launch as a background agent or task process — it must run inline and re
 
 Always pass the spec path explicitly: `specs/<issue_id>-<short_title>/spec.md` (or the manual-mode
 folder resolved in Stage 01). Never let the skill guess — an ambiguous match makes it ask the user,
-which is a turn-ending stop inside this NO-STOP ZONE.
+which is a turn-ending stop inside this NO-STOP ZONE. On retry iterations, also pass the previous
+review's `state_file` path so the review runs in its selective area-loading mode.
 
 ## Loop Algorithm (speckit-auto executes this — do not exit until DONE)
 
