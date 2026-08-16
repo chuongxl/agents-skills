@@ -8,6 +8,12 @@ Analysis basis: all 44 markdown files across the three skills (~226 KB total), t
 flow defined in `speckit-auto/SKILL.md` Entry Dispatch + Stage Router, and the github-speckit
 provider reference chain. Token estimates use ~4 chars/token for English prose + markdown.
 
+**Cost basis (Claude Sonnet 4.6, Anthropic list prices):** input $3.00/MTok, output $15.00/MTok,
+cache read $0.30/MTok. Frozen baseline cost figures live in
+[`docs/token-baseline-report.md`](token-baseline-report.md) — per-pass static instructions
+~$0.084; full run **$3.75–$13.50 uncached**, **$1.20–$5.70 with prompt caching**. Projected
+post-optimization costs and % savings are in §5 of this plan.
+
 ---
 
 ## 1. What Gets Loaded Per Run
@@ -103,27 +109,27 @@ Two distinct numbers matter:
 
 ### P1 — high impact, low risk
 
-| # | Change | Est. saving |
-|---|---|---|
-| 1 | **Deduplicate canonical rules.** One `global-rules.md` statement + one-line back-references from stage files (e.g. "Stage 03 no-stop rule: see global-rules.md #11"). | −25–35% instruction tokens (−6–8k/run) |
-| 2 | **Slim entry bundle.** Compress host-adaptation to a ~15-line table; inline provider resolution (3 lines) into SKILL.md; load install-recovery tables only on preflight failure. | −3k at entry |
-| 3 | **Stage-boundary compaction.** Persist run state + Project Context to `.speckit/run-state.json` (resume-marker mechanism already half-exists) and allow context compaction / fresh turn between stages; keep same-turn only within a stage. | Up to −50% cumulative billed tokens |
-| 4 | **speckit-code-review selective refs.** Load only the category ref matching the failure (extend the existing `detail_files` mechanism to review refs); skip unit-test-coverage ref when no test runner detected. | −1.5–2.5k per review iteration |
+| # | Change | Est. saving (tokens) | Est. cost saving | % saving (base) |
+|---|---|---|---|---|
+| 1 | **Deduplicate canonical rules.** One `global-rules.md` statement + one-line back-references from stage files (e.g. "Stage 03 no-stop rule: see global-rules.md #11"). | −6–8k/run instructions | −$0.018–0.024 per pass (compounds ×~30–60 calls uncached: −$0.54–1.44/run) | 21–29% of static instruction layer (~28k) |
+| 2 | **Slim entry bundle.** Compress host-adaptation to a ~15-line table; inline provider resolution (3 lines) into SKILL.md; load install-recovery tables only on preflight failure. | −3k at entry | −$0.009 per pass (−$0.27–0.54/run uncached) | ~40% of entry bundle (~7.2k) |
+| 3 | **Stage-boundary compaction.** Persist run state + Project Context to `.speckit/run-state.json` (resume-marker mechanism already half-exists) and allow context compaction / fresh turn between stages; keep same-turn only within a stage. | Up to −50% cumulative billed input (1M–3M → 0.5M–1.5M) | **Up to −$1.90–6.75 uncached / −$0.60–2.85 cached per run** | Up to 50% of total run cost |
+| 4 | **speckit-code-review selective refs.** Load only the category ref matching the failure (extend the existing `detail_files` mechanism to review refs); skip unit-test-coverage ref when no test runner detected. | −1.5–2.5k per review iteration | −$0.0045–0.0075 per iteration (−$0.01–0.03/run at 2–4 iterations) | 55–93% of area-ref layer (~2.7k) |
 
 ### P2 — medium impact
 
-| # | Change | Est. saving |
-|---|---|---|
-| 5 | **jira-to-speckit scripted fetch.** Fetch via `curl` + `jq` writing the snapshot straight to disk; model reads only bounded summary/description fields, never raw JSON. | −1k–3k per Jira run |
-| 6 | **R5 scoped regeneration.** Regenerate only the affected package/slice (reuse partitioning machinery unconditionally), not the whole plan/tasks chain. | −8k–20k per FR/ARCH fix iteration |
-| 7 | **Artifact digest.** Maintain a ≤500-token spec digest for prompt wiring instead of re-sending full spec.md + plan.md to every `speckit.*` stage. | −2k–6k per stage invocation |
+| # | Change | Est. saving (tokens) | Est. cost saving | % saving (base) |
+|---|---|---|---|---|
+| 5 | **jira-to-speckit scripted fetch.** Fetch via `curl` + `jq` writing the snapshot straight to disk; model reads only bounded summary/description fields, never raw JSON. | −1–3k per Jira run | −$0.003–0.009 per pass (compounds uncached) | up to ~100% of raw-payload tool result |
+| 6 | **R5 scoped regeneration.** Regenerate only the affected package/slice (reuse partitioning machinery unconditionally), not the whole plan/tasks chain. | −8–20k per FR/ARCH fix iteration | −$0.024–0.06 per iteration | 60–90% of regeneration cost per iteration |
+| 7 | **Artifact digest.** Maintain a ≤500-token spec digest for prompt wiring instead of re-sending full spec.md + plan.md to every `speckit.*` stage. | −2–6k per stage invocation (−16–48k/run at 8 invocations) | −$0.05–0.14/run | ~70–90% of artifact re-send volume |
 
 ### P3 — polish
 
-| # | Change | Est. saving |
-|---|---|---|
-| 8 | Trim the three frontmatter `description` fields to ~2 lines each. | ~160 tok × 3 skills, permanent, every session |
-| 9 | Add per-stage token/char accounting to the execution report so future tuning is measurable. | observability |
+| # | Change | Est. saving (tokens) | Est. cost saving | % saving (base) |
+|---|---|---|---|---|
+| 8 | Trim the three frontmatter `description` fields to ~2 lines each. | ~−360 tok permanent | −$0.001 per session | ~75% of description overhead (~480 tok) |
+| 9 | Add per-stage token/char accounting to the execution report so future tuning is measurable. | observability | enables measured % reporting | — |
 
 ### Constraints for implementation
 
@@ -136,7 +142,29 @@ Two distinct numbers matter:
 
 ---
 
-## 5. Proposed Execution Order (after confirmation)
+## 5. Projected Cost After Optimization (Claude Sonnet 4.6 list prices)
+
+Estimates assume all P1 items land; P2 adds further reduction on top (not stacked into the
+projection below except where noted). Ranges keep the baseline run profile (medium feature,
+2–3 review iterations, 30–60 tool calls).
+
+| Layer | Baseline | Projected after P1 (+P2 where noted) | Δ | % saving |
+|---|---|---|---|---|
+| Static instructions, per pass | ~28k tok / ~$0.084 | ~17–19k tok / ~$0.051–0.057 (P1-1+2+4) | −$0.027–0.033 | **−32–39%** |
+| Entry bundle, per pass | ~7.2k tok / ~$0.022 | ~4.2k tok / ~$0.013 | −$0.009 | **~−40%** |
+| Full run — uncached | $3.75–13.50 | $1.90–8.10 (P1-3 midpoint ~−40–50%, plus P1-1/2 compounding) | −$1.85–5.40 | **−40–50%** |
+| Full run — with prompt caching | $1.20–5.70 | $0.70–3.50 | −$0.50–2.20 | **−35–45%** |
+| With P2-6 + P2-7 also landed (runs that hit FR/ARCH fixes) | — | additional −$0.07–0.20/run typical | extra −3–6% of run cost | — |
+
+Rules of thumb: instruction-layer savings (P1-1/2/4, P2-7) mostly protect the uncached and
+first-call bill plus cache-write volume; transcript-shape savings (P1-3, P2-6) are the only ones
+that also shrink the cached-run bill materially. All figures are projections — measured results
+replace them via the comparison procedure in
+[`test-case/speckit-auto/token-optimization-test-cases.md`](../test-case/speckit-auto/token-optimization-test-cases.md).
+
+---
+
+## 6. Proposed Execution Order (after confirmation)
 
 1. P1-1, P1-2 (pure prose dedup — no semantic change)
 2. P1-4 (code-review selective refs — local to one skill)

@@ -163,26 +163,30 @@ cache read $0.30/MTok. Cost cells = input tokens × $3.00/MTok (chars/4 ≈ toke
 
 ## Static (section A)
 
-| Metric | Baseline | Baseline cost | Optimized | Optimized cost | Δ cost | Target (report §6) | Met? |
-|---|---|---|---|---|---|---|---|
-| Primary manifest total (chars/tok) | 108,720 / ~27.2k | ~$0.082 | | | | | |
-| Entry bundle (chars/tok) | 28,690 / ~7.2k | ~$0.022 | | | | | |
-| All-skill .md census (chars) | 225,875 | ~$0.17 | | | | | |
-| Frontmatter descriptions (chars/tok) | ~1,930 / ~480 | ~$0.0014 | | | | | |
-| Duplication spot-check (lines) | 44 | — | | | | | |
-| speckit-code-review area refs per iteration | 5 | ~$0.0081 | | | | | |
+| Metric | Baseline | Baseline cost | Optimized | Optimized cost | Δ cost | Δ % | Target (report §6) | Met? |
+|---|---|---|---|---|---|---|---|---|
+| Primary manifest total (chars/tok) | 108,720 / ~27.2k | ~$0.082 | | | | | | |
+| Entry bundle (chars/tok) | 28,690 / ~7.2k | ~$0.022 | | | | | | |
+| All-skill .md census (chars) | 225,875 | ~$0.17 | | | | | | |
+| Frontmatter descriptions (chars/tok) | ~1,930 / ~480 | ~$0.0014 | | | | | | |
+| Duplication spot-check (lines) | 44 | — | | | — | | | |
+| speckit-code-review area refs per iteration | 5 | ~$0.0081 | | | | | | |
 
 ## Dynamic (section B, controlled run)
 
-| Metric | Baseline | Optimized | Δ |
-|---|---|---|---|
-| Tool calls (total / per stage) | | | |
-| Review-loop iterations | | | |
-| Peak context (est. or reported) | | | |
-| Billed input tokens (if reported by host) | | | |
-| **Est. input cost** ($3.00/MTok) | | | |
-| **Est. output cost** (output tok × $15.00/MTok) | | | |
-| **Est. total cost per run** | | | |
+| Metric | Baseline | Optimized | Δ | Δ % |
+|---|---|---|---|---|
+| Tool calls (total / per stage) | | | | |
+| Review-loop iterations | | | | |
+| Peak context (est. or reported) | | | | |
+| Billed input tokens (if reported by host) | | | | |
+| **Est. input cost** ($3.00/MTok) | | | | |
+| **Est. output cost** (output tok × $15.00/MTok) | | | | |
+| **Est. total cost per run** | | | | |
+
+Compare Δ % against the projections in
+[`docs/token-optimization-plan.md`](../../docs/token-optimization-plan.md) §5
+(−40–50% uncached run cost, −35–45% cached, −32–39% static instructions).
 
 ## Behavioral
 
