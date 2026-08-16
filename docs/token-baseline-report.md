@@ -12,65 +12,88 @@ against both this baseline commit and the optimized commit, then filling the com
 Conversion basis: ~4 chars/token (English prose + markdown). Dynamic figures are estimates from
 instruction analysis, not instrumented counts — the test case defines how to refine them.
 
+**Cost basis (Anthropic list pricing, Claude Sonnet 4.6):** input **$3.00 / MTok**, output
+**$15.00 / MTok**, cached input read **$0.30 / MTok** (10% of input), cache write 1.25× for 5 min.
+All cost figures below are **input-token costs** unless stated otherwise; output cost is covered
+in §3. If Anthropic publishes different Sonnet 4.6 rates, rescale every cost cell linearly.
+
 ---
 
 ## 1. Static Skill Instruction Load Per Run
 
 ### 1.1 github-speckit provider, `--issue` mode, default mode (primary scenario)
 
-| Load point | File | chars | ~tokens |
-|---|---|---|---|
-| Entry | `speckit-auto/SKILL.md` | 8,891 | 2,200 |
-| Entry | `references/shared/host-adaptation.md` | 5,224 | 1,300 |
-| Entry | `references/integration-mode.md` | 4,048 | 1,000 |
-| Entry | `references/shared/global-rules.md` | 8,120 | 2,000 |
-| Entry | `references/github-speckit/provider-rules.md` | 2,407 | 600 |
-| Stage 01 | `references/github-speckit/stage-01-preflight-intake.md` | 5,437 | 1,350 |
-| Stage 01 | `references/shared/branching.md` | 4,416 | 1,100 |
-| Stage 01 | `references/shared/intake.md` | 8,085 | 2,000 |
-| Stage 01 | `references/shared/preflight-guidelines-context.md` | 4,432 | 1,100 |
-| Stage 01 | `references/shared/scratch-hygiene.md` | 1,174 | 300 |
-| Stage 01 | `references/shared/execution-report.md` | 1,356 | 350 |
-| Stage 02 | `references/github-speckit/stage-02-spec-design-flow.md` | 7,158 | 1,800 |
-| Stage 02 | `references/github-speckit/review-interview.md` | 2,891 | 720 |
-| Stage 03 | `references/github-speckit/stage-03-implement-and-code-review-loop.md` | 8,854 | 2,200 |
-| Stage 04+06 | `stage-04` + `stage-06` + `references/shared/commit.md` | 5,707 | 1,430 |
-| **Subtotal** | | **77,580** | **~19,400** |
+| Load point | File | chars | ~tokens | ~cost (input) |
+|---|---|---|---|---|
+| Entry | `speckit-auto/SKILL.md` | 8,891 | 2,200 | $0.0066 |
+| Entry | `references/shared/host-adaptation.md` | 5,224 | 1,300 | $0.0039 |
+| Entry | `references/integration-mode.md` | 4,048 | 1,000 | $0.0030 |
+| Entry | `references/shared/global-rules.md` | 8,120 | 2,000 | $0.0060 |
+| Entry | `references/github-speckit/provider-rules.md` | 2,407 | 600 | $0.0018 |
+| Stage 01 | `references/github-speckit/stage-01-preflight-intake.md` | 5,437 | 1,350 | $0.0041 |
+| Stage 01 | `references/shared/branching.md` | 4,416 | 1,100 | $0.0033 |
+| Stage 01 | `references/shared/intake.md` | 8,085 | 2,000 | $0.0060 |
+| Stage 01 | `references/shared/preflight-guidelines-context.md` | 4,432 | 1,100 | $0.0033 |
+| Stage 01 | `references/shared/scratch-hygiene.md` | 1,174 | 300 | $0.0009 |
+| Stage 01 | `references/shared/execution-report.md` | 1,356 | 350 | $0.0011 |
+| Stage 02 | `references/github-speckit/stage-02-spec-design-flow.md` | 7,158 | 1,800 | $0.0054 |
+| Stage 02 | `references/github-speckit/review-interview.md` | 2,891 | 720 | $0.0022 |
+| Stage 03 | `references/github-speckit/stage-03-implement-and-code-review-loop.md` | 8,854 | 2,200 | $0.0066 |
+| Stage 04+06 | `stage-04` + `stage-06` + `references/shared/commit.md` | 5,707 | 1,430 | $0.0043 |
+| **Subtotal** | | **77,580** | **~19,400** | **~$0.058** |
 
 ### 1.2 Sub-skill instructions
 
-| Skill | Load | chars | ~tokens |
-|---|---|---|---|
-| `jira-to-speckit` | `SKILL.md` (+ `references/JIRA_API.md` 2,280 on fallback only) | 11,551 | ~2,900 |
-| `speckit-code-review` | `SKILL.md` | 8,043 | ~2,000 |
-| `speckit-code-review` | 5 area refs, serial load/discard | 10,926 | ~2,700 |
-| **Subtotal** | | | **~9,100** |
+| Skill | Load | chars | ~tokens | ~cost (input) |
+|---|---|---|---|---|
+| `jira-to-speckit` | `SKILL.md` (+ `references/JIRA_API.md` 2,280 on fallback only) | 11,551 | ~2,900 | ~$0.0087 |
+| `speckit-code-review` | `SKILL.md` | 8,043 | ~2,000 | ~$0.0060 |
+| `speckit-code-review` | 5 area refs, serial load/discard | 10,926 | ~2,700 | ~$0.0081 |
+| **Subtotal** | | | **~9,100** | **~$0.027** |
 
 ### 1.3 Baseline totals by variant
 
-| Variant | Static instruction tokens |
-|---|---|
-| github-speckit, `--issue`, default (primary) | **~28k** |
-| superpowers provider refs (~96k chars) + sub-skills | **~33k** |
-| Manual mode (no `--issue`) | ~25k (saves ~3.3k) |
+| Variant | Static instruction tokens | ~cost (input, per pass) |
+|---|---|---|
+| github-speckit, `--issue`, default (primary) | **~28k** | **~$0.084** |
+| superpowers provider refs (~96k chars) + sub-skills | **~33k** | ~$0.099 |
+| Manual mode (no `--issue`) | ~25k (saves ~3.3k) | ~$0.075 |
+
+Note: this is the one-pass cost of the instructions. Because the transcript is re-sent on every
+call, instructions actually bill once per subsequent API call — the multiplier is what §3 captures.
 
 ## 2. Dynamic Runtime Content (estimates)
 
-| Source | Est. per occurrence |
-|---|---|
-| Raw Jira payload in tool result (input cap 12k chars) | 1k–3k |
-| Compact brief (cap 2.5k chars) | ~600 |
-| spec.md / plan.md / tasks.md written + re-read across stages | 3k–15k per artifact set |
-| Repo-installed `speckit.*` stage skills (8 invocations) | 9k–15k |
-| Code reads/edits in Stage 03 + fix iterations | 20k–60k+ |
-| speckit-code-review iteration (diff + spec + refs) | 5k–20k; ×2–4 iterations |
-| Interview round-trips (default mode) | 1k–2k each |
+| Source | Est. per occurrence | ~cost (input) per occurrence |
+|---|---|---|
+| Raw Jira payload in tool result (input cap 12k chars) | 1k–3k | $0.003–$0.009 |
+| Compact brief (cap 2.5k chars) | ~600 | ~$0.0018 |
+| spec.md / plan.md / tasks.md written + re-read across stages | 3k–15k per artifact set | $0.009–$0.045 |
+| Repo-installed `speckit.*` stage skills (8 invocations) | 9k–15k | $0.027–$0.045 |
+| Code reads/edits in Stage 03 + fix iterations | 20k–60k+ | $0.06–$0.18 |
+| speckit-code-review iteration (diff + spec + refs) | 5k–20k; ×2–4 iterations | $0.015–$0.06 each |
+| Interview round-trips (default mode) | 1k–2k each | $0.003–$0.006 each |
 
-## 3. Run-Level Totals (estimates)
+## 3. Run-Level Totals and Cost (estimates)
+
+Token totals:
 
 - **Peak context footprint:** ~45k–120k tokens (medium feature, 2–3 review iterations).
 - **Cumulative billed input tokens** (same-turn mandate, ~30–60 tool calls): **1M–3M** uncached;
   ~150k–400k effective with prompt caching.
+
+Estimated cost per full run (Claude Sonnet 4.6, Anthropic list prices):
+
+| Scenario | Input tok | Input cost | Output tok (est. 5–15% of input) | Output cost | **Total** |
+|---|---|---|---|---|---|
+| Uncached, low end (1M in / 50k out) | 1M | $3.00 | 50k | $0.75 | **$3.75** |
+| Uncached, high end (3M in / 300k out) | 3M | $9.00 | 300k | $4.50 | **$13.50** |
+| With prompt caching (150k–400k effective in) | 150k–400k | $0.45–$1.20 | 50k–300k | $0.75–$4.50 | **$1.20–$5.70** |
+
+Caching assumptions: growing transcript prefix served as cache reads at $0.30/MTok plus cache
+writes at 1.25×; output is never cached. Static instructions (~28k tok) are the most cache-stable
+part of the prefix — which is why shrinking them mainly helps the uncached and first-call costs,
+while §3-style stage-boundary compaction is what shrinks the cached bill too.
 
 ## 4. Key Findings (inefficiencies targeted by the plan)
 

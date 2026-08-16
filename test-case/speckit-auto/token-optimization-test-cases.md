@@ -158,16 +158,19 @@ from re-running section A/B on the stated commits.
 
 Baseline commit: <sha>   Optimized commit: <sha>   Date: <date>
 
+Cost basis: Claude Sonnet 4.6, Anthropic list prices — input $3.00/MTok, output $15.00/MTok,
+cache read $0.30/MTok. Cost cells = input tokens × $3.00/MTok (chars/4 ≈ tokens).
+
 ## Static (section A)
 
-| Metric | Baseline | Optimized | Δ | Target (report §6) | Met? |
-|---|---|---|---|---|---|
-| Primary manifest total (chars/tok) | 108,720 / ~27.2k | | | | |
-| Entry bundle (chars/tok) | 28,690 / ~7.2k | | | | |
-| All-skill .md census (chars) | 225,875 | | | | |
-| Frontmatter descriptions (chars/tok) | ~1,930 / ~480 | | | | |
-| Duplication spot-check (lines) | 44 | | | | |
-| speckit-code-review area refs per iteration | 5 | | | | |
+| Metric | Baseline | Baseline cost | Optimized | Optimized cost | Δ cost | Target (report §6) | Met? |
+|---|---|---|---|---|---|---|---|
+| Primary manifest total (chars/tok) | 108,720 / ~27.2k | ~$0.082 | | | | | |
+| Entry bundle (chars/tok) | 28,690 / ~7.2k | ~$0.022 | | | | | |
+| All-skill .md census (chars) | 225,875 | ~$0.17 | | | | | |
+| Frontmatter descriptions (chars/tok) | ~1,930 / ~480 | ~$0.0014 | | | | | |
+| Duplication spot-check (lines) | 44 | — | | | | | |
+| speckit-code-review area refs per iteration | 5 | ~$0.0081 | | | | | |
 
 ## Dynamic (section B, controlled run)
 
@@ -176,7 +179,10 @@ Baseline commit: <sha>   Optimized commit: <sha>   Date: <date>
 | Tool calls (total / per stage) | | | |
 | Review-loop iterations | | | |
 | Peak context (est. or reported) | | | |
-| Billed usage (if reported by host) | | | |
+| Billed input tokens (if reported by host) | | | |
+| **Est. input cost** ($3.00/MTok) | | | |
+| **Est. output cost** (output tok × $15.00/MTok) | | | |
+| **Est. total cost per run** | | | |
 
 ## Behavioral
 
