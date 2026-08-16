@@ -32,9 +32,9 @@ data and immediately invoke the next required step, in the same turn.
 
 ## Non-Negotiable Rules
 
-1. Always create/switch a new branch before the first pipeline step — a hard gate via real git commands (not merely described); no framework source check, install, intake, or provider stage call may run first. See [branching.md](branching.md).
+1. Always create/switch a linked git worktree with the working branch before the first pipeline step — a hard gate via real git commands (not merely described); no framework source check, install, intake, or provider stage call may run first. See [branching.md](branching.md).
 2. Base branch priority is `develop → main → master` (local first, then remote-tracking). Sync that base to latest before branching off it — for the main repo and for any modified submodule. The sync is best-effort: a fetch/pull failure logs a warning and continues from the local copy, and is never a stop. See [branching.md](branching.md).
-3. Git worktrees are never used, in any provider. This is the canonical statement of that rule.
+3. Pipeline execution always runs inside the Stage 01 linked git worktree; never run implementation stages from the base checkout path.
 4. In `--issue` mode, the lowercase Jira issue key is the artifact id prefix and must stay stable across reruns. See [intake.md](intake.md).
 4a. **In `--issue` mode the ticket must be persisted as `ticket.md` in the feature's artifact folder** and committed with the other artifacts, so spec/plan decisions can be traced back to the original request. Spec and plan remain the source of truth for *what gets built*; `ticket.md` is the record of *what was asked*. It is written by `jira-to-speckit` to a staging path and relocated once the artifact folder exists; it is never read back into run context wholesale. See [intake.md](intake.md).
 5. Stage 01 intake has **no interview gate**. After input is collected, continue immediately to the provider's Stage 02 entry step.

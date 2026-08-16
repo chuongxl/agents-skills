@@ -63,15 +63,11 @@ subagents dispatched from inside a superpowers skill.
    provider, and no superpowers slash command or agent exists.
 2. If the superpowers skills are not available, Stage 01 runs install recovery (ask `Install` /
    `Stop`, then install and re-check). See Stage 01.
-3. `superpowers:using-git-worktrees` is **never used**. Branching follows
-   [../shared/branching.md](../shared/branching.md) — plain branch off `develop → main → master`.
-   **The Stage 01 branch IS the isolated workspace.** `subagent-driven-development` opens with
-   "ensure the work happens in an isolated workspace: use `superpowers:using-git-worktrees` to
-   create one **or verify the existing one**" — the verify arm is what applies here, and it is
-   already satisfied by the checked-out Stage 01 branch. State that to the skill, do not create a
-   worktree, and never stop to ask which workspace to use. The same skill's "never start
-   implementation on main/master without consent" is satisfied for the same reason: the pipeline
-   never implements on a base branch.
+3. Stage 01 in [../shared/branching.md](../shared/branching.md) is authoritative for isolation: it
+   creates/reuses a linked git worktree and checks out the working branch there before any provider
+   action. `subagent-driven-development`'s "create or verify isolated workspace" requirement is
+   satisfied by that Stage 01 worktree. Do not create a second/nested worktree in later stages, and
+   never stop to ask which workspace to use.
 4. `superpowers:finishing-a-development-branch` is **not** used for branch lifecycle or worktree
    cleanup. It may only be used at Stage 04/05 to open a PR, and only after the pipeline's own
    commit rules have run.
