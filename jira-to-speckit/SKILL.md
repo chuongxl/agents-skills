@@ -22,6 +22,10 @@ review loops, never performs git operations, and never tracks an execution repor
 owned by the caller (`speckit-auto`'s shared intake reference and its provider
 `stage-01-preflight-intake.md` files).
 
+Portability note: `allowed-tools` uses GitHub Copilot-style names (`bash view create`). Claude Code
+and OpenCode expose the same capabilities under their own names (`Bash`, `Read`, `Write`). The
+workflow below is identical on all three hosts.
+
 ## What This Skill Does
 
 - Reads Jira issue content from a Jira issue key or URL.

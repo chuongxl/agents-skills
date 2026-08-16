@@ -8,8 +8,7 @@ description: |
   remediation loops until pass, then commit and completion.
   Use --integration <github-speckit|superpowers> to set the provider (setup only, no pipeline).
   Use --yolo for zero-human-in-the-loop fully automated execution.
-compatibility:
-  github-copilot: "Skill auto-discovered from ~/.agents/skills/. Invoked via skill tool."
+compatibility: "Runs on GitHub Copilot, Claude Code, and OpenCode. Discovered from ~/.agents/skills/, ~/.claude/skills/, or ~/.config/opencode/skills/. Requires git and bash; network access for Jira intake via --issue. Providers: github-speckit (Copilot/Claude/OpenCode) or superpowers."
 license: MIT
 allowed-tools: bash glob grep view create edit skill
 metadata:
@@ -36,21 +35,26 @@ made yet — make it now.
 ## Entry Dispatch (Do This First, Every Invocation)
 
 ```
-1. Parse the command:
+1. Load references/shared/host-adaptation.md once per run. Detect the host agent
+   (GitHub Copilot, Claude Code, or OpenCode) from the tool surface and the skill directory this
+   file was discovered from. The host is fixed for the whole run.
+
+2. Parse the invocation text (slash-command body on Copilot/Claude Code, or the natural-language
+   message that triggered this skill on OpenCode — flags may be embedded anywhere in the text):
      --integration <value>   → setup intent
      --issue <url>           → Jira pipeline intent
      --yolo                  → mode = yolo (else mode = default)
      free text               → requirement pipeline intent
 
-2. IF --integration is present:
+3. IF --integration is present:
      → load references/integration-setup.md
      → perform SETUP ONLY: normalize, validate, persist, report
      → END TURN (this is the one legitimate no-pipeline turn end)
 
-3. ELSE (pipeline intent):
+4. ELSE (pipeline intent):
      → load references/integration-mode.md
      → resolve provider: repo-local .speckit/integration.json
-                       → global ~/.agents/skills/speckit-auto/.state/integration.json
+                       → global <skill-dir>/.state/integration.json
                        → First-Run Selection (ask once, persist, continue same turn)
      → record `integration` in run state (resolved once, never changes mid-run)
      → load references/shared/global-rules.md
@@ -58,9 +62,10 @@ made yet — make it now.
      → enter Stage 01 of the resolved provider IMMEDIATELY, in this same turn
 ```
 
-Never return an acknowledgement-only response. If this skill is already loaded mid-run (a turn
-contains `<skill-context name="speckit-auto">`), resume from the current stage using available run
-context — never block asking the user to re-run `/speckit-auto`.
+Never return an acknowledgement-only response. If this skill is already loaded mid-run (the resume
+marker varies per host: `<skill-context name="speckit-auto">` on Claude Code, the `<available_skills>`
+block on OpenCode, the skill tool list on Copilot), resume from the current stage using available run
+context — never block asking the user to re-run the skill.
 
 ## Providers + Stage Router (Load On Demand)
 
@@ -87,6 +92,7 @@ Shared references, loaded by every provider:
 | File | Used at |
 |------|---------|
 | [references/shared/global-rules.md](references/shared/global-rules.md) | whole run |
+| [references/shared/host-adaptation.md](references/shared/host-adaptation.md) | entry dispatch, every run |
 | [references/shared/branching.md](references/shared/branching.md) | Stage 01 gate, Stage 03 submodules |
 | [references/shared/intake.md](references/shared/intake.md) | Stage 01 |
 | [references/shared/preflight-guidelines-context.md](references/shared/preflight-guidelines-context.md) | Stage 01 |
@@ -102,6 +108,15 @@ Discard Stage 02 files (and any interview reference) at Stage 03 entry.
 Canonical list: [references/shared/global-rules.md](references/shared/global-rules.md) — load it
 once at the start of every pipeline run. The selected provider's `provider-rules.md` adds
 provider-specific rules on top; it may never weaken a shared rule.
+
+## Portability Note (Tool Names Vary Per Agent)
+
+This skill's `allowed-tools` uses GitHub Copilot-style tool names (`bash glob grep view create edit skill`).
+Claude Code and OpenCode expose the same capabilities under their own names (`Bash`, `Read`, `Edit`,
+`Write`, `Glob`, `Grep`, `skill`). See
+[references/shared/host-adaptation.md](references/shared/host-adaptation.md) for the per-host tool
+map, skill-directory, and invocation-channel differences. Never refuse to act because a tool is named
+differently than in `allowed-tools` — the capabilities are equivalent across all three hosts.
 
 ## Required Inputs
 

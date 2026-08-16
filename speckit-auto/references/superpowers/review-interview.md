@@ -51,7 +51,8 @@ The Interview Flow below applies to:
 4. Constraint detail (only if constraints exist)
    - Ask: "List the constraints to enforce."
 
-Ask one question at a time via `ask_user`.
+Ask one question at a time via the host's ask tool (`ask_user` on Copilot, `question` on OpenCode,
+`AskUser` on Claude Code).
 
 ## Decision Logic
 

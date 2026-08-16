@@ -170,7 +170,8 @@ Reaching the end of Stage 02 is **never** a stop condition on its own.
 the routine post-`writing-plans` interview is folded into it, so never ask both back-to-back,
 and never add a follow-up question after `Start implementation`.
 
-1. Ask via `ask_user`: "Stage 02 complete (design spec + plan). Start implementation (Stage 03)?"
+1. Ask via the host's ask tool (`ask_user` on Copilot, `question` on OpenCode, `AskUser` on Claude
+   Code): "Stage 02 complete (design spec + plan). Start implementation (Stage 03)?"
    Choices: `Start implementation`, `Request changes`.
 2. `Start implementation` → discard Stage 02 files and `review-interview.md` from context and
    invoke [stage-03-implement-and-code-review-loop.md](stage-03-implement-and-code-review-loop.md)

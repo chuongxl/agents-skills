@@ -16,11 +16,19 @@ Also load: [review-interview.md](review-interview.md) (default mode only; discar
 
 ## Invocation Method (Critical)
 
-Call stages directly via repo-installed slash commands (`/speckit.specify`, `/speckit.clarify`,
-`/speckit.plan`, `/speckit.checklist`, `/speckit.tasks`, `/speckit.analyze`) —
-`stage_invocation_mode` is always `slash-agent`; never attempt `task` with a `speckit.*` agent_type.
+Call stages directly via the resolved host channel (see
+[../shared/host-adaptation.md](../shared/host-adaptation.md)):
 
-Never emit a capability disclaimer before attempting these — call the slash command now (SKILL.md premise applies here too).
+- **GitHub Copilot / Claude Code** — repo slash commands (`/speckit.specify`, `/speckit.clarify`,
+  `/speckit.plan`, `/speckit.checklist`, `/speckit.tasks`, `/speckit.analyze`) —
+  `stage_invocation_mode` is `slash-agent`.
+- **OpenCode** — the `skill` tool by each stage's resolved skill name (`speckit.specify`, …);
+  OpenCode has no skill slash commands.
+
+Never attempt `task` with a `speckit.*` agent_type on any host.
+
+Never emit a capability disclaimer before attempting these — make the stage invocation now
+(SKILL.md premise applies here too).
 
 ## Prompt Wiring Rules
 
@@ -109,7 +117,8 @@ Reaching the end of Stage 02 is **never** a stop condition on its own.
 **Default mode** — one confirmation, and only this one. Never add a follow-up question after
 `Start implementation`:
 
-1. Ask via `ask_user`: "Stage 02 complete (spec, plan, tasks, analyze). Start implementation
+1. Ask via the host's ask tool (`ask_user` on Copilot, `question` on OpenCode, `AskUser` on Claude
+   Code): "Stage 02 complete (spec, plan, tasks, analyze). Start implementation
    (Stage 03)?" Choices: `Start implementation`, `Request changes`.
 2. `Start implementation` → discard Stage 02 files and `review-interview.md` from context and
    invoke [stage-03-implement-and-code-review-loop.md](stage-03-implement-and-code-review-loop.md)

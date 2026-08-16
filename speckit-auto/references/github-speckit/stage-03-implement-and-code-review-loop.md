@@ -18,10 +18,12 @@ fields to those sub-skills so workspace assignment and architecture compliance a
 
 ## Invocation Method (Critical)
 
-- `speckit.implement` and `speckit.converge`: call directly via repo-installed slash commands
-  (`/speckit.implement`, `/speckit.converge`) — `stage_invocation_mode` is always `slash-agent`;
-  never attempt `task` with a `speckit.*` agent_type.
-- `speckit-code-review`: invoke via the `skill` tool with name `speckit-code-review`.
+- `speckit.implement` and `speckit.converge`: call directly via the resolved host channel (see
+  [../shared/host-adaptation.md](../shared/host-adaptation.md)) — repo slash commands
+  (`/speckit.implement`, `/speckit.converge`) on Copilot and Claude Code
+  (`stage_invocation_mode` is `slash-agent`), or the `skill` tool by each stage's resolved skill name
+  on OpenCode. Never attempt `task` with a `speckit.*` agent_type on any host.
+- `speckit-code-review`: invoke via the `skill` tool with name `speckit-code-review` (all hosts).
 
 Never stop with a generic runtime/capability disclaimer before attempting the real call. Only stop
 if a concrete tool call fails with a quoted error message.

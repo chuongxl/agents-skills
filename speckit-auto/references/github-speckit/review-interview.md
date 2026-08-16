@@ -17,7 +17,8 @@ Stage 01 never asks intake interview questions. If requirement clarity is insuff
 
 1. Detect unclear areas in `speckit.specify` output (missing acceptance details, ambiguous scope,
    undefined constraints, unclear non-functional expectations).
-2. Ask clarification questions as popups (`ask_user`) — one question at a time.
+2. Ask clarification questions as popups (the host's ask tool: `ask_user` on Copilot,
+   `question` on OpenCode, `AskUser` on Claude Code) — one question at a time.
 3. Capture answers and append them as requirement clarifications.
 4. Rerun `speckit.specify` using the clarifications.
 5. Repeat until spec is clear enough to proceed, then continue to `speckit.clarify`.

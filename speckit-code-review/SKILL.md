@@ -6,8 +6,7 @@ description: |
   Produces strict JSON pass/fail with business coverage, missing requirements, code issues, security issues, architecture issues, and unit test coverage.
   Triggers: "speckit code review", "review with spec", "compare code to spec.md", "spec coverage audit",
   "invoke speckit-code-review", "run speckit-code-review".
-compatibility:
-  github-copilot: "Skill auto-discovered from ~/.agents/skills/. Invoked via skill tool."
+compatibility: Runs on GitHub Copilot, Claude Code, and OpenCode. Discovered from ~/.agents/skills/, ~/.claude/skills/, or ~/.config/opencode/skills/. Requires git, bash, and a spec at specs/<feature-folder>/spec.md.
 license: MIT
 allowed-tools: bash glob grep view create edit
 metadata:
@@ -24,6 +23,10 @@ The spec may come from `speckit.specify` (usually already has `FR-*`/`NFR-*` IDs
 `superpowers:brainstorming` (narrative design doc, usually no IDs) — both are reviewed identically.
 
 **Always run inline.** Never dispatch as a background task or sub-agent; the caller needs the JSON in-band.
+
+Portability note: `allowed-tools` uses GitHub Copilot-style names (`bash glob grep view create edit`).
+Claude Code and OpenCode expose the same capabilities under their own names (`Bash`, `Read`, `Edit`,
+`Write`, `Glob`, `Grep`). The review procedure below is identical on all three hosts.
 
 ## Inputs
 

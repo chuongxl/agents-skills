@@ -20,17 +20,20 @@ Verify the superpowers skills are invocable. Check in this order and stop at the
 
 1. Superpowers skills appear in this session's available-skills list (names may be surfaced as
    `superpowers:<name>` or bare `<name>`) — record which form is used and reuse it all run.
-2. The skills exist on disk. Probe both shapes before concluding it is missing
+2. The skills exist on disk. Probe the paths for the resolved host (see
+   [../shared/host-adaptation.md](../shared/host-adaptation.md)) before concluding it is missing
    (`<name>` = any skill from the minimum set below):
 
    | Install shape | Skills path |
    |---|---|
    | Repo-vendored (project-local) | `<repo-root>/.agents/skills/<name>/SKILL.md` |
-   | User-level skills dir | `~/.agents/skills/<name>/SKILL.md` |
+   | User-level skills dir (Copilot) | `~/.agents/skills/<name>/SKILL.md` |
    | Copilot CLI plugin | `~/.copilot/installed-plugins/<marketplace>/superpowers/skills/<name>/SKILL.md` |
+   | User-level skills dir (Claude Code) | `~/.claude/skills/<name>/SKILL.md`, `.claude/skills/<name>/SKILL.md` |
+   | User-level skills dir (OpenCode) | `~/.config/opencode/skills/<name>/SKILL.md`, `.opencode/skills/<name>/SKILL.md` |
 
-   Glob `<marketplace>` (typically `superpowers-marketplace`) rather than hardcoding it, and confirm
-   the plugin is enabled in `~/.copilot/settings.json` →
+   On Copilot, glob `<marketplace>` (typically `superpowers-marketplace`) rather than hardcoding it,
+   and confirm the plugin is enabled in `~/.copilot/settings.json` →
    `enabledPlugins["superpowers@superpowers-marketplace"]`. Record the resolved directory once and
    reuse it for the file-read fallback all run.
 3. Direct probe: invoke `using-superpowers` via the `skill` tool. If it returns content,
