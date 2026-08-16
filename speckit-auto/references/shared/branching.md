@@ -72,3 +72,33 @@ Apply only when the repo uses git submodules.
 
 Commit submodule changes first, then commit the parent repo pointer updates. Never commit the
 parent pointer before the submodule commit it points at exists.
+
+## Persist Run-State After Stage 01
+
+After Stage 01 completes (worktree linked, intake done, project context built, artifact folder
+created), save the run-state so later stages can resume without re-running Stage 01. This is
+mandatory even when the pipeline continues in the same turn — on stateless API hosts the
+transcript is cumulative but attention to earlier content degrades; the file is the authoritative
+resume point.
+
+Write to `<worktree_path>/.speckit/run-state.json` (mkdir -p first). The format and field
+definitions are in [run-state.md](run-state.md). At minimum, populate:
+
+- `worktree_path` — from the bootstrap script output or the resolved path
+- `current_stage: "stage-02"` — Stage 01 is done
+- `integration` — the resolved provider
+- `mode` — `"default"` or `"yolo"`
+- `project_context` — summary, repo_map, linked_guidelines, loaded_guidelines from Stage 01
+- `spec_path`, `plan_path`, `tasks_path`, `ticket_path`, `execution_report_path` — artifact paths
+  relative to the worktree root
+
+Persist call (single bash invocation):
+
+```bash
+mkdir -p <worktree_path>/.speckit && cat > <worktree_path>/.speckit/run-state.json << 'EOF'
+{ ... }
+EOF
+```
+
+Subsequent stages (02, 03) also persist run-state before declaring completion — see each
+stage file's "Persist run-state" step.

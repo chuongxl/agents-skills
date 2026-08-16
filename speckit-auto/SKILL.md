@@ -13,7 +13,7 @@ license: MIT
 allowed-tools: bash glob grep view create edit skill
 metadata:
   author: Alex Nguyen
-  version: "0.1.1"
+  version: "0.2.0"
 ---
 
 # Speckit Auto — Provider Factory
@@ -35,6 +35,15 @@ required tool call hasn't been made yet. Make it now.
 1. Load references/shared/host-adaptation.md once per run. Detect the host agent
    (GitHub Copilot, Claude Code, or OpenCode) from the tool surface and the skill directory this
    file was discovered from. The host is fixed for the whole run.
+
+1b. Check for an existing run-state (resume path):
+    - Run `git worktree list` and scan for a linked worktree.
+    - If a worktree exists AND <worktree_path>/.speckit/run-state.json exists:
+      → read the run-state, validate version (currently 1), confirm worktree_path matches
+      → load project_context, integration, mode from run-state (skip re-reading architecture.md)
+      → jump directly to the stage named in current_stage — load that provider's stage file
+        and continue. Do NOT re-run Stage 01 or ask the user for inputs.
+    - If no valid run-state: continue to step 2 (fresh start).
 
 2. Parse the invocation text (slash-command body on Copilot/Claude Code, or the natural-language
    message that triggered this skill on OpenCode — flags may be embedded anywhere in the text):
@@ -97,6 +106,7 @@ Shared references, loaded by every provider:
 | [references/shared/preflight-guidelines-context.md](references/shared/preflight-guidelines-context.md) | Stage 01 |
 | [references/shared/scratch-hygiene.md](references/shared/scratch-hygiene.md) | Stage 01 |
 | [references/shared/execution-report.md](references/shared/execution-report.md) | Stage 01 (`--issue` only) |
+| [references/shared/run-state.md](references/shared/run-state.md) | stage transitions, re-invocation resume |
 | [references/shared/partitioning.md](references/shared/partitioning.md) | Stage 02/03 when scope is large |
 | [references/shared/commit.md](references/shared/commit.md) | Stage 04/05 |
 

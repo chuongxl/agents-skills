@@ -50,6 +50,10 @@ the input for the next fix iteration.
 
 ## Mandatory Exit Routing from Stage 03
 
+**Persist run-state** before exiting: save to `<worktree_path>/.speckit/run-state.json` with
+`current_stage: "stage-04"` (default) or `"stage-05"` (yolo), `stage_03_completed_at` to now.
+Format: see [../shared/run-state.md](../shared/run-state.md).
+
 After the loop exits with `status = pass`, stage transition is deterministic:
 
 - If `--yolo` mode is enabled: jump to **Stage 05**.

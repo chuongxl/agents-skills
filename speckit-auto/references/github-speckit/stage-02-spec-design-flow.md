@@ -131,3 +131,12 @@ Reaching the end of Stage 02 is **never** a stop condition on its own.
 
 **`--yolo` mode** — skip the confirmation entirely. Once the self-review gate passes, enter
 Stage 03 immediately in the same turn.
+
+## Persist Run-State Before Stage Transition
+
+After the self-review gate passes and before (or immediately after) the Stage 03 entry step,
+save the run-state to `<worktree_path>/.speckit/run-state.json`:
+
+- Set `current_stage: "stage-03"` (about to enter) and `stage_02_completed_at` to now.
+- Update `spec_path`, `plan_path`, `tasks_path` if they changed during this stage.
+- Format: see [../shared/run-state.md](../shared/run-state.md).
