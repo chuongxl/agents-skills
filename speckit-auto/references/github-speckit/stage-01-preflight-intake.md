@@ -4,12 +4,12 @@ Provider: **github-speckit** — repo-installed GitHub Spec Kit agents.
 
 Load with this file:
 - [provider-rules.md](provider-rules.md) — provider-specific rules and invocation
-- [../shared/branching.md](../shared/branching.md) — branch gate (runs first)
+- [../shared/branching.md](../shared/branching.md) — worktree + branch gate (runs first)
 - [../shared/intake.md](../shared/intake.md) — issue resolution, run state, Jira intake
 - [../shared/preflight-guidelines-context.md](../shared/preflight-guidelines-context.md) — project context
 
 Execution order for this stage:
-**branch setup (shared) → Speckit source check → install recovery if missing → guidelines load →
+**worktree + branch setup (shared) → Speckit source check → install recovery if missing → guidelines load →
 intake (shared) → artifact path → Stage 02 entry (`speckit.specify`, also the executability proof).**
 
 Only the Speckit-specific steps are described below; everything else lives in the shared files.

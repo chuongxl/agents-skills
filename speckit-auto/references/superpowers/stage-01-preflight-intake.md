@@ -4,12 +4,12 @@ Provider: **superpowers** — the `obra/superpowers` skills library.
 
 Load with this file:
 - [provider-rules.md](provider-rules.md) — skill names, invocation precedence, provider rules
-- [../shared/branching.md](../shared/branching.md) — branch gate (runs first)
+- [../shared/branching.md](../shared/branching.md) — worktree + branch gate (runs first)
 - [../shared/intake.md](../shared/intake.md) — issue resolution, run state, Jira intake
 - [../shared/preflight-guidelines-context.md](../shared/preflight-guidelines-context.md) — project context
 
 Execution order for this stage:
-**branch setup (shared) → superpowers availability check → install recovery if missing →
+**worktree + branch setup (shared) → superpowers availability check → install recovery if missing →
 bootstrap → guidelines load → intake (shared) → artifact paths → Stage 02.**
 
 Only the superpowers-specific steps are described below; everything else lives in the shared files.
@@ -79,11 +79,10 @@ and `.superpowers/` are produced in this provider.
 Load [../shared/preflight-guidelines-context.md](../shared/preflight-guidelines-context.md).
 If `docs/guidelines/` or `architecture.md` is missing, skip and continue — never a stop.
 
-## Worktrees Are Skipped (Critical)
+## Worktree Handling (Critical)
 
-`using-git-worktrees` is **not** invoked — the branch from
-[../shared/branching.md](../shared/branching.md) is the working branch for the whole run. See
-global rule 3 and [provider-rules.md](provider-rules.md) rule 3.
+The Stage 01 gate in [../shared/branching.md](../shared/branching.md) already creates/reuses the
+linked worktree. Do not invoke `using-git-worktrees` again inside this provider stage.
 
 ## Artifact Paths (`specs/` Layout — Same Place as Spec Kit Output)
 

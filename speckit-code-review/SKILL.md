@@ -32,7 +32,9 @@ Claude Code and OpenCode expose the same capabilities under their own names (`Ba
 
 - `spec.md` for the target feature. If no path is given, resolve from `specs/*/spec.md` using the
   current branch name or changed files; ask the user only if still ambiguous.
-- Review scope = current git change set (staged + unstaged, incl. renames/deletes).
+- Review scope = current git change set (staged + unstaged, incl. renames/deletes). This is
+  evaluated in the current working directory — when invoked from `speckit-auto`, the caller must
+  run this skill inline from inside the Stage 01 linked worktree, never from the base checkout.
 
 ## Spec ID
 

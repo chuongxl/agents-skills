@@ -1,8 +1,8 @@
-# Shared: Branching (Provider-Agnostic)
+# Shared: Branching + Worktree (Provider-Agnostic)
 
 Applies identically to every provider. Loaded by Stage 01 of all providers.
 
-## Preflight Branch Setup
+## Preflight Worktree + Branch Setup
 
 **Mandatory gate — must complete before any other Stage 01 action** (framework source check,
 framework install, guidelines load, intake, or any provider stage call):
@@ -15,10 +15,7 @@ framework install, guidelines load, intake, or any provider stage call):
    - `git pull origin <base-branch>` (fast-forward only)
    - If fetch/pull fails (no remote, offline, conflict), log a warning and continue with the local
      copy of `<base-branch>` as-is — this is not a hard stop.
-3. Create or switch to the working branch off the now-synced base branch:
-   - if the deterministic branch name does not exist → create it from the synced base
-   - if it already exists (a rerun) → check it out and **continue on it**; never reset, force-move,
-     or recreate it, and never append a suffix to make a new one
+3. Resolve the deterministic branch name (final or provisional) exactly as defined below.
 4. Branch name must exactly match the feature name the run will use for its `specs/` artifact folder
    (`<issue_id>-<short_title>` in `--issue` mode, `<NNN>-<slug>` in manual mode — see
    [intake.md](intake.md) → "Artifact Identity"). Branch and artifact folder are always the same
@@ -37,12 +34,23 @@ framework install, guidelines load, intake, or any provider stage call):
    - If [intake.md](intake.md)'s artifact-identity resolution finds an **existing** artifact folder
      from a prior run (a rerun), skip the provisional-name step and use that resolved final name
      directly when first creating/checking out the branch.
-5. Actually run the git command(s) now (do not describe the plan) and confirm the working branch is
-   checked out before proceeding. Set `branch_created: true` and `branch_name` in run state
-   (`branch_created` means "the working branch is now checked out", whether created or reused).
-
-Git worktrees are **not** used by any provider — see global rule 3. If a provider's native workflow
-prescribes worktrees, that part is skipped in favor of the plain-branch flow above.
+5. Ensure worktree root `<repo-root>/.worktrees/` is ignored:
+   - if `.gitignore` exists and `.worktrees/` is missing, append it
+   - if `.gitignore` does not exist, create it with `.worktrees/`
+   - this edit is part of the feature branch commit flow; do not create a separate commit
+6. Create or reuse a linked worktree for the resolved branch name:
+   - canonical path: `<repo-root>/.worktrees/<branch-name>`
+   - if a linked worktree already exists for that branch (rerun), reuse it and continue there
+   - if branch exists without a linked worktree, add one at the canonical path
+   - if branch does not exist, create it from synced `<base-branch>` while creating the worktree
+7. Actually run the git command(s) now (do not describe the plan), switch execution into that
+   linked worktree, and confirm the branch is checked out there before proceeding. Set
+   `branch_created: true`, `branch_name`, and `worktree_path` in run state.
+8. **Rename alignment step (required once intake resolves final feature name):**
+   - if current branch name differs, run `git branch -m <final-name>` inside the linked worktree
+   - if current worktree path differs from canonical `<repo-root>/.worktrees/<final-name>`, move it
+     with `git worktree move` when safe; if move fails, continue on current path and log warning
+   - update run state `branch_name` and `worktree_path`
 
 ## Git Submodule Branch Handling (Implementation Stage)
 

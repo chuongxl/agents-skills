@@ -1,7 +1,7 @@
 # Shared: Intake (Provider-Agnostic)
 
 Applies identically to every provider. Loaded by Stage 01 of all providers.
-Runs **after** the branch gate in [branching.md](branching.md) has completed.
+Runs **after** the worktree + branch gate in [branching.md](branching.md) has completed.
 
 ## Intake Mode Selection
 
@@ -40,6 +40,7 @@ If `run_state`/stage file/channel binding is absent in this turn, initialize in 
   "mode": "<default|yolo>",
   "branch_created": false,
   "branch_name": null,
+  "worktree_path": null,
   "issue_url": "<resolved-or-null>",
   "ticket_path": null,
   "requirement_text": "<resolved-or-null>"
@@ -47,9 +48,9 @@ If `run_state`/stage file/channel binding is absent in this turn, initialize in 
 ```
 
 Execute Stage 01 in this order (this is the true order regardless of file position):
-**branch setup → framework source/availability check + install recovery → guidelines load → intake.**
-`branch_created` must be `true` (real `branch_name` from an actual git command) before any
-framework stage call, `jira-to-speckit` call, or intake step runs.
+**worktree + branch setup → framework source/availability check + install recovery → guidelines load → intake.**
+`branch_created` must be `true` (real `branch_name` and `worktree_path` from actual git commands)
+before any framework stage call, `jira-to-speckit` call, or intake step runs.
 
 `integration` is resolved once by [../integration-mode.md](../integration-mode.md) and never
 changes during the run.
@@ -146,10 +147,11 @@ slug, search the provider's artifact location for an existing artifact whose nam
 2. If several match, use the most recently modified one and log the ambiguity.
 3. Only if none matches, derive `short_title` from the current Jira title.
 
-The same resolution applies to the branch name: once `issue_id`/`short_title` (or `<NNN>-<slug>` in
-manual mode) are resolved here, this **is** the point the provisional branch created in
-[branching.md](branching.md) gets renamed (`git branch -m`) to match exactly, so branch and
-artifact folder stay aligned across reruns.
+The same resolution applies to the branch/worktree identity: once `issue_id`/`short_title` (or
+`<NNN>-<slug>` in manual mode) are resolved here, this **is** the point the provisional branch
+created in [branching.md](branching.md) gets renamed (`git branch -m`) to match exactly, and the
+worktree path is moved to the canonical final path when safe, so branch/worktree and artifact
+folder stay aligned across reruns.
 
 Each provider's Stage 01 defines how `issue_id` and `short_title` compose into its artifact path,
 and that same path is where the ticket snapshot is relocated to.

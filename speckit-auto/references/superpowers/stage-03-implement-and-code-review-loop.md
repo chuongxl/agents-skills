@@ -54,10 +54,10 @@ here.
 Pass these into the implementation skill as explicit constraints. Each one overrides a step the
 skill would otherwise take on its own:
 
-1. **Workspace** — the current branch (from Stage 01) is the isolated workspace.
+1. **Workspace** — the current Stage 01 linked worktree is the isolated workspace.
    `subagent-driven-development` opens by requiring an isolated workspace, "created or verified";
-   the verify arm is satisfied. Do not create or enter a git worktree, and do not stop to ask which
-   workspace to use.
+   the verify arm is satisfied. Do not create or enter a second git worktree, and do not stop to
+   ask which workspace to use.
 2. **No branch finish** — the skill's terminal step ("final review clean → delete this plan's
    workspace → use `finishing-a-development-branch`") is **suspended**. Returning means "continue
    Stage 03", never "the branch is done". No PR, no merge, no branch deletion, no workspace
