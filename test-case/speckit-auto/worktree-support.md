@@ -24,6 +24,7 @@ Scope: validate Stage 01 worktree-based isolation, branch/worktree alignment, an
 | WT18 | superpowers Stage 01 avoids nested worktree creation | `superpowers` selected | Run Stage 01 and Stage 03 entry | Uses shared Stage 01 worktree; does not invoke another worktree setup in provider stages | superpowers |
 | WT19 | github-speckit Stage 01 uses shared worktree gate | `github-speckit` selected | Run Stage 01 | Uses shared worktree+branch gate before Speckit source check and intake | github-speckit |
 | WT20 | Parallel-session isolation | Two features started from same repo | Run two pipeline invocations with different requirements | Each run gets separate linked worktree path under `.worktrees/`; no workspace collision | Both |
+| WT21 | speckit-code-review runs on worktree change set | Stage 03 loop reaches review step | Invoke `speckit-code-review` per Stage 03 rules | Runs inline (never a background task) with cwd inside the Stage 01 linked worktree; its `git status`/`git diff HEAD` scope and the explicitly passed `specs/<feature>/spec.md` resolve against the worktree branch, never the base checkout | Both |
 
 ## Minimum pass criteria
 
