@@ -145,9 +145,9 @@ slug, search the provider's artifact location for an existing artifact whose nam
 
 The same resolution applies to the branch/worktree identity: once `issue_id`/`short_title` (or
 `<NNN>-<slug>` in manual mode) are resolved here, this **is** the point the provisional branch
-created in [branching.md](branching.md) gets renamed (`git branch -m`) to match exactly, and the
-worktree path is moved to the canonical final path when safe, so branch/worktree and artifact
-folder stay aligned across reruns.
+created in [branching.md](branching.md) gets renamed to match exactly — via that script's
+`--rename-to` mode, one bash call that also moves the worktree to the canonical final path when
+safe — so branch/worktree and artifact folder stay aligned across reruns.
 
 Each provider's Stage 01 defines how `issue_id` and `short_title` compose into its artifact path,
 and that same path is where the ticket snapshot is relocated to.

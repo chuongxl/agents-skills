@@ -9,48 +9,49 @@ framework install, guidelines load, intake, or any provider stage call):
 
 1. Base branch priority: `develop` → `main` → `master` (local first, then remote-tracking).
    If none exists, stop with a missing base-branch error.
-2. Sync the base branch to latest before branching off it:
-   - `git fetch origin <base-branch>`
-   - `git checkout <base-branch>`
-   - `git pull origin <base-branch>` (fast-forward only)
-   - If fetch/pull fails (no remote, offline, conflict), log a warning and continue with the local
-     copy of `<base-branch>` as-is — this is not a hard stop.
+2. Sync the base branch to latest before branching off it (fetch + checkout + fast-forward pull).
+   A fetch/pull failure is a warning, not a stop — continue with the local copy as-is.
 3. Resolve the deterministic branch name (final or provisional) exactly as defined below.
 4. Branch name must exactly match the feature name the run will use for its `specs/` artifact folder
    (`<issue_id>-<short_title>` in `--issue` mode, `<NNN>-<slug>` in manual mode — see
    [intake.md](intake.md) → "Artifact Identity"). Branch and artifact folder are always the same
    string, never two different deterministic schemes.
    - `short_title` (Jira mode) and the final `<NNN>-<slug>` (manual mode) are only fully resolved
-     during intake, which runs *after* this branch gate. If the full name is not yet known:
-     - Jira mode: create/checkout a provisional branch named `<issue_id>` only.
-     - Manual mode: create/checkout a provisional branch named from the requirement slug (best
-       guess at this point, no timestamp — a timestamp would never match the feature name).
-   - **Rename step (required once intake resolves the final feature name):** as soon as the
-     provider's Stage 01 resolves `<issue_id>-<short_title>` or `<NNN>-<slug>`, and if the current
-     branch name differs from it, run `git branch -m <final-name>` to rename the checked-out branch
-     in place (do not create a second branch, do not delete/recreate). This must happen before any
-     push or PR creation (Stage 04/05) — nothing upstream has been pushed yet at this point, so the
-     rename is local-only and safe. Update `branch_name` in run state to the final name.
+      during intake, which runs *after* this branch gate. If the full name is not yet known:
+      - Jira mode: create/checkout a provisional branch named `<issue_id>` only.
+      - Manual mode: create/checkout a provisional branch named from the requirement slug (best
+        guess at this point, no timestamp — a timestamp would never match the feature name).
    - If [intake.md](intake.md)'s artifact-identity resolution finds an **existing** artifact folder
-     from a prior run (a rerun), skip the provisional-name step and use that resolved final name
-     directly when first creating/checking out the branch.
-5. Ensure worktree root `<repo-root>/.worktrees/` is ignored:
-   - if `.gitignore` exists and `.worktrees/` is missing, append it
-   - if `.gitignore` does not exist, create it with `.worktrees/`
-   - this edit is part of the feature branch commit flow; do not create a separate commit
-6. Create or reuse a linked worktree for the resolved branch name:
-   - canonical path: `<repo-root>/.worktrees/<branch-name>`
-   - if a linked worktree already exists for that branch (rerun), reuse it and continue there
-   - if branch exists without a linked worktree, add one at the canonical path
-   - if branch does not exist, create it from synced `<base-branch>` while creating the worktree
-7. Actually run the git command(s) now (do not describe the plan), switch execution into that
-   linked worktree, and confirm the branch is checked out there before proceeding. Set
-   `branch_created: true`, `branch_name`, and `worktree_path` in run state.
-8. **Rename alignment step (required once intake resolves final feature name):**
-   - if current branch name differs, run `git branch -m <final-name>` inside the linked worktree
-   - if current worktree path differs from canonical `<repo-root>/.worktrees/<final-name>`, move it
-     with `git worktree move` when safe; if move fails, continue on current path and log warning
-   - update run state `branch_name` and `worktree_path`
+      from a prior run (a rerun), skip the provisional-name step and use that resolved final name
+      directly.
+5. Execute the whole gate — base resolution/sync, `.worktrees/` gitignore enforcement, worktree
+   create/reuse at the canonical path `<repo-root>/.worktrees/<branch-name>`, and branch
+   check-out verification — as **one bash call**:
+
+   ```bash
+   bash <skill-dir>/scripts/worktree-bootstrap.sh --branch <branch-name>
+   ```
+
+   It prints one compact JSON object: `{ok, repo_root, base, branch, worktree_path, reused,
+   warnings[]}`. On `ok:true`, switch execution into `worktree_path` for the rest of the run and
+   set `branch_created: true`, `branch_name`, and `worktree_path` in run state. `warnings[]`
+   (e.g. fetch/pull fallback) are logged and continued. On `ok:false`, the `error` string is the
+   reportable failure — missing base branch and branch-checked-out-elsewhere are the hard stops.
+   The `.gitignore` edit the script may make is part of the feature branch commit flow; never
+   create a separate commit for it.
+6. **Rename alignment (required once intake resolves the final feature name)** — again one bash
+   call, run from inside the linked worktree:
+
+   ```bash
+   bash <skill-dir>/scripts/worktree-bootstrap.sh --rename-to <final-name>
+   ```
+
+   It renames the branch in place (`git branch -m`, never delete/recreate) and moves the worktree
+   to the canonical `<repo-root>/.worktrees/<final-name>` path when safe; a failed move is a
+   warning — continue on the current path. It returns `{ok, branch, worktree_path, warnings[]}`;
+   update run state `branch_name` and `worktree_path` from it. This must happen before any push or
+   PR creation (Stage 04/05) — nothing upstream has been pushed yet at this point, so the rename
+   is local-only and safe.
 
 ## Git Submodule Branch Handling (Implementation Stage)
 
