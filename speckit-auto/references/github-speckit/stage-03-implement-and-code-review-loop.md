@@ -40,21 +40,13 @@ capability, and invoking `speckit.implement` once per package until the queue is
 
 See [../shared/branching.md](../shared/branching.md) — "Git Submodule Branch Handling". No
 Speckit-specific deviation.
+## NO-STOP ZONE (canonical: global rules 11–12, 20)
 
-## CRITICAL: speckit-auto Owns This Loop — NO STOPS, NO GATES
-
-**This stage is a NO-STOP ZONE. The following are SUSPENDED for the entire duration of Stage 03, regardless of mode (default or --yolo):**
-- Human approval gates
-- Post-stage interview questions
-- "Do you approve?" prompts
-- Any pause waiting for human input
-- Any report-and-stop on failed result
-
-**The only valid success exit from Stage 03 is `status = pass` from `speckit-code-review`.**
-The only other permitted exit is the circuit breaker in global rule 20 (identical failure 5×
-with no file change in between, or a git/filesystem write error).
-A `failed` result is NOT a stop condition in any mode. It is the input for the next fix iteration.
-The agent MUST continue the loop autonomously until pass is received.
+Stage 03 runs autonomously in both modes — no human gates, no interviews, no pauses, no
+report-and-stop on a failed result. The only success exit is `status = pass` from
+`speckit-code-review`; the only other permitted exit is the global rule 20 circuit breaker
+(identical failure 5× with no file change, or a git/filesystem write error). A `failed` result is
+the input for the next fix iteration.
 
 ## Mandatory Exit Routing from Stage 03
 
@@ -92,14 +84,11 @@ PHASE 1 — Convergence loop
 PHASE 2 — Code review loop
   R1 — Invoke speckit-code-review with spec path specs/<issue_id>-<short_title>/spec.md;
        receive JSON result
-  R2 — Read result.status
-    IF status = "pass"  → EXIT STAGE 03
-                           IF --yolo = true  → jump to Stage 05
-                           IF --yolo = false → jump to Stage 04 (mandatory)
-    IF status = "failed" → IMMEDIATELY go to R3
-                           DO NOT produce a prose summary to the user
-                           DO NOT end the turn
-                           DO NOT ask the user what to do
+   R2 — Read result.status
+     IF status = "pass"  → EXIT STAGE 03
+                            IF --yolo = true  → jump to Stage 05
+                            IF --yolo = false → jump to Stage 04 (mandatory)
+     IF status = "failed" → IMMEDIATELY go to R3 (rule 12: no prose summary, no stop, no ask)
   R3 — Read compact result fields:
     - `status` — already checked in R2
     - `Business cover` — business coverage %
@@ -135,10 +124,9 @@ PHASE 2 — Code review loop
       2. Read the relevant method/lines
       3. Write the fix inline using edit/create file tools
       4. Move to next item
-    Rules for R6:
+     Rules for R6:
       - DO NOT delegate to speckit.implement for code-only or test-coverage issues
-      - DO NOT produce a prose response to the user — just make the edits
-      - DO NOT end the turn after making edits — continue Stage 03 flow immediately
+      - Just make the edits, then continue the Stage 03 flow immediately (rule 12)
       - If a fix requires a new file, create it with the create file tool
       - If you don't have enough context to fix an item, read the file first, then fix
   R7 — Run speckit.implement to apply broader changes if needed, then return to R1
@@ -146,8 +134,7 @@ PHASE 2 — Code review loop
 
 ## Loop Invariants
 
-- Never exit this stage with `status = failed`; never end a turn or write a prose summary after
-  one — the review result is data to act on and the next action is always file edits.
+- Never exit this stage with `status = failed`; the review result is data to act on (rules 11–12).
 - Never ask the user for help during this loop; the only stop is the global rule 20 circuit breaker.
 - Run `speckit.converge` until it reports converged before entering the code-review loop.
 - Retain only `state_file`, the top `fixes[]`, and the one category file needed for the current fix.

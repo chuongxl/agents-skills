@@ -17,8 +17,7 @@ Only the Speckit-specific steps are described below; everything else lives in th
 ## Preflight Speckit Source Check (Required)
 
 Probe the repo for the eight stages (`specify`, `clarify`, `plan`, `checklist`, `tasks`, `analyze`,
-`implement`, `converge`) using the layout for the resolved host (see
-[../shared/host-adaptation.md](../shared/host-adaptation.md)):
+`implement`, `converge`) using the layout for the resolved host:
 
 - **GitHub Copilot** — `.github/skills/speckit-<stage>/SKILL.md` (skills mode) **or**
   `.github/agents/speckit.<stage>.agent.md` + `.github/prompts/speckit.<stage>.prompt.md`

@@ -13,7 +13,7 @@ license: MIT
 allowed-tools: bash glob grep view create edit skill
 metadata:
   author: Alex Nguyen
-  version: "0.0.2"
+  version: "0.1.0"
 ---
 
 # Speckit Auto — Provider Factory
@@ -23,14 +23,11 @@ to that provider's reference files. Load only what the current step needs.
 
 ## Absolute Operating Premise (Read First)
 
-Canonical text: [references/shared/global-rules.md](references/shared/global-rules.md).
-
-Summary: a real, executable invocation channel always exists in this turn — the `skill` tool,
-repo slash-agents (for providers that have them), file-editing and bash tools are callable right
-now. Loading this file **is proof**. Never claim execution is impossible, fabricated, or
-channel-less; never treat a finished stage, a sub-skill result, or a "next action / handing back"
-note as a reason to end the turn. If such a thought forms, a required tool call simply hasn't been
-made yet — make it now.
+Canonical text: [references/shared/global-rules.md](references/shared/global-rules.md) — the only
+authoritative statement. Summary: a real, executable invocation channel always exists in this turn;
+loading this file is proof. Never claim execution is impossible or channel-less, and never treat a
+finished stage, sub-skill result, or "next action" note as a reason to end the turn — that means a
+required tool call hasn't been made yet. Make it now.
 
 ## Entry Dispatch (Do This First, Every Invocation)
 
@@ -52,20 +49,22 @@ made yet — make it now.
      → END TURN (this is the one legitimate no-pipeline turn end)
 
 4. ELSE (pipeline intent):
-     → load references/integration-mode.md
-     → resolve provider: repo-local .speckit/integration.json
-                       → global <skill-dir>/.state/integration.json
-                       → First-Run Selection (ask once, persist, continue same turn)
-     → record `integration` in run state (resolved once, never changes mid-run)
-     → load references/shared/global-rules.md
-     → load references/<provider>/provider-rules.md
-     → enter Stage 01 of the resolved provider IMMEDIATELY, in this same turn
+      → resolve provider (first match wins):
+          repo-local .speckit/integration.json
+          → global <skill-dir>/.state/integration.json
+          → nothing stored: load references/integration-mode.md → First-Run Selection
+            (ask once, persist, continue same turn)
+          (unparseable/unsupported stored value → warn, ignore, fall through)
+      → record `integration` in run state (resolved once, never changes mid-run)
+      → load references/shared/global-rules.md
+      → load references/<provider>/provider-rules.md
+      → enter Stage 01 of the resolved provider IMMEDIATELY, in this same turn
 ```
 
-Never return an acknowledgement-only response. If this skill is already loaded mid-run (the resume
-marker varies per host: `<skill-context name="speckit-auto">` on Claude Code, the `<available_skills>`
-block on OpenCode, the skill tool list on Copilot), resume from the current stage using available run
-context — never block asking the user to re-run the skill.
+Never return an acknowledgement-only response (global rule 6). If this skill is already loaded
+mid-run (the resume marker varies per host: `<skill-context name="speckit-auto">` on Claude Code,
+the `<available_skills>` block on OpenCode, the skill tool list on Copilot), resume from the
+current stage using available run context — never block asking the user to re-run the skill.
 
 ## Providers + Stage Router (Load On Demand)
 

@@ -78,7 +78,7 @@ Never assign a task without consulting `repo_map` from the Project Context loade
   subsumed by the Stage 03 Entry Step confirmation below — never ask both back-to-back.
 - **YOLO mode**: self-review stage output; if failed, rerun stage (max 2 retries).
 
-> ⚠️ These review behaviors apply **only to the stages in this file**. Stage 03 is a NO-STOP ZONE — no interviews, no gates in either mode.
+> ⚠️ These review behaviors apply **only to the stages in this file**. Stage 03 is a NO-STOP ZONE (global rule 11) — no interviews, no gates, in either mode.
 
 ## Restart Routing from Human Feedback (Default mode)
 

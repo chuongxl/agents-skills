@@ -153,8 +153,8 @@ already cached. Never assign a task without consulting `repo_map`.
 - **YOLO mode**: no interviews. Self-review the step output; if it fails, re-run the step
   (max 2 retries).
 
-> ⚠️ These review behaviors apply **only to the steps in this file**. Stage 03 is a NO-STOP ZONE —
-> no interviews, no gates, in either mode.
+> ⚠️ These review behaviors apply **only to the steps in this file**. Stage 03 is a NO-STOP ZONE
+> (global rule 11) — no interviews, no gates, in either mode.
 
 ## Restart Routing from Human Feedback (Default mode)
 

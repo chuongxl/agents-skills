@@ -4,7 +4,7 @@ Use this guide during Stage 02 after each stage (`specify`, `clarify`, `plan`, `
 `analyze` is excluded — its approval is subsumed by the Stage 03 Entry Step confirmation in
 [stage-02-spec-design-flow.md](stage-02-spec-design-flow.md). Never ask both back-to-back.
 
-> ⚠️ **Stage 03 is a NO-STOP ZONE.** Do NOT run any interview flow during Stage 03 in any mode.
+> ⚠️ **Stage 03 is a NO-STOP ZONE** (global rule 11) — no interview flow there, in any mode.
 
 > **Mode note**: All interview sections apply to **default mode only**. In `--yolo` mode, human interactions are replaced by autonomous self-review (see Stage 02 YOLO behavior in stage-02-spec-design-flow.md).
 

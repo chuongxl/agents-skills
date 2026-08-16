@@ -94,18 +94,14 @@ onward without waiting for another user message.
 ### Fallback if `jira-to-speckit` Unavailable
 
 1. Log the fallback message.
-2. Read root `.env`: `JIRA_URL`, `JIRA_USERNAME`, `JIRA_API_TOKEN`.
-3. If any is missing, stop and request `.env` completion.
-4. Fetch the issue:
-   `GET {JIRA_URL}/rest/api/2/issue/{issueKey}?fields=summary,description,issuetype,status,priority,labels,assignee,fixVersions`
-5. Handle errors:
-   - `401/403`: invalid credentials/permission
-   - `404`: confirm issue key
-   - `5xx`: retry later
-6. Write the ticket snapshot yourself, to the same staging path and in the same shape described in
+2. Read root `.env` (`JIRA_URL`, `JIRA_USERNAME`, `JIRA_API_TOKEN`); if any is missing, stop and
+   request `.env` completion.
+3. Fetch `GET {JIRA_URL}/rest/api/2/issue/{issueKey}?fields=summary,description,issuetype,status,priority,labels,assignee,fixVersions`
+   (`401/403` credentials/permission · `404` confirm issue key · `5xx` retry later).
+4. Write the ticket snapshot yourself, to the same staging path and shape described in
    "Ticket Snapshot" below, straight from the fetched payload.
-7. Compact into: summary, business goal, acceptance criteria, constraints. Keep the raw payload out
-   of the ongoing run context once the snapshot is on disk.
+5. Compact into: summary, business goal, acceptance criteria, constraints — and keep the raw
+   payload out of run context once the snapshot is on disk.
 
 ## Ticket Snapshot (Required in `--issue` Mode)
 

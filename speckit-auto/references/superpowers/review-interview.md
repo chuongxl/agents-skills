@@ -4,7 +4,7 @@ Use this guide during Stage 02: as the question set for the Stage 03 Entry Step 
 (the plan's approval gate), and after `brainstorming` in the two design-spec cases listed under
 Scope below.
 
-> ⚠️ **Stage 03 is a NO-STOP ZONE.** Do NOT run any interview flow during Stage 03 in any mode.
+> ⚠️ **Stage 03 is a NO-STOP ZONE** (global rule 11) — no interview flow there, in any mode.
 
 > **Mode note**: every section here is **default mode only**. In `--yolo` mode, human interactions
 > are replaced by autonomous self-review (see the YOLO behavior in stage-02-spec-design-flow.md).

@@ -111,20 +111,12 @@ apply it, building `implementation_packages[]` from the plan's tasks grouped by 
 bounded capability, and invoking the implementation skill once per package until the queue is empty.
 Use `dispatching-parallel-agents` when parallelizing.
 
-## CRITICAL: speckit-auto Owns This Loop — NO STOPS, NO GATES
+## NO-STOP ZONE (canonical: global rules 11–12, 20)
 
-**This stage is a NO-STOP ZONE. The following are SUSPENDED for the entire duration of Stage 03,
-regardless of mode (default or `--yolo`):**
-- Human approval gates
-- Post-step interview questions
-- "Do you approve?" prompts
-- Any pause waiting for human input
-- Any report-and-stop on a failed result
-
-**The only valid success exit from Stage 03 is `status = pass` from `speckit-code-review`.**
-The only other permitted exit is the circuit breaker in global rule 20 (identical failure 5×
-with no file change in between, or a git/filesystem write error).
-A `failed` result is NOT a stop condition in any mode — it is the input for the next fix iteration.
+Stage 03 runs autonomously in both modes — no human gates, no interviews, no pauses, no
+report-and-stop on a failed result. The only success exit is `status = pass` from
+`speckit-code-review`; the only other permitted exit is the global rule 20 circuit breaker. A
+`failed` result is the input for the next fix iteration.
 
 Superpowers' own gates are subordinated here:
 - `verification-before-completion` is a check to run, not a place to stop.
@@ -173,14 +165,11 @@ PHASE 2 — Code review loop
        - log Minor findings; do not stop for any of them
   R1 — Invoke speckit-code-review with spec path specs/<feature_folder>/spec.md;
        receive the JSON result (AUTHORITATIVE GATE)
-  R2 — Read result.status
-    IF status = "pass"  → EXIT STAGE 03
-                           IF --yolo = true  → jump to Stage 05
-                           IF --yolo = false → jump to Stage 04 (mandatory)
-    IF status = "failed" → IMMEDIATELY go to R3
-                           DO NOT produce a prose summary to the user
-                           DO NOT end the turn
-                           DO NOT ask the user what to do
+   R2 — Read result.status
+     IF status = "pass"  → EXIT STAGE 03
+                            IF --yolo = true  → jump to Stage 05
+                            IF --yolo = false → jump to Stage 04 (mandatory)
+     IF status = "failed" → IMMEDIATELY go to R3 (rule 12: no prose summary, no stop, no ask)
   R3 — Read compact result fields:
     - `status` — already checked in R2
     - `Business cover` — business coverage %
@@ -214,10 +203,9 @@ PHASE 2 — Code review loop
       3. Write the fix inline using edit/create file tools, following the TDD cycle for
          behavior changes (failing test first, then the fix)
       4. Move to the next item
-    Rules for R6:
+     Rules for R6:
       - DO NOT delegate to the implementation skill for code-only or test-coverage issues
-      - DO NOT produce a prose response to the user — just make the edits
-      - DO NOT end the turn after making edits — continue the Stage 03 flow immediately
+      - Just make the edits, then continue the Stage 03 flow immediately (rule 12)
       - If a fix needs a new file, create it
       - If context is insufficient, read the file first, then fix
   R7 — Run the implementation skill for broader changes if needed.
@@ -229,8 +217,7 @@ PHASE 2 — Code review loop
 
 ## Loop Invariants
 
-- Never exit this stage with `status = failed`; never end a turn or write a prose summary after
-  one — the review result is data to act on and the next action is always file edits.
+- Never exit this stage with `status = failed`; the review result is data to act on (rules 11–12).
 - Never ask the user for help during this loop; the only stop is the global rule 20 circuit breaker.
 - Never treat a superpowers gate skill as an exit point.
 - Reach clean `verification-before-completion` evidence before first entering PHASE 2.

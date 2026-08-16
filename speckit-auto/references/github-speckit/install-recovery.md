@@ -3,9 +3,8 @@
 Load this **only** when the Stage 01 Speckit source check failed. A normal run never loads it.
 
 1. Fetch the install guide: `https://github.com/github/spec-kit/blob/main/docs/installation.md`
-2. Resolve the host-specific `--integration` key from
-   [../shared/host-adaptation.md](../shared/host-adaptation.md): `copilot` (Copilot),
-   `claude` (Claude Code), or `opencode` (OpenCode).
+2. Resolve the host-specific `--integration` key matching the resolved host:
+   `copilot` (Copilot), `claude` (Claude Code), or `opencode` (OpenCode).
 3. Ask the user once: `Install GitHub Speckit` or `Stop`.
 4. If `Stop`, halt and report that installation is required.
 5. If `Install`, follow the guide exactly to install the Spec Kit CLI.

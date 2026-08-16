@@ -5,8 +5,7 @@ Load this **only** when the Stage 01 availability check failed. A normal run nev
 1. Fetch the install guide: `https://github.com/obra/superpowers`.
 2. Ask the user once: `Install superpowers` or `Stop`.
 3. If `Stop`, halt and report that installation is required.
-4. If `Install`, install for the resolved host (see
-   [../shared/host-adaptation.md](../shared/host-adaptation.md)):
+4. If `Install`, install for the resolved host:
    - **GitHub Copilot** — run both Copilot CLI commands in order:
      `copilot plugin marketplace add obra/superpowers-marketplace`, then
      `copilot plugin install superpowers@superpowers-marketplace`.

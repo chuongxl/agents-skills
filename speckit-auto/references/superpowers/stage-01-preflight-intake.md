@@ -20,8 +20,7 @@ Verify the superpowers skills are invocable. Check in this order and stop at the
 
 1. Superpowers skills appear in this session's available-skills list (names may be surfaced as
    `superpowers:<name>` or bare `<name>`) — record which form is used and reuse it all run.
-2. The skills exist on disk. Probe the paths for the resolved host (see
-   [../shared/host-adaptation.md](../shared/host-adaptation.md)) before concluding it is missing
+2. The skills exist on disk. Probe the paths for the resolved host before concluding it is missing
    (`<name>` = any skill from the minimum set below):
 
    | Install shape | Skills path |
