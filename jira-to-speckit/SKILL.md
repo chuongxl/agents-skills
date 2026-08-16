@@ -28,7 +28,8 @@ workflow below is identical on all three hosts.
 
 ## What This Skill Does
 
-- Reads Jira issue content from a Jira issue key or URL.
+- Reads Jira issue content from a Jira issue key or URL — via `scripts/fetch_jira_issue.sh`
+  (one bash call: full snapshot to disk, bounded fields JSON back).
 - Uses Jira credentials from the local repository `.env` file.
 - Compacts the Jira ticket into a Speckit-friendly feature brief.
 - Writes a full-fidelity ticket snapshot to `ticket_output_path` when the caller supplies one.
@@ -78,9 +79,9 @@ Optional `.env` tuning for large Jira tickets:
 - Keep the result business-focused; remove implementation noise, vendor chatter, and duplicate ticket text.
 - Preserve exact Jira IDs, business terms, office codes, acceptance criteria, and dependencies.
 - Never print tokens or `.env` values in logs or chat output.
-- Never pass raw Jira payloads, full comment threads, or full ADF trees back to the caller. Writing
-  them to the `ticket_output_path` snapshot is the one permitted destination — the file goes to
-  disk, its contents never go into the return value.
+- Never pass raw Jira payloads, full comment threads, or full ADF trees back to the caller — and
+  never keep them in context. The helper script is the primary gate (snapshot to disk, bounded
+  JSON out); writing them to the `ticket_output_path` snapshot is the one permitted destination.
 - Always enforce character budgets before producing the compact brief. The budgets apply to the
   brief only, never to the snapshot file.
 - Write no file other than `ticket_output_path`, and only when the caller supplies it.
@@ -93,41 +94,46 @@ Optional `.env` tuning for large Jira tickets:
 - If a URL is provided, extract the issue key from the URL path.
 - Treat the Jira issue key as the canonical ID for naming.
 
-### 2. Read Jira credentials from `.env`
+### 2. Fetch via the helper script (preferred — one bash call)
 
-Load the repository `.env` file and confirm these values exist:
+Run `<skill-dir>/scripts/fetch_jira_issue.sh --key <ISSUE-KEY> --output <ticket_output_path>` from
+the repo root (add `--env-file <path>` if `.env` is elsewhere). The script:
 
-- `JIRA_URL`
-- `JIRA_USERNAME`
-- `JIRA_API_TOKEN`
+- reads `JIRA_URL`, `JIRA_USERNAME`, `JIRA_API_TOKEN` (and the optional budget vars below) from
+  `.env` without ever printing them;
+- fetches the issue once and **writes the full-fidelity snapshot markdown straight to
+  `ticket_output_path`** (step 2b's shape — description, acceptance criteria, comments capped at
+  50 unless `JIRA_SNAPSHOT_COMMENTS=false`, attachments);
+- prints **one bounded JSON** on stdout containing only brief-sized fields (`key`, `summary`,
+  `issue_type`, `status`, `priority`, `labels`, `components`, `assignee`, `parent`, `project`,
+  `description_brief` trimmed to `JIRA_MAX_DESCRIPTION_CHARS`, `acceptance_criteria_brief`,
+  `comments_brief` when `JIRA_FETCH_COMMENTS=true`, `snapshot_written`, `truncation_note`).
 
-Use the Jira REST API with basic authentication.
+The raw Jira payload never enters the model context — only the bounded JSON does. Treat the
+script's error JSON as the API error handling (`401/403` credentials/permission, `404` confirm
+issue key, `5xx` retry later, missing-credentials → stop and ask the user to populate `.env`).
 
-Suggested endpoint (stage 1, required):
+Manual fallback (only if the script is unavailable): use the endpoints in
+[references/JIRA_API.md](references/JIRA_API.md), write the snapshot to disk yourself **before**
+compacting, and keep the raw payload out of context once the snapshot is written.
 
-- `GET {JIRA_URL}/rest/api/2/issue/{issueKey}?fields=summary,description,issuetype,status,priority,labels,components,assignee,reporter,fixVersions,project,parent`
+Stage 1 fields (what the script fetches):
 
-Optional endpoint (stage 2, only when needed by ambiguity):
+- `GET {JIRA_URL}/rest/api/2/issue/{issueKey}?fields=summary,description,issuetype,status,priority,labels,components,assignee,reporter,fixVersions,project,parent,attachments,comment,created,updated,duedate`
 
-- `GET {JIRA_URL}/rest/api/2/issue/{issueKey}/comment?maxResults={JIRA_MAX_COMMENTS}`
+Stage 2 (comments for the compact brief) is covered by the script's `JIRA_FETCH_COMMENTS=true`
+mode; do not fetch comments manually unless running the manual fallback.
 
-If the Jira API returns an error:
-- `401` or `403`: inform the user that credentials may be invalid or they may not have permission.
-- `404`: ask the user to confirm the Jira issue key.
-- `5xx`: ask the user to retry after a brief wait.
+### 2b. Ticket snapshot (only when `ticket_output_path` is given)
 
-### 2b. Write the ticket snapshot (only when `ticket_output_path` is given)
-
-Run this **before compaction**, while the fetched content is still complete. Compaction is lossy by
+When using the helper script (step 2), the snapshot is already written — skip to verifying
+`snapshot_written: true` in its JSON output; a `false` there (with the reason in
+`truncation_note`) does not abort the brief. When running the manual fallback, write the snapshot
+yourself **before compaction**, while the fetched content is still complete. Compaction is lossy by
 design; the snapshot exists so the caller can trace a spec decision back to what the ticket actually
-said, so it must not inherit the compact brief's budgets.
-
-1. Add `attachments,comment,created,updated,duedate` to the stage-1 field list for this fetch.
-2. Fetch comments for the snapshot (cap 50) unless `.env` sets `JIRA_SNAPSHOT_COMMENTS=false`.
-   This is independent of `JIRA_FETCH_COMMENTS`, which governs only what feeds the compact brief.
-3. Convert ADF/wiki markup to readable markdown. Do **not** trim, summarize, deduplicate, or drop
-   sections — this file is written straight to disk and never enters the caller's context.
-4. Create parent directories if missing, and write this shape:
+said, so it must not inherit the compact brief's budgets. Convert ADF/wiki markup to readable
+markdown, do **not** trim, summarize, deduplicate, or drop sections, and use this shape (both the
+script and the manual fallback produce it):
 
 ```markdown
 ---
@@ -176,7 +182,9 @@ and continue — a failed snapshot does not abort the brief.
 
 ### 3. Compact the Jira ticket
 
-Turn the Jira issue into a short, structured brief with these parts:
+Work **from the bounded JSON of step 2** (or, in the manual fallback, from the fetched fields after
+the snapshot is safely on disk — never from the raw payload in context). Turn it into a short,
+structured brief with these parts:
 
 - Title
 - Problem or opportunity
