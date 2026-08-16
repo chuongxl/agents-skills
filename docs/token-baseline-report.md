@@ -1,7 +1,9 @@
 # Token Usage Baseline Report — speckit-auto Pipeline
 
 **Date:** 2026-08-16
-**Baseline commit:** `d2a9fb1` (branch `token-optimization`, after develop merge — content-identical to analysis base for all skill files)
+**Baseline commit:** `ec7a85f` (branch `token-optimization`; re-baselined after merging
+origin/develop `0d7e008` — "speckit-auto worktree support". Prior baseline `d2a9fb1`; see §7
+for the worktree-merge delta.)
 **Scope:** `speckit-auto`, `speckit-code-review`, `jira-to-speckit`
 **Purpose:** Frozen pre-optimization measurements. The post-optimization comparison report
 (`docs/token-optimization-comparison.md`, to be created when optimization completes) must be
@@ -28,11 +30,11 @@ in §3. If Anthropic publishes different Sonnet 4.6 rates, rescale every cost ce
 | Entry | `speckit-auto/SKILL.md` | 8,891 | 2,200 | $0.0066 |
 | Entry | `references/shared/host-adaptation.md` | 5,224 | 1,300 | $0.0039 |
 | Entry | `references/integration-mode.md` | 4,048 | 1,000 | $0.0030 |
-| Entry | `references/shared/global-rules.md` | 8,120 | 2,000 | $0.0060 |
+| Entry | `references/shared/global-rules.md` | 8,193 | 2,050 | $0.0061 |
 | Entry | `references/github-speckit/provider-rules.md` | 2,407 | 600 | $0.0018 |
-| Stage 01 | `references/github-speckit/stage-01-preflight-intake.md` | 5,437 | 1,350 | $0.0041 |
-| Stage 01 | `references/shared/branching.md` | 4,416 | 1,100 | $0.0033 |
-| Stage 01 | `references/shared/intake.md` | 8,085 | 2,000 | $0.0060 |
+| Stage 01 | `references/github-speckit/stage-01-preflight-intake.md` | 5,459 | 1,365 | $0.0041 |
+| Stage 01 | `references/shared/branching.md` | 5,095 | 1,275 | $0.0038 |
+| Stage 01 | `references/shared/intake.md` | 8,242 | 2,060 | $0.0062 |
 | Stage 01 | `references/shared/preflight-guidelines-context.md` | 4,432 | 1,100 | $0.0033 |
 | Stage 01 | `references/shared/scratch-hygiene.md` | 1,174 | 300 | $0.0009 |
 | Stage 01 | `references/shared/execution-report.md` | 1,356 | 350 | $0.0011 |
@@ -40,24 +42,24 @@ in §3. If Anthropic publishes different Sonnet 4.6 rates, rescale every cost ce
 | Stage 02 | `references/github-speckit/review-interview.md` | 2,891 | 720 | $0.0022 |
 | Stage 03 | `references/github-speckit/stage-03-implement-and-code-review-loop.md` | 8,854 | 2,200 | $0.0066 |
 | Stage 04+06 | `stage-04` + `stage-06` + `references/shared/commit.md` | 5,707 | 1,430 | $0.0043 |
-| **Subtotal** | | **77,580** | **~19,400** | **~$0.058** |
+| **Subtotal** | | **79,131** | **~19,800** | **~$0.059** |
 
 ### 1.2 Sub-skill instructions
 
 | Skill | Load | chars | ~tokens | ~cost (input) |
 |---|---|---|---|---|
 | `jira-to-speckit` | `SKILL.md` (+ `references/JIRA_API.md` 2,280 on fallback only) | 11,551 | ~2,900 | ~$0.0087 |
-| `speckit-code-review` | `SKILL.md` | 8,043 | ~2,000 | ~$0.0060 |
+| `speckit-code-review` | `SKILL.md` | 8,246 | ~2,060 | ~$0.0062 |
 | `speckit-code-review` | 5 area refs, serial load/discard | 10,926 | ~2,700 | ~$0.0081 |
-| **Subtotal** | | | **~9,100** | **~$0.027** |
+| **Subtotal** | | | **~9,200** | **~$0.027** |
 
 ### 1.3 Baseline totals by variant
 
 | Variant | Static instruction tokens | ~cost (input, per pass) |
 |---|---|---|
-| github-speckit, `--issue`, default (primary) | **~28k** | **~$0.084** |
+| github-speckit, `--issue`, default (primary) | **~27.5k** | **~$0.082** |
 | superpowers provider refs (~96k chars) + sub-skills | **~33k** | ~$0.099 |
-| Manual mode (no `--issue`) | ~25k (saves ~3.3k) | ~$0.075 |
+| Manual mode (no `--issue`) | ~24k (saves ~3.3k) | ~$0.073 |
 
 Note: this is the one-pass cost of the instructions. Because the transcript is re-sent on every
 call, instructions actually bill once per subsequent API call — the multiplier is what §3 captures.
@@ -68,6 +70,7 @@ call, instructions actually bill once per subsequent API call — the multiplier
 |---|---|---|
 | Raw Jira payload in tool result (input cap 12k chars) | 1k–3k | $0.003–$0.009 |
 | Compact brief (cap 2.5k chars) | ~600 | ~$0.0018 |
+| Worktree gate setup (base sync, worktree add/list, `.gitignore` edit, rename/move align) — +3–6 bash calls early in run | ~1k instr + 3–6 round-trips | +$0.05–0.25 uncached / +$0.01–0.03 cached per run |
 | spec.md / plan.md / tasks.md written + re-read across stages | 3k–15k per artifact set | $0.009–$0.045 |
 | Repo-installed `speckit.*` stage skills (8 invocations) | 9k–15k | $0.027–$0.045 |
 | Code reads/edits in Stage 03 + fix iterations | 20k–60k+ | $0.06–$0.18 |
@@ -79,8 +82,8 @@ call, instructions actually bill once per subsequent API call — the multiplier
 Token totals:
 
 - **Peak context footprint:** ~45k–120k tokens (medium feature, 2–3 review iterations).
-- **Cumulative billed input tokens** (same-turn mandate, ~30–60 tool calls): **1M–3M** uncached;
-  ~150k–400k effective with prompt caching.
+- **Cumulative billed input tokens** (same-turn mandate, now ~35–70 tool calls incl. worktree gate):
+  **1M–3.2M** uncached; ~150k–430k effective with prompt caching.
 
 Estimated cost per full run (Claude Sonnet 4.6, Anthropic list prices):
 
@@ -146,3 +149,31 @@ Note: two distinct "architecture.md" files exist in review — the skill's own b
 All changes must keep `python3 tools/validate_skills.py` green, bump `metadata.version` + sync
 root README badges, and preserve behavior of every test case in
 `test-case/speckit-auto/test-cases.md` plus TC-ARCH-01.
+
+---
+
+## 7. Re-baseline Delta — Worktree Support Merge (`d2a9fb1` → `ec7a85f`)
+
+Origin/develop `0d7e008` ("speckit-auto worktree support") reversed global rule 3: pipeline
+execution now **requires** a linked git worktree at `<repo-root>/.worktrees/<branch-name>`,
+created/reused at the Stage 01 gate, with rename/move alignment after intake. Effects on this
+baseline:
+
+| Item | Before | After | Δ |
+|---|---|---|---|
+| Primary manifest (chars / ~tok) | 108,720 / ~27.2k | 109,854 / ~27.5k | +1,134 / +0.3k |
+| Entry bundle (chars) | 28,690 | 28,763 | +73 (global-rules only) |
+| All-skill .md census (chars) | 225,875 | 227,101 | +1,226 |
+| `branching.md` (chars) | 4,416 | 5,095 | +679 — worktree steps 5–8 |
+| `intake.md` (chars) | 8,085 | 8,242 | +157 — `worktree_path` state, rename/move note |
+| `speckit-code-review/SKILL.md` (chars) | 8,043 | 8,246 | +203 — WT21 cwd rule |
+| superpowers refs net (chars) | — | — | −378 (rule-3 rewrite deduplicated) |
+| Duplication spot-check (lines) | 44 | 44 | unchanged |
+| Dynamic: Stage 01 gate tool calls | ~4–6 | ~7–12 | +3–6 calls (worktree add/list, .gitignore, rename, move) |
+
+Run-level cost effect: +$0.05–0.25 uncached / +$0.01–0.03 cached per run (extra early-run
+round-trips). §3 ranges widened accordingly. New optimization opportunity P2-10 (one-shot
+worktree bootstrap script) added to the plan to recover this.
+
+Behavioral regression surface added: `test-case/speckit-auto/worktree-support.md` WT01–WT21 now
+part of the must-pass set (see test-case doc §C).

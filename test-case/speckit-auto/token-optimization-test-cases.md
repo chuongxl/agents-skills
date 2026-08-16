@@ -7,7 +7,8 @@ and `jira-to-speckit`. Two layers:
    reduction and catches regressions.
 2. **Behavioral regression** — proves the optimization changed cost, not correctness.
 
-Baseline: `docs/token-baseline-report.md` (commit `d2a9fb1`).
+Baseline: `docs/token-baseline-report.md` (commit `ec7a85f`, re-baselined after the worktree-support
+merge — see report §7 for the delta from the original `d2a9fb1` baseline).
 Post-optimization comparison report template: appendix of this file, filled into
 `docs/token-optimization-comparison.md` when optimization completes.
 
@@ -26,7 +27,7 @@ find speckit-auto speckit-code-review jira-to-speckit -name "*.md" -not -path "*
   | xargs wc -c | sort -n
 ```
 
-Baseline total: 225,875 chars (44 files, incl. READMEs/assets).
+Baseline total: 227,101 chars (45 files, incl. READMEs/assets; +1,226 vs pre-worktree merge).
 
 ### A.2 Per-run load manifest (primary scenario: github-speckit, `--issue`, default mode)
 
@@ -72,7 +73,7 @@ cat speckit-auto/SKILL.md \
     | wc -c
 ```
 
-Baseline result: 108,720 chars ≈ 27.2k tok (matches report §1 within rounding).
+Baseline result: 109,854 chars ≈ 27.5k tok (matches report §1 within rounding).
 
 Variants (recompute by adding/removing manifest rows):
 
@@ -83,7 +84,7 @@ Variants (recompute by adding/removing manifest rows):
 
 ### A.3 Entry bundle metric
 
-Sum of the Entry group only. Baseline: 28,690 chars ≈ 7.2k tok.
+Sum of the Entry group only. Baseline: 28,763 chars ≈ 7.2k tok.
 
 ### A.4 Frontmatter description census
 
@@ -129,8 +130,9 @@ Protocol:
 
 ## C. Behavioral Regression Cases
 
-All existing cases in [`test-cases.md`](test-cases.md) must still pass (T01–T25, H01–H11). The
-following are optimization-specific additions:
+All existing cases in [`test-cases.md`](test-cases.md) (T01–T25, H01–H11) **and**
+[`worktree-support.md`](worktree-support.md) (WT01–WT21, added by the worktree merge) must still
+pass. The following are optimization-specific additions:
 
 | ID | Scenario | Preconditions | Steps | Expected result |
 |---|---|---|---|---|
@@ -140,8 +142,9 @@ following are optimization-specific additions:
 | TC-OPT-04 | Jira snapshot bypasses context | Optimized commit, `--issue` | Run T09 | Raw Jira JSON never appears in any tool result visible to the model; compact brief still ≤2.5k chars; snapshot file on disk complete |
 | TC-OPT-05 | R5 scoped regeneration | Optimized commit | Inject one FR-* gap post-review | Only the affected package/slice artifacts regenerate; unaffected tasks/plan sections unchanged on disk |
 | TC-OPT-06 | architecture.md chain survives | Optimized commit, `docs/guidelines/architecture.md` present | Full run | Project Context built in Stage 01; `repo_map` present in plan/tasks; review findings carry `guideline_source` tag (baseline report §5) |
-| TC-OPT-07 | Resume after stage compaction (if P1-3 done) | Optimized commit, mid-run interruption | Interrupt after Stage 02; new turn | Run state rehydrated from `.speckit/run-state.json`; pipeline resumes at Stage 03 without re-asking provider/mode |
+| TC-OPT-07 | Resume after stage compaction (if P1-3 done) | Optimized commit, mid-run interruption | Interrupt after Stage 02; new turn | Run state rehydrated from `.speckit/run-state.json` **inside the linked worktree**; `worktree_path` restored and all further stage calls execute from the worktree (never the base checkout — see WT17/WT21); pipeline resumes at Stage 03 without re-asking provider/mode |
 | TC-OPT-08 | Validator + spec still green | Optimized commit | `python3 tools/validate_skills.py` and `python3 tools/test_validate_skills.py` | Exit 0; README badges match bumped versions |
+| TC-OPT-09 | Worktree bootstrap script (if P2-10 done) | Optimized commit, fresh repo state | Run Stage 01 gate | Single script invocation returns compact JSON (`branch`, `worktree_path`, `base`, `warnings`); WT01–WT15 behaviors unchanged; tool-call count for the gate ≤ 2 |
 
 Pass criteria: all static targets in baseline report §6 met (or documented why not), all T/H cases
 pass, all TC-OPT cases pass.
@@ -165,12 +168,13 @@ cache read $0.30/MTok. Cost cells = input tokens × $3.00/MTok (chars/4 ≈ toke
 
 | Metric | Baseline | Baseline cost | Optimized | Optimized cost | Δ cost | Δ % | Target (report §6) | Met? |
 |---|---|---|---|---|---|---|---|---|
-| Primary manifest total (chars/tok) | 108,720 / ~27.2k | ~$0.082 | | | | | | |
-| Entry bundle (chars/tok) | 28,690 / ~7.2k | ~$0.022 | | | | | | |
-| All-skill .md census (chars) | 225,875 | ~$0.17 | | | | | | |
+| Primary manifest total (chars/tok) | 109,854 / ~27.5k | ~$0.082 | | | | | | |
+| Entry bundle (chars/tok) | 28,763 / ~7.2k | ~$0.022 | | | | | | |
+| All-skill .md census (chars) | 227,101 | ~$0.17 | | | | | | |
 | Frontmatter descriptions (chars/tok) | ~1,930 / ~480 | ~$0.0014 | | | | | | |
 | Duplication spot-check (lines) | 44 | — | | | — | | | |
 | speckit-code-review area refs per iteration | 5 | ~$0.0081 | | | | | | |
+| Stage 01 gate tool calls (worktree bootstrap) | 7–12 | — | | | — | | | |
 
 ## Dynamic (section B, controlled run)
 
@@ -192,7 +196,8 @@ Compare Δ % against the projections in
 
 - test-cases.md T01–T25: <pass/fail count>
 - Host checks H01–H11: <pass/fail count>
-- TC-OPT-01..08: <results>
+- Worktree checks WT01–WT21: <pass/fail count>
+- TC-OPT-01..09: <results>
 
 ## Verdict
 

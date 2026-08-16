@@ -1,8 +1,15 @@
 # Token Usage Analysis & Optimization Plan — speckit-auto Pipeline
 
-**Date:** 2026-08-15
+**Date:** 2026-08-15 (re-analyzed 2026-08-16 after worktree-support merge `ec7a85f`)
 **Scope:** `speckit-auto`, `speckit-code-review`, `jira-to-speckit`
 **Status:** Analysis only — no changes applied yet. Implementation starts after explicit confirmation.
+
+Re-analysis note: origin/develop merged a worktree-support change (global rule 3 now *requires* a
+linked git worktree at `.worktrees/<branch-name>`). Static instruction load rose +1,134 chars
+(manifest 108,720 → 109,854) and Stage 01 gained 3–6 tool calls; superpowers refs net-shrank
+−378 chars. Baseline figures below were refreshed in
+[`docs/token-baseline-report.md`](token-baseline-report.md) §7; projections in §5 are unchanged
+in percentage terms. New item P2-10 recovers the worktree-gate round-trip cost.
 
 Analysis basis: all 44 markdown files across the three skills (~226 KB total), the load-on-demand
 flow defined in `speckit-auto/SKILL.md` Entry Dispatch + Stage Router, and the github-speckit
@@ -88,7 +95,7 @@ Two distinct numbers matter:
 1. **Rule duplication.** The "no-stop zone" / absolute-operating-premise is restated ~6×
    (SKILL.md, global-rules rules 6/11/20/48, stage-02, stage-03, review-interview). Global rules +
    provider rules + stage files overlap heavily — ~30–40% redundancy ≈ **~6k tok/run**.
-2. **Heavy entry load.** 4 files (~5.1k tok) load before Stage 01 does any work.
+2. **Heavy entry load.** 5 files (~7.2k tok) load before Stage 01 does any work.
    host-adaptation.md is ~60% install-recovery tables needed only on failure.
 3. **"Discard from context" is mostly aspirational.** On stateless API hosts (Copilot), tokens
    already in the transcript stay billed on every subsequent call. The design pays cumulative,
@@ -113,7 +120,7 @@ Two distinct numbers matter:
 |---|---|---|---|---|
 | 1 | **Deduplicate canonical rules.** One `global-rules.md` statement + one-line back-references from stage files (e.g. "Stage 03 no-stop rule: see global-rules.md #11"). | −6–8k/run instructions | −$0.018–0.024 per pass (compounds ×~30–60 calls uncached: −$0.54–1.44/run) | 21–29% of static instruction layer (~28k) |
 | 2 | **Slim entry bundle.** Compress host-adaptation to a ~15-line table; inline provider resolution (3 lines) into SKILL.md; load install-recovery tables only on preflight failure. | −3k at entry | −$0.009 per pass (−$0.27–0.54/run uncached) | ~40% of entry bundle (~7.2k) |
-| 3 | **Stage-boundary compaction.** Persist run state + Project Context to `.speckit/run-state.json` (resume-marker mechanism already half-exists) and allow context compaction / fresh turn between stages; keep same-turn only within a stage. | Up to −50% cumulative billed input (1M–3M → 0.5M–1.5M) | **Up to −$1.90–6.75 uncached / −$0.60–2.85 cached per run** | Up to 50% of total run cost |
+| 3 | **Stage-boundary compaction.** Persist run state + Project Context to `.speckit/run-state.json` **inside the Stage 01 linked worktree** (state must include `worktree_path`; resume re-enters the worktree before any stage call) and allow context compaction / fresh turn between stages; keep same-turn only within a stage. | Up to −50% cumulative billed input (1M–3.2M → 0.5M–1.6M) | **Up to −$1.90–6.75 uncached / −$0.60–2.85 cached per run** | Up to 50% of total run cost |
 | 4 | **speckit-code-review selective refs.** Load only the category ref matching the failure (extend the existing `detail_files` mechanism to review refs); skip unit-test-coverage ref when no test runner detected. | −1.5–2.5k per review iteration | −$0.0045–0.0075 per iteration (−$0.01–0.03/run at 2–4 iterations) | 55–93% of area-ref layer (~2.7k) |
 
 ### P2 — medium impact
@@ -123,6 +130,7 @@ Two distinct numbers matter:
 | 5 | **jira-to-speckit scripted fetch.** Fetch via `curl` + `jq` writing the snapshot straight to disk; model reads only bounded summary/description fields, never raw JSON. | −1–3k per Jira run | −$0.003–0.009 per pass (compounds uncached) | up to ~100% of raw-payload tool result |
 | 6 | **R5 scoped regeneration.** Regenerate only the affected package/slice (reuse partitioning machinery unconditionally), not the whole plan/tasks chain. | −8–20k per FR/ARCH fix iteration | −$0.024–0.06 per iteration | 60–90% of regeneration cost per iteration |
 | 7 | **Artifact digest.** Maintain a ≤500-token spec digest for prompt wiring instead of re-sending full spec.md + plan.md to every `speckit.*` stage. | −2–6k per stage invocation (−16–48k/run at 8 invocations) | −$0.05–0.14/run | ~70–90% of artifact re-send volume |
+| 10 | **One-shot worktree bootstrap script** (new after worktree merge). Batch the Stage 01 gate — base sync, worktree add/reuse, `.gitignore` edit, rename/move alignment — into a single `scripts/worktree-bootstrap.sh` invocation returning compact JSON (`branch`, `worktree_path`, `base`, `warnings`). | −3–6 round-trips/run; −~1k gate instructions | −$0.05–0.25/run uncached, −$0.01–0.03 cached | recovers ~100% of the worktree-gate cost added by the merge |
 
 ### P3 — polish
 
@@ -168,6 +176,6 @@ replace them via the comparison procedure in
 
 1. P1-1, P1-2 (pure prose dedup — no semantic change)
 2. P1-4 (code-review selective refs — local to one skill)
-3. P2-5 (jira scripted fetch — new scripts/ helper, stdlib/curl only)
+3. P2-5, P2-10 (scripted helpers — jira fetch + worktree bootstrap; stdlib/curl only)
 4. P1-3 (stage-boundary compaction — semantic change, needs sign-off)
 5. P2-6, P2-7, P3-8, P3-9
