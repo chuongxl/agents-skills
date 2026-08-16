@@ -4,13 +4,14 @@ Provider: **github-speckit** — repo-installed GitHub Spec Kit agents.
 
 Load with this file:
 - [provider-rules.md](provider-rules.md) — provider-specific rules and invocation
-- [../shared/branching.md](../shared/branching.md) — worktree + branch gate (runs first)
+- [../shared/branching.md](../shared/branching.md) — workspace gate (runs last, after intake)
 - [../shared/intake.md](../shared/intake.md) — issue resolution, run state, Jira intake
 - [../shared/preflight-guidelines-context.md](../shared/preflight-guidelines-context.md) — project context
 
 Execution order for this stage:
-**worktree + branch setup (shared) → Speckit source check → install recovery if missing → guidelines load →
-intake (shared) → artifact path → Stage 02 entry (`speckit.specify`, also the executability proof).**
+**Speckit source check → install recovery if missing → guidelines load → intake (shared) →
+artifact path → workspace gate (shared) → Stage 02 entry (`speckit.specify`, also the
+executability proof).**
 
 Only the Speckit-specific steps are described below; everything else lives in the shared files.
 
@@ -71,10 +72,9 @@ Using `issue_id` and `short_title` from [../shared/intake.md](../shared/intake.m
 
 The folder must stay stable across reruns of the same issue.
 
-As soon as this path is resolved, apply the branch rename step from
-[../shared/branching.md](../shared/branching.md) (`git branch -m` to the same
-`<issue_id>-<short_title>`/`<NNN>-<slug>` string) if the checked-out branch is still on its
-provisional name.
+The folder name is also the branch name. Pass it to the workspace gate in
+[../shared/branching.md](../shared/branching.md), which runs after this step and creates the branch
+once under that exact `<issue_id>-<short_title>`/`<NNN>-<slug>` string. There is no rename.
 
 | Artifact | Path | Written by |
 |----------|------|------------|

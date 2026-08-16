@@ -54,10 +54,10 @@ here.
 Pass these into the implementation skill as explicit constraints. Each one overrides a step the
 skill would otherwise take on its own:
 
-1. **Workspace** — the current Stage 01 linked worktree is the isolated workspace.
-   `subagent-driven-development` opens by requiring an isolated workspace, "created or verified";
-   the verify arm is satisfied. Do not create or enter a second git worktree, and do not stop to
-   ask which workspace to use.
+1. **Workspace** — the Stage 01 workspace is `workspace_root`, and submodule paths resolve through
+   `submodule_workspaces{}`. `subagent-driven-development` opens by requiring an isolated
+   workspace, "created or verified"; the verify arm is satisfied. Do not create or enter another
+   git worktree, and do not stop to ask which workspace to use.
 2. **No branch finish** — the skill's terminal step ("final review clean → delete this plan's
    workspace → use `finishing-a-development-branch`") is **suspended**. Returning means "continue
    Stage 03", never "the branch is done". No PR, no merge, no branch deletion, no workspace
@@ -99,10 +99,21 @@ Code written before its test must be deleted and redone. This applies to fix ite
 When a test fails unexpectedly or a bug appears, run `systematic-debugging` — never
 apply a fix without an identified root cause.
 
-## Git Submodule Branch Handling
+## Submodule Workspaces (Stage 03 Entry)
 
-See [../shared/branching.md](../shared/branching.md) — "Git Submodule Branch Handling". No
+See [../shared/branching.md](../shared/branching.md) — "Submodule Workspaces". No
 superpowers-specific deviation.
+
+In `worktree` mode, run the graft pass **at Stage 03 entry, before the first implementation call**:
+parse `plan.md` for `apps/<name>/` prefixes, and for each one init that single submodule if needed,
+fetch only, snapshot its baseline status, then `git worktree add` it to
+`.worktrees/<feature>/apps/<name>`. Record `submodule_workspaces{}` and
+`submodule_baseline_status{}`. Never run a recursive submodule init.
+
+From then on, resolve every path beginning `apps/<name>/` through `submodule_workspaces{}` before
+reading or writing, and run that submodule's tests, lint, `status`, and `diff` in the mapped
+workspace — running them from the repo root would exercise the original checkout on the base
+branch and report a misleading pass.
 
 ## Heavy Payload Prevention + Implementation Partitioning
 

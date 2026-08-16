@@ -4,13 +4,13 @@ Provider: **superpowers** — the `obra/superpowers` skills library.
 
 Load with this file:
 - [provider-rules.md](provider-rules.md) — skill names, invocation precedence, provider rules
-- [../shared/branching.md](../shared/branching.md) — worktree + branch gate (runs first)
+- [../shared/branching.md](../shared/branching.md) — workspace gate (runs last, after intake)
 - [../shared/intake.md](../shared/intake.md) — issue resolution, run state, Jira intake
 - [../shared/preflight-guidelines-context.md](../shared/preflight-guidelines-context.md) — project context
 
 Execution order for this stage:
-**worktree + branch setup (shared) → superpowers availability check → install recovery if missing →
-bootstrap → guidelines load → intake (shared) → artifact paths → Stage 02.**
+**superpowers availability check → install recovery if missing → bootstrap → guidelines load →
+intake (shared) → artifact paths → workspace gate (shared) → Stage 02.**
 
 Only the superpowers-specific steps are described below; everything else lives in the shared files.
 
@@ -79,10 +79,12 @@ and `.superpowers/` are produced in this provider.
 Load [../shared/preflight-guidelines-context.md](../shared/preflight-guidelines-context.md).
 If `docs/guidelines/` or `architecture.md` is missing, skip and continue — never a stop.
 
-## Worktree Handling (Critical)
+## Workspace Handling (Critical)
 
-The Stage 01 gate in [../shared/branching.md](../shared/branching.md) already creates/reuses the
-linked worktree. Do not invoke `using-git-worktrees` again inside this provider stage.
+The Stage 01 workspace gate in [../shared/branching.md](../shared/branching.md) already creates or
+reuses the workspace — an in-place feature branch by default, a worktree under `--worktree`. Do not
+invoke `using-git-worktrees` inside this provider stage, and do not assume a worktree exists: with
+the default strategy, `workspace_root` is the repo root.
 
 ## Artifact Paths (`specs/` Layout — Same Place as Spec Kit Output)
 
@@ -120,9 +122,9 @@ applies unchanged.
 
 Create `specs/<feature_folder>/` if missing.
 
-As soon as `<feature_folder>` is resolved, apply the branch rename step from
-[../shared/branching.md](../shared/branching.md) (`git branch -m` to the same `<feature_folder>`
-string) if the checked-out branch is still on its provisional name.
+`<feature_folder>` is also the branch name. Pass it to the workspace gate in
+[../shared/branching.md](../shared/branching.md), which runs after this step and creates the branch
+once under that exact string. There is no rename.
 
 ## Ticket Snapshot Relocation (Required, `--issue` Mode)
 

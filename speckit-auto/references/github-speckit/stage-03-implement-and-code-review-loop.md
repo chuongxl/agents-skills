@@ -36,10 +36,21 @@ When implementation scope is large, load [../shared/partitioning.md](../shared/p
 apply it, building `implementation_packages[]` from `tasks.md` grouped by `workspace` + bounded
 capability, and invoking `speckit.implement` once per package until the queue is empty.
 
-## Git Submodule Branch Handling (Implementation Stage)
+## Submodule Workspaces (Stage 03 Entry)
 
-See [../shared/branching.md](../shared/branching.md) — "Git Submodule Branch Handling". No
-Speckit-specific deviation.
+See [../shared/branching.md](../shared/branching.md) — "Submodule Workspaces". No Speckit-specific
+deviation.
+
+In `worktree` mode, run the graft pass **at Stage 03 entry, before the first `speckit.implement`
+call**: parse `plan.md` for `apps/<name>/` prefixes, and for each one init that single submodule if
+needed, fetch only, snapshot its baseline status, then `git worktree add` it to
+`.worktrees/<feature>/apps/<name>`. Record `submodule_workspaces{}` and
+`submodule_baseline_status{}`. Never run a recursive submodule init.
+
+From then on, resolve every path beginning `apps/<name>/` through `submodule_workspaces{}` before
+reading or writing, and run that submodule's tests, lint, `status`, and `diff` in the mapped
+workspace — running them from the repo root would exercise the original checkout on the base
+branch and report a misleading pass.
 
 ## CRITICAL: speckit-auto Owns This Loop — NO STOPS, NO GATES
 

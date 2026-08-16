@@ -18,6 +18,11 @@ The only valid ways to end a turn anywhere in this pipeline are:
 - a concrete tool/runtime error with quoted error text
 - a genuinely missing required input, after one ask
 - the user explicitly choosing `Stop` at the framework install-recovery ask (rule 7)
+- the user explicitly choosing `Stop` at the workspace risk-confirmation ask (rule 1a)
+- `--yolo` meeting a dirty umbrella in a `.gitmodules` repo, where no isolation is available and no
+  human can confirm (rule 1a)
+- a workspace rerun-reuse validation failure (rule 1b)
+- a submodule leak-guard failure before commit (rule 23a)
 - a mandatory human checkpoint in default mode: any Stage 02 approval interaction (a provider
   post-stage interview, `brainstorming`'s own approval and its delegation fallback, and the
   Stage 02 → Stage 03 start-implementation confirmation), or Stage 04
@@ -32,9 +37,11 @@ data and immediately invoke the next required step, in the same turn.
 
 ## Non-Negotiable Rules
 
-1. Always create/switch a linked git worktree with the working branch before the first pipeline step — a hard gate via real git commands (not merely described); no framework source check, install, intake, or provider stage call may run first. See [branching.md](branching.md).
-2. Base branch priority is `develop → main → master` (local first, then remote-tracking). Sync that base to latest before branching off it — for the main repo and for any modified submodule. The sync is best-effort: a fetch/pull failure logs a warning and continues from the local copy, and is never a stop. See [branching.md](branching.md).
-3. Pipeline execution always runs inside the Stage 01 linked git worktree; never run implementation stages from the base checkout path.
+1. Always create the workspace and check out the working branch — a hard gate via real git commands (not merely described) — **after** intake resolves the final feature name and **before** any business-code write or the provider's Stage 02 entry step. Only the framework source check, install recovery, guidelines load, and intake may precede it; all four are read-only with respect to business code. The workspace is created once, with the final feature name: there is no provisional branch name, no `git branch -m`, and no `git worktree move`. See [branching.md](branching.md).
+1a. `workspace_strategy` defaults to `branch` (branch in-place); `--worktree` selects `worktree`. In a repo with `.gitmodules`, `--worktree` never worktrees the umbrella — it keeps the umbrella on an in-place feature branch and isolates only the submodules named by the plan, never running recursive submodule init/update. When the working tree is dirty, the confirmation ask and its `--yolo` resolution follow the per-level table in [branching.md](branching.md).
+1b. Reusing an existing branch or worktree on a rerun requires passing the rerun-reuse validation checklist in [branching.md](branching.md). Stale or mismatched state stops with the exact reason; it is never silently reused.
+2. Base branch priority is `develop → main → master` (local first, then remote-tracking). Sync that base to latest before branching off it — for the main repo, and for any modified submodule in `branch` mode. The sync is best-effort: a fetch/pull failure logs a warning and continues from the local copy, and is never a stop. In `worktree` mode a submodule's original checkout is **fetch-only**: checkout, pull, reset, or any command that changes its working tree or HEAD is forbidden. See [branching.md](branching.md).
+3. Root-level artifact and umbrella commands run in `workspace_root`. Any command targeting a mapped submodule path must run in that submodule's mapped workspace from `submodule_workspaces{}` — this covers reads, writes, tests, lint, `status`, `diff`, and `commit`, not just file edits. Never run implementation stages from a path that is neither.
 4. In `--issue` mode, the lowercase Jira issue key is the artifact id prefix and must stay stable across reruns. See [intake.md](intake.md).
 4a. **In `--issue` mode the ticket must be persisted as `ticket.md` in the feature's artifact folder** and committed with the other artifacts, so spec/plan decisions can be traced back to the original request. Spec and plan remain the source of truth for *what gets built*; `ticket.md` is the record of *what was asked*. It is written by `jira-to-speckit` to a staging path and relocated once the artifact folder exists; it is never read back into run context wholesale. See [intake.md](intake.md).
 5. Stage 01 intake has **no interview gate**. After input is collected, continue immediately to the provider's Stage 02 entry step.
@@ -57,5 +64,6 @@ data and immediately invoke the next required step, in the same turn.
 20. Circuit breaker — the only non-`pass` exit from Stage 03: abort only if the **exact same failure repeats for 5 consecutive iterations** with no file change between them, or a git/filesystem error prevents code from being written. Report the stuck state and stop. A failure that differs, or that was followed by any file edit, does not count toward the 5.
 21. On every failed review retry, rebuild the loop context from `state_file` plus the current `fixes[]` only; do not retain the full prior review body or earlier category detail files unless needed for the next fix.
 22. Failure ordering is strict: first run framework install/source checks; only after those pass may runtime stage-invocation errors be reported.
-23. If implementation modifies git submodule repositories, branch inside each modified submodule and commit submodule changes first, then commit parent repo pointer updates. See [branching.md](branching.md).
+23. If implementation modifies git submodule repositories, isolate each modified submodule per `workspace_strategy` — an in-place branch in `branch` mode, a grafted worktree under `.worktrees/<feature>/apps/<name>` in `worktree` mode — and commit submodule changes first, then commit parent repo pointer updates. See [branching.md](branching.md).
+23a. In `worktree` mode, before the Stage 04/05 commit, compare each original submodule checkout's `git status --porcelain` against the baseline captured at graft time. Entries that are new or changed relative to that baseline mean writes leaked to the wrong checkout: stop and report the exact paths. Entries identical to the baseline are the user's pre-existing work and are left alone. See [branching.md](branching.md).
 24. The provider is resolved once per run from `integration.json` and never changes mid-run. See [../integration-mode.md](../integration-mode.md).

@@ -44,6 +44,7 @@ made yet — make it now.
      --integration <value>   → setup intent
      --issue <url>           → Jira pipeline intent
      --yolo                  → mode = yolo (else mode = default)
+     --worktree              → workspace_strategy = worktree (else branch)
      free text               → requirement pipeline intent
 
 3. IF --integration is present:
@@ -134,6 +135,14 @@ differently than in `allowed-tools` — the capabilities are equivalent across a
   confirmation, and Stage 04 are skipped, and Stage 05 is used instead.
 
 Stage 03 is a NO-STOP ZONE in both modes.
+
+## Workspace Strategy
+
+Default is a plain in-place feature branch. `--worktree` opts into isolation, and repo shape
+decides how that is realized: a repo with `.gitmodules` keeps the umbrella branch in-place and
+worktrees only the submodules the plan names (never a recursive submodule init); a single repo gets
+a repo-level worktree. Details, including the dirty-tree confirmation and its `--yolo` resolution:
+[references/shared/branching.md](references/shared/branching.md).
 
 ## Sub-Skill Dependencies
 

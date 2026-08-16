@@ -1,7 +1,8 @@
 # Shared: Intake (Provider-Agnostic)
 
 Applies identically to every provider. Loaded by Stage 01 of all providers.
-Runs **after** the worktree + branch gate in [branching.md](branching.md) has completed.
+Runs **before** the workspace gate in [branching.md](branching.md). Intake resolves the final
+feature name, which the gate then uses to create the branch/worktree exactly once.
 
 ## Intake Mode Selection
 
@@ -40,7 +41,10 @@ If `run_state`/stage file/channel binding is absent in this turn, initialize in 
   "mode": "<default|yolo>",
   "branch_created": false,
   "branch_name": null,
-  "worktree_path": null,
+  "workspace_strategy": "<branch|worktree>",
+  "workspace_root": null,
+  "submodule_workspaces": {},
+  "submodule_baseline_status": {},
   "issue_url": "<resolved-or-null>",
   "ticket_path": null,
   "requirement_text": "<resolved-or-null>"
@@ -48,9 +52,10 @@ If `run_state`/stage file/channel binding is absent in this turn, initialize in 
 ```
 
 Execute Stage 01 in this order (this is the true order regardless of file position):
-**worktree + branch setup → framework source/availability check + install recovery → guidelines load → intake.**
-`branch_created` must be `true` (real `branch_name` and `worktree_path` from actual git commands)
-before any framework stage call, `jira-to-speckit` call, or intake step runs.
+**framework source/availability check + install recovery → guidelines load → intake → workspace gate.**
+The gate runs last because intake resolves the final feature name it needs. `branch_created` must
+be `true` (real `branch_name`, `workspace_strategy`, and `workspace_root` from actual git commands)
+before the provider's Stage 02 entry step and before any business-code write.
 
 `integration` is resolved once by [../integration-mode.md](../integration-mode.md) and never
 changes during the run.
@@ -147,11 +152,11 @@ slug, search the provider's artifact location for an existing artifact whose nam
 2. If several match, use the most recently modified one and log the ambiguity.
 3. Only if none matches, derive `short_title` from the current Jira title.
 
-The same resolution applies to the branch/worktree identity: once `issue_id`/`short_title` (or
-`<NNN>-<slug>` in manual mode) are resolved here, this **is** the point the provisional branch
-created in [branching.md](branching.md) gets renamed (`git branch -m`) to match exactly, and the
-worktree path is moved to the canonical final path when safe, so branch/worktree and artifact
-folder stay aligned across reruns.
+The same resolution supplies the workspace identity: `issue_id`/`short_title` (or `<NNN>-<slug>` in
+manual mode) resolved here is the exact name the workspace gate in [branching.md](branching.md)
+then uses to create the branch — and, in `worktree` mode, the `.worktrees/<feature>/` path. Because
+the gate runs after this step, the name is final on first creation, so branch and artifact folder
+stay aligned across reruns without any rename.
 
 Each provider's Stage 01 defines how `issue_id` and `short_title` compose into its artifact path,
 and that same path is where the ticket snapshot is relocated to.

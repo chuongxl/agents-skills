@@ -25,7 +25,8 @@ Load this only in default mode after `speckit-code-review` returns `pass`.
 
 `finishing-a-development-branch` may be invoked **only after** the commits above, and
 **only** to push the branch and open a PR. Do not let it manage branch lifecycle, merge locally, or
-clean up worktrees during this stage.
+clean up the workspace during this stage — neither the feature branch nor any submodule worktree
+under `.worktrees/`.
 
 ## If Request Changes
 

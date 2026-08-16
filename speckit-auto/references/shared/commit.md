@@ -26,7 +26,15 @@ pipeline failure at the very last step. Every commit below is therefore conditio
 
 If git submodules exist and were modified:
 
-1. For each modified submodule whose status is dirty, commit **inside that submodule first**:
+0. **Leak guard (worktree mode only).** For every entry in `submodule_workspaces{}`, run
+   `git -C <repo-root>/apps/<name> status --porcelain` and compare it against
+   `submodule_baseline_status{}` for that path. Entries new or changed relative to the baseline mean
+   writes leaked into the original checkout instead of the mapped workspace: stop and report the
+   exact paths. Entries identical to the baseline are pre-existing user work — leave them alone.
+   See [branching.md](branching.md).
+1. For each modified submodule whose status is dirty, commit **inside that submodule first**. In
+   `worktree` mode the commit runs in the mapped workspace from `submodule_workspaces{}`, not in
+   `<repo-root>/apps/<name>`:
    - `git add -A`
    - `git commit -m "<commit-message>"`
 2. Then, in the parent repo, commit the submodule pointer update and any parent changes. Re-check
