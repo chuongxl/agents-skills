@@ -82,9 +82,10 @@ If `docs/guidelines/` or `architecture.md` is missing, skip and continue — nev
 ## Workspace Handling (Critical)
 
 The Stage 01 workspace gate in [../shared/branching.md](../shared/branching.md) already creates or
-reuses the workspace — an in-place feature branch by default, a worktree under `--worktree`. Do not
-invoke `using-git-worktrees` inside this provider stage, and do not assume a worktree exists: with
-the default strategy, `workspace_root` is the repo root.
+reuses the workspace — worktree isolation by default, an in-place feature branch under
+`--no-worktree`. Do not invoke `using-git-worktrees` inside this provider stage, and do not assume
+`workspace_root` is a worktree: in a `.gitmodules` repo it is always the repo root, because only
+submodules get worktrees there.
 
 ## Artifact Paths (`specs/` Layout — Same Place as Spec Kit Output)
 

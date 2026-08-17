@@ -64,8 +64,8 @@ subagents dispatched from inside a superpowers skill.
 2. If the superpowers skills are not available, Stage 01 runs install recovery (ask `Install` /
    `Stop`, then install and re-check). See Stage 01.
 3. Stage 01 in [../shared/branching.md](../shared/branching.md) is authoritative for isolation: its
-   workspace gate checks out the working branch — in place by default, in a worktree under
-   `--worktree` — after intake and before the Stage 02 entry step.
+   workspace gate checks out the working branch — with worktree isolation by default, in place
+   under `--no-worktree` — after intake and before the Stage 02 entry step.
    `subagent-driven-development`'s "create or verify isolated workspace" requirement is satisfied by
    that gate, whichever strategy it chose. Do not create another worktree in later stages, and
    never stop to ask which workspace to use. Root-level commands run in `workspace_root`; commands

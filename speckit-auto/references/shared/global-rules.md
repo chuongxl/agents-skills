@@ -19,8 +19,8 @@ The only valid ways to end a turn anywhere in this pipeline are:
 - a genuinely missing required input, after one ask
 - the user explicitly choosing `Stop` at the framework install-recovery ask (rule 7)
 - the user explicitly choosing `Stop` at the workspace risk-confirmation ask (rule 1a)
-- `--yolo` meeting a dirty umbrella in a `.gitmodules` repo, where no isolation is available and no
-  human can confirm (rule 1a)
+- `--yolo` meeting a dirty umbrella in a `.gitmodules` repo, or any dirtiness under an explicit
+  `--no-worktree`, where no isolation is available and no human can confirm (rule 1a)
 - a workspace rerun-reuse validation failure (rule 1b)
 - a submodule leak-guard failure before commit (rule 23a)
 - a mandatory human checkpoint in default mode: any Stage 02 approval interaction (a provider
@@ -38,7 +38,7 @@ data and immediately invoke the next required step, in the same turn.
 ## Non-Negotiable Rules
 
 1. Always create the workspace and check out the working branch — a hard gate via real git commands (not merely described) — **after** intake resolves the final feature name and **before** any business-code write or the provider's Stage 02 entry step. Only the framework source check, install recovery, guidelines load, and intake may precede it; all four are read-only with respect to business code. The workspace is created once, with the final feature name: there is no provisional branch name, no `git branch -m`, and no `git worktree move`. See [branching.md](branching.md).
-1a. `workspace_strategy` defaults to `branch` (branch in-place); `--worktree` selects `worktree`. In a repo with `.gitmodules`, `--worktree` never worktrees the umbrella — it keeps the umbrella on an in-place feature branch and isolates only the submodules named by the plan, never running recursive submodule init/update. When the working tree is dirty, the confirmation ask and its `--yolo` resolution follow the per-level table in [branching.md](branching.md).
+1a. `workspace_strategy` defaults to `worktree`; `--no-worktree` selects `branch` (branch in-place). No strategy ever worktrees the umbrella of a `.gitmodules` repo — the umbrella stays on an in-place feature branch in both, and the default isolates only the submodules named by the plan, never running recursive submodule init/update. Because the umbrella is always in-place there, an uncommitted umbrella change is a live risk on the default path. When the working tree is dirty, the confirmation ask and its `--yolo` resolution follow the per-level tables in [branching.md](branching.md); `--yolo` never overrides an explicit `--no-worktree`.
 1b. Reusing an existing branch or worktree on a rerun requires passing the rerun-reuse validation checklist in [branching.md](branching.md). Stale or mismatched state stops with the exact reason; it is never silently reused.
 2. Base branch priority is `develop → main → master` (local first, then remote-tracking). Sync that base to latest before branching off it — for the main repo, and for any modified submodule in `branch` mode. The sync is best-effort: a fetch/pull failure logs a warning and continues from the local copy, and is never a stop. In `worktree` mode a submodule's original checkout is **fetch-only**: checkout, pull, reset, or any command that changes its working tree or HEAD is forbidden. See [branching.md](branching.md).
 3. Root-level artifact and umbrella commands run in `workspace_root`. Any command targeting a mapped submodule path must run in that submodule's mapped workspace from `submodule_workspaces{}` — this covers reads, writes, tests, lint, `status`, `diff`, and `commit`, not just file edits. Never run implementation stages from a path that is neither.

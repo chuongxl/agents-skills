@@ -33,15 +33,19 @@ that is correct — `.speckit/` is repo-level tooling, not feature-branch conten
 
 ## Strategy Selection
 
-`workspace_strategy` defaults to `branch`. The `--worktree` flag selects `worktree`. Repo shape
+`workspace_strategy` defaults to `worktree`. The `--no-worktree` flag selects `branch`. Repo shape
 then decides how `worktree` is realized — detection is the presence of `.gitmodules`:
 
-| Repo shape | `branch` (default) | `worktree` (`--worktree`) |
+| Repo shape | `worktree` (default) | `branch` (`--no-worktree`) |
 |---|---|---|
-| Has `.gitmodules` | umbrella branch in-place; modified submodules branch in-place | **umbrella branch in-place**; modified submodules get worktrees |
-| Single repo | branch in-place | repo worktree at `.worktrees/<feature>/` |
+| Has `.gitmodules` | **umbrella branch in-place**; modified submodules get worktrees | umbrella branch in-place; modified submodules branch in-place |
+| Single repo | repo worktree at `.worktrees/<feature>/` | branch in-place |
 
-In a repo with `.gitmodules`, `--worktree` means exactly this:
+**The umbrella is branch in-place under both strategies.** In a `.gitmodules` repo, no strategy ever
+worktrees the umbrella, so uncommitted umbrella changes are a live risk on the default path — see
+"Risk-Triggered Confirmation".
+
+In a repo with `.gitmodules`, the default `worktree` strategy means exactly this:
 
 - keep the umbrella repo in-place on a feature branch
 - do not create an umbrella worktree
@@ -54,7 +58,7 @@ worktree) or pushes the agent toward recursive submodule initialization, which c
 multi-team repos with 8-10 submodules. The strategy optimizes for the actual change surface: branch
 the umbrella pointer, worktree only the submodules being edited.
 
-For a single repo under `--worktree`, `workspace_root` is the worktree and artifact paths resolve
+For a single repo under `worktree`, `workspace_root` is the worktree and artifact paths resolve
 natively — no path map is needed. The ignored paths the run depends on (`.env` in `--issue` mode,
 `.speckit/`) are **read from the repo root**, not from the worktree, and `.speckit/` output is
 written back there. They are resolved by falling back to the repo root rather than copied, so
@@ -64,7 +68,7 @@ credentials are never duplicated onto disk.
 
 Use `.git/info/exclude` in all modes, unless `.gitignore` already contains `.worktrees/`, in which
 case write nothing. `info/exclude` is local and untracked, so it dirties no tracked file and needs
-no commit — which matters for single-repo `--worktree`, where a `.gitignore` edit would land in the
+no commit — which matters for a single-repo worktree, where a `.gitignore` edit would land in the
 base checkout rather than in the feature worktree it is meant to describe.
 
 ## Rerun Reuse Validation
@@ -86,32 +90,39 @@ If any check fails, stop and report the exact reason. Never silently reuse stale
 Dirtiness is evaluated per level, and the two levels have different available remedies. A clean
 tree at both levels asks nothing, preserving Stage 01's no-interview-gate property (global rule 5).
 
+Because `worktree` is the default, most dirtiness is already handled by isolation and asks nothing.
+A confirmation is needed only where isolation is unavailable or was explicitly declined.
+
 **Umbrella dirty** — tracked files modified or staged in the umbrella itself:
 
-- If dirty before the branch switch: ask `Continue` / `Stop`.
-- In a `.gitmodules` repo, worktree is **not** an available safety option for umbrella dirtiness.
-  An umbrella worktree would lose the ignored runtime files above and/or push the agent toward
+- In a `.gitmodules` repo, the umbrella is branch in-place under **both** strategies, so this fires
+  on the default path: ask `Continue` / `Stop`. Worktree is **not** an available remedy here — an
+  umbrella worktree would lose the ignored runtime files above and/or push the agent toward
   recursive submodule hydration, whose cost this strategy exists to avoid.
-- In a single repo, worktree **is** available, so the ask is `Worktree` / `Continue` / `Stop`.
+- In a single repo under the default `worktree`: do not ask. The repo worktree leaves the dirty
+  checkout untouched.
+- In a single repo under `--no-worktree`: ask `Worktree` / `Continue` / `Stop`.
 
 **Submodule dirty** — tracked files modified or staged inside a submodule:
 
-- If the selected mode is `branch`: ask `Worktree` / `Continue` / `Stop`.
-- If the selected mode is `worktree`: do not ask. Proceed by creating submodule worktrees; the
-  original submodule checkout is left untouched, so its dirty state is already safe.
+- Under the default `worktree`: do not ask. The submodule worktrees leave the original checkout
+  untouched, so its dirty state is already safe.
+- Under `--no-worktree`: ask `Worktree` / `Continue` / `Stop`.
 
-**`--yolo` resolution.** No question is asked; the mode is chosen from the same condition:
+**`--yolo` resolution.** No question is asked. `--yolo` never silently overrides an explicit
+`--no-worktree`, and never proceeds when the only safe remedy is unavailable:
 
 | Condition | `--yolo` behaviour |
 |---|---|
-| Clean at both levels | `branch` (the normal default) |
-| Submodule dirty only | `worktree` — isolation leaves the dirty checkout untouched |
-| Umbrella dirty, single repo | `worktree` |
-| Umbrella dirty, `.gitmodules` repo | **stop and report** — no safe automatic answer exists |
+| Clean at both levels | proceed on the default `worktree` |
+| Submodule dirty, default strategy | proceed — submodule isolation leaves the dirty checkout untouched |
+| Single repo dirty, default strategy | proceed — the repo worktree leaves the dirty checkout untouched |
+| Umbrella dirty, `.gitmodules` repo | **stop and report** — the umbrella is branch in-place in every strategy, so no isolation exists to fall back on |
+| Any dirtiness under explicit `--no-worktree` | **stop and report** — isolation is the only safe remedy and the user explicitly declined it |
 
-The last row is a deliberate stop: with no isolation available and no human to confirm, continuing
-would commit the user's unrelated in-flight umbrella changes into the feature branch. Halting is
-the lesser harm, and the condition is rare.
+Both stops are deliberate. With no human to confirm, continuing would commit the user's unrelated
+in-flight changes into the feature branch, and overriding an explicit flag would violate a choice
+the user stated on the command line. Halting is the lesser harm, and both conditions are rare.
 
 ## Submodule Workspaces
 
