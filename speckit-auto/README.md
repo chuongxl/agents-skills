@@ -30,6 +30,8 @@ Speckit Auto orchestrates delivery across six distinct stages:
 6. **Stage 06: Spec Completion** — Mark the spec as completed and create a final commit.
 
 **Key rule**: Stage 03 is a **NO-STOP ZONE** in both default and YOLO modes; code review loops continue automatically until the spec is satisfied.
+<img width="754" height="501" alt="image" src="https://github.com/user-attachments/assets/bc5e90df-0523-4951-a195-3b740d1d38c6" />
+<img width="2120" height="3775" alt="spec-driven-development-Speckit-Auto-Skill drawio" src="https://github.com/user-attachments/assets/cbe59272-6c75-4f33-bdf9-ad7d0f6aaa22" />
 
 ### Provider System
 
