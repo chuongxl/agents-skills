@@ -33,6 +33,16 @@ Claude Code and OpenCode expose the same capabilities under their own names (`Ba
 - Review scope = current git change set (staged + unstaged, incl. renames/deletes). This is
   evaluated in the current working directory — when invoked from `speckit-auto`, the caller must
   run this skill inline from inside the Stage 01 linked worktree, never from the base checkout.
+- **Incremental scope (optional)**: the caller may pass `scope` as either a newline-separated file
+  list (`--files <paths>`) or a compact map `file → {lines, blob}` — the hunk ranges changed since
+  the last review of the same feature. When both `scope` and `state_file` are present, only the
+  scoped hunks are re-read; all other files/hunks/areas carry their prior verdicts forward from
+  `state_file`. When `scope` is absent, scope = the full git change set (backward-compatible).
+- **Invalidate (optional)**: a list of tokens marking which cached review state is stale because a
+  Stage 02 artifact changed since the last pass: `spec` (re-derive the checklist + re-run all five
+  areas), `plan` (re-run architecture + business-gap), or `tasks` (re-run business-gap +
+  code-quality + unit-tests for the scoped files). Categories/tokens not listed carry their prior
+  verdicts forward. `invalidate: ["spec"]` is equivalent to a full pass.
 - **Retry runs**: the `state_file` path from the previous failed review of the same feature
   (supplied by the caller, e.g. speckit-auto Stage 03 re-entry, or the newest existing
   `.speckit/review-<spec-id>-*/state.json`). Its presence switches area loading to the selective
@@ -68,10 +78,21 @@ Step 1 must always yield a numbered checklist.
 If zero requirements are extractable, return `failed` with one `FR-000` fix telling the user to add
 testable requirements to the spec. Never return `pass` against an empty checklist.
 
+On a **retry run** (prior `state_file` present), do **not** re-derive the checklist — load it
+verbatim from `state_file.checklist` and reuse its `requirements_source`. Re-read `spec.md` only if
+`state_file.checklist` is absent, `spec.md` has a newer mtime than the state file, or the caller's
+`invalidate` includes `spec`.
+
 ## Procedure
 
-1. Build the requirement checklist (see above).
-2. Resolve the git change set as review scope.
+1. Build the requirement checklist (see above). On retry, load it from `state_file.checklist`
+   instead of re-reading `spec.md`; re-derive only if `state_file.checklist` is absent, `spec.md`
+   is newer than the state file, or `invalidate` includes `spec`.
+2. Resolve the review scope: use the explicit `scope` input if supplied, else compute the full
+   git change set (staged + unstaged, incl. renames/deletes). When `scope` carries line ranges,
+   read only those hunks (plus ~5 lines of surrounding context) instead of whole files. On retry
+   with `state_file` + `scope`, restrict re-reading to the scoped hunks; files/hunks outside
+   `scope` carry forward as verified.
 3. **Project guidelines (conditional)** — if `docs/guidelines/architecture.md` exists, load
    [references/project-guidelines-review.md](references/project-guidelines-review.md) and follow its
    Steps 1–4 to load only the guideline files matching the changed-file categories. Skip silently
@@ -93,7 +114,12 @@ testable requirements to the spec. Never return `pass` against an empty checklis
      open (unresolved) findings in `state_file`; categories with no open findings carry their
      prior verdicts forward from `state_file` — do not reload their refs. Recompute
      `Business cover` from the checklist in `state_file`, re-checking only open `FR-*`/`NFR-*`
-     items now.
+     items now. When a `scope` is supplied, additionally restrict each loaded area to the scoped
+     files: findings on files outside `scope` carry forward and are not re-read or re-scanned.
+     Any category named by `invalidate` is treated as having open findings this pass: its prior
+     verdicts are dropped and its area ref is loaded and run again. `invalidate` expands as
+     `spec` → all five areas, `plan` → `architecture` + `business-gap`, `tasks` → `business-gap`
+     + `code-quality` + `unit-tests`.
    - **Test-runner skip**: before loading `unit-test-coverage.md`, probe for a test runner
      (package.json `scripts.test`, `*.spec.*`/`*.test.*` files, `tests/`, `pytest.ini`/
      `pyproject.toml [tool.pytest]`, `go.mod` + `*_test.go`, surefire in `pom.xml`, a `test`
@@ -106,7 +132,9 @@ testable requirements to the spec. Never return `pass` against an empty checklis
 6. `Business cover = round(covered / total * 100)`.
 7. Write `state_file` (each finding carries `status: open|resolved` so retry runs can carry
    verified verdicts forward), plus one detail file **per category that has issues**. Skip empty
-   categories; on `pass` write only `state_file`.
+   categories; on `pass` write only `state_file`. Persist a `scope` digest inside `state_file` —
+   the `last_reviewed_sha` and the `file → {lines, blob}` map actually reviewed this pass — so the
+   next iteration diffs against what was already reviewed, never re-reading unchanged hunks.
 8. Build `fixes` from all findings ordered high → medium → low severity, then keep only the **top 3**
    inline. The rest live in `state_file` and the category detail files.
 9. `status` = `pass` only if `fixes` is empty **and** coverage ≥ 80% (or `N/A`) **and** the checklist
@@ -123,7 +151,7 @@ they already live in the files.
 | `status` | `"pass"` or `"failed"` |
 | `Business cover` | percent string, `"0%"`–`"100%"` |
 | `unit-test-coverage` | percent string, or `"N/A (no test runner detected)"` — `N/A` counts as passing |
-| `state_file` | `.speckit/review-<spec-id>-<ts>/state.json` — ordered issue inventory + next fix queue, so speckit-auto can resume without reloading findings |
+| `state_file` | `.speckit/review-<spec-id>-<ts>/state.json` — ordered issue inventory + next fix queue + pinned `checklist` + `scope` digest, so speckit-auto can resume without re-deriving the checklist or re-reading unchanged hunks |
 | `detail_files` | map of category → path; `{}` on pass. Keys: `business-gap`, `architecture`, `security`, `code-quality`, `unit-tests`, each at `.speckit/review-<spec-id>-<ts>/<key>.json` |
 | `fixes` | `[]` on pass; else ≤ 3 objects with exactly `id`, `file`, `method`, `lines`, `action` |
 

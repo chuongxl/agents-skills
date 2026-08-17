@@ -34,7 +34,8 @@ here; never suppress them.
 `speckit-code-review` must run **inline** (never as a background agent/task) and must always be
 given the spec path explicitly: `specs/<feature_folder>/spec.md` — an ambiguous match makes it ask
 the user, a turn-ending stop inside this NO-STOP ZONE. On retry iterations, also pass the previous
-review's `state_file` path so the review runs in its selective area-loading mode. That spec is a
+review's `state_file` path so the review runs in its selective area-loading mode, **and** pass an
+explicit `scope` (the files changed since that review) so it re-reads only those files. That spec is a
 `brainstorming` design document with no `FR-*`/`NFR-*` IDs; the review skill synthesizes the
 checklist itself, so never pre-convert the spec to add IDs.
 
@@ -91,6 +92,69 @@ If `BASE_SHA` and `HEAD_SHA` resolve to the same commit at R0, nothing is commit
 - **Clean tree**: nothing was implemented — return to PHASE 1 step C1 once. If PHASE 1 completes
   again and the range is still empty with a clean tree, that is a stalled implementation: apply the
   global rule 20 circuit breaker rather than looping C1 → R0 indefinitely.
+
+## Incremental Review Scope (Avoid Re-reading Unchanged Code)
+
+The dominant Stage 03 cost is the review re-reading the whole feature diff + spec on every
+iteration, when one fix iteration usually touches 1–3 files. Bound it:
+
+1. At Stage 03 entry, set `last_reviewed_sha = BASE_SHA` (the merge-base recorded in Review Range)
+   in run-state (see [../shared/run-state.md](../shared/run-state.md)).
+2. Before each R1, compute the incremental change map from inside the worktree in one call:
+   `git diff --unified=0 <last_reviewed_sha>..HEAD` → parse the `@@` hunk headers into a
+   `file → {lines}` map (fall back to `--name-only` when a file has no parseable hunks). The first
+   iteration is the full feature diff; every later iteration is only the hunks the fix loop just
+   edited.
+3. Pass that map to `speckit-code-review` as `scope` (in addition to `state_file` on retries). The
+   review then reads only those hunks with open findings and carries everything else forward.
+4. After R1 returns, read the review's `scope` digest back from its `state_file` and set
+   `last_reviewed_sha = HEAD` in run-state — even when the review `failed`, because that pass is
+   the checkpoint for the next, narrower diff.
+5. If `last_reviewed_sha..HEAD` is empty (nothing changed since the last review yet `status` was
+   `failed`), the fixes touched no reviewed file: re-run the full scope once rather than looping on
+   an empty diff, and count it toward the rule 20 circuit breaker.
+
+Do not fold this into the R3 "drop the review body" step — that clears the orchestrator's own
+context; this bounds what the *review skill* reads on its next call, which is the larger cost.
+
+## Regeneration → Re-implementation → Re-review (Granular Invalidation)
+
+When the fix loop regenerates a Stage 02 artifact, the code must be re-implemented to match **before**
+the next review — otherwise a review can only fail, or worse, pass against stale code. Granular
+invalidation tells `speckit-code-review` exactly which cached verdicts are stale; re-implementation
+makes the code reflect the new artifacts.
+
+Superpowers has **no `tasks.md`** — the task breakdown lives inside `plan.md` (its `- [ ]`
+checkboxes). There are therefore only two invalidation levels:
+
+| Artifact regenerated | `invalidate` token | Re-implement scope (before re-review) |
+|---|---|---|
+| `spec.md` (design changed — Stage 02/04 restart routing) | `spec` → re-derive checklist + all areas | full plan → implement cascade (restart routing) |
+| `plan.md` (via `writing-plans` — architecture **and** task breakdown) | `plan` → architecture + business-gap | affected slice/tasks via `subagent-driven-development`/`executing-plans` |
+
+**Mandatory re-implementation invariant:** after R5 regenerates `plan.md` (or restart routing
+changes `spec.md`), R7 is no longer "if needed" — invoke the implementation skill for the affected
+scope (the delta tasks, computed below) **before** returning to R1. Record the regenerated artifact
++ affected scope in run-state (`review_invalidate`, see
+[../shared/run-state.md](../shared/run-state.md)) so the next R1 passes the matching `invalidate`
+token and `scope`. Only re-review after the code reflects the regenerated artifacts.
+
+### Task Delta Detection (Re-implement Only What Changed)
+
+Regeneration rewrites `plan.md` and resets its `- [ ]` checkboxes to unchecked, so "unchecked" is
+**not** the delta — diffing by checkbox would re-implement everything. Compute the delta by task
+*content*:
+
+1. **Before** R5 runs `writing-plans`, snapshot the current task checklist (the `- [ ]`/`- [x]`
+   lines in `plan.md`) to `.speckit/pre-regen-tasks.md`. `.speckit/` is gitignored
+   (scratch-hygiene), so this never leaks into a commit.
+2. Run `writing-plans`.
+3. Extract the task lines from the regenerated `plan.md` and diff against the snapshot:
+   - **new** task (absent before) or **edited** task (text changed) → re-implement.
+   - **unchanged** task (identical text, even if its checkbox was reset) → already implemented;
+     skip it.
+4. R7 passes **only the delta tasks** to the implementation skill (a scoped task list, never the
+   whole plan).
 
 ## Mandatory TDD
 
@@ -169,7 +233,8 @@ PHASE 2 — Code review loop
        - apply Critical and Important findings immediately via file edits
          (evaluate them through receiving-code-review discipline)
        - log Minor findings; do not stop for any of them
-  R1 — Invoke speckit-code-review with spec path specs/<feature_folder>/spec.md;
+  R1 — Invoke speckit-code-review with spec path specs/<feature_folder>/spec.md and, on retries,
+       the incremental `scope` (files changed since last review) + `state_file`;
        receive the JSON result (AUTHORITATIVE GATE)
    R2 — Read result.status
      IF status = "pass"  → EXIT STAGE 03
@@ -204,6 +269,10 @@ PHASE 2 — Code review loop
     - Mix of FR-*/ARCH-* + SEC-*/CODE-*/TEST-* → re-run `writing-plans` (task breakdown only)
       for the affected workspace, re-run the self-review gate, then R6.
     - Only SEC-*/CODE-*/TEST-* fixes → go directly to R6 (no artifact regeneration).
+    - Snapshot the pre-regen task checklist first (`.speckit/pre-regen-tasks.md`), then record the
+      regenerated artifact + affected scope in run-state (`review_invalidate = plan`) so R7
+      re-implements only the delta and the next R1 passes the matching `invalidate` token
+      (see "Regeneration → Re-implementation → Re-review" above).
   R6 — Apply fixes DIRECTLY using file-editing tools (this turn, right now):
     For EACH item in the corrective action list:
       1. Open the file named in suggested_fix_area / file
@@ -216,7 +285,11 @@ PHASE 2 — Code review loop
       - Just make the edits, then continue the Stage 03 flow immediately (rule 12)
       - If a fix needs a new file, create it
       - If context is insufficient, read the file first, then fix
-  R7 — Run the implementation skill for broader changes if needed.
+  R7 — If R5 regenerated plan.md (or restart routing changed spec), run the implementation
+       skill for the delta tasks computed in "Task Delta Detection" FIRST (mandatory) so the code
+       reflects the new artifacts; otherwise run it only for broader changes if needed. Clear
+       `review_invalidate` in run-state and delete the `.speckit/pre-regen-tasks.md` snapshot after
+       the re-implementation completes.
        Then re-run verification-before-completion, scoped to the tasks and tests touched by this
        iteration's fixes (not the whole plan), and go DIRECTLY to R1 (never to R0/R2 — R0 is
        first-entry only and is skipped whenever `r0_completed` is true).

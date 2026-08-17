@@ -11,6 +11,8 @@ python3 tools/test_validate_skills.py   # self-tests for the validator
 
 CI (`.github/workflows/validate-skills.yml`) runs both, plus `bash -n` on `*.sh` and `python3 -m compileall -q tools */scripts`. Stdlib-only tooling — never add a third-party dependency to `tools/`.
 
+Local-only (not CI): `python3 tools/test_speckit_auto.py` **executes** the `speckit-auto` skill through a real agent (OpenCode/Claude/Copilot) on the build-a-to-do-app scenario and prints a coverage report. It needs an agent CLI with credentials, so it cannot run in CI.
+
 ## Skills
 
 - `speckit-auto` — orchestrator; depends on `jira-to-speckit` + `speckit-code-review` being installed

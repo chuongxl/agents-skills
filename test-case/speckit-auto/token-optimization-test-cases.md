@@ -151,6 +151,57 @@ pass, all TC-OPT cases pass.
 
 ---
 
+## D. Incremental Review-Loop Optimization Cases (execution-based)
+
+Covers the review-loop token optimization (incremental scope, diff digest, pinned checklist,
+granular invalidation, task delta detection) by **actually running the `speckit-auto` skill
+through a coding agent** on the build-a-to-do-app scenario, then validating the on-disk outcomes.
+
+Driver: `tools/test_speckit_auto.py` (stdlib only; requires an agent CLI with credentials).
+
+```bash
+python3 tools/test_speckit_auto.py                         # run via OpenCode (default)
+python3 tools/test_speckit_auto.py --agent claude          # run via Claude Code
+python3 tools/test_speckit_auto.py --model opencode-go/deepseek-v4-pro
+python3 tools/test_speckit_auto.py --timeout 1200 --keep   # keep the workspace for inspection
+python3 tools/test_speckit_auto.py --json
+```
+
+What the driver does, in order:
+
+1. Copies the current repo's `speckit-auto`, `speckit-code-review`, `jira-to-speckit` into the
+   agent's skill directory.
+2. Seeds a fresh git repo as a minimal to-do app (`package.json` with `node --test`,
+   `docs/guidelines/architecture.md`, one commit) — provider defaults to `superpowers` (its skills
+   are already installed).
+3. Invokes the agent headlessly with `Run the speckit-auto skill with --yolo on this requirement:
+   <to-do requirement>`.
+4. Validates the artifacts the pipeline should have produced and prints a coverage report.
+
+Scenario: **build a to-do application** (create/edit/complete/delete tasks, organize into lists,
+set due dates; plain Node.js, no external deps).
+
+| ID | Check | Expected result |
+|---|---|---|
+| V01 | spec produced | `specs/<feature>/spec.md` exists (brainstorming design spec) |
+| V02 | plan produced | `specs/<feature>/plan.md` exists (writing-plans plan) |
+| V03 | implementation | code written under `src/` |
+| V04 | tests | at least one `*.test.js` (TDD via `node --test`) |
+| V05 | commits | ≥1 commit on top of the seed commit |
+| V06 | run-state | `.speckit/run-state.json` persisted |
+| V09 | review gate | `.speckit/review-*/state.json` written (speckit-code-review ran) |
+| V07 | isolation | linked worktree under `.worktrees/` or a non-`main` feature branch |
+| V08 | completion | agent run finished without timeout; token cost reported |
+
+Pass criteria: `python3 tools/test_speckit_auto.py` exits 0 (all checks PASS). A non-zero exit or
+any FAIL documents exactly which pipeline artifact was not produced. Validation runs against the
+Stage 01 linked worktree, not the base checkout (the pipeline always executes inside the worktree).
+
+Note: this driver is a local/developer tool — it needs agent credentials, so it is intentionally
+not part of CI.
+
+---
+
 ## Appendix: Comparison Report Template
 
 Copy to `docs/token-optimization-comparison.md` and fill after optimization. Every cell must come

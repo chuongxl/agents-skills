@@ -28,14 +28,26 @@ so it is automatically discarded if the worktree is deleted.
   "execution_report_path": "specs/<issue_id>-<short_title>/execution-report.md",
   "stage_01_completed_at": "2026-08-16T07:00:00Z",
   "stage_02_completed_at": null,
-  "stage_03_completed_at": null
+  "stage_03_completed_at": null,
+  "last_reviewed_sha": null,
+  "review_invalidate": null
 }
 ```
 
 All paths are **relative to the worktree root**. `project_context` is the same object built in
 Stage 01 from `docs/guidelines/architecture.md` (see
 [preflight-guidelines-context.md](preflight-guidelines-context.md)); it is cached here so later
-stages can load it without re-reading the guideline file.
+stages can load it without re-reading the guideline file. `last_reviewed_sha` is the git commit the
+last `speckit-code-review` pass covered (initialized to the base-branch merge-base at Stage 03
+entry and updated to `HEAD` after every review pass, pass or fail); Stage 03 uses it to compute the
+incremental `scope` so retries re-read only files changed since the last review. `review_invalidate`
+is the granular invalidation token (`spec` | `plan` | `tasks` | `null`) set after a Stage 02
+artifact regeneration; the next review pass gets it as `invalidate`, and it is cleared once the
+affected scope has been re-implemented and re-reviewed.
+
+Provider note: `github-speckit` produces `spec.md`, `plan.md`, `checklist.md`, and `tasks.md`
+(`tasks_path` set); `superpowers` produces only `spec.md` and `plan.md` — the task breakdown lives
+inside `plan.md`, so `tasks_path` is `null` and any task-level change is a `plan`-level change.
 
 ## Persist Protocol
 
