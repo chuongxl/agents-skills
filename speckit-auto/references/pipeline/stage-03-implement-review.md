@@ -2,7 +2,7 @@
 
 Implementation identity, convergence step, and fix-application style come from the resolved
 provider adapter ([../providers/](../providers/)): github-speckit runs
-`speckit.implement → speckit.converge`; superpowers runs its implementation skill
+`speckit-implement → speckit-converge`; superpowers runs its implementation skill
 (`subagent-driven-development` preferred, `executing-plans` fallback, chosen once at entry) with
 per-step `test-driven-development` and `systematic-debugging` on failures. Discard Stage 02
 interview context at entry — this stage is a NO-STOP ZONE.
@@ -104,7 +104,8 @@ PHASE 2 — Code review loop
          (speckit-code-review is the authoritative gate)
   R1 — Invoke speckit-code-review with the explicit spec path; receive the JSON result
   R2 — Read result.status
-       IF "pass"   → EXIT STAGE 03 → default mode: Stage 04; --yolo: YOLO commit path (Stage 04)
+       IF "pass"   → EXIT STAGE 03 → load stage-04-finish.md immediately in the same turn
+                     (default mode: Stage 04 human review; --yolo: YOLO auto-commit path)
        IF "failed" → go to R3 immediately. No summary, no turn end, no user question.
   R3 — Read the compact result fields only:
        status, "Business cover", unit-test-coverage (<80% → all TEST-* fixes apply),
@@ -146,6 +147,11 @@ PHASE 2 — Code review loop
 
 ## Exit Routing
 
-`status = pass` → jump to [stage-04-finish.md](stage-04-finish.md) immediately: Stage 04 human
-review + commit in default mode (mandatory, never skipped), or the YOLO auto-commit path in
-`--yolo` mode.
+`status = pass` from `speckit-code-review` is the **only** normal exit from Stage 03. When it
+fires, immediately load and execute [stage-04-finish.md](stage-04-finish.md) **in the same turn**
+— no summary, no turn end, no user question before Stage 04 begins:
+
+- **Default mode:** Stage 04 human review + commit (mandatory, never skipped).
+- **`--yolo` mode:** Stage 04 YOLO auto-commit path.
+
+Do not wait for a user message to trigger Stage 04. The transition is automatic and immediate.
