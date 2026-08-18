@@ -6,7 +6,8 @@ Load this only when `--yolo` is enabled and `speckit-code-review` is already `pa
 2. Auto-generate the commit message:
    `feat(<artifact_id>): <short summary from spec.md or Jira summary>`
    (`artifact_id` — see ../shared/commit.md)
-3. Run the commit procedure in [../shared/commit.md](../shared/commit.md) with that message.
+3. Run the commit + push procedure in [../shared/commit.md](../shared/commit.md) with that
+   message.
 
 ## Notes
 

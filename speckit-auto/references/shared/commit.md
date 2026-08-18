@@ -1,4 +1,4 @@
-# Shared: Commit Procedure (Provider-Agnostic)
+# Shared: Commit + Push Procedure (Provider-Agnostic)
 
 Used by Stage 04 (default mode, after human approval) and Stage 05 (`--yolo`). The procedure is
 identical; only the commit message source differs — Stage 04 asks the user, Stage 05 auto-generates
@@ -42,15 +42,30 @@ If no submodules were modified and the tree is dirty:
 - `git add -A`
 - `git commit -m "<commit-message>"`
 
+## Branch Push (Required)
+
+After the commit decision above (including the "already committed during Stage 03" success path),
+push the current feature branch to the remote:
+
+1. Resolve the current branch:
+   - `git branch --show-current`
+2. Push to `origin`:
+   - first push on a new branch: `git push -u origin <branch>`
+   - subsequent pushes: `git push origin <branch>`
+3. If push fails, stop and report the exact failure.
+
+This stage must leave the implementation commit(s) available on the remote feature branch.
+
 ## Reporting
 
-Report the resulting commits (hash + subject). If nothing needed committing, report the Stage 03
-commits instead — never report "no commit" as a failure.
+Report the resulting commits (hash + subject) and the pushed branch name. If nothing needed
+committing, report the Stage 03 commits instead — never report "no commit" as a failure.
 
 ## Failure Handling
 
 If a commit that was actually needed fails, stop and report the exact failure. A skipped commit on
-an already-clean tree is **not** a failure and never stops the pipeline.
+an already-clean tree is **not** a failure and never stops the pipeline. A failed push is a failure
+for this stage.
 
 ## Scratch Must Already Be Ignored
 

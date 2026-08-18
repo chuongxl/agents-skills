@@ -25,8 +25,8 @@ Speckit Auto orchestrates delivery across six distinct stages:
 1. **Stage 01: Preflight + Intake** — Validate the requirement, extract context from docs/guidelines, and prepare the project environment for spec authoring.
 2. **Stage 02: Spec / Design** — Author a detailed feature specification including acceptance criteria, edge cases, and architectural decisions.
 3. **Stage 03: Implement + Code Review Loop** — Execute implementation and automatically invoke speckit-code-review until the code passes the spec; no human approval required.
-4. **Stage 04: Human Review + Commit** (default mode only) — Human reviewer validates the implementation against the spec and makes the final decision before merge.
-5. **Stage 05: YOLO Commit Flow** (YOLO mode only) — Automatically merge and commit with zero human checkpoints.
+4. **Stage 04: Human Review + Commit** (default mode only) — Human reviewer validates the implementation against the spec, then the pipeline commits and pushes the feature branch.
+5. **Stage 05: YOLO Commit Flow** (YOLO mode only) — Automatically commit and push the feature branch with zero human checkpoints.
 6. **Stage 06: Spec Completion** — Mark the spec as completed and create a final commit.
 
 **Key rule**: Stage 03 is a **NO-STOP ZONE** in both default and YOLO modes; code review loops continue automatically until the spec is satisfied.
@@ -55,14 +55,14 @@ Each provider includes stage-specific reference files that implement the pipelin
 
 **Default Mode** (recommended for critical features):
 - Runs Stages 01–04 with mandatory human checkpoint at Stage 04
-- Requires explicit human approval before code is merged
+- Requires explicit human approval before code is committed and pushed
 - Best for production, regulatory, or high-stakes work
 
 **YOLO Mode** (`--yolo` flag):
 - Skips Stage 04, uses Stage 05 instead
-- Zero human checkpoints; fully automated merge and commit
+- Zero human checkpoints; fully automated commit and push
 - Ideal for internal tools, experiments, or when continuous delivery is the goal
-- All code still passes speckit-code-review before merge
+- All code still passes speckit-code-review before push
 
 ---
 
@@ -182,11 +182,11 @@ This writes to `.speckit/integration.json` (repo-local) and persists for all fut
 **Stage 04 (Human Review + Commit, default mode only)**:
 - Present implementation summary and code diff to human reviewer
 - Human approves or requests changes (returns to Stage 03)
-- Approved code triggers merge and commit
+- Approved code triggers commit and push to the remote feature branch
 
 **Stage 05 (YOLO Commit Flow, YOLO mode only)**:
-- Automatically merge feature branch to main
-- Create implementation commit with linked spec
+- Automatically create implementation commit with linked spec
+- Push the feature branch to origin
 
 **Stage 06 (Spec Completion)**:
 - Mark spec completed in spec file
@@ -204,7 +204,7 @@ Every feature is authored to a specification first, implementation follows the s
 Stage 03 automatically invokes `speckit-code-review` until the implementation passes. Loop continues until spec compliance achieved—humans can't bypass the gate.
 
 ### Human-in-the-Loop vs Fully Automated
-- **Default mode**: Strategic checkpoint at Stage 04 allows human judgment on merge timing, additional testing, or deployment readiness
+- **Default mode**: Strategic checkpoint at Stage 04 allows human judgment on commit/push timing, additional testing, or deployment readiness
 - **YOLO mode**: Removes human checkpoint for continuous delivery workflows; all code still passes spec review
 
 ### Provider Flexibility
@@ -350,7 +350,7 @@ skill speckit-auto --yolo "Add Sentry error reporting to API server"
 **Execution**:
 1. **Stages 01–03**: Same as default, but no human prompts
 2. **Stage 04**: Skipped (YOLO mode)
-3. **Stage 05**: Automatic merge to main
+3. **Stage 05**: Automatic commit and push to remote feature branch
 4. **Stage 06**: Completion commit
 
 **Commits produced**: Spec commit + implementation commit (no approval review)

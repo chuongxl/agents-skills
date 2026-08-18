@@ -19,12 +19,13 @@ Load this only in default mode after `speckit-code-review` returns `pass`.
 ## If Approved
 
 1. Ask for the commit message.
-2. Run the commit procedure in [../shared/commit.md](../shared/commit.md) with that message.
+2. Run the commit + push procedure in [../shared/commit.md](../shared/commit.md) with that
+   message.
 
 ## Optional PR Creation
 
-`finishing-a-development-branch` may be invoked **only after** the commits above, and
-**only** to push the branch and open a PR. Do not let it manage branch lifecycle, merge locally, or
+`finishing-a-development-branch` may be invoked **only after** the commit/push above, and
+**only** to open a PR. Do not let it manage branch lifecycle, merge locally, or
 clean up worktrees during this stage.
 
 ## If Request Changes

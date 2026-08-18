@@ -5,7 +5,7 @@ description: |
   using a pluggable integration provider: github-speckit (repo-installed GitHub Spec Kit
   agents) or superpowers (obra/superpowers skills library).
   Covers intake, spec/design, implementation, and automatic speckit-code-review
-  remediation loops until pass, then commit and completion.
+  remediation loops until pass, then commit, push, and completion.
   Use --integration <github-speckit|superpowers> to set the provider (setup only, no pipeline).
   Use --yolo for zero-human-in-the-loop fully automated execution.
 compatibility: "Runs on GitHub Copilot, Claude Code, and OpenCode. Discovered from ~/.agents/skills/, ~/.claude/skills/, or ~/.config/opencode/skills/. Requires git and bash; network access for Jira intake via --issue. Providers: github-speckit (Copilot/Claude/OpenCode) or superpowers."
