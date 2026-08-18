@@ -16,10 +16,11 @@ Before invoking the implementation skill, inject into its input:
 
 ## Invocation Method (Critical)
 
-Invoke every superpowers step and `speckit-code-review` through the `skill` tool, per
+Invoke every superpowers step through the `skill` tool, per
 [provider-rules.md](provider-rules.md) (name resolution + Task Tool section). The skills these steps
 dispatch subagents from — `subagent-driven-development`, `requesting-code-review` — are required
-here; never suppress them.
+here; never suppress them. `speckit-code-review` is the one exception: dispatch it as a sub-agent
+(see below), never through the `skill` tool inline.
 
 | Step | Skill |
 |------|-------|
@@ -31,13 +32,16 @@ here; never suppress them.
 | Review response discipline | `receiving-code-review` |
 | Completion evidence gate | `verification-before-completion` |
 
-`speckit-code-review` must run **inline** (never as a background agent/task) and must always be
-given the spec path explicitly: `specs/<feature_folder>/spec.md` — an ambiguous match makes it ask
-the user, a turn-ending stop inside this NO-STOP ZONE. On retry iterations, also pass the previous
-review's `state_file` path so the review runs in its selective area-loading mode, **and** pass an
-explicit `scope` (the files changed since that review) so it re-reads only those files. That spec is a
-`brainstorming` design document with no `FR-*`/`NFR-*` IDs; the review skill synthesizes the
-checklist itself, so never pre-convert the spec to add IDs.
+`speckit-code-review` must run as a **sub-agent** (background task, never inline in this
+orchestrator's context) and must always be given the spec path explicitly:
+`specs/<feature_folder>/spec.md` — an ambiguous match makes it ask the user, a turn-ending stop
+inside this NO-STOP ZONE. Dispatch it via the `task` tool with a `general-purpose` agent type whose
+prompt instructs it to load and run the `speckit-code-review` skill and return only the JSON verdict;
+block on that dispatch. On retry iterations, also pass the previous review's `state_file` path so the
+review runs in its selective area-loading mode, **and** pass an explicit `scope` (the files changed
+since that review) so it re-reads only those files. That spec is a `brainstorming` design document
+with no `FR-*`/`NFR-*` IDs; the review skill synthesizes the checklist itself, so never pre-convert
+the spec to add IDs.
 
 Never stop with a generic runtime/capability disclaimer before attempting the real call.
 
@@ -233,10 +237,14 @@ PHASE 2 — Code review loop
        - apply Critical and Important findings immediately via file edits
          (evaluate them through receiving-code-review discipline)
        - log Minor findings; do not stop for any of them
-  R1 — Invoke speckit-code-review with spec path specs/<feature_folder>/spec.md and, on retries,
-       the incremental `scope` (files changed since last review) + `state_file`;
-       receive the JSON result (AUTHORITATIVE GATE)
-   R2 — Read result.status
+  R1 — Dispatch speckit-code-review as a sub-agent via the `task` tool (`general-purpose` agent
+       type) with spec path specs/<feature_folder>/spec.md and, on retries, the incremental `scope`
+       (files changed since last review) + `state_file`. BLOCK on the dispatch: take no other action
+       (no file reads, edits, run-state writes, or loop advance) until the sub-agent returns its JSON
+       verdict. That JSON — with its `status` field — is the review's return value
+       (AUTHORITATIVE GATE).
+   R2 — Read result.status from the JSON returned by R1. This check is the very next action after
+       R1 returns; never interleave any step between R1 and R2.
      IF status = "pass"  → EXIT STAGE 03
                             IF --yolo = true  → jump to Stage 05
                             IF --yolo = false → jump to Stage 04 (mandatory)

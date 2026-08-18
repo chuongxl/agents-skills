@@ -24,7 +24,8 @@ to those sub-skills so workspace assignment and architecture compliance are pres
   (`/speckit.implement`, `/speckit.converge`) on Copilot and Claude Code
   (`stage_invocation_mode` is `slash-agent`), or the `skill` tool by each stage's resolved skill name
   on OpenCode. Never attempt `task` with a `speckit.*` agent_type on any host.
-- `speckit-code-review`: invoke via the `skill` tool with name `speckit-code-review` (all hosts).
+- `speckit-code-review`: dispatch as a sub-agent (background task) and block on its JSON verdict —
+  see "How to Invoke speckit-code-review" below. Never run it inline in this orchestrator's context.
 
 Never stop with a generic runtime/capability disclaimer before attempting the real call. Only stop
 if a concrete tool call fails with a quoted error message.
@@ -64,8 +65,11 @@ In default mode, Stage 04 is mandatory and must never be skipped.
 
 ## How to Invoke speckit-code-review
 
-Invoke via the `skill` tool with name `speckit-code-review`.
-Never launch as a background agent or task process — it must run inline and return JSON directly.
+Dispatch `speckit-code-review` as a **sub-agent** (background task) — never inline in this
+orchestrator's own context — and **block until it returns its JSON verdict**. Use the `task` tool
+with a `general-purpose` agent type whose prompt instructs it to load and run the
+`speckit-code-review` skill (from its on-disk `SKILL.md`) and return only the JSON object. The
+returned JSON's `status` field is the review result this loop waits on.
 
 Always pass the spec path explicitly: `specs/<issue_id>-<short_title>/spec.md` (or the manual-mode
 folder resolved in Stage 01). Never let the skill guess — an ambiguous match makes it ask the user,
@@ -150,10 +154,13 @@ PHASE 1 — Convergence loop
          - proceed to PHASE 2
 
 PHASE 2 — Code review loop
-  R1 — Invoke speckit-code-review with spec path specs/<issue_id>-<short_title>/spec.md and, on
-       retries, the incremental `scope` (files changed since last review) + `state_file`;
-       receive JSON result
-   R2 — Read result.status
+  R1 — Dispatch speckit-code-review as a sub-agent via the `task` tool (`general-purpose` agent
+       type) with spec path specs/<issue_id>-<short_title>/spec.md and, on retries, the incremental
+       `scope` (files changed since last review) + `state_file`. BLOCK on the dispatch: take no
+       other action (no file reads, edits, run-state writes, or loop advance) until the sub-agent
+       returns its JSON verdict. That JSON — with its `status` field — is the review's return value.
+   R2 — Read result.status from the JSON returned by R1. This check is the very next action after
+       R1 returns; never interleave any step between R1 and R2.
      IF status = "pass"  → EXIT STAGE 03
                             IF --yolo = true  → jump to Stage 05
                             IF --yolo = false → jump to Stage 04 (mandatory)

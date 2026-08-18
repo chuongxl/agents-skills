@@ -34,7 +34,7 @@ Every relative markdown link in `SKILL.md`, `README.md`, and `references/**` mus
 ## Gotchas
 
 - `jira-to-speckit` reads Jira credentials from the project root `.env` (gitignored): `JIRA_URL`, `JIRA_USERNAME`, `JIRA_API_TOKEN`. Never print them; stop and ask the user if missing.
-- `speckit-code-review` is invoked as a **skill** (its strict JSON verdict must come back in-band), never as a background task agent.
+- `speckit-code-review` is invoked as a **sub-agent** (background task via the `task` tool with a `general-purpose` agent type); `speckit-auto` blocks on its returned JSON verdict. Never run it inline in the orchestrator's own context.
 - `speckit-auto` resolves its provider from repo-local `.speckit/integration.json` first, then global `~/.agents/skills/speckit-auto/.state/integration.json`. Provider is fixed for the whole run — never infer it from repo contents.
 - Gitignored runtime state/scratch: `speckit-auto/.state/`, `.superpowers/`, `.speckit/`, `.security-scan-results/`.
 - Manual test cases for `speckit-auto` live in `test-case/speckit-auto/test-cases.md`; there is no automated test framework for skill behavior.

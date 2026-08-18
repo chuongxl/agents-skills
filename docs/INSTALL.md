@@ -97,8 +97,8 @@ Whichever agent you use, the following must stay aligned:
 
 - Folder name equals the `name` in `SKILL.md` frontmatter.
 - Trigger phrases in `description` are identical across agents.
-- `speckit-code-review` is invoked as a **skill**, never as a background task
-  agent — its caller needs the JSON verdict in-band.
+- `speckit-code-review` is invoked as a **sub-agent** (background task via the `task` tool with a
+  `general-purpose` agent type), never inline — its caller blocks on the returned JSON verdict.
 
 Run the validator before installing to confirm the definitions are well formed:
 

@@ -20,7 +20,9 @@ Compare implementation code to `specs/<feature-folder>/spec.md` and return a str
 The spec may come from `speckit.specify` (usually already has `FR-*`/`NFR-*` IDs) or from
 `superpowers:brainstorming` (narrative design doc, usually no IDs) — both are reviewed identically.
 
-**Always run inline.** Never dispatch as a background task or sub-agent; the caller needs the JSON in-band.
+Run as a dispatched review agent, never inline in the caller's own context. When `speckit-auto`
+invokes you, it dispatches you as a sub-agent (background task) and blocks until you return the JSON
+verdict below — that verdict is your final output and the only thing the caller reads.
 
 Portability note: `allowed-tools` uses GitHub Copilot-style names (`bash glob grep view create edit`).
 Claude Code and OpenCode expose the same capabilities under their own names (`Bash`, `Read`, `Edit`,
@@ -31,8 +33,8 @@ Claude Code and OpenCode expose the same capabilities under their own names (`Ba
 - `spec.md` for the target feature. If no path is given, resolve from `specs/*/spec.md` using the
   current branch name or changed files; ask the user only if still ambiguous.
 - Review scope = current git change set (staged + unstaged, incl. renames/deletes). This is
-  evaluated in the current working directory — when invoked from `speckit-auto`, the caller must
-  run this skill inline from inside the Stage 01 linked worktree, never from the base checkout.
+  evaluated in the current working directory — when invoked by `speckit-auto`, run from inside the
+  Stage 01 linked worktree, never from the base checkout.
 - **Incremental scope (optional)**: the caller may pass `scope` as either a newline-separated file
   list (`--files <paths>`) or a compact map `file → {lines, blob}` — the hunk ranges changed since
   the last review of the same feature. When both `scope` and `state_file` are present, only the

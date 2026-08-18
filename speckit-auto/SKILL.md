@@ -146,7 +146,7 @@ Stage 03 is a NO-STOP ZONE in both modes.
 | Sub-skill | Purpose | Invocation |
 |-----------|---------|-----------|
 | `jira-to-speckit` | Jira fetch + compaction (steps 1–5 only) + ticket snapshot write | `skill` tool with name `jira-to-speckit` |
-| `speckit-code-review` | Authoritative JSON pass/fail review gate | `skill` tool with name `speckit-code-review` |
+| `speckit-code-review` | Authoritative JSON pass/fail review gate | `task` tool as a sub-agent (`general-purpose` agent type); block on its returned JSON verdict |
 
 Both are provider-independent and used by every provider.
 
