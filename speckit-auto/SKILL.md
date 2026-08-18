@@ -34,21 +34,9 @@ load.
    - `--yolo` → mode = yolo (else default)
    - free text → requirement pipeline intent
 
-3. **Setup intent** (`--integration` present): perform setup only, then END TURN (the one
-   legitimate no-pipeline turn end):
-   a. Normalize the value: trim, lowercase, map aliases (`github`, `speckit`, `spec-kit`,
-      `github-spec-kit` → `github-speckit`; `superpower`, `obra-superpowers` → `superpowers`).
-   b. Unsupported value → report the two valid providers and stop, writing nothing. No value →
-      ask once, then perform setup in the same turn.
-   c. Persist `{"integration": "<value>", "updated_at": "<ISO-8601>", "set_by": "speckit-auto"}`
-      to `<repo-root>/.speckit/integration.json` by default (`mkdir -p` first; root from
-      `git rev-parse --show-toplevel`); write the global path `<skill-dir>/.state/integration.json`
-      instead when `--global` is passed or the cwd is not in a git repo. Overwrite silently;
-      report the previous value. Add `.speckit/` to `.gitignore` only if `.gitignore` exists and
-      doesn't already ignore it. Never stop over a persistence failure — fall back and report.
-   d. Report: resolved provider, file path written, scope, and the next command to run
-      (`--issue <jira-url>` or a requirement). Other arguments alongside `--integration` are
-      ignored — echo them so the user can re-run.
+3. **Setup intent** (`--integration` present): load
+   [references/shared/integration-setup.md](references/shared/integration-setup.md) and follow
+   its steps. END TURN after — do not enter the pipeline.
 
 4. **Pipeline intent** (no `--integration`): resolve the provider once — first match wins:
    a. Repo-local `<repo-root>/.speckit/integration.json` → `integration` field.
@@ -86,6 +74,7 @@ selected.
 | Provider adapter | `references/providers/<provider>.md` |
 | Shared operating rules | [references/shared/operating-rules.md](references/shared/operating-rules.md) |
 | Host detection / tool names | [references/shared/host-adaptation.md](references/shared/host-adaptation.md) |
+| Integration setup (`--integration`) | [references/shared/integration-setup.md](references/shared/integration-setup.md) |
 | Commit + push procedure | [references/shared/commit.md](references/shared/commit.md) |
 
 Shared references are loaded by both providers; provider-specific behavior (install layout,
