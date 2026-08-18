@@ -3,14 +3,18 @@
 Load this **only** when the Stage 01 Speckit source check failed. A normal run never loads it.
 
 1. Fetch the install guide: `https://github.com/github/spec-kit/blob/main/docs/installation.md`
-2. Resolve the host-specific `--integration` key from
+2. Resolve the host-specific `--integration` key from the already-detected host in
    [../shared/host-adaptation.md](../shared/host-adaptation.md): `copilot` (Copilot),
-   `claude` (Claude Code), or `opencode` (OpenCode).
+   `claude` (Claude Code), or `opencode` (OpenCode). Do not guess and do not ask the user for this
+   value.
 3. Ask the user once: `Install GitHub Speckit` or `Stop`.
 4. If `Stop`, halt and report that installation is required.
 5. If `Install`, follow the guide exactly to install the Spec Kit CLI.
-6. Initialize in this repo: `specify init . --integration <host-key>` (for a Copilot repo that
-   already uses the commands layout, pass `--integration-options="--commands"`).
+6. Initialize in this repo (mandatory success gate): `specify init . --integration <host-key>`
+   (for a Copilot repo that already uses the commands layout, pass
+   `--integration-options="--commands"`).
+   - This command must succeed before any pipeline continuation.
+   - If it fails, stop and report the exact failing command output.
 7. Run the `speckit.constitution` step via the host's invocation channel:
    - **Copilot**: invoke the repository **agent/slash command** (`/speckit.constitution` or the
      equivalent repo-agent invocation path). Do **not** use the `skill` tool for this step.
