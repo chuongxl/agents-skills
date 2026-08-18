@@ -79,9 +79,23 @@ variant; never continue past a concrete install failure (stop and report the exa
 
 ## 3. Mandatory Provider Gate
 
-- **github-speckit:** invoke `speckit.constitution` through the host channel (repo slash-agent on
-  Copilot/Claude Code — never the `skill` tool on Copilot for this step; `skill` tool on OpenCode)
-  and require success before Stage 02. Failure → stop with the exact error.
+- **github-speckit (GitHub Copilot):**
+  1. Emit `@speckit.constitution` as this turn's own assistant message (agent call — slash
+     commands are not visible on Copilot; do NOT use `/speckit.constitution`). This hands
+     execution to the repo agent for the duration of the current turn — `speckit-auto` does not
+     continue in the same turn.
+  2. In the **next turn**, read the constitution agent's output from the conversation. A
+     successful run produces a readable constitution summary or passes silently. An absent output,
+     truncated run, error message, or agent that stopped mid-run is a constitution failure.
+  3. On failure: stop with the exact output quoted and ask the user to re-run `speckit-auto` after
+     resolving the issue (missing agent files, repo config problem, or host restart if the agent
+     call itself failed). Do **not** proceed to Stage 02 with an unconfirmed constitution.
+- **github-speckit (Claude Code):**
+  1. Emit `/speckit.constitution` as this turn's own assistant message (slash command is visible
+     and callable on Claude Code). Same turn-boundary and validation rules apply.
+  2. For skills-mode layout, the `Skill` tool is also valid.
+- **github-speckit (OpenCode):** invoke via the `skill` tool by the resolved on-disk name. Treat
+  a tool resolution failure the same as a constitution failure above.
 - **superpowers:** invoke `using-superpowers` once per run (skip if already injected by
   superpowers' session hook). It proves runtime executability.
 

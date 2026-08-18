@@ -8,11 +8,20 @@ tasks+analyze). Never skip, bypass, or reorder in either mode.
 
 ## Invocation
 
-Invoke each step via the provider's channel (see [../shared/host-adaptation.md](../shared/host-adaptation.md)
-and the adapter): repo slash-agents / `skill` tool for github-speckit; the `skill` tool for every
-superpowers skill. Never the `task` tool with a `speckit.*` / `superpowers:*` agent_type; never a
-nested CLI subprocess. Never emit a capability disclaimer before attempting the call — make the
-invocation now.
+Invoke each step via the provider's resolved channel
+(see [../shared/host-adaptation.md](../shared/host-adaptation.md) and the adapter):
+
+- **GitHub Copilot:** emit `@speckit.<command> [args]` (agent call). Slash commands are **not
+  visible** on Copilot — never use `/speckit.<command>` here.
+- **Claude Code:** emit `/speckit.<command> [args]` (slash command, visible and callable). For
+  skills-mode layout, the `Skill` tool is also valid.
+- **OpenCode:** use the `skill` tool by the resolved on-disk skill name.
+- **superpowers (all hosts):** use the `skill` tool for every superpowers skill.
+
+On Copilot and Claude Code, each `@speckit.<command>` / `/speckit.<command>` call is a **turn
+boundary** — the agent takes over the current turn; resume in the next turn, read the output, and
+validate before invoking the next step. Never the `task` tool with a `speckit.*` agent_type;
+never a nested CLI subprocess.
 
 Before each provider step invocation in this stage, run provider availability validation. If
 validation fails, trigger install recovery immediately for the resolved provider. If post-install

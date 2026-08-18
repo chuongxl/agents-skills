@@ -16,12 +16,28 @@ superpowers — the plan path `specs/<feature_folder>/plan.md`.
 
 ## Invocation
 
-Per [../shared/host-adaptation.md](../shared/host-adaptation.md) and the adapter: repo slash-agents
-/ `skill` tool for github-speckit; `skill` tool for every superpowers skill. Never the `task` tool
-with a `speckit.*` / `superpowers:*` agent_type; never a nested CLI subprocess. `speckit-code-review`
-runs **inline** via the `skill` tool on all hosts — never as a background agent — and always with
-the spec path passed explicitly (`specs/<feature_folder>/spec.md`); an ambiguous match makes the
-skill ask the user, which would be a turn-ending stop inside this no-stop zone.
+Per [../shared/host-adaptation.md](../shared/host-adaptation.md) and the adapter:
+
+- **GitHub Copilot:** emit `@speckit.<command> [args]` (agent call). Slash commands are **not
+  visible** on Copilot — never use `/speckit.<command>` here.
+- **Claude Code:** emit `/speckit.<command> [args]` (slash command, visible and callable). For
+  skills-mode layout, the `Skill` tool is also valid.
+- **OpenCode:** use the `skill` tool by the resolved on-disk skill name.
+- **superpowers (all hosts):** use the `skill` tool for every superpowers skill.
+
+`speckit-code-review` runs **inline** via the `skill` tool on all hosts — never as a background
+agent — and always with the spec path passed explicitly (`specs/<feature_folder>/spec.md`); an
+ambiguous match makes the skill ask the user, which would be a turn-ending stop inside this
+no-stop zone.
+
+On Copilot and Claude Code, each `@speckit.<command>` / `/speckit.<command>` call is a **turn
+boundary** — the agent takes over the current turn. Resume in the next turn, read the agent
+output, and validate it before continuing the loop. A missing, truncated, or error output from
+the agent is a failure — trigger recovery; if still failing after recovery, stop and ask the user
+to manually fix or restart the host.
+
+Never the `task` tool with a `speckit.*` / `superpowers:*` agent_type; never a nested CLI
+subprocess.
 
 Before each provider step invocation in this stage, run provider availability validation. If
 validation fails, trigger install recovery immediately for the resolved provider. If post-install

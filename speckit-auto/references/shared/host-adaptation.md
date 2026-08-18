@@ -22,26 +22,37 @@ fixed for the whole run.
 |--------|----------------|-------------|----------|
 | Skill dirs | `~/.agents/skills/`, `.github/skills/`, `~/.copilot/skills/` | `~/.claude/skills/`, `.claude/skills/` | `~/.config/opencode/skills/`, `.opencode/skills/`, plus `.claude/skills/` / `.agents/skills/` |
 | Tool names | `bash glob grep view create edit skill` | `Bash Read Edit Write Glob Grep Skill` | `bash glob grep view create edit skill` |
-| Invocation channel | `skill` tool; repo skills also surface as `/name` slash commands | `Skill` tool; invocable skills surface as `/name` | `skill` tool only — no slash commands |
-| Flags | slash-command body | slash-command body / `$ARGUMENTS` | embedded in the natural-language trigger message |
+| Invocation channel | `skill` tool for installed skills; `@speckit.<command>` agent call for repo agents | `Skill` tool for installed skills; `/speckit.<command>` slash command for repo agents | `skill` tool only — no agent calls or slash commands |
+| Repo agent visibility | Slash commands (`/speckit.*`) are **not visible**; call via `@speckit.<command>` | Slash commands are visible and callable as `/speckit.<command>` | N/A — use `skill` tool only |
+| Flags | slash-command body / agent message body | slash-command body / `$ARGUMENTS` | embedded in the natural-language trigger message |
 | Mid-run resume marker | the skill tool list in tool context | `<skill-context name="...">` | `<available_skills>` block |
 | Ask tool (default mode) | `ask_user` | `AskUser` | `question` |
 
 Never refuse to act because a tool is named differently from `allowed-tools` — the capabilities
 are equivalent across all three hosts.
 
-## What a Repo Slash-Agent Command Means (canonical statement)
+## What a Repo Agent/Command Invocation Means (canonical statement)
 
-"Invoke `/speckit.<command> ...`" means: emit that text as the literal content of this session's
-own next assistant turn, the same way a human would type it in this same chat — so the current
-host runtime intercepts and executes the repo agent in this session, in this turn. It does **not**
-mean spawning a second CLI process. Never invoke a stage by shelling out to a `copilot`,
-`claude`, or `opencode` binary from bash — that starts an unrelated, unbounded nested session.
-The only two valid invocation channels are the literal slash command as this turn's own message
-(Copilot, Claude Code) and the `skill` tool by the stage's resolved skill name (OpenCode, and the
-Claude Code fallback). If neither channel is available, the stage invocation failed — stop and
-report the exact error; never "work around" it with a nested subprocess.
+Invoking a `speckit.*` repo agent means emitting the call as the literal content of this
+session's own next assistant turn — so the current host runtime routes it to the repo agent and
+executes it in this session:
 
-Provider-specific install keys, probe layouts, and install commands live in the provider
+- **GitHub Copilot:** emit `@speckit.<command> [args]` (agent call — slash commands are **not
+  visible** on Copilot and must not be used).
+- **Claude Code:** emit `/speckit.<command> [args]` (slash command — visible and callable).
+- **OpenCode:** use the `skill` tool by the resolved on-disk name — no agent calls or slash
+  commands available.
+
+**This is a turn boundary (Copilot and Claude Code).** The agent call/slash command takes over
+execution for the duration of that turn. `speckit-auto` does NOT continue in the same turn. When
+the agent finishes and returns output, `speckit-auto` must resume in the **next turn**, read the
+agent's output from the conversation, and validate the result before proceeding to the next step.
+
+It does **not** mean spawning a second CLI process. Never invoke a stage by shelling out to a
+`copilot`, `claude`, or `opencode` binary from bash — that starts an unrelated, unbounded nested
+session. If no valid invocation channel is available for the resolved host, stop and report the
+exact error; never work around it with a subprocess.
+
+Provider-specific install keys, probe layouts, and invocation channels live in the provider
 adapters: [../providers/github-speckit.md](../providers/github-speckit.md) and
 [../providers/superpowers.md](../providers/superpowers.md).

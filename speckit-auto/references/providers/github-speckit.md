@@ -22,17 +22,49 @@ All artifacts (spec/plan/tasks/checklist/implementation) are produced ONLY by th
 ## Install / Layout Per Host
 
 `<command>` = `constitution`, `specify`, `clarify`, `plan`, `checklist`, `tasks`, `analyze`,
-`implement`, `converge`. Skills-mode folders are `speckit-<command>`; the slash command is always
-`/speckit.<command>`.
+`implement`, `converge`. Skills-mode folders are `speckit-<command>`; the agent file is
+`speckit.<command>.agent.md`; the prompt file is `speckit.<command>.prompt.md`.
 
 | Host | `specify init` key | Layout to probe (first complete set wins) | Invocation |
 |------|--------------------|-------------------------------------------|------------|
-| GitHub Copilot | `copilot` | `.github/skills/speckit-<command>/SKILL.md` (skills mode) **or** `.github/agents/speckit.<command>.agent.md` + `.github/prompts/speckit.<command>.prompt.md` (commands mode) | `/speckit.<command>` slash-agent |
-| Claude Code | `claude` | `.claude/skills/speckit-<command>/SKILL.md` | `/speckit.<command>` slash-agent or `Skill` tool |
+| GitHub Copilot | `copilot` | `.github/skills/speckit-<command>/SKILL.md` (skills mode) **or** `.github/agents/speckit.<command>.agent.md` + `.github/prompts/speckit.<command>.prompt.md` (commands mode) | `@speckit.<command>` agent call |
+| Claude Code | `claude` | `.claude/skills/speckit-<command>/SKILL.md` | `/speckit.<command>` slash command or `Skill` tool |
 | OpenCode | `opencode` | `.opencode/skills/` then `.agents/skills/` then `.claude/skills/` | `skill` tool by resolved name |
 
 Never fall back to a global or external Speckit variant — the repo-installed agents are the only
 valid source.
+
+## Critical: speckit.* Are Repo Agents/Commands — Not Skills
+
+`speckit.*` commands (`constitution`, `specify`, `clarify`, `plan`, `checklist`, `tasks`,
+`analyze`, `implement`, `converge`) are **repo-installed agents or prompt-files**. They are **not**
+installable skills and must **never** be invoked via the `skill` tool on Copilot or Claude Code.
+
+**Invocation channel per host:**
+
+- **GitHub Copilot:** `speckit.*` agents live under `.github/agents/speckit.<command>.agent.md`.
+  Slash commands (`/speckit.<command>`) are **not visible** on Copilot. Invoke by calling the
+  agent directly: emit `@speckit.<command> [args]` as this session's own next assistant message.
+  The Copilot runtime routes the `@agent` call to the repo agent and executes it in this session.
+- **Claude Code:** invoke as `/speckit.<command> [args]` (slash command) or via the `Skill` tool
+  for skills-mode layout. The slash command is visible and callable on Claude Code.
+- **OpenCode:** repo agents/slash commands are not available. Invoke via the `skill` tool by the
+  resolved on-disk skill name.
+
+**This is a turn boundary (Copilot and Claude Code).** When `@speckit.<command>` or
+`/speckit.<command>` is emitted, the agent takes over the current turn — `speckit-auto` does NOT
+continue in the same turn. When the agent finishes and returns output, `speckit-auto` must
+**resume in the next turn**, read the agent's output from the conversation, and validate the
+result before proceeding. A missing, truncated, or error output means the agent did not complete —
+treat as a failure; do NOT proceed.
+
+**Consequence for `speckit.constitution`:**
+- Copilot: emit `@speckit.constitution` → turn ends → resume next turn → read output → validate.
+- Claude Code: emit `/speckit.constitution` → turn ends → resume next turn → read output →
+  validate.
+- OpenCode: invoke via `skill` tool → read return value → validate.
+If constitution output is absent, truncated, or the agent stopped mid-run, it is a constitution
+failure — do NOT proceed to Stage 02.
 
 ## Install Recovery (only when the source check fails)
 
@@ -59,15 +91,17 @@ continues the pipeline in the same turn. It never switches provider.
    `specify init . --integration <host-key>` — for a Copilot repo that already uses the commands
    layout, pass `--integration-options="--commands"`. This command must succeed or the run stops
    with the exact failing output quoted.
-6. **Prove executability**: invoke `speckit.constitution` through the host channel within the
-   same turn (Copilot: repo slash-agent `/speckit.constitution`, not the `skill` tool; Claude
-   Code: `/speckit.constitution` or `Skill` tool; OpenCode: `skill` tool by resolved name). It
-   must succeed — otherwise stop and report.
+6. **Prove executability**: invoke `speckit.constitution` through the resolved host channel:
+   - **Copilot:** emit `@speckit.constitution` as the next assistant message. This ends the
+     current turn — resume in the next turn and confirm constitution completed successfully.
+   - **Claude Code:** emit `/speckit.constitution`. Same turn-boundary rule applies.
+   - **OpenCode:** invoke via `skill` tool by resolved name; validate return value inline.
+   Failure (absent/truncated output, agent stopped mid-run, tool resolution error) → stop and
+   report the exact output; do not proceed.
 7. **Post-install validation (hard gate).** Re-run the full Stage 01 source check against the repo
-   layout and confirm `speckit.constitution` can execute successfully through the host channel in
-   this session.
+   layout and confirm `speckit.constitution` completed successfully in the prior turn.
 8. **Validation failure handling (stop, no continuation).** If any validation step fails
-   (missing agents/layout, constitution invocation failure, command not found, host channel not
+   (missing agents/layout, constitution did not complete, command not found, host channel not
    ready), do not continue the pipeline. Stop and ask the user to manually install/fix the
    provider or restart the host session (Copilot / Claude Code / OpenCode), then re-run
    `speckit-auto`.
@@ -82,13 +116,21 @@ to later pipeline steps while validation remains failed.
 
 ## Invocation Rules (all stages)
 
-- Copilot / Claude Code: emit the literal `/speckit.<command> ...` as this session's own next
-  assistant message — the current host runtime intercepts and executes the repo agent in this
-  turn. OpenCode: the `skill` tool by the stage's resolved skill name.
+- **GitHub Copilot:** slash commands (`/speckit.<command>`) are **not visible**. Call the repo
+  agent directly: emit `@speckit.<command> [args]` as this session's own next assistant message.
+  This ends the current turn — resume in the next turn, read the agent output, and validate before
+  continuing.
+- **Claude Code:** emit `/speckit.<command> [args]` as this session's own next assistant message
+  (slash command is visible and callable). This ends the current turn — resume in the next turn,
+  read the output, and validate before continuing. For skills-mode layout, the `Skill` tool is
+  also valid.
+- **OpenCode:** use the `skill` tool by the stage's resolved on-disk skill name — no agent calls
+  or slash commands available on this host.
+- NEVER invoke a `speckit.*` command via the `skill` tool on Copilot or Claude Code (commands
+  mode) — `speckit.*` are repo agents/commands, not installed skills on those hosts.
 - NEVER use the `task` tool with a `speckit.*` agent_type (fails with `Unknown agent_type`).
 - NEVER shell out to a nested `copilot`/`claude`/`opencode` CLI subprocess from bash — that spawns
-  an unrelated, unbounded nested session (see host-adaptation.md). A stage invocation is only the
-  literal slash command as this turn's own message, or the `skill` tool call.
+  an unrelated, unbounded nested session (see host-adaptation.md).
 - If a required stage cannot be invoked via the resolved host channel, stop and report the
   concrete invocation error — no manual fallback, no subprocess retry.
 
