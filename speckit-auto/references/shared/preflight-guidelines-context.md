@@ -65,22 +65,9 @@ Do not load linked files during parse. Load only when relevant:
 - naming/API/class/method/file decisions → stems containing `naming|convention|style`
 - schema/migration/query design → stems containing `database|db|data`
 - workflow/process/state-machine design → stems containing `workflow|process|state`
-- security/auth/permission decisions → stems containing `security|auth|permission`
-- **workspace/service implementation decisions (mandatory for any task/plan targeting a
-  specific `repo_map` workspace)** → load the service-specific guideline whose stem matches the
-  target workspace role, when present in `linked_guidelines`:
-  - `backend` workspace → stems containing `back-end|backend|server`
-  - `frontend` workspace → stems containing `front-end|frontend|ui|client`
-  - `bff` workspace → stems containing `bff|gateway|proxy`
-  - `database` workspace → stems containing `database|db|data`
-  - `shared` workspace → stems containing `shared|common|config|utils|lib`
-  - A single task/plan slice may span more than one role (e.g. a plan touching both `backend`
-    and `frontend`) — load every matching service guideline for the roles actually involved,
-    not just the first match.
 - otherwise pick best stem match from task text; if none, load none
 
-Cache content in `loaded_guidelines[stem]`. Never load same file twice — check the cache before
-any load, including repeat workspace matches across `speckit.plan`/`speckit.tasks`/`speckit.checklist`.
+Cache content in `loaded_guidelines[stem]`. Never load same file twice.
 
 ## Step 5 — Build Project Context Object
 
@@ -112,11 +99,6 @@ If `architecture.md` is absent after Step 2 skip logic, set:
 ### Architecture Compliance
 - Generated structure/code must follow `arch_pattern` + `bounded_context_layout`.
 - Apply `dependency_rule` in plan/layer design.
-- `speckit.checklist` must include an explicit item verifying `spec.md`/`plan.md` compliance
-  with `arch_pattern`, `dependency_rule`, and `bounded_context_layout`.
-- `speckit.analyze` must treat any violation of `arch_pattern`, `dependency_rule`, or
-  `bounded_context_layout` across `spec.md`/`plan.md`/`tasks.md` as a reportable conflict, not
-  only cross-artifact inconsistency.
 
 ### Guideline Cache Rule
 - Check `loaded_guidelines` before loading any linked guideline.
@@ -125,13 +107,7 @@ If `architecture.md` is absent after Step 2 skip logic, set:
 - For `speckit.specify`, `speckit.plan`, `speckit.tasks`, `speckit.implement`:
   - prepend `summary`
   - append relevant `repo_map`
-  - include loaded guideline content when applicable (see Step 4's workspace-mandatory load rule
-    for `speckit.plan`/`speckit.tasks`)
-- For `speckit.clarify`, `speckit.checklist`, `speckit.analyze`:
-  - append `arch_pattern`, `dependency_rule`, and `bounded_context_layout` so architecture
-    compliance can be checked/questioned, even though these stages don't assign workspaces
-  - do not reload `architecture.md` or any already-cached guideline — reuse Stage 01's Project
-    Context and `loaded_guidelines` cache as-is
+  - include loaded guideline content when applicable
 
 ## Step 7 — Persistence Log
 

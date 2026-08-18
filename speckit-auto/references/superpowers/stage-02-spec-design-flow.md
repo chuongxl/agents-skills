@@ -61,8 +61,7 @@ Pass into the skill:
 
 - the compact Jira brief (or requirement text) from Stage 01
 - open questions from Jira intake, as clarification seeds
-- Project Context `summary`, `arch_pattern`, `dependency_rule`, and `bounded_context_layout` from
-  Stage 01 (so the design accounts for existing architecture constraints, not just requirements)
+- Project Context `summary` from Stage 01
 - **the exact output path**: `specs/<feature_folder>/spec.md`
 - an instruction **not to commit** the design document — the pipeline owns commits (Stage 04/05).
   If it commits anyway, log it and continue; never treat that as an error.
@@ -95,11 +94,7 @@ Guard, not assumed) and its self-review found no placeholders or contradictions.
 Pass into the skill:
 
 - the finalized design spec path from Step 1
-- Project Context `summary`, `arch_pattern`, `dependency_rule`, `bounded_context_layout`,
-  `repo_map`, and every service guideline in `loaded_guidelines` matching a workspace this plan
-  touches (load any not yet cached, per
-  [../shared/preflight-guidelines-context.md](../shared/preflight-guidelines-context.md) Step 4's
-  workspace rule — never reread `architecture.md` or an already-cached guideline)
+- Project Context `summary`, `repo_map`, and any relevant cached guidelines from `loaded_guidelines`
 - **the exact output path**: `specs/<feature_folder>/plan.md`
 - an instruction to choose the execution style at Stage 03 (do not let it start implementing here)
 
@@ -121,8 +116,6 @@ Before leaving Stage 02, verify explicitly and record the result:
 3. **Consistency** — no conflicts, gaps, or ambiguities between the design spec and the plan
    (types, names, API contracts, file paths agree).
 4. **Workspace assignment** — every task has a `workspace` from `repo_map`.
-5. **Architecture compliance** — spec and plan follow Project Context `arch_pattern`,
-   `dependency_rule`, and `bounded_context_layout`; flag any violation as a concern.
 
 This check is read-only. If it flags anything, treat that as a checklist concern gate failure:
 - **Default mode**: run interview flow to resolve the concern, then fix at source and re-verify.
@@ -155,12 +148,7 @@ Every plan task **must** carry a `workspace` derived from `repo_map`:
 
 Before naming any file, class, method, or API contract, check `linked_guidelines` from the Project
 Context and load the relevant cached guideline (match by stem name). Reuse `loaded_guidelines` if
-already cached. This is **mandatory, not optional**, for any workspace a task touches — per
-[../shared/preflight-guidelines-context.md](../shared/preflight-guidelines-context.md) Step 4, load
-the service-specific guideline matching that workspace role (e.g. `back-end.md` for `backend`,
-`front-end.md` for `frontend`, `bff.md` for `bff`, `database.md` for `database`) the first time that
-workspace is touched, then reuse the cached copy for every later step in the same run. Never assign
-a task without consulting `repo_map`.
+already cached. Never assign a task without consulting `repo_map`.
 
 ## Review Behavior Per Step
 
