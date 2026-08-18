@@ -8,6 +8,8 @@ Also load: [review-interview.md](review-interview.md) (default mode only; discar
 1. `brainstorming` → design spec document
 2. `writing-plans` → implementation plan
 
+Both steps are mandatory. Never skip, reorder, or bypass them in default or `--yolo` mode.
+
 These two map onto the Spec Kit flow as follows:
 
 | Spec Kit stage | superpowers coverage |
@@ -68,6 +70,8 @@ Interaction mode:
 
 - **Default mode**: allow the skill's interactive Q&A and section-by-section approval. This *is*
   the clarification interview — do not additionally run a separate clarify step.
+  If clarification gaps/concerns remain, continue one-question-at-a-time interviewing and rerun
+  `brainstorming` until concerns are resolved and the gate is explicitly approved by a human.
   **Fallback (default mode only)**: if `brainstorming` produced the design spec *without* running
   its interactive approval (no questions asked, or approval was skipped), the design spec has not
   been approved by a human. Do not proceed on the delegated gate alone — run the Interview Flow in
@@ -113,9 +117,11 @@ Before leaving Stage 02, verify explicitly and record the result:
    (types, names, API contracts, file paths agree).
 4. **Workspace assignment** — every task has a `workspace` from `repo_map`.
 
-This check is read-only. If it flags anything, fix it at the source (re-run `brainstorming` for
-spec issues, `writing-plans` for plan issues) and re-verify before Stage 03. Retry exhaustion
-follows global rule 10a: the same check failing 3 consecutive times stops and reports.
+This check is read-only. If it flags anything, treat that as a checklist concern gate failure:
+- **Default mode**: run interview flow to resolve the concern, then fix at source and re-verify.
+- **`--yolo` mode**: resolve concern autonomously, re-run source step, and re-check.
+Retry exhaustion follows global rule 10a: the same check failing 3 consecutive times stops and
+reports.
 
 Re-run this gate after **any** Stage 02 artifact regeneration, including one triggered from
 Stage 03 or Stage 04. It fires no interview, so it never violates the Stage 03 no-stop rule.
@@ -151,7 +157,7 @@ already cached. Never assign a task without consulting `repo_map`.
   approval is the Stage 03 Entry Step confirmation below — do not run a separate post-`writing-plans`
   interview on top of it.
 - **YOLO mode**: no interviews. Self-review the step output; if it fails, re-run the step
-  (max 2 retries).
+  (max 2 retries). Each retry must end with explicit autonomous gate approval before proceeding.
 
 > ⚠️ These review behaviors apply **only to the steps in this file**. Stage 03 is a NO-STOP ZONE —
 > no interviews, no gates, in either mode.

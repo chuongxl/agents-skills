@@ -14,6 +14,9 @@ Also load: [review-interview.md](review-interview.md) (default mode only; discar
 5. `speckit.tasks`
 6. `speckit.analyze`
 
+Run these in this exact order every time. No step may be skipped, reordered, or treated as
+optional in either mode.
+
 ## Invocation Method (Critical)
 
 Call stages directly via the resolved host channel (see
@@ -74,9 +77,15 @@ Never assign a task without consulting `repo_map` from the Project Context loade
 
 - **Default mode**: run post-stage interview (review-interview.md) and capture feedback/constraints.
 - **Default mode / specify only**: if `speckit.specify` output is unclear, run the engineer clarification interview from `review-interview.md`, rerun `speckit.specify`, then continue.
+- **Default mode / clarify + checklist concern gate**: after `speckit.clarify` and
+  `speckit.checklist`, explicitly check for gaps/concerns. If any concern exists, run the
+  interview flow to capture answers, rerun the same stage, then re-check. Do not advance until the
+  concern gate is cleared and approved.
 - **Default mode / analyze only**: do **not** run a separate post-stage interview. Its approval is
   subsumed by the Stage 03 Entry Step confirmation below — never ask both back-to-back.
-- **YOLO mode**: self-review stage output; if failed, rerun stage (max 2 retries).
+- **YOLO mode**: run an autonomous AI review gate after every Stage 02 step and explicitly
+  approve/reject the step result. On reject (including clarify/checklist concerns), self-correct
+  and rerun the same step (max 2 retries).
 
 > ⚠️ These review behaviors apply **only to the stages in this file**. Stage 03 is a NO-STOP ZONE — no interviews, no gates in either mode.
 

@@ -25,6 +25,20 @@ Stage 01 never asks intake interview questions. If requirement clarity is insuff
 
 **YOLO mode**: do not interview; infer best-effort assumptions and continue.
 
+## Clarify + Checklist Concern Interview (Default Mode)
+
+After `speckit.clarify` and `speckit.checklist`, run an explicit concern check:
+
+1. Detect concrete concerns (unresolved ambiguity, missing acceptance criteria, contradictory
+   constraints, weak quality checks).
+2. If concerns exist, ask one question at a time via the host ask tool to resolve each concern.
+3. Capture answers, append to stage input, rerun the same stage.
+4. Repeat until concerns are cleared.
+5. Then run the normal approval gate for that stage and proceed only on approval.
+
+**YOLO mode**: replace the interview with autonomous AI concern resolution + self-approval
+(reject/rerun up to the configured retry limit).
+
 ## Interview Flow
 
 **Default mode only. Applies to stages: `specify`, `clarify`, `plan`, `checklist`, `tasks`.**
@@ -52,6 +66,8 @@ Stage 01 never asks intake interview questions. If requirement clarity is insuff
 - **Code review failed after implement**: → Stage 03 owns this loop autonomously (no stops, no user prompts).
 - **Human manual review requests changes** (default mode): → Stage 04 collects feedback and routes the restart.
 - **YOLO mode — self-review fail**: self-correct and retry (max 2). On 3rd fail, stop and report.
+- **YOLO mode — concern found in clarify/checklist**: AI resolves concern autonomously, reruns the
+  same stage, and only proceeds after autonomous approval.
 
 ## Prompt Addendum Template
 

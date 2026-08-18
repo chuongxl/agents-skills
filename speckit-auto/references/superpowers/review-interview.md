@@ -54,6 +54,18 @@ The Interview Flow below applies to:
 Ask one question at a time via the host's ask tool (`ask_user` on Copilot, `question` on OpenCode,
 `AskUser` on Claude Code).
 
+## Clarify + Checklist Concern Gates
+
+In superpowers Stage 02, clarify/checklist map to:
+- **Clarify equivalent**: `brainstorming` clarification loop
+- **Checklist equivalent**: `writing-plans` mandatory self-review gate
+
+Behavior:
+- **Default mode**: if either equivalent stage has a gap/concern, run this interview flow to
+  collect answers, rerun the source step, and require explicit human approval before advancing.
+- **`--yolo` mode**: no human interview; AI resolves concerns autonomously, reruns the source step,
+  and only advances after autonomous approval.
+
 ## Decision Logic
 
 - **Approve + no constraints**: proceed immediately.
@@ -62,6 +74,8 @@ Ask one question at a time via the host's ask tool (`ask_user` on Copilot, `ques
 - **Code review failed after implement**: Stage 03 owns that loop autonomously — no stops, no prompts.
 - **Human manual review requests changes** (default mode): Stage 04 collects feedback and routes the restart.
 - **YOLO mode — self-review fail**: self-correct and retry (max 2). On the 3rd failure, stop and report.
+- **YOLO mode — clarify/checklist concern**: resolve concern autonomously, rerun the source step,
+  then approve before continuing.
 
 ## Prompt Addendum Template
 
