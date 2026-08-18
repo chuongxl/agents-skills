@@ -41,12 +41,17 @@ Do not hand-write or "fill in" spec/plan/tasks/analyze outputs outside github-sp
 
 ## Prompt Wiring Rules
 
+Every stage below reuses the Stage 01 Project Context
+([../shared/preflight-guidelines-context.md](../shared/preflight-guidelines-context.md)) — never
+reread `architecture.md` or any already-cached guideline; only fetch a linked guideline the first
+time it becomes relevant (Step 4 of that file), then reuse it from `loaded_guidelines`.
+
 - `specify`: requirement text (or normalized Jira intake output) **+ Project Context `summary`**
-- `clarify`: current `spec.md`
-- `plan`: finalized `spec.md` **+ Project Context `summary`, `repo_map`, and any relevant cached guidelines from `loaded_guidelines`**
-- `checklist`: finalized `spec.md` — generate a quality checklist ("unit tests for your requirements") to confirm the spec is complete, clear, and consistent before task breakdown
-- `tasks`: spec + plan context **+ `repo_map`** — every task must declare its target workspace
-- `analyze`: `spec.md`, `plan.md`, `tasks.md` — read-only consistency check across artifacts; report conflicts/gaps/ambiguities
+- `clarify`: current `spec.md` **+ Project Context `arch_pattern`, `dependency_rule`, `bounded_context_layout`** (so clarification questions can surface architecture ambiguity)
+- `plan`: finalized `spec.md` **+ Project Context `summary`, `arch_pattern`, `dependency_rule`, `bounded_context_layout`, `repo_map`, and every service guideline in `loaded_guidelines` matching a workspace this plan touches** (load any not yet cached, per Step 4's workspace rule)
+- `checklist`: finalized `spec.md` **+ Project Context `arch_pattern`, `dependency_rule`, `bounded_context_layout`** — generate a quality checklist ("unit tests for your requirements") that includes an explicit architecture-compliance item, to confirm the spec is complete, clear, and consistent before task breakdown
+- `tasks`: spec + plan context **+ `repo_map`, and every service guideline in `loaded_guidelines` matching a workspace a task targets** — every task must declare its target workspace
+- `analyze`: `spec.md`, `plan.md`, `tasks.md` **+ Project Context `arch_pattern`, `dependency_rule`, `bounded_context_layout`** — read-only consistency check across artifacts; report conflicts/gaps/ambiguities, including any architecture/dependency-rule violation
 
 If `speckit.analyze` reports issues, fix at source (`specify/clarify/plan/checklist/tasks`) and rerun `speckit.analyze` before Stage 03.
 All such fixes must be via re-invoking the corresponding github-speckit stage agent, not manual
@@ -78,6 +83,11 @@ When `speckit.tasks` runs, each task entry **must** include a `workspace` field 
 Before naming any file, class, method, or API contract in `speckit.plan` or `speckit.tasks`,
 check `linked_guidelines` from the Project Context and load the relevant cached guideline
 (use the stem name to find a match). If it is already in `loaded_guidelines`, use the cached copy.
+This is **mandatory, not optional**, for any workspace a plan or task touches — per
+[../shared/preflight-guidelines-context.md](../shared/preflight-guidelines-context.md) Step 4, load
+the service-specific guideline matching that workspace role (e.g. `back-end.md` for `backend`,
+`front-end.md` for `frontend`, `bff.md` for `bff`, `database.md` for `database`) the first time that
+workspace is touched, then reuse the cached copy for every later stage in the same run.
 
 Never assign a task without consulting `repo_map` from the Project Context loaded in Stage 01.
 
