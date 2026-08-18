@@ -43,14 +43,33 @@ be modified: sync its base (same priority/best-effort rules), branch inside it o
 base, and commit submodule changes before the parent pointer update. If none exist or none are
 modified, behavior is unchanged.
 
-## 2. Framework Source Check + Install Recovery
+## 2. Framework Source Check + Install Recovery (Required — never skip, never abandon)
 
-Probe the provider's installed layout for the resolved host per the adapter (github-speckit:
-the full `speckit.*` command set; superpowers: the minimum skill set). Record resolved layout and
-invocation channel. No complete set → run the adapter's install recovery (ask user once
-`Install` / `Stop`; on `Install` install, run the provider's mandatory success gates, re-check,
-continue same turn — operating rules 3). Never switch provider because a framework is missing;
-never fall back to a global/external variant.
+**Detect.** Probe the provider's installed layout for the resolved host per the adapter
+(github-speckit: probe the repo for `constitution`, `specify`, `clarify`, `plan`, `checklist`,
+`tasks`, `analyze`, `implement`, `converge` under the host's layout dirs; superpowers: check the
+session skill list, then the host on-disk skill dirs, then probe `using-superpowers`). Record the
+resolved layout + invocation channel in run state. A **complete** set → continue to section 3.
+
+**No complete set → RUN install recovery now, do not skip and do not abandon the run:**
+
+1. **Load the adapter's Install Recovery section** — open
+   [../providers/github-speckit.md](../providers/github-speckit.md) or
+   [../providers/superpowers.md](../providers/superpowers.md) for the RESOLVED provider as given
+   by integration.json — the exact install commands for this host are there.
+2. **Ask the user once** via the host ask tool: `Install <framework>` / `Stop`
+   (e.g. `Install GitHub Speckit` / `Install superpowers`). `Stop` → halt and report that
+   installation is required (a valid turn end, operating rules premise).
+3. **Install** — run the adapter's exact commands for the resolved host: github-speckit → CLI
+   install + `specify version` sanity + `specify init . --integration <host-key>` (mandatory
+   success gate) + `speckit.constitution` through the host channel; superpowers → the host's
+   plugin/clone+copy command + on-disk verification.
+4. **Re-check** — re-run the probe from step "Detect". On pass, continue to section 3 in the
+   same turn. Superpowers note: freshly installed skills may not appear in this session's skill
+   list — use the adapter's sanctioned file-read fallback for the rest of the run.
+
+Never switch provider because a framework is missing; never fall back to a global/external
+variant; never continue past a concrete install failure (stop and report the exact error quoted).
 
 ## 3. Mandatory Provider Gate
 

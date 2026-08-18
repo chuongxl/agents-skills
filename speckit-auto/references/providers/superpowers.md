@@ -54,20 +54,33 @@ owns the control flow.
 
 ## Install Recovery (only when the availability check fails)
 
-Run from the Stage 01 linked worktree; ask the user once (`Install superpowers` / `Stop`).
+Run from the Stage 01 linked worktree. This flow installs the superpowers skills for the resolved
+host, re-checks availability, and continues the pipeline in the same turn. It never switches
+provider (see [../shared/operating-rules.md](../shared/operating-rules.md), rule 2).
 
-- **GitHub Copilot** — `copilot plugin marketplace add obra/superpowers-marketplace`, then
-  `copilot plugin install superpowers@superpowers-marketplace` (in order).
-- **Claude Code** — `/plugin marketplace add obra/superpowers-marketplace`, then
-  `/plugin install superpowers@superpowers-marketplace` (fallback: `claude plugin ...` commands).
-- **OpenCode** — `git clone https://github.com/obra/superpowers.git /tmp/superpowers`, then
-  `mkdir -p <skills dir> && cp -R /tmp/superpowers/skills/* <skills dir>/` (`<skills dir>` =
-  `~/.config/opencode/skills/` or project-local `.opencode/skills/`).
-
-Re-run the availability check from the current linked worktree; newly installed skills may not
-surface in this session's skill list — use the file-read fallback rather than stopping. On pass,
-continue the pipeline in the same turn. If the host-specific command is unavailable, stop and
-report it as a concrete install failure — do not improvise another host's install path.
+1. **Ask the user once**: `Install superpowers` / `Stop`. `Stop` → halt and report that
+   installation is required.
+2. **Run the exact install command for the resolved host** (from host detection — never improvise
+   another host's install path):
+   - **GitHub Copilot** — in order: `copilot plugin marketplace add obra/superpowers-marketplace`,
+     then `copilot plugin install superpowers@superpowers-marketplace`.
+   - **Claude Code** — `/plugin marketplace add obra/superpowers-marketplace`, then
+     `/plugin install superpowers@superpowers-marketplace` (fallback: `claude plugin marketplace
+     add obra/superpowers-marketplace` / `claude plugin install superpowers@superpowers-marketplace`).
+   - **OpenCode** — `git clone https://github.com/obra/superpowers.git /tmp/superpowers`, then
+     `mkdir -p <skills dir> && cp -R /tmp/superpowers/skills/* <skills dir>/`, where `<skills dir>`
+     is `~/.config/opencode/skills/` (user-wide) or `.opencode/skills/` (project-local).
+   If the host-specific command is unavailable, stop and report it as a concrete install failure.
+3. **Confirm the install landed on disk**: re-run the availability check's on-disk probe (Stage 01
+   check 2) from the current linked worktree — verify the minimum skill set's `SKILL.md` files
+   exist at the host paths (for project-local installs, verify from the worktree checkout, not a
+   different checkout).
+4. **Re-run the full availability check** (Stage 01 checks 1–3). Newly installed skills may NOT
+   surface in this session's available-skills list — if the skill tool cannot resolve them, use
+   the sanctioned file-read fallback from this adapter's skill-name resolution for the rest of the
+   run rather than stopping.
+5. **Continue the pipeline in the same turn** on pass. Only a concrete install failure stops the
+   run (report the exact failing step with quoted error output).
 
 ## Artifact Path Guard (mandatory, after every Stage 02 skill call)
 

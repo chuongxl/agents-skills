@@ -36,19 +36,35 @@ valid source.
 
 ## Install Recovery (only when the source check fails)
 
-Run from the Stage 01 linked worktree. A normal run never loads this.
+Run from the Stage 01 linked worktree. A normal run never loads this. This flow installs the Spec
+Kit CLI, initializes it into THIS repo for the resolved host, proves runtime executability, and
+continues the pipeline in the same turn. It never switches provider.
 
-1. Fetch the install guide: `https://github.com/github/spec-kit/blob/main/docs/installation.md`
-2. Resolve the host key from host detection (`copilot` / `claude` / `opencode`) — never guess, never ask.
-3. Ask the user once: `Install GitHub Speckit` or `Stop`. `Stop` → halt and report that
-   installation is required.
-4. On `Install`: follow the guide, then run the mandatory success gate
-   `specify init . --integration <host-key>` (Copilot repos already on the commands layout also
-   pass `--integration-options="--commands"`). This command must succeed or the run stops with the
-   exact failing output quoted.
-5. Run `speckit.constitution` through the host channel **within the same turn** (Copilot: repo
-   slash-agent, not the `skill` tool). It must succeed — otherwise stop and report.
-6. Re-run the source check; on pass, continue the pipeline in the same turn.
+1. **Install the CLI** (official channels — source install is recommended, PyPI is the fallback):
+   - Source (pinned, requires `uv`): fetch the install guide
+     `https://github.com/github/spec-kit/blob/main/docs/installation.md`, read the current
+     release tag `vX.Y.Z` from the Releases page, then
+     `uv tool install specify-cli --from git+https://github.com/github/spec-kit.git@vX.Y.Z`.
+   - PyPI (simpler, no tag needed): `uv tool install specify-cli`, or `pipx install specify-cli`,
+     or `pip install specify-cli`.
+2. **Sanity check**: `specify version` must print a version. If the command is not found after a
+   successful-looking install, PATH may not include the tool dir — report the exact output and
+   stop; do not proceed with a broken install.
+3. **Resolve the host key** from host detection (`copilot` / `claude` / `opencode`) — never guess,
+   never ask.
+4. **Ask the user once**: `Install GitHub Speckit` / `Stop` (the install commands above run only
+   after this confirm). `Stop` → halt and report that installation is required. (Steps 1–2 may run
+   before or after the ask; the gate below never runs before the ask.)
+5. **Initialize into this repo (mandatory success gate)**:
+   `specify init . --integration <host-key>` — for a Copilot repo that already uses the commands
+   layout, pass `--integration-options="--commands"`. This command must succeed or the run stops
+   with the exact failing output quoted.
+6. **Prove executability**: invoke `speckit.constitution` through the host channel within the
+   same turn (Copilot: repo slash-agent `/speckit.constitution`, not the `skill` tool; Claude
+   Code: `/speckit.constitution` or `Skill` tool; OpenCode: `skill` tool by resolved name). It
+   must succeed — otherwise stop and report.
+7. **Re-run the source check** from step 1 of Stage 01 against the repo layout. On pass, continue
+   the pipeline in the same turn. Only a concrete install/init/constitution failure stops the run.
 
 ## Invocation Rules (all stages)
 
