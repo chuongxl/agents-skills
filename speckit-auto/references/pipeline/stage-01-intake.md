@@ -64,14 +64,22 @@ A **complete** set → continue to section 3 (no install step). Do not defer thi
    [../providers/github-speckit.md](../providers/github-speckit.md) or
    [../providers/superpowers.md](../providers/superpowers.md) for the RESOLVED provider.
 2. **Ask the user once** via the host ask tool: `Install <framework>` / `Stop`. `Stop` → halt.
-3. **Install** — run the adapter's exact commands:
-   - github-speckit → CLI install + `specify version` sanity +
-     `specify init . --integration <host-key> --integration-options="--skills"` + validate skill
-     files + invoke `speckit-constitution` via `skill` tool.
-   - superpowers → the host's plugin/clone+copy command + on-disk verification.
-4. **Validate + re-check (hard gate)** — re-run the probe from "Detect". On pass, continue to
-   section 3 in the same turn.
-5. **If validation fails after install** — stop immediately. **Ask the user to restart the host
+3. **Install on the base branch (main module only — never directly on the worktree):**
+   - `cd <repo-root>` (the main checkout, not the worktree path).
+   - Run the adapter's exact install commands there:
+     - github-speckit → CLI install + `specify version` sanity +
+       `specify init . --integration <host-key> --integration-options="--skills"` + validate skill
+       files.
+     - superpowers → the host's plugin/clone+copy command + on-disk verification.
+   - The install writes provider files (e.g. `.github/skills/speckit-*/`) into the main checkout.
+4. **Copy provider files into the worktree:**
+   - After a successful install on the main checkout, copy the installed provider layout into the
+     worktree. For github-speckit: `cp -r <repo-root>/.github/skills <worktree-path>/.github/`.
+     For superpowers: copy the equivalent on-disk skill directories.
+   - Do not re-run `specify init` inside the worktree — copy only.
+5. **Validate + re-check (hard gate)** — re-run the probe from "Detect" against the **worktree**
+   path. On pass, continue to section 3 in the same turn.
+6. **If validation fails after install** — stop immediately. **Ask the user to restart the host
    session (Copilot / Claude Code / OpenCode), then re-run `speckit-auto`.**
 
 Never switch provider because a framework is missing; never fall back to a global/external

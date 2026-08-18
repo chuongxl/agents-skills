@@ -93,9 +93,10 @@ After every `skill speckit-<command>` call, before proceeding to the next step:
 
 ## Install Recovery (only when the source check fails)
 
-Run from the Stage 01 linked worktree. A normal run never loads this. This flow installs the Spec
-Kit CLI, initializes it into THIS repo for the resolved host as **skills**, verifies the layout,
-proves executability, and continues the pipeline in the same turn. It never switches provider.
+Run from Stage 01. A normal run (provider already installed) never loads this. This flow installs
+the Spec Kit CLI into the **main repo checkout** (base branch), copies the installed skills into
+the worktree, verifies the layout, proves executability, and continues the pipeline in the same
+turn. It never switches provider and never runs `specify init` directly inside the worktree.
 
 1. **Install the CLI** (official channels — source install is recommended, PyPI is the fallback):
    - Source (pinned, requires `uv`): fetch the install guide
@@ -104,7 +105,7 @@ proves executability, and continues the pipeline in the same turn. It never swit
      `uv tool install specify-cli --from git+https://github.com/github/spec-kit.git@vX.Y.Z`.
    - PyPI (simpler, no tag needed): `uv tool install specify-cli`, or `pipx install specify-cli`,
      or `pip install specify-cli`.
-   - if not found release tag : using `uv tool install specify-cli --from git+https://github.com/github/spec-kit.git@v0.16.4`
+   - if not found release tag: use `uv tool install specify-cli --from git+https://github.com/github/spec-kit.git@v0.16.4`
 2. **Sanity check**: `specify version` must print a version. If the command is not found after a
    successful-looking install, PATH may not include the tool dir — report the exact output and
    stop; do not proceed with a broken install.
@@ -113,24 +114,32 @@ proves executability, and continues the pipeline in the same turn. It never swit
 4. **Ask the user once**: `Install GitHub Speckit` / `Stop` (the install commands above run only
    after this confirm). `Stop` → halt and report that installation is required. (Steps 1–2 may run
    before or after the ask; the gate below never runs before the ask.)
-5. **Initialize into this repo as skills (mandatory success gate)**:
+5. **Initialize into the MAIN REPO checkout as skills (mandatory success gate)**:
    ```
+   cd <repo-root>   # main checkout — NOT the worktree path
    specify init . --integration <host-key> --integration-options="--skills"
    ```
    Examples: `specify init . --integration copilot --integration-options="--skills"`
             `specify init . --integration claude --integration-options="--skills"`
             `specify init . --integration opencode --integration-options="--skills"`
-   This installs `speckit-<command>` skills under `.github/skills/`. This command must succeed or
-   the run stops with the exact failing output quoted.
-6. **Post-install validation (hard gate)**:
+   This installs `speckit-<command>` skills under `<repo-root>/.github/skills/`. This command must
+   succeed or the run stops with the exact failing output quoted. **Do not run this inside the
+   worktree.**
+6. **Copy provider files into the worktree**:
+   ```
+   cp -r <repo-root>/.github/skills <worktree-path>/.github/
+   ```
+   Only copy — do not re-run `specify init` in the worktree. If the worktree `.github/` dir does
+   not exist, create it first.
+7. **Post-install validation (hard gate)**:
    a. Re-run the Stage 01 source check: verify all nine `speckit-<command>` skills exist at
-      `.github/skills/speckit-<command>/SKILL.md` in the worktree.
+      `.github/skills/speckit-<command>/SKILL.md` in the **worktree**.
    b. Invoke `speckit-constitution` via the `skill` tool with prompt
       `"constitution project to understand the project architecture"` and confirm it returns
       successfully (inline, same turn — no turn boundary, no user ask needed).
    c. If either check fails: **stop and ask the user to restart the host session (Copilot /
       Claude Code / OpenCode), then re-run `speckit-auto`.**
-7. **On pass**: continue the pipeline in the same turn.
+8. **On pass**: continue the pipeline in the same turn.
 
 ## Runtime Validation Failure Handling (any step)
 
