@@ -52,6 +52,11 @@ real post-intake Stage 02 entry invocation at the end of this stage.
 [../shared/host-adaptation.md](../shared/host-adaptation.md)): repo slash commands (`/speckit.specify`)
 on Copilot and Claude Code, the `skill` tool by the stage's resolved skill name on OpenCode. Never
 attempt the `task` tool with a `speckit.*` agent_type — it always fails with `Unknown agent_type`.
+Never invoke a stage by shelling out to a nested `copilot`/`claude`/`opencode` CLI subprocess (e.g.
+`bash: copilot --agent speckit.specify -p "..."`) — that launches an unrelated, unbounded nested
+session instead of calling the stage in this session (see
+[../shared/host-adaptation.md](../shared/host-adaptation.md) "What 'repo slash-agent command'
+Means").
 Only a concrete error from the real invocation is reportable as a runtime failure (quote it), and
 only after the source check passed.
 
@@ -60,7 +65,8 @@ only after the source check passed.
 After source check/install recovery and before Stage 02, invoke `speckit.constitution` through the
 resolved github-speckit host channel and require success:
 
-- Copilot / Claude Code: repo slash-agent invocation path (for example `/speckit.constitution`)
+- Copilot / Claude Code: repo slash-agent invocation path (for example `/speckit.constitution`) —
+  emitted as this session's own turn, never as a `bash`/CLI subprocess call.
 - OpenCode: `skill` tool by resolved `speckit-constitution` name
 
 If this invocation fails, stop and report the exact error. Do not continue to Stage 02 or Stage 03

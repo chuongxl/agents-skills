@@ -26,6 +26,11 @@ Also loads [../shared/host-adaptation.md](../shared/host-adaptation.md) for the 
      the `Skill` tool by resolved skill name.
    - **OpenCode** — `skill` tool only: invoke each stage by its resolved skill name. OpenCode has no skill slash commands.
    Never attempt the `task` tool with a `speckit.*` agent_type on any host — it always fails with `Unknown agent_type`.
+   Never invoke a stage by shelling out to a nested `copilot`/`claude`/`opencode` CLI subprocess
+   (e.g. `bash: copilot --agent speckit.specify -p "..."`) on any host — that launches an unrelated,
+   unbounded nested session instead of calling the stage in this session (see
+   host-adaptation.md "What 'repo slash-agent command' Means"). A stage invocation is only ever the
+   literal slash command as this turn's own message, or the `skill` tool call — never a subprocess.
 4. Map user wording `speckit.implementation` to the repo agent `speckit.implement`.
 5. Stage 03 order is fixed: run `speckit.implement → speckit.converge` repeatedly until converge reports no gaps, then run `speckit-code-review`; after that, loop `speckit.implement → speckit-code-review` until review status is `pass`.
 6. Stage 02 order is fixed: `specify → clarify → plan → checklist → tasks → analyze`.
@@ -36,10 +41,12 @@ Also loads [../shared/host-adaptation.md](../shared/host-adaptation.md) for the 
    must never synthesize spec/plan/tasks content itself.
 9. If a required github-speckit stage cannot be invoked via the resolved host channel (slash-agent
    on Copilot/Claude, `skill` on OpenCode), stop and report the concrete invocation error. Do not
-   continue with a manual fallback.
+   continue with a manual fallback, and do not retry by spawning a nested CLI subprocess.
 
 ## Invocation
 
 Invoke each stage via the resolved host channel — the repo slash command on Copilot and Claude Code
 (for example `/speckit.specify`), or the `skill` tool by the stage's resolved skill name on OpenCode —
-run as a real call in the current turn.
+run as a real call in the current turn. "The repo slash command" means emitting `/speckit.specify
+...` as this turn's own assistant message so the current session's own slash-command router handles
+it — never running `copilot`/`claude`/`opencode` as a subprocess via `bash`/`run_command`/`shell`.

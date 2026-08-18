@@ -22,7 +22,12 @@ fields to those sub-skills so workspace assignment and architecture compliance a
   [../shared/host-adaptation.md](../shared/host-adaptation.md)) — repo slash commands
   (`/speckit.implement`, `/speckit.converge`) on Copilot and Claude Code
   (`stage_invocation_mode` is `slash-agent`), or the `skill` tool by each stage's resolved skill name
-  on OpenCode. Never attempt `task` with a `speckit.*` agent_type on any host.
+  on OpenCode. Never attempt `task` with a `speckit.*` agent_type on any host. Never invoke a stage
+  by shelling out to a nested `copilot`/`claude`/`opencode` CLI subprocess (e.g. `bash: copilot
+  --agent speckit.implement -p "..."`) — that launches an unrelated, unbounded nested session
+  instead of calling the stage in this session (see
+  [../shared/host-adaptation.md](../shared/host-adaptation.md) "What 'repo slash-agent command'
+  Means").
 - `speckit-code-review`: invoke via the `skill` tool with name `speckit-code-review` (all hosts).
 
 Never stop with a generic runtime/capability disclaimer before attempting the real call. Only stop

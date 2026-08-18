@@ -28,7 +28,11 @@ Call stages directly via the resolved host channel (see
 - **OpenCode** — the `skill` tool by each stage's resolved skill name (`speckit.specify`, …);
   OpenCode has no skill slash commands.
 
-Never attempt `task` with a `speckit.*` agent_type on any host.
+Never attempt `task` with a `speckit.*` agent_type on any host. Never invoke a stage by shelling
+out to a nested `copilot`/`claude`/`opencode` CLI subprocess (e.g. `bash: copilot --agent
+speckit.specify -p "..."`) — that launches an unrelated, unbounded nested session instead of
+calling the stage in this session (see [../shared/host-adaptation.md](../shared/host-adaptation.md)
+"What 'repo slash-agent command' Means").
 
 Never emit a capability disclaimer before attempting these — make the stage invocation now
 (SKILL.md premise applies here too).

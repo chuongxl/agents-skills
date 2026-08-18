@@ -32,6 +32,31 @@ whole run.
 Rule: never refuse to act because a tool is named differently than `allowed-tools`. The capabilities
 are equivalent across all three hosts.
 
+## What "repo slash-agent command" Means (Critical — Read Before Any Stage Invocation)
+
+"Invoke `/speckit.specify ...`" means: emit `/speckit.specify ...` as the literal content of this
+session's own next assistant turn, the same way a human would type it in this same chat — so the
+**current host runtime** (the one already running this conversation) intercepts and executes the
+repo agent in this session, in this turn.
+
+It does **not** mean spawning a second, independent CLI process. Never invoke a `speckit.*` stage
+by shelling out to a `copilot`, `claude`, or `opencode` binary from `bash`/`run_command`/`shell`
+(for example `copilot --agent speckit.specify -p "..."`, `claude -p "..."`, or any equivalent
+subprocess launch). That starts an unrelated nested session with its own skills, its own
+brainstorming/exploration loop, and no bounded completion time — it is indistinguishable from
+launching a second, unsupervised agent and polling it forever, and it is the most common cause of
+a run hanging or being aborted mid-stage. The only two valid invocation channels are:
+
+- The literal `/speckit.<command> ...` (or `/speckit.constitution`) text as this turn's own
+  message, on GitHub Copilot and Claude Code.
+- The `skill` tool called by the stage's resolved skill name, on OpenCode (and as the Claude Code
+  fallback where slash commands are unavailable).
+
+If neither channel is available in the current session (the command errors, is unrecognized, or
+the tool call itself fails), that is the stage invocation failing — stop and report the exact
+error. Do not "work around" the missing channel by shelling out to a nested CLI process, and do not
+treat a successful nested-CLI subprocess as a valid stage completion even if it happens to finish.
+
 ## github-speckit Provider Layout (per host)
 
 Probe order for the Stage 01 source check; install with the host's `--integration` key.
