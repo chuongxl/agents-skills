@@ -55,6 +55,14 @@ After each of the two skill calls below, before doing anything else:
 This guard is deterministic and mandatory. Never assume the path instruction was honored, and never
 carry a "the skill said it saved it" claim forward without checking the file.
 
+Reuse the Stage 01 Project Context
+([../shared/preflight-guidelines-context.md](../shared/preflight-guidelines-context.md)) for every
+step below — never reread `architecture.md`. If a step needs more architecture detail than the
+cached `summary` provides, lazy-load the specific file(s) `architecture.md` itself links to
+(`linked_guidelines`, per that file's Step 4) — driven entirely by what this project's own
+`architecture.md` references, never a fixed file-name assumption — then reuse it from
+`loaded_guidelines` for the rest of the run.
+
 ## Step 1 — `brainstorming`
 
 Pass into the skill:
