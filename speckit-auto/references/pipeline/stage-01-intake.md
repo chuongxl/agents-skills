@@ -51,8 +51,9 @@ before provider invocations in Stage 02/03/04.
 
 **Detect.** Probe the provider's installed layout for the resolved host per the adapter:
 - **github-speckit:** check that all nine skills exist at `.github/skills/speckit-<command>/SKILL.md`
-  in the worktree for `<command>` in `constitution`, `specify`, `clarify`, `plan`, `checklist`,
-  `tasks`, `analyze`, `implement`, `converge`.
+  in the **main repo checkout (`<repo-root>`)** for `<command>` in `constitution`, `specify`,
+  `clarify`, `plan`, `checklist`, `tasks`, `analyze`, `implement`, `converge`. The worktree does
+  not need to be checked at this stage — detection always targets the main space.
 - **superpowers:** check the session skill list, then the host on-disk skill dirs, then probe
   `using-superpowers`.
 
@@ -77,8 +78,9 @@ A **complete** set → continue to section 3 (no install step). Do not defer thi
      worktree. For github-speckit: `cp -r <repo-root>/.github/skills <worktree-path>/.github/`.
      For superpowers: copy the equivalent on-disk skill directories.
    - Do not re-run `specify init` inside the worktree — copy only.
-5. **Validate + re-check (hard gate)** — re-run the probe from "Detect" against the **worktree**
-   path. On pass, continue to section 3 in the same turn.
+5. **Validate + re-check (hard gate)** — re-run the probe from "Detect" against the **main repo
+   checkout** (`<repo-root>`). On pass, copy provider files into the worktree (step 4), then
+   continue to section 3 in the same turn.
 6. **If validation fails after install** — stop immediately. **Ask the user to restart the host
    session (Copilot / Claude Code / OpenCode), then re-run `speckit-auto`.**
 
@@ -158,6 +160,11 @@ requirement_text }`. `branch_created` must be true before any provider call, `ji
 call, or intake step.
 
 ### Jira intake via `jira-to-speckit` (`--issue`)
+
+**Pre-invocation provider check.** Before calling `jira-to-speckit`, re-run the Section 2
+"Detect" probe against the **main repo checkout** (`<repo-root>`). If the provider is not fully
+installed, run the full install recovery flow (Section 2, steps 1–6) now. Only proceed to intake
+after the probe passes.
 
 Invoke the `skill` tool with name `jira-to-speckit`, passing the URL and the ticket staging path.
 **Scope constraint:** instruct it to perform only Jira fetch + compaction (workflow steps 1–5,
