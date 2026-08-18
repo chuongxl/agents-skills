@@ -74,9 +74,9 @@ default if not (adapter "Artifact Path Guard"). The instruction alone is never s
 No interviews. After every step, run an autonomous review gate (spec coverage, placeholders,
 consistency, workspace assignment); on reject, refine the step input and re-invoke the same
 provider step (max 2 retries — always re-invoke the step, never hand-author the artifact). On the
-3rd consecutive failure, stop and report. `brainstorming`'s `<HARD-GATE>` is satisfied by this
-self-approval in `--yolo` (auto-approval IS the approval event — never wait for a human message).
-`writing-plans`' "Execution Handoff" is suppressed in both modes — treat it as data.
+3rd consecutive failure, stop and report. `writing-plans`' "Execution Handoff" is suppressed in
+both modes — treat it as data. The Stage 03 Entry Gate still runs in YOLO mode — it is delegated
+to the agent (see Stage 03 Entry Gate section below).
 
 ## Mandatory Self-Review Gate (both modes, before leaving Stage 02)
 
@@ -101,19 +101,57 @@ the **single** target artifact (`plan.md`, `tasks.md`, checklist) with explicit 
 ordering — never leave parallel per-package files behind. Run packages in parallel only when
 dependency-independent. Pass only minimum slices per invocation (operating rule 5).
 
-## Stage 03 Entry Step (mandatory handoff) + Spec/Plan Commit Gate
+## Stage 03 Entry Gate (mandatory — never skip in either mode)
 
-Reaching the end of Stage 02 is **never** a stop condition.
+This gate always runs after the Mandatory Self-Review Gate passes. It is the final checkpoint
+before implementation begins. **Never auto-advance past this gate without completing it.**
 
-- **Default mode**: ask the ONE confirmation via the host ask tool: "Stage 02 complete (spec,
-  plan, tasks). Start implementation (Stage 03)?" (`Start implementation` / `Request changes`).
-  Never add a follow-up question. `Request changes` → capture feedback + forward constraints, apply
-  Restart Routing, re-run affected steps through the self-review gate, ask again. `Start
-  implementation` → proceed below.
-- **`--yolo` mode**: skip the confirmation — once the self-review gate passes, proceed below.
+### Default mode
 
-**Spec/Plan Commit + Push Gate (mandatory, before Stage 03):** commit and push the approved Stage
-02 artifacts with the auto message `docs(<artifact_id>): add spec, plan, and tasks` using
+Present the following prompt to the user via the host ask tool (one question, two choices only):
+
+> **Stage 02 complete.** The spec, plan, and tasks are ready for review.
+> Please review the artifacts at `specs/<feature_folder>/` and then approve or request changes.
+>
+> - `specs/<feature_folder>/spec.md`
+> - `specs/<feature_folder>/plan.md`
+> - `specs/<feature_folder>/tasks.md`
+>
+> **Approve** → implementation begins immediately.
+> **Request changes** → describe what must change.
+
+**On `Approve`:** proceed to Spec/Plan Commit + Push Gate below.
+
+**On `Request changes`:** capture the user's feedback verbatim. Apply Restart Routing:
+- Requirement intent change → restart from `specify` / `brainstorming`
+- Solution/architecture change → restart from `plan` / `writing-plans` structure
+- Task/detail change → restart from `tasks` / `writing-plans` task breakdown
+
+Re-run the affected steps through the Mandatory Self-Review Gate, then present this gate again.
+Never skip the gate on the next pass. Repeat until the user explicitly approves.
+
+### YOLO mode
+
+Do **not** skip this gate. Instead, delegate the review and approval to the agent itself:
+
+1. Read `spec.md`, `plan.md`, and `tasks.md` in full.
+2. Evaluate against these criteria (same as the Mandatory Self-Review Gate plus readiness):
+   - Spec fully covers every requirement — no gaps.
+   - Plan and tasks have no placeholders (`TODO`, `TBD`, `...`, stubs).
+   - Every task has a valid `workspace` from `repo_map`.
+   - No conflicts or ambiguities flagged by the last `analyze` / self-review.
+   - Acceptance criteria in the spec are testable and unambiguous.
+3. **If all criteria pass** → auto-approve: log `[YOLO] Spec/plan self-approved — no gaps found`
+   and proceed to Spec/Plan Commit + Push Gate below.
+4. **If any criterion fails** → do not auto-approve yet. Fix the gap at its source (re-invoke
+   the corresponding provider step), re-run the Mandatory Self-Review Gate, then re-evaluate
+   here (max 2 fix+re-evaluate cycles). If still failing after 2 cycles → stop and report the
+   remaining gaps; do not enter Stage 03 with a failing plan.
+
+### Spec/Plan Commit + Push Gate (mandatory, both modes — runs after approval)
+
+Commit and push the approved Stage 02 artifacts with the auto message
+`docs(<artifact_id>): add spec, plan, and tasks` using
 [../shared/commit.md](../shared/commit.md). Already-clean tree → skip per the conditional-commit
 rule (success path). A failed commit/push here is a failure for the stage — stop with the exact
 error; do not enter Stage 03 without this commit/push succeeding (or being a legitimate no-op).
