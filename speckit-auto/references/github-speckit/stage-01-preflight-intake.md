@@ -38,6 +38,8 @@ When any required repo Speckit file is missing, run recovery — do not silently
 abandon the run. Load [install-recovery.md](install-recovery.md) and follow it.
 `specify init . --integration <host-key>` in that recovery flow is a mandatory success gate, where
 `<host-key>` must come from resolved host detection (`copilot` / `claude` / `opencode`).
+`speckit.constitution` is also mandatory in that recovery flow and must complete successfully
+before continuing.
 
 ## Runtime Executability (No Separate Probe)
 

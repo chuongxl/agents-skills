@@ -14,8 +14,9 @@ Also loads [../shared/host-adaptation.md](../shared/host-adaptation.md) for the 
    guide, ask the user once (`Install GitHub Speckit` / `Stop`), and on `Install` perform the
    install, run `specify init . --integration <host-key>` as a mandatory success gate, run
    `speckit.constitution` through the host channel (Copilot: repo slash-agent, not `skill` tool),
-   re-check, then continue in the same turn. On `Stop`, halt and report that installation is
-   required. Only a concrete install/init failure stops the run otherwise.
+   require `speckit.constitution` success, re-check, then continue in the same turn. All of this
+   runs inside the Stage 01 linked worktree branch. On `Stop`, halt and report that installation is
+   required. Only a concrete install/init/constitution failure stops the run otherwise.
 3. `stage_invocation_mode` is host-dependent:
    - **GitHub Copilot** — `slash-agent`: invoke repo slash commands (`/speckit.specify`, …). For
      `speckit.constitution` after install, use the repo slash-agent channel (not `skill` tool).

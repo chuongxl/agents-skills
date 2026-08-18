@@ -46,6 +46,9 @@ framework install, guidelines load, intake, or any provider stage call):
 7. Actually run the git command(s) now (do not describe the plan), switch execution into that
    linked worktree, and confirm the branch is checked out there before proceeding. Set
    `branch_created: true`, `branch_name`, and `worktree_path` in run state.
+   - Every subsequent Stage 01 step (framework source check, framework install recovery, init, and
+     provider stage calls) must execute from this linked worktree path on this branch. If a
+     framework is missing there, install it there.
 8. **Rename alignment step (required once intake resolves final feature name):**
    - if current branch name differs, run `git branch -m <final-name>` inside the linked worktree
    - if current worktree path differs from canonical `<repo-root>/.worktrees/<final-name>`, move it

@@ -1,6 +1,8 @@
 # github-speckit: Install Recovery
 
 Load this **only** when the Stage 01 Speckit source check failed. A normal run never loads it.
+Run this recovery from the Stage 01 linked worktree path (`worktree_path`) with the feature branch
+checked out.
 
 1. Fetch the install guide: `https://github.com/github/spec-kit/blob/main/docs/installation.md`
 2. Resolve the host-specific `--integration` key from the already-detected host in
@@ -21,6 +23,8 @@ Load this **only** when the Stage 01 Speckit source check failed. A normal run n
    - **Claude Code**: invoke `/speckit.constitution` (or `Skill` tool by resolved name).
    - **OpenCode**: invoke via `skill` tool by resolved name.
 8. Re-run the source check.
+   - `speckit.constitution` is a required success gate in this recovery flow. If it fails, stop and
+     report the exact failing step/output.
 9. If it passes, continue the pipeline in the same turn.
 10. Only if install or init fails, stop and report the exact failing step with quoted error output.
 

@@ -55,6 +55,7 @@ If none of the three checks succeed, run install recovery below.
 ## Missing Superpowers Recovery (Required)
 
 When superpowers is not available, load [install-recovery.md](install-recovery.md) and follow it.
+Run that recovery inside the linked worktree branch created by shared Stage 01.
 Never fall back to the `github-speckit` provider — the provider is fixed for the run.
 
 ## Bootstrap (Required, After Availability Check)
