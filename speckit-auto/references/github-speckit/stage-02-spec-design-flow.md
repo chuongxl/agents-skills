@@ -88,8 +88,10 @@ Never assign a task without consulting `repo_map` from the Project Context loade
 - **Default mode / analyze only**: do **not** run a separate post-stage interview. Its approval is
   subsumed by the Stage 03 Entry Step confirmation below — never ask both back-to-back.
 - **YOLO mode**: run an autonomous AI review gate after every Stage 02 step and explicitly
-  approve/reject the step result. On reject (including clarify/checklist concerns), self-correct
-  and rerun the same step (max 2 retries).
+  approve/reject the step result. On reject (including clarify/checklist concerns), refine the
+  stage input/prompt and re-invoke the same github-speckit stage agent (max 2 retries). Never
+  author or edit `spec.md`/`plan.md`/`tasks.md`/checklist content directly instead of re-invoking
+  the agent.
 
 > ⚠️ These review behaviors apply **only to the stages in this file**. Stage 03 is a NO-STOP ZONE — no interviews, no gates in either mode.
 

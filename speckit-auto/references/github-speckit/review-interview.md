@@ -65,7 +65,9 @@ After `speckit.clarify` and `speckit.checklist`, run an explicit concern check:
 - **Request changes**: rerun the same stage with feedback, then repeat interview.
 - **Code review failed after implement**: → Stage 03 owns this loop autonomously (no stops, no user prompts).
 - **Human manual review requests changes** (default mode): → Stage 04 collects feedback and routes the restart.
-- **YOLO mode — self-review fail**: self-correct and retry (max 2). On 3rd fail, stop and report.
+- **YOLO mode — self-review fail**: refine the stage input/prompt and re-invoke the same
+  github-speckit stage agent (max 2 retries). Never author the artifact content directly instead
+  of re-invoking the agent. On 3rd fail, stop and report.
 - **YOLO mode — concern found in clarify/checklist**: AI resolves concern autonomously, reruns the
   same stage, and only proceeds after autonomous approval.
 
