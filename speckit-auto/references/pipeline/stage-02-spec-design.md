@@ -14,6 +14,11 @@ superpowers skill. Never the `task` tool with a `speckit.*` / `superpowers:*` ag
 nested CLI subprocess. Never emit a capability disclaimer before attempting the call — make the
 invocation now.
 
+Before each provider step invocation in this stage, run provider availability validation. If
+validation fails, trigger install recovery immediately for the resolved provider. If post-install
+validation still fails, stop and ask the user to manually install/fix the provider or restart
+Copilot / Claude Code / OpenCode, then re-run `speckit-auto`.
+
 ## Project Context Wiring (mandatory)
 
 Pass the Stage 01 Project Context into every step as its starting basis: `summary` prefixes the

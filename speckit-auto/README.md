@@ -1,6 +1,6 @@
 # Speckit Auto — Spec-Driven Delivery Pipeline
 
-**Version**: 0.3.2
+**Version**: 0.3.3
 **Author**: Alex Nguyen
 
 ## Overview
@@ -88,7 +88,7 @@ repo map.
 | "Which provider?" on every run | Run `--integration <provider>` once to persist |
 | Jira intake fails | Ensure root `.env` has all three `JIRA_*` keys; test with `jira-to-speckit` directly |
 | Stage 03 review loop doesn't converge | Simplify the spec's acceptance criteria; avoid vague language ("elegant", "performant") |
-| Missing framework | Startup recovery always runs first; if validation still fails after install, stop and manually install/fix the provider or restart Copilot/Claude/OpenCode, then re-run |
+| Missing framework | At startup and any later step, failed provider validation triggers install recovery; if still failing after install, stop and manually install/fix or restart Copilot/Claude/OpenCode, then re-run |
 
 ## Notes
 

@@ -44,13 +44,15 @@ This list is exhaustive.
    provider from repo contents — a missing framework installation is handled by install recovery,
    never by switching provider.
 
-3. **Startup recovery gate is mandatory.** On every pipeline invocation, immediately after
-   provider resolution and before any provider stage work, run the framework availability check
-   for that provider (github-speckit agents or superpowers skills). If incomplete/missing, run
-   install recovery: fetch the install guide, ask the user once (`Install` / `Stop`), and on
-   `Install` perform the install, run the provider's mandatory success gates (e.g. `specify init`,
-   the constitution/bootstrap check), run post-install validation, re-check, and continue in the
-   same turn. `Stop` halts with a report that installation is required.
+3. **Provider validation + recovery gate is mandatory at start and at any step.** On every
+   pipeline invocation, immediately after provider resolution and before any provider stage work,
+   run the framework availability check for that provider (github-speckit agents or superpowers
+   skills). Repeat this validation before each later provider invocation in Stage 02/03/04. If
+   incomplete/missing at any point, trigger install recovery immediately: fetch the install guide,
+   ask the user once (`Install` / `Stop`), and on `Install` perform the install, run the
+   provider's mandatory success gates (e.g. `specify init`, the constitution/bootstrap check), run
+   post-install validation, re-check, and continue in the same turn. `Stop` halts with a report
+   that installation is required.
 
 4. **Post-install validation failure is a hard stop.** If recovery install ran but validation
    still fails (missing provider files/skills, invocation channel/tool resolution failure, or host
@@ -93,10 +95,10 @@ This list is exhaustive.
    Report the stuck state and stop. A differing failure, or one followed by any file edit, does
    not count toward the 5.
 
-11. **Failure ordering and reporting.** Framework/source checks run first; only after they pass
-    may runtime stage-invocation errors be reported. Any stage failure, failed required commit,
-    or failed push stops the run with the exact error quoted. A skipped commit on an already-clean
-    tree is not a failure.
+11. **Failure ordering and reporting.** Provider validation checks run first (startup and
+    pre-invocation at any step); only after they pass may runtime stage-invocation errors be
+    reported. Any stage failure, failed required commit, or failed push stops the run with the
+    exact error quoted. A skipped commit on an already-clean tree is not a failure.
 
 12. **`--issue` mode record keeping.** The lowercase Jira key is the artifact id prefix and must
     stay stable across reruns (reuse an existing artifact whose name starts with `<issue_id>-`

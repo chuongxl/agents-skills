@@ -23,6 +23,11 @@ runs **inline** via the `skill` tool on all hosts — never as a background agen
 the spec path passed explicitly (`specs/<feature_folder>/spec.md`); an ambiguous match makes the
 skill ask the user, which would be a turn-ending stop inside this no-stop zone.
 
+Before each provider step invocation in this stage, run provider availability validation. If
+validation fails, trigger install recovery immediately for the resolved provider. If post-install
+validation still fails, stop and ask the user to manually install/fix the provider or restart
+Copilot / Claude Code / OpenCode, then re-run `speckit-auto`.
+
 ## Large Scope (condensed)
 
 Large scope → build `implementation_packages[]` from the tasks/plan grouped by `workspace` +

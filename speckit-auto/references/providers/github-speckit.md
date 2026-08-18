@@ -72,6 +72,14 @@ continues the pipeline in the same turn. It never switches provider.
    provider or restart the host session (Copilot / Claude Code / OpenCode), then re-run
    `speckit-auto`.
 
+## Runtime Validation Failure Handling (any step)
+
+If any later github-speckit stage invocation fails due to missing/invalid `speckit.*` agents,
+layout drift, or host-channel resolution failure, treat it as provider validation failure: trigger
+this Install Recovery flow immediately, then re-run post-install validation. If validation still
+fails, stop and ask the user to manually install/fix or restart the host session. Never continue
+to later pipeline steps while validation remains failed.
+
 ## Invocation Rules (all stages)
 
 - Copilot / Claude Code: emit the literal `/speckit.<command> ...` as this session's own next

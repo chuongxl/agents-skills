@@ -46,7 +46,8 @@ modified, behavior is unchanged.
 ## 2. Framework Source Check + Install Recovery (Startup Gate, required every run)
 
 This is the startup recovery gate from entry dispatch. It must execute on every pipeline
-invocation before any provider stage call.
+invocation before any provider stage call. The same validation + recovery logic is reused later
+before provider invocations in Stage 02/03/04.
 
 **Detect.** Probe the provider's installed layout for the resolved host per the adapter
 (github-speckit: probe the repo for `constitution`, `specify`, `clarify`, `plan`, `checklist`,

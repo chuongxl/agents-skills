@@ -12,7 +12,7 @@ license: MIT
 allowed-tools: bash glob grep view create edit skill
 metadata:
   author: Alex Nguyen
-  version: "0.3.2"
+  version: "0.3.3"
 ---
 
 # Speckit Auto
@@ -73,6 +73,8 @@ load.
    without install; an incomplete check must run recovery now (user may choose `Install` / `Stop`
    per the provider adapter). If install ran but validation still fails, stop and ask the user to
    manually install/fix the provider or restart Copilot / Claude Code / OpenCode, then re-run.
+   The same recovery logic also applies at **any later step**: before each provider invocation,
+   validate provider availability; if validation fails, trigger install recovery immediately.
 
 6. Load [references/shared/operating-rules.md](references/shared/operating-rules.md), the
    provider adapter [references/providers/github-speckit.md](references/providers/github-speckit.md)
