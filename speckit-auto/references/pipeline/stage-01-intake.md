@@ -67,9 +67,11 @@ section 3 (no install step). Do not defer this check.
    install + `specify version` sanity + `specify init . --integration <host-key>` (mandatory
    success gate) + `speckit.constitution` through the host channel; superpowers → the host's
    plugin/clone+copy command + on-disk verification.
-4. **Re-check** — re-run the probe from step "Detect". On pass, continue to section 3 in the
-   same turn. Superpowers note: freshly installed skills may not appear in this session's skill
-   list — use the adapter's sanctioned file-read fallback for the rest of the run.
+4. **Validate + re-check (hard gate)** — run the adapter's post-install validation gates and
+   re-run the probe from step "Detect". On pass, continue to section 3 in the same turn.
+5. **If validation fails after install** — stop immediately; do not continue provider stages.
+   Ask the user to manually install/fix the provider or restart the host session (Copilot /
+   Claude Code / OpenCode), then re-run `speckit-auto`.
 
 Never switch provider because a framework is missing; never fall back to a global/external
 variant; never continue past a concrete install failure (stop and report the exact error quoted).

@@ -63,8 +63,14 @@ continues the pipeline in the same turn. It never switches provider.
    same turn (Copilot: repo slash-agent `/speckit.constitution`, not the `skill` tool; Claude
    Code: `/speckit.constitution` or `Skill` tool; OpenCode: `skill` tool by resolved name). It
    must succeed — otherwise stop and report.
-7. **Re-run the source check** from step 1 of Stage 01 against the repo layout. On pass, continue
-   the pipeline in the same turn. Only a concrete install/init/constitution failure stops the run.
+7. **Post-install validation (hard gate).** Re-run the full Stage 01 source check against the repo
+   layout and confirm `speckit.constitution` can execute successfully through the host channel in
+   this session.
+8. **Validation failure handling (stop, no continuation).** If any validation step fails
+   (missing agents/layout, constitution invocation failure, command not found, host channel not
+   ready), do not continue the pipeline. Stop and ask the user to manually install/fix the
+   provider or restart the host session (Copilot / Claude Code / OpenCode), then re-run
+   `speckit-auto`.
 
 ## Invocation Rules (all stages)
 

@@ -49,50 +49,56 @@ This list is exhaustive.
    for that provider (github-speckit agents or superpowers skills). If incomplete/missing, run
    install recovery: fetch the install guide, ask the user once (`Install` / `Stop`), and on
    `Install` perform the install, run the provider's mandatory success gates (e.g. `specify init`,
-   the constitution/bootstrap check), re-check, and continue in the same turn. `Stop` halts with
-   a report that installation is required.
+   the constitution/bootstrap check), run post-install validation, re-check, and continue in the
+   same turn. `Stop` halts with a report that installation is required.
 
-4. **Heavy payload prevention.** Pass only the minimum slices each stage needs (current input +
+4. **Post-install validation failure is a hard stop.** If recovery install ran but validation
+   still fails (missing provider files/skills, invocation channel/tool resolution failure, or host
+   session not ready), do not continue the pipeline. Stop and ask the user to manually
+   install/fix the provider or restart the host session (Copilot / Claude Code / OpenCode), then
+   re-run `speckit-auto`.
+
+5. **Heavy payload prevention.** Pass only the minimum slices each stage needs (current input +
    relevant excerpts + compact project context). Never forward full prior-stage prose. For large
    scope, partition into small packages (see Stage 02/03 partitions) and invoke per package;
    parallel only when dependency-independent, else sequentially in dependency order.
 
-5. **Stage 02 mandatory self-review gate.** Before leaving Stage 02, in both modes: spec coverage,
+6. **Stage 02 mandatory self-review gate.** Before leaving Stage 02, in both modes: spec coverage,
    placeholder scan (`TODO`/`TBD`/`...`/stubs), consistency, and workspace assignment for every
    task. Fix failures at the source and re-verify; re-run the gate after **any** Stage 02 artifact
    regeneration (including regenerations triggered from Stage 03/04). Same check failing 3
    consecutive times stops and reports. Read-only — never fires an interview.
 
-6. **Stage 02 → 03 handoff is mandatory, never a stop.** Default mode: ask the single
+7. **Stage 02 → 03 handoff is mandatory, never a stop.** Default mode: ask the single
    start-implementation confirmation, then enter Stage 03 in the same turn on approval. `--yolo`:
    skip the confirmation and enter Stage 03 directly. Before entering, commit + push the approved
    Stage 02 artifacts (see Stage 02). Finishing Stage 02 is never by itself a reason to end the
    turn.
 
-7. **Stage 03 is a NO-STOP ZONE** in both modes: no approvals, pauses, interviews, or prompts.
+8. **Stage 03 is a NO-STOP ZONE** in both modes: no approvals, pauses, interviews, or prompts.
    The only success exit is `status = pass` from `speckit-code-review`; the only other exit is the
-   circuit breaker (rule 9). A `failed` review is never a stop condition — it is the input for the
+   circuit breaker (rule 10). A `failed` review is never a stop condition — it is the input for the
    next fix iteration; apply fixes and loop immediately, never writing a prose summary of a failed
    result. On each retry, rebuild loop context from `state_file` + current `fixes[]` only.
 
-8. **Routing and commits.** Stage 03 pass routes to Stage 04 (default mode; mandatory, never
+9. **Routing and commits.** Stage 03 pass routes to Stage 04 (default mode; mandatory, never
    skipped) or the YOLO auto-commit (Stage 04 YOLO path). After the implementation commit, mark
    the active spec/design artifact `completed` and make a follow-up commit for that status change.
    Every commit is conditional: check `git status --porcelain` first; an already-clean tree
    ("already committed during Stage 03") is a success path. Sync before push (`pull --rebase`,
    resolve conflicts, continue) and push the feature branch to origin.
 
-9. **Circuit breaker.** Abort Stage 03 only if the exact same failure repeats 5 consecutive
+10. **Circuit breaker.** Abort Stage 03 only if the exact same failure repeats 5 consecutive
    iterations with no file change between them, or a git/filesystem error prevents writing code.
    Report the stuck state and stop. A differing failure, or one followed by any file edit, does
    not count toward the 5.
 
-10. **Failure ordering and reporting.** Framework/source checks run first; only after they pass
+11. **Failure ordering and reporting.** Framework/source checks run first; only after they pass
     may runtime stage-invocation errors be reported. Any stage failure, failed required commit,
     or failed push stops the run with the exact error quoted. A skipped commit on an already-clean
     tree is not a failure.
 
-11. **`--issue` mode record keeping.** The lowercase Jira key is the artifact id prefix and must
+12. **`--issue` mode record keeping.** The lowercase Jira key is the artifact id prefix and must
     stay stable across reruns (reuse an existing artifact whose name starts with `<issue_id>-`
     rather than deriving a new slug). The ticket snapshot is persisted as `ticket.md` in the
     feature's artifact folder and committed with the other artifacts; it is the record of *what

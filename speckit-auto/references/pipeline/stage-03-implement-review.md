@@ -107,7 +107,7 @@ PHASE 2 — Code review loop
          speckit.tasks / writing-plans task breakdown) → R5b
        - ONLY SEC-*/CODE-*/TEST-*             → go straight to R6
        R5b — after ANY artifact regeneration, re-run the Stage 02 self-review gate (read-only)
-       before the fix iteration (operating rule 5).
+       before the fix iteration (operating rule 6).
   R6 — Apply the fixes via the provider's style:
        - github-speckit: re-invoke speckit.implement with a focused correction prompt built from
          the corrective action list (never direct file edits as a substitute)

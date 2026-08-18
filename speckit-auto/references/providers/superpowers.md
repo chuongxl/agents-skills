@@ -75,12 +75,14 @@ provider (see [../shared/operating-rules.md](../shared/operating-rules.md), rule
    check 2) from the current linked worktree — verify the minimum skill set's `SKILL.md` files
    exist at the host paths (for project-local installs, verify from the worktree checkout, not a
    different checkout).
-4. **Re-run the full availability check** (Stage 01 checks 1–3). Newly installed skills may NOT
-   surface in this session's available-skills list — if the skill tool cannot resolve them, use
-   the sanctioned file-read fallback from this adapter's skill-name resolution for the rest of the
-   run rather than stopping.
-5. **Continue the pipeline in the same turn** on pass. Only a concrete install failure stops the
-   run (report the exact failing step with quoted error output).
+4. **Post-install validation (hard gate).** Re-run the full Stage 01 availability check (checks
+   1–3) and require runtime executability (`using-superpowers` invocable in this session). On
+   pass, continue the pipeline in the same turn.
+5. **Validation failure handling (stop, no continuation).** If validation fails after install
+   (skills still missing, skill tool cannot invoke required skills, host session not refreshed), do
+   not continue the pipeline and do not use file-read fallback. Stop and ask the user to manually
+   install/fix superpowers or restart the host session (Copilot / Claude Code / OpenCode), then
+   re-run `speckit-auto`.
 
 ## Artifact Path Guard (mandatory, after every Stage 02 skill call)
 

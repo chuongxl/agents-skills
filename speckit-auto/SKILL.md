@@ -12,7 +12,7 @@ license: MIT
 allowed-tools: bash glob grep view create edit skill
 metadata:
   author: Alex Nguyen
-  version: "0.3.1"
+  version: "0.3.2"
 ---
 
 # Speckit Auto
@@ -71,7 +71,8 @@ load.
      re-check.
    This gate is mandatory on every pipeline invocation. A complete provider check continues
    without install; an incomplete check must run recovery now (user may choose `Install` / `Stop`
-   per the provider adapter).
+   per the provider adapter). If install ran but validation still fails, stop and ask the user to
+   manually install/fix the provider or restart Copilot / Claude Code / OpenCode, then re-run.
 
 6. Load [references/shared/operating-rules.md](references/shared/operating-rules.md), the
    provider adapter [references/providers/github-speckit.md](references/providers/github-speckit.md)
@@ -111,7 +112,7 @@ the same four stage files.
 - **YOLO** (`--yolo`): no human checkpoints; all Stage 02 interactions and Stage 04 human review
   are skipped, with an auto-generated commit message.
 
-Stage 03 is a NO-STOP ZONE in both modes (operating rule 7).
+Stage 03 is a NO-STOP ZONE in both modes (operating rule 8).
 
 ## Sub-Skill Dependencies
 

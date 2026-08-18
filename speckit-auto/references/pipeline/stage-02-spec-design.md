@@ -86,7 +86,7 @@ When the requirement is large or task volume is high, partition Stage 02 work in
 grouped by capability + `workspace`, invoke the step once per package, and merge the slices into
 the **single** target artifact (`plan.md`, `tasks.md`, checklist) with explicit cross-package
 ordering — never leave parallel per-package files behind. Run packages in parallel only when
-dependency-independent. Pass only minimum slices per invocation (operating rule 4).
+dependency-independent. Pass only minimum slices per invocation (operating rule 5).
 
 ## Stage 03 Entry Step (mandatory handoff) + Spec/Plan Commit Gate
 
