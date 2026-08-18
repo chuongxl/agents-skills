@@ -49,9 +49,9 @@ all three host agents (GitHub Copilot, Claude Code, OpenCode).
 
 ## Provider-specific checks
 
-- `github-speckit`: stage refs stay under `references/github-speckit/` and output mentions repo-installed agents.
-- `superpowers`: stage refs stay under `references/superpowers/` and output mentions `superpowers:*` skills.
-- Both: the chosen provider never changes mid-run.
+- `github-speckit`: pipeline stage refs live under `references/pipeline/` and the provider adapter under `references/providers/github-speckit.md`; output mentions repo-installed agents.
+- `superpowers`: pipeline stage refs live under `references/pipeline/` and the provider adapter under `references/providers/superpowers.md`; output mentions `superpowers:*` skills.
+- Both: the chosen provider never changes mid-run; stage files load only the selected provider's adapter.
 
 ## Minimum pass criteria
 
