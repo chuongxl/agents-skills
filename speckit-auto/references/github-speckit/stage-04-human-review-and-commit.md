@@ -32,6 +32,9 @@ Load this only in default mode after `speckit-code-review` returns `pass`.
    (`specify → clarify → plan → checklist → tasks → analyze`, starting from the routed one), so no
    derived artifact is left stale, then re-run the Stage 02 Mandatory Self-Review Gate
    (read-only, no interview) — global rule 10a.
-4. Then re-enter the **full** Stage 03 flow (converge loop, then the `speckit-code-review` loop)
+4. Commit and push the regenerated Stage 02 artifacts using the Spec/Plan Commit + Push Gate in
+   [stage-02-spec-design-flow.md](stage-02-spec-design-flow.md) before re-entering Stage 03 — the
+   spec/plan changed, so the same "commit before implementation" rule applies here too.
+5. Then re-enter the **full** Stage 03 flow (converge loop, then the `speckit-code-review` loop)
    until `status = pass`. Stage 03's no-stop rules apply again for that re-entry.
-5. Return to this gate and repeat until approved.
+6. Return to this gate and repeat until approved.

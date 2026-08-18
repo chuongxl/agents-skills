@@ -4,6 +4,8 @@ Load this only while executing stages:
 `speckit.specify -> speckit.clarify -> speckit.plan -> speckit.checklist -> speckit.tasks -> speckit.analyze`
 
 Also load: [review-interview.md](review-interview.md) (default mode only; discard at Stage 03 entry).
+Also load: [../shared/commit.md](../shared/commit.md) (needed for the Spec/Plan Commit + Push Gate
+below, right before Stage 03 entry).
 
 ## Stage Order (must not skip)
 
@@ -150,8 +152,10 @@ Reaching the end of Stage 02 is **never** a stop condition on its own.
 1. Ask via the host's ask tool (`ask_user` on Copilot, `question` on OpenCode, `AskUser` on Claude
    Code): "Stage 02 complete (spec, plan, tasks, analyze). Start implementation
    (Stage 03)?" Choices: `Start implementation`, `Request changes`.
-2. `Start implementation` → discard Stage 02 files and `review-interview.md` from context and
-   invoke [stage-03-implement-and-code-review-loop.md](stage-03-implement-and-code-review-loop.md)
+2. `Start implementation` → commit and push the approved Stage 02 artifacts (see
+   "Spec/Plan Commit + Push Gate" below), **then** discard Stage 02 files and
+   `review-interview.md` from context and invoke
+   [stage-03-implement-and-code-review-loop.md](stage-03-implement-and-code-review-loop.md)
    **immediately, in the same turn**. Do not summarize, do not ask anything else, do not wait for
    another user message.
 3. `Request changes` → capture the feedback (including any forward constraints the user states
@@ -159,5 +163,23 @@ Reaching the end of Stage 02 is **never** a stop condition on its own.
    above, re-run the affected stages through to `speckit.analyze` and the self-review gate, then
    ask this question again.
 
-**`--yolo` mode** — skip the confirmation entirely. Once the self-review gate passes, enter
+**`--yolo` mode** — skip the confirmation entirely. Once the self-review gate passes, commit and
+push the approved Stage 02 artifacts (see "Spec/Plan Commit + Push Gate" below), then enter
 Stage 03 immediately in the same turn.
+
+## Spec/Plan Commit + Push Gate (mandatory, before Stage 03)
+
+Once spec/plan/tasks are approved (the Stage 03 Entry Step confirmation in default mode, or the
+self-review gate passing in `--yolo` mode) and **before** invoking Stage 03, persist those
+artifacts to the remote feature branch:
+
+1. Auto-generate the commit message: `docs(<artifact_id>): add spec, plan, and tasks`
+   (`artifact_id` — see [../shared/commit.md](../shared/commit.md)).
+2. Run the commit + push procedure in [../shared/commit.md](../shared/commit.md) with that
+   message. This covers `spec.md`, `plan.md`, `tasks.md`, the checklist, and any other Stage 02
+   artifact files — not the implementation itself, which Stage 04/05 commits separately later.
+3. If nothing is uncommitted (e.g. a prior run already pushed these artifacts), skip per
+   commit.md's conditional-commit rule — that is a success path, not a failure.
+4. A failed commit or push here is a failure for this stage: stop and report the exact error.
+   Do not enter Stage 03 without this commit/push succeeding (or being a legitimate no-op).
+

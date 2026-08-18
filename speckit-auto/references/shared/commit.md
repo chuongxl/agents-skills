@@ -1,8 +1,15 @@
 # Shared: Commit + Push Procedure (Provider-Agnostic)
 
-Used by Stage 04 (default mode, after human approval) and Stage 05 (`--yolo`). The procedure is
-identical; only the commit message source differs — Stage 04 asks the user, Stage 05 auto-generates
-`feat(<artifact_id>): <short summary from the spec or Jira summary>`.
+Used by:
+- Stage 04 (default mode, after human approval of the implementation)
+- Stage 05 (`--yolo`, after `speckit-code-review` passes)
+- The Stage 02 → Stage 03 handoff (github-speckit), to persist the approved spec/plan/tasks
+  before implementation starts
+
+The procedure is identical in all three call sites; only the commit message source differs —
+Stage 04 asks the user, Stage 05 auto-generates `feat(<artifact_id>): <short summary from the spec
+or Jira summary>`, and the Stage 02 → 03 handoff auto-generates
+`docs(<artifact_id>): add spec, plan, and tasks` (see that stage file for the exact message).
 
 `artifact_id` is provider-independent and always defined: the Jira issue key in `--issue` runs,
 otherwise the artifact folder's prefix-slug (e.g. `007-user-export`). Never emit a literal
