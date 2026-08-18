@@ -42,17 +42,26 @@ If no submodules were modified and the tree is dirty:
 - `git add -A`
 - `git commit -m "<commit-message>"`
 
-## Branch Push (Required)
+## Branch Sync + Push (Required)
 
 After the commit decision above (including the "already committed during Stage 03" success path),
-push the current feature branch to the remote:
+sync and push the current feature branch to the remote:
 
 1. Resolve the current branch:
    - `git branch --show-current`
-2. Push to `origin`:
+2. Pull with rebase before pushing:
+   - `git pull --rebase origin <branch>`
+   - If this fails because the remote branch does not exist yet, continue to push (new branch path).
+3. If rebase conflicts occur:
+   - resolve conflicts in files
+   - `git add <resolved-files>`
+   - `git rebase --continue`
+   - repeat until rebase completes
+   - if conflicts cannot be resolved, stop and report the exact failure
+4. Push to `origin`:
    - first push on a new branch: `git push -u origin <branch>`
    - subsequent pushes: `git push origin <branch>`
-3. If push fails, stop and report the exact failure.
+5. If push fails, stop and report the exact failure.
 
 This stage must leave the implementation commit(s) available on the remote feature branch.
 
@@ -65,7 +74,7 @@ committing, report the Stage 03 commits instead — never report "no commit" as 
 
 If a commit that was actually needed fails, stop and report the exact failure. A skipped commit on
 an already-clean tree is **not** a failure and never stops the pipeline. A failed push is a failure
-for this stage.
+for this stage. A failed or unresolved rebase is also a failure for this stage.
 
 ## Scratch Must Already Be Ignored
 
