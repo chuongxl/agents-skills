@@ -34,10 +34,10 @@ agent — and always with the spec path passed explicitly (`specs/<feature_folde
 Never the `task` tool with any skill name; never a nested CLI subprocess. Never emit `@speckit.*`
 or `/speckit.*`.
 
-Before each provider step invocation in this stage, run provider availability validation. If
-`skill speckit-<command>` fails to resolve, trigger install recovery immediately. If post-install
-validation still fails, **stop and ask the user to restart the host session (Copilot / Claude
-Code / OpenCode), then re-run `speckit-auto`.**
+If any `skill` invocation fails (skill not found, tool error) → **stop immediately** and tell
+the user:
+> "Provider skills are not installed or not available. Please run
+> `/speckit-auto --integration {provider}` first, then re-run your command."
 
 ## Large Scope (condensed)
 

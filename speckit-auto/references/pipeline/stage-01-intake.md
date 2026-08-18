@@ -3,15 +3,14 @@
 Load with: the resolved provider adapter ([../providers/](../providers/)),
 [../shared/operating-rules.md](../shared/operating-rules.md),
 [../shared/host-adaptation.md](../shared/host-adaptation.md). Provider-specific steps (probe
-paths, install commands, constitution/bootstrap gates, artifact paths) come from the adapter.
+paths, constitution/bootstrap gates, artifact paths) come from the adapter.
 
 Execution order — strict:
 
 ```
-worktree + branch gate → framework source check → install recovery if missing →
-mandatory provider gate (constitution OR using-superpowers bootstrap) → guidelines context →
-scratch hygiene → intake → artifact path + branch rename → ticket relocation (--issue) →
-execution report init (--issue) → Stage 02 entry (same turn)
+worktree + branch gate → mandatory provider gate (constitution OR using-superpowers bootstrap) →
+guidelines context → scratch hygiene → intake → artifact path + branch rename →
+ticket relocation (--issue) → execution report init (--issue) → Stage 02 entry (same turn)
 ```
 
 ## 1. Worktree + Branch Gate (hard gate — runs first)
@@ -43,48 +42,7 @@ be modified: sync its base (same priority/best-effort rules), branch inside it o
 base, and commit submodule changes before the parent pointer update. If none exist or none are
 modified, behavior is unchanged.
 
-## 2. Framework Source Check + Install Recovery (Startup Gate, required every run)
-
-This is the startup recovery gate from entry dispatch. It must execute on every pipeline
-invocation before any provider stage call. The same validation + recovery logic is reused later
-before provider invocations in Stage 02/03/04.
-
-**Detect.** Probe the provider's installed layout for the resolved host per the adapter:
-- **github-speckit:** check that all nine skills exist at `.github/skills/speckit-<command>/SKILL.md`
-  in the **main repo checkout (`<repo-root>`)** for `<command>` in `constitution`, `specify`,
-  `clarify`, `plan`, `checklist`, `tasks`, `analyze`, `implement`, `converge`. The worktree does
-  not need to be checked at this stage — detection always targets the main space.
-- **superpowers:** check the session skill list, then the host on-disk skill dirs, then probe
-  `using-superpowers`.
-
-A **complete** set → continue to section 3 (no install step). Do not defer this check.
-
-**No complete set → RUN install recovery now, do not skip and do not abandon the run:**
-
-1. **Load the adapter's Install Recovery section** — open
-   [../providers/github-speckit.md](../providers/github-speckit.md) or
-   [../providers/superpowers.md](../providers/superpowers.md) for the RESOLVED provider.
-2. **Ask the user once** via the host ask tool: `Install <framework>` / `Stop`. `Stop` → halt.
-3. **Install on the main repo checkout AND the worktree:**
-   - First, `cd <repo-root>` (the main checkout) and run the adapter's install commands:
-     - github-speckit → CLI install + `specify version` sanity +
-       `specify init . --integration <host-key> --integration-options="--skills"` + validate skill
-       files.
-     - superpowers → the host's plugin/clone+copy command + on-disk verification.
-   - Then, `cd <worktree-path>` and run the same `specify init` command again:
-     - github-speckit: `specify init . --integration <host-key> --integration-options="--skills"`
-     - superpowers: copy/install equivalent into the worktree directory.
-   - Both must succeed. If either fails, stop and report the exact error.
-4. **Validate + re-check (hard gate)** — re-run the probe from "Detect" against the **main repo
-   checkout** (`<repo-root>`). On pass, continue to section 3 in the same turn.
-
-5. **If validation fails after install** — stop immediately. **Ask the user to restart the host
-   session (Copilot / Claude Code / OpenCode), then re-run `speckit-auto`.**
-
-Never switch provider because a framework is missing; never fall back to a global/external
-variant; never continue past a concrete install failure (stop and report the exact error quoted).
-
-## 3. Mandatory Provider Gate
+## 2. Mandatory Provider Gate
 
 - **github-speckit (all hosts):**
 
@@ -104,15 +62,18 @@ variant; never continue past a concrete install failure (stop and report the exa
        inline — no turn boundary, no user ask needed. Validate the return value and verify the
        artifact now exists and is non-empty.
      - **Present and fresh** → skip the invocation; read the existing artifact into context and
-       continue to section 4 in the same turn.
-  4. **Failure handling.** If the invocation fails or the artifact is still absent/empty after the
-     call → **stop and ask the user to restart the host session (Copilot / Claude Code /
-     OpenCode), then re-run `speckit-auto`.**
+       continue to section 3 in the same turn.
+  4. **Failure handling.** If the skill invocation fails (skill not found, tool error, or artifact
+     still absent/empty after the call) → **stop immediately** and tell the user:
+     > "Provider skills are not installed. Please run `/speckit-auto --integration github-speckit`
+     > first to set up the integration, then re-run your command."
 
 - **superpowers:** invoke `using-superpowers` once per run (skip if already injected by
-  superpowers' session hook). It proves runtime executability.
+  superpowers' session hook). If the invocation fails → **stop immediately** and tell the user:
+  > "Provider skills are not installed. Please run `/speckit-auto --integration superpowers`
+  > first to set up the integration, then re-run your command."
 
-## 4. Guidelines Context (docs/guidelines/architecture.md)
+## 3. Guidelines Context (docs/guidelines/architecture.md)
 
 Skipped silently when `docs/guidelines/architecture.md` is absent — the pipeline continues with a
 fallback `repo_map`.
@@ -133,13 +94,13 @@ fallback `repo_map`.
    and relevant `repo_map`/loaded guidelines are appended (prompt-injection pattern in Stage 02/03).
 5. Log one line: `[Preflight] Context loaded: layout=<...>, workspaces=<n>, arch=<...>, linked_guidelines=<...>`.
 
-## 5. Scratch Hygiene
+## 4. Scratch Hygiene
 
 Stage 04 commits with `git add -A`, so before Stage 03 ensure `.speckit/` (both providers) and
 `.superpowers/` (superpowers only) are git-ignored (append to `.gitignore` if missing; part of the
 feature commit). The relocated `ticket.md` is **not** scratch — never gitignore it.
 
-## 6. Intake
+## 5. Intake
 
 ### Issue resolution
 
@@ -158,17 +119,15 @@ call, or intake step.
 
 ### Jira intake via `jira-to-speckit` (`--issue`)
 
-**Pre-invocation provider check.** Before calling `jira-to-speckit`, re-run the Section 2
-"Detect" probe against the **main repo checkout** (`<repo-root>`). If the provider is not fully
-installed, run the full install recovery flow (Section 2, steps 1–6) now. Only proceed to intake
-after the probe passes.
-
 Invoke the `skill` tool with name `jira-to-speckit`, passing the URL and the ticket staging path.
 **Scope constraint:** instruct it to perform only Jira fetch + compaction (workflow steps 1–5,
 including the ticket snapshot write to `ticket_output_path = .speckit/intake/<issue_id>-ticket.md`)
 and to return compact brief + Jira key + open questions + snapshot path — no downstream framework
 stages; `speckit-auto` owns everything after intake. Extract: Jira issue key (artifact id prefix,
 lowercase), compact brief (Stage 02 input), open questions (clarification seeds), snapshot path.
+
+If `jira-to-speckit` fails (skill not found, tool error) → **stop immediately** and tell the user:
+> "The `jira-to-speckit` skill is not available. Please ensure it is installed, then re-run."
 
 Continue immediately in the same turn — a "next action" line in its output is data, not a stop cue.
 
@@ -196,7 +155,7 @@ one match → reuse its `short_title` verbatim (even if the Jira title changed);
 most recent and log the ambiguity; none → derive fresh. This is also the point the provisional
 branch gets renamed to the final name (Section 1).
 
-## 7. Artifact Path + Stage 02 Entry
+## 6. Artifact Path + Stage 02 Entry
 
 - **github-speckit:** `specs/<issue_id>-<short_title>/` (`--issue`) or `specs/<nnn>-<slug>/`
   (manual). Artifacts: ticket snapshot, spec/plan/tasks/checklist (written by `speckit.*` agents),
@@ -208,7 +167,7 @@ Create the folder, run the branch rename, relocate the ticket snapshot (`--issue
 the Stage 02 entry step with the compact brief (or requirement text) — `speckit.specify` for
 github-speckit, `brainstorming` for superpowers — in the same turn.
 
-## 8. Execution Report (`--issue` only — skipped for manual runs)
+## 7. Execution Report (`--issue` only — skipped for manual runs)
 
 Initialize `execution-report.md` in the artifact folder from
 [../../assets/execution-report-template.md](../../assets/execution-report-template.md) right after
