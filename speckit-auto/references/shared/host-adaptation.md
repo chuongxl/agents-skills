@@ -37,7 +37,7 @@ name on every host. The `skill` tool returns inline in the same turn. There are 
 no agent calls, and no turn boundaries for skill invocations.
 
 ```
-skill speckit-constitution    # same on Copilot, Claude Code, and OpenCode
+skill speckit-constitution "constitution project to understand the project architecture"
 skill speckit-specify
 skill speckit-implement
 ...

@@ -19,9 +19,14 @@ superpowers — the plan path `specs/<feature_folder>/plan.md`.
 Invoke every step via the `skill` tool using the skill name from the provider adapter's Stage
 Skill Map. Identical on all three hosts:
 
-- **github-speckit:** `skill speckit-implement`, `skill speckit-converge`, etc. The `skill` tool
-  returns inline — no turn boundary, no user confirmation, no state file needed per step.
+- **github-speckit:** `skill speckit-implement`, `skill speckit-converge`, etc.
 - **superpowers (all hosts):** `skill subagent-driven-development`, etc.
+
+The `skill` tool is **synchronous** — it blocks until the skill finishes and returns inline.
+After every call, apply the **Step Execution and Completion Protocol** from the provider adapter:
+read the return value, verify the expected artifact on disk (for `speckit-implement`: source/test
+files written; for `speckit-converge`: return value reports status), retry once on failure, stop
+if still failing. Never continue the loop until the current step's completion is confirmed.
 
 `speckit-code-review` runs **inline** via the `skill` tool on all hosts — never as a background
 agent — and always with the spec path passed explicitly (`specs/<feature_folder>/spec.md`).
@@ -31,8 +36,8 @@ or `/speckit.*`.
 
 Before each provider step invocation in this stage, run provider availability validation. If
 `skill speckit-<command>` fails to resolve, trigger install recovery immediately. If post-install
-validation still fails, stop and ask the user to manually install/fix or restart the host
-session, then re-run `speckit-auto`.
+validation still fails, **stop and ask the user to restart the host session (Copilot / Claude
+Code / OpenCode), then re-run `speckit-auto`.**
 
 ## Large Scope (condensed)
 

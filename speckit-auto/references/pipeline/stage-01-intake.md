@@ -71,8 +71,8 @@ A **complete** set → continue to section 3 (no install step). Do not defer thi
    - superpowers → the host's plugin/clone+copy command + on-disk verification.
 4. **Validate + re-check (hard gate)** — re-run the probe from "Detect". On pass, continue to
    section 3 in the same turn.
-5. **If validation fails after install** — stop immediately; ask the user to manually install/fix
-   the provider or restart the host session, then re-run `speckit-auto`.
+5. **If validation fails after install** — stop immediately. **Ask the user to restart the host
+   session (Copilot / Claude Code / OpenCode), then re-run `speckit-auto`.**
 
 Never switch provider because a framework is missing; never fall back to a global/external
 variant; never continue past a concrete install failure (stop and report the exact error quoted).
@@ -80,9 +80,11 @@ variant; never continue past a concrete install failure (stop and report the exa
 ## 3. Mandatory Provider Gate
 
 - **github-speckit (all hosts):**
-  Invoke `speckit-constitution` via the `skill` tool (name: `speckit-constitution`). The `skill`
-  tool returns inline — no turn boundary, no user ask needed. Validate the return value. Failure
-  → stop with the exact error and ask the user to manually fix or restart the host session.
+  Invoke `speckit-constitution` via the `skill` tool with prompt
+  `"constitution project to understand the project architecture"` (name: `speckit-constitution`).
+  The `skill` tool returns inline — no turn boundary, no user ask needed. Validate the return
+  value. Failure → **stop and ask the user to restart the host session (Copilot / Claude Code /
+  OpenCode), then re-run `speckit-auto`.**
 - **superpowers:** invoke `using-superpowers` once per run (skip if already injected by
   superpowers' session hook). It proves runtime executability.
 

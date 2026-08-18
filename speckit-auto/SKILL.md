@@ -71,8 +71,8 @@ load.
      re-check.
    This gate is mandatory on every pipeline invocation. A complete provider check continues
    without install; an incomplete check must run recovery now (user may choose `Install` / `Stop`
-   per the provider adapter). If install ran but validation still fails, stop and ask the user to
-   manually install/fix the provider or restart Copilot / Claude Code / OpenCode, then re-run.
+   per the provider adapter). If install ran but validation still fails, **stop and ask the user
+   to restart Copilot / Claude Code / OpenCode, then re-run `speckit-auto`.**
    The same recovery logic also applies at **any later step**: before each provider invocation,
    validate provider availability; if validation fails, trigger install recovery immediately.
 

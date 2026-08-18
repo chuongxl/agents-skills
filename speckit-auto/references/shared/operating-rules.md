@@ -56,9 +56,8 @@ This list is exhaustive.
 
 4. **Post-install validation failure is a hard stop.** If recovery install ran but validation
    still fails (missing provider files/skills, invocation channel/tool resolution failure, or host
-   session not ready), do not continue the pipeline. Stop and ask the user to manually
-   install/fix the provider or restart the host session (Copilot / Claude Code / OpenCode), then
-   re-run `speckit-auto`.
+   session not ready), do not continue the pipeline. **Stop and ask the user to restart the host
+   session (Copilot / Claude Code / OpenCode), then re-run `speckit-auto`.**
 
 5. **Heavy payload prevention.** Pass only the minimum slices each stage needs (current input +
    relevant excerpts + compact project context). Never forward full prior-stage prose. For large

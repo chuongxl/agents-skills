@@ -80,17 +80,16 @@ provider (see [../shared/operating-rules.md](../shared/operating-rules.md), rule
    pass, continue the pipeline in the same turn.
 5. **Validation failure handling (stop, no continuation).** If validation fails after install
    (skills still missing, skill tool cannot invoke required skills, host session not refreshed), do
-   not continue the pipeline and do not use file-read fallback. Stop and ask the user to manually
-   install/fix superpowers or restart the host session (Copilot / Claude Code / OpenCode), then
-   re-run `speckit-auto`.
+   not continue the pipeline and do not use file-read fallback. **Stop and ask the user to restart
+   the host session (Copilot / Claude Code / OpenCode), then re-run `speckit-auto`.**
 
 ## Runtime Validation Failure Handling (any step)
 
 If any later superpowers stage invocation fails because required skills are missing/unresolvable
 in-session, treat it as provider validation failure: trigger this Install Recovery flow
-immediately, then re-run post-install validation. If validation still fails, stop and ask the user
-to manually install/fix or restart the host session. Never continue to later pipeline steps while
-validation remains failed.
+immediately, then re-run post-install validation. If validation still fails, **stop and ask the
+user to restart the host session (Copilot / Claude Code / OpenCode), then re-run `speckit-auto`.**
+Never continue to later pipeline steps while validation remains failed.
 
 ## Artifact Path Guard (mandatory, after every Stage 02 skill call)
 

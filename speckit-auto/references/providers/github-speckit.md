@@ -21,7 +21,8 @@ and invoked via the `skill` tool on all hosts, exactly like any other skill.
 | Stage 03 implement | `speckit-implement` (user wording `speckit.implementation` maps here) | — |
 | Stage 03 convergence | `speckit-converge` | run after implement until it reports no gaps |
 
-Constitution: invoke `speckit-constitution` via the `skill` tool once per pipeline run; it must
+Constitution: invoke `speckit-constitution` via the `skill` tool once per pipeline run, passing
+the prompt `"constitution project to understand the project architecture"`. It must
 succeed before Stage 02 (mandatory gate). In install recovery it is also mandatory.
 
 All artifacts (spec/plan/tasks/checklist/implementation) are produced ONLY by these skills.
@@ -46,7 +47,7 @@ Invoke every `speckit-*` step via the `skill` tool using the skill name from the
 This is identical on all three hosts — no agent calls, no slash commands.
 
 ```
-skill speckit-constitution
+skill speckit-constitution "constitution project to understand the project architecture"
 skill speckit-specify
 skill speckit-clarify
 ...
@@ -55,11 +56,39 @@ skill speckit-clarify
 - NEVER use the `task` tool with a `speckit-*` or `speckit.*` name.
 - NEVER shell out to a nested `copilot`/`claude`/`opencode` CLI subprocess from bash.
 - NEVER emit `@speckit.*` or `/speckit.*` — skills are not invoked that way.
-- The `skill` tool returns inline in the same turn — no turn boundary, no user confirmation
-  needed, no state file required per step.
+- The `skill` tool is **synchronous** — it blocks until the skill finishes and returns the result
+  inline in the same turn. speckit-auto does not continue to the next step until the `skill` call
+  returns.
+
+## Step Execution and Completion Protocol (mandatory for every speckit-* call)
+
+After every `skill speckit-<command>` call, before proceeding to the next step:
+
+1. **Read the return value.** If the return value is empty, contains an error, or the skill tool
+   itself reports a failure, treat it as a skill failure — do NOT proceed.
+2. **Verify the expected artifact on disk.** Each skill writes a specific output file. Check that
+   the file exists and is non-empty in the worktree:
+
+   | Skill | Expected artifact |
+   |-------|------------------|
+   | `speckit-constitution` | no file artifact — validate return value only |
+   | `speckit-specify` | `specs/<feature_folder>/spec.md` |
+   | `speckit-clarify` | `specs/<feature_folder>/spec.md` (updated) |
+   | `speckit-plan` | `specs/<feature_folder>/plan.md` |
+   | `speckit-checklist` | `specs/<feature_folder>/checklist.md` |
+   | `speckit-tasks` | `specs/<feature_folder>/tasks.md` |
+   | `speckit-analyze` | `specs/<feature_folder>/analyze.md` or updated tasks |
+   | `speckit-implement` | source/test files written in the worktree |
+   | `speckit-converge` | return value reports convergence status |
+
+3. **On missing or empty artifact:** the skill did not complete its work — treat as failure. Do
+   not proceed to the next step. Retry the same skill once; if it fails again, stop and report the
+   exact return value and file check result. Ask the user to inspect the skill output or restart
+   the host session.
+4. **On pass:** proceed to the next step immediately in the same turn.
 - If the `skill` tool cannot resolve `speckit-<command>`, treat it as a provider validation
-  failure: trigger install recovery, re-validate. If still failing, stop and ask the user to
-  manually install/fix or restart the host session.
+  failure: trigger install recovery, re-validate. If still failing, **stop and ask the user to
+  restart the host session (Copilot / Claude Code / OpenCode), then re-run `speckit-auto`.**
 
 ## Install Recovery (only when the source check fails)
 
@@ -95,19 +124,20 @@ proves executability, and continues the pipeline in the same turn. It never swit
 6. **Post-install validation (hard gate)**:
    a. Re-run the Stage 01 source check: verify all nine `speckit-<command>` skills exist at
       `.github/skills/speckit-<command>/SKILL.md` in the worktree.
-   b. Invoke `speckit-constitution` via the `skill` tool and confirm it returns successfully
-      (inline, same turn — no turn boundary, no user ask needed).
-   c. If either check fails: stop and ask the user to manually install/fix the provider or restart
-      the host session (Copilot / Claude Code / OpenCode), then re-run `speckit-auto`. Never
-      continue past a failed validation.
+   b. Invoke `speckit-constitution` via the `skill` tool with prompt
+      `"constitution project to understand the project architecture"` and confirm it returns
+      successfully (inline, same turn — no turn boundary, no user ask needed).
+   c. If either check fails: **stop and ask the user to restart the host session (Copilot /
+      Claude Code / OpenCode), then re-run `speckit-auto`.**
 7. **On pass**: continue the pipeline in the same turn.
 
 ## Runtime Validation Failure Handling (any step)
 
 If any `skill speckit-<command>` call fails (skill not found, skill tool error), treat it as
 provider validation failure: trigger this Install Recovery flow, re-run post-install validation.
-If validation still fails, stop and ask the user to manually install/fix or restart the host
-session. Never continue to later pipeline steps while validation remains failed.
+If validation still fails, **stop and ask the user to restart the host session (Copilot /
+Claude Code / OpenCode), then re-run `speckit-auto`.** Never continue to later pipeline steps
+while validation remains failed.
 
 ## Artifacts
 

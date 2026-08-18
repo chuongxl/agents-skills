@@ -88,7 +88,7 @@ repo map.
 | "Which provider?" on every run | Run `--integration <provider>` once to persist |
 | Jira intake fails | Ensure root `.env` has all three `JIRA_*` keys; test with `jira-to-speckit` directly |
 | Stage 03 review loop doesn't converge | Simplify the spec's acceptance criteria; avoid vague language ("elegant", "performant") |
-| Missing framework | At startup and any later step, failed provider validation triggers install recovery; if still failing after install, stop and manually install/fix or restart Copilot/Claude/OpenCode, then re-run |
+| Missing framework | At startup and any later step, failed provider validation triggers install recovery; if still failing after install, stop and ask the user to restart Copilot / Claude Code / OpenCode, then re-run |
 
 ## Notes
 

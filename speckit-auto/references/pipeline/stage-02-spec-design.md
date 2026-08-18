@@ -11,17 +11,21 @@ tasks+analyze). Never skip, bypass, or reorder in either mode.
 Invoke each step via the `skill` tool using the skill name from the provider adapter's Stage
 Skill Map. This is identical on all three hosts (Copilot, Claude Code, OpenCode):
 
-- **github-speckit:** `skill speckit-specify`, `skill speckit-clarify`, etc. The `skill` tool
-  returns inline in the same turn — no turn boundary, no user confirmation, no state file needed.
+- **github-speckit:** `skill speckit-specify`, `skill speckit-clarify`, etc.
 - **superpowers (all hosts):** `skill brainstorming`, `skill writing-plans`, etc.
+
+The `skill` tool is **synchronous** — it blocks until the skill finishes and returns inline.
+After every call, apply the **Step Execution and Completion Protocol** from the provider adapter:
+read the return value, verify the expected artifact on disk, retry once on failure, stop if still
+failing. Never proceed to the next step until the current step's artifact is confirmed present.
 
 Never the `task` tool with any skill name; never a nested CLI subprocess. Never emit
 `@speckit.*` or `/speckit.*` — all github-speckit steps are skills invoked via the `skill` tool.
 
 Before each provider step invocation in this stage, run provider availability validation. If
 `skill speckit-<command>` fails to resolve, trigger install recovery immediately. If post-install
-validation still fails, stop and ask the user to manually install/fix or restart the host
-session, then re-run `speckit-auto`.
+validation still fails, **stop and ask the user to restart the host session (Copilot / Claude
+Code / OpenCode), then re-run `speckit-auto`.**
 
 ## Project Context Wiring (mandatory)
 
