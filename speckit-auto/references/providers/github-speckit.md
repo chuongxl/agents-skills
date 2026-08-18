@@ -21,9 +21,10 @@ and invoked via the `skill` tool on all hosts, exactly like any other skill.
 | Stage 03 implement | `speckit-implement` (user wording `speckit.implementation` maps here) | — |
 | Stage 03 convergence | `speckit-converge` | run after implement until it reports no gaps |
 
-Constitution: invoke `speckit-constitution` via the `skill` tool once per pipeline run, passing
-the prompt `"constitution project to understand the project architecture"`. It must
-succeed before Stage 02 (mandatory gate). In install recovery it is also mandatory.
+Constitution: invoke `speckit-constitution` via the `skill` tool when the artifact is missing or
+outdated (see Stage 01 Section 3 for the freshness check). It must succeed before Stage 02
+(mandatory gate). In install recovery it is also mandatory (always runs). The skill writes its
+output to `.specify/memory/constitution.md` in the worktree.
 
 All artifacts (spec/plan/tasks/checklist/implementation) are produced ONLY by these skills.
 `speckit-auto` never synthesizes spec/plan/tasks content or writes implementation code itself.
@@ -71,7 +72,7 @@ After every `skill speckit-<command>` call, before proceeding to the next step:
 
    | Skill | Expected artifact |
    |-------|------------------|
-   | `speckit-constitution` | no file artifact — validate return value only |
+   | `speckit-constitution` | `.specify/memory/constitution.md` (non-empty, ≥100 words) |
    | `speckit-specify` | `specs/<feature_folder>/spec.md` |
    | `speckit-clarify` | `specs/<feature_folder>/spec.md` (updated) |
    | `speckit-plan` | `specs/<feature_folder>/plan.md` |

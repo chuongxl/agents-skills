@@ -80,11 +80,28 @@ variant; never continue past a concrete install failure (stop and report the exa
 ## 3. Mandatory Provider Gate
 
 - **github-speckit (all hosts):**
-  Invoke `speckit-constitution` via the `skill` tool with prompt
-  `"constitution project to understand the project architecture"` (name: `speckit-constitution`).
-  The `skill` tool returns inline — no turn boundary, no user ask needed. Validate the return
-  value. Failure → **stop and ask the user to restart the host session (Copilot / Claude Code /
-  OpenCode), then re-run `speckit-auto`.**
+
+  Before calling any other `speckit-*` skill, check whether the constitution artifact is present
+  and up-to-date in the **worktree**:
+
+  1. **Locate the artifact.** Look for a non-empty `.specify/memory/constitution.md` (written by
+     `speckit-constitution`, github-speckit only) inside the worktree.
+  2. **Freshness check.** The artifact is considered **outdated** if any of the following are true:
+     - The file does not exist or is empty.
+     - Its last-modified timestamp is older than the most recent commit on the current base branch
+       (i.e., there were new commits since the file was last written).
+     - The file's word count is under 100 words (truncated / partial run artifact).
+  3. **Decision:**
+     - **Missing or outdated** → invoke `skill speckit-constitution` with prompt
+       `"constitution project to understand the project architecture"`. The `skill` tool returns
+       inline — no turn boundary, no user ask needed. Validate the return value and verify the
+       artifact now exists and is non-empty.
+     - **Present and fresh** → skip the invocation; read the existing artifact into context and
+       continue to section 4 in the same turn.
+  4. **Failure handling.** If the invocation fails or the artifact is still absent/empty after the
+     call → **stop and ask the user to restart the host session (Copilot / Claude Code /
+     OpenCode), then re-run `speckit-auto`.**
+
 - **superpowers:** invoke `using-superpowers` once per run (skip if already injected by
   superpowers' session hook). It proves runtime executability.
 
