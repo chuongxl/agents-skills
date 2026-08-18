@@ -11,8 +11,11 @@ Load this **only** when the Stage 01 Speckit source check failed. A normal run n
 5. If `Install`, follow the guide exactly to install the Spec Kit CLI.
 6. Initialize in this repo: `specify init . --integration <host-key>` (for a Copilot repo that
    already uses the commands layout, pass `--integration-options="--commands"`).
-7. Run the `speckit.constitution` step via the host's invocation channel (slash command on
-   Copilot/Claude Code; `skill` tool by its resolved name on OpenCode).
+7. Run the `speckit.constitution` step via the host's invocation channel:
+   - **Copilot**: invoke the repository **agent/slash command** (`/speckit.constitution` or the
+     equivalent repo-agent invocation path). Do **not** use the `skill` tool for this step.
+   - **Claude Code**: invoke `/speckit.constitution` (or `Skill` tool by resolved name).
+   - **OpenCode**: invoke via `skill` tool by resolved name.
 8. Re-run the source check.
 9. If it passes, continue the pipeline in the same turn.
 10. Only if install or init fails, stop and report the exact failing step with quoted error output.

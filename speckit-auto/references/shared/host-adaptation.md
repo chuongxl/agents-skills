@@ -38,13 +38,13 @@ Probe order for the Stage 01 source check; install with the host's `--integratio
 
 | Host | `specify init` key | Installed layout to probe | Invocation |
 |------|--------------------|---------------------------|------------|
-| GitHub Copilot | `copilot` | `.github/skills/speckit-<command>/SKILL.md` (skills mode, default) **or** `.github/agents/speckit.<command>.agent.md` + `.github/prompts/speckit.<command>.prompt.md` (commands mode, `--integration-options="--commands"`) | `/speckit.<command>` slash command |
+| GitHub Copilot | `copilot` | `.github/skills/speckit-<command>/SKILL.md` (skills mode, default) **or** `.github/agents/speckit.<command>.agent.md` + `.github/prompts/speckit.<command>.prompt.md` (commands mode, `--integration-options="--commands"`) | `/speckit.<command>` repo slash-agent command |
 | Claude Code | `claude` | `.claude/skills/speckit-<command>/SKILL.md` | `/speckit.<command>` slash command (user-invocable skills) or `Skill` tool |
 | OpenCode | `opencode` | `.opencode/skills/speckit-<command>/SKILL.md`, then `.agents/skills/`, then `.claude/skills/` | `skill` tool by the resolved skill name; no slash commands |
 
-`<command>` is one of: `specify`, `clarify`, `plan`, `checklist`, `tasks`, `analyze`, `implement`,
-`converge`. Skills-mode installs name the folder `speckit-<command>`; the slash command is always
-`/speckit.<command>`.
+`<command>` is one of: `constitution`, `specify`, `clarify`, `plan`, `checklist`, `tasks`,
+`analyze`, `implement`, `converge`. Skills-mode installs name the folder `speckit-<command>`; the
+slash command is always `/speckit.<command>`.
 
 ## superpowers Provider Layout (per host)
 
