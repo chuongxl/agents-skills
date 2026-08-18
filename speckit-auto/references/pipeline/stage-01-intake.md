@@ -49,53 +49,40 @@ This is the startup recovery gate from entry dispatch. It must execute on every 
 invocation before any provider stage call. The same validation + recovery logic is reused later
 before provider invocations in Stage 02/03/04.
 
-**Detect.** Probe the provider's installed layout for the resolved host per the adapter
-(github-speckit: probe the repo for `constitution`, `specify`, `clarify`, `plan`, `checklist`,
-`tasks`, `analyze`, `implement`, `converge` under the host's layout dirs; superpowers: check the
-session skill list, then the host on-disk skill dirs, then probe `using-superpowers`). Record the resolved layout + invocation channel in run state. A **complete** set → continue to
-section 3 (no install step). Do not defer this check.
+**Detect.** Probe the provider's installed layout for the resolved host per the adapter:
+- **github-speckit:** check that all nine skills exist at `.github/skills/speckit-<command>/SKILL.md`
+  in the worktree for `<command>` in `constitution`, `specify`, `clarify`, `plan`, `checklist`,
+  `tasks`, `analyze`, `implement`, `converge`.
+- **superpowers:** check the session skill list, then the host on-disk skill dirs, then probe
+  `using-superpowers`.
+
+A **complete** set → continue to section 3 (no install step). Do not defer this check.
 
 **No complete set → RUN install recovery now, do not skip and do not abandon the run:**
 
 1. **Load the adapter's Install Recovery section** — open
    [../providers/github-speckit.md](../providers/github-speckit.md) or
-   [../providers/superpowers.md](../providers/superpowers.md) for the RESOLVED provider as given
-   by integration.json — the exact install commands for this host are there.
-2. **Ask the user once** via the host ask tool: `Install <framework>` / `Stop`
-   (e.g. `Install GitHub Speckit` / `Install superpowers`). `Stop` → halt and report that
-   installation is required (a valid turn end, operating rules premise).
-3. **Install** — run the adapter's exact commands for the resolved host: github-speckit → CLI
-   install + `specify version` sanity + `specify init . --integration <host-key>` (mandatory
-   success gate) + `speckit.constitution` through the host channel; superpowers → the host's
-   plugin/clone+copy command + on-disk verification.
-4. **Validate + re-check (hard gate)** — run the adapter's post-install validation gates and
-   re-run the probe from step "Detect". On pass, continue to section 3 in the same turn.
-5. **If validation fails after install** — stop immediately; do not continue provider stages.
-   Ask the user to manually install/fix the provider or restart the host session (Copilot /
-   Claude Code / OpenCode), then re-run `speckit-auto`.
+   [../providers/superpowers.md](../providers/superpowers.md) for the RESOLVED provider.
+2. **Ask the user once** via the host ask tool: `Install <framework>` / `Stop`. `Stop` → halt.
+3. **Install** — run the adapter's exact commands:
+   - github-speckit → CLI install + `specify version` sanity +
+     `specify init . --integration <host-key> --integration-options="--skills"` + validate skill
+     files + invoke `speckit-constitution` via `skill` tool.
+   - superpowers → the host's plugin/clone+copy command + on-disk verification.
+4. **Validate + re-check (hard gate)** — re-run the probe from "Detect". On pass, continue to
+   section 3 in the same turn.
+5. **If validation fails after install** — stop immediately; ask the user to manually install/fix
+   the provider or restart the host session, then re-run `speckit-auto`.
 
 Never switch provider because a framework is missing; never fall back to a global/external
 variant; never continue past a concrete install failure (stop and report the exact error quoted).
 
 ## 3. Mandatory Provider Gate
 
-- **github-speckit (GitHub Copilot):**
-  1. Emit `@speckit.constitution` as this turn's own assistant message (agent call — slash
-     commands are not visible on Copilot; do NOT use `/speckit.constitution`). This hands
-     execution to the repo agent for the duration of the current turn — `speckit-auto` does not
-     continue in the same turn.
-  2. In the **next turn**, read the constitution agent's output from the conversation. A
-     successful run produces a readable constitution summary or passes silently. An absent output,
-     truncated run, error message, or agent that stopped mid-run is a constitution failure.
-  3. On failure: stop with the exact output quoted and ask the user to re-run `speckit-auto` after
-     resolving the issue (missing agent files, repo config problem, or host restart if the agent
-     call itself failed). Do **not** proceed to Stage 02 with an unconfirmed constitution.
-- **github-speckit (Claude Code):**
-  1. Emit `/speckit.constitution` as this turn's own assistant message (slash command is visible
-     and callable on Claude Code). Same turn-boundary and validation rules apply.
-  2. For skills-mode layout, the `Skill` tool is also valid.
-- **github-speckit (OpenCode):** invoke via the `skill` tool by the resolved on-disk name. Treat
-  a tool resolution failure the same as a constitution failure above.
+- **github-speckit (all hosts):**
+  Invoke `speckit-constitution` via the `skill` tool (name: `speckit-constitution`). The `skill`
+  tool returns inline — no turn boundary, no user ask needed. Validate the return value. Failure
+  → stop with the exact error and ask the user to manually fix or restart the host session.
 - **superpowers:** invoke `using-superpowers` once per run (skip if already injected by
   superpowers' session hook). It proves runtime executability.
 

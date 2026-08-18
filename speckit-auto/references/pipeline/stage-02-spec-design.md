@@ -8,25 +8,20 @@ tasks+analyze). Never skip, bypass, or reorder in either mode.
 
 ## Invocation
 
-Invoke each step via the provider's resolved channel
-(see [../shared/host-adaptation.md](../shared/host-adaptation.md) and the adapter):
+Invoke each step via the `skill` tool using the skill name from the provider adapter's Stage
+Skill Map. This is identical on all three hosts (Copilot, Claude Code, OpenCode):
 
-- **GitHub Copilot:** emit `@speckit.<command> [args]` (agent call). Slash commands are **not
-  visible** on Copilot — never use `/speckit.<command>` here.
-- **Claude Code:** emit `/speckit.<command> [args]` (slash command, visible and callable). For
-  skills-mode layout, the `Skill` tool is also valid.
-- **OpenCode:** use the `skill` tool by the resolved on-disk skill name.
-- **superpowers (all hosts):** use the `skill` tool for every superpowers skill.
+- **github-speckit:** `skill speckit-specify`, `skill speckit-clarify`, etc. The `skill` tool
+  returns inline in the same turn — no turn boundary, no user confirmation, no state file needed.
+- **superpowers (all hosts):** `skill brainstorming`, `skill writing-plans`, etc.
 
-On Copilot and Claude Code, each `@speckit.<command>` / `/speckit.<command>` call is a **turn
-boundary** — the agent takes over the current turn; resume in the next turn, read the output, and
-validate before invoking the next step. Never the `task` tool with a `speckit.*` agent_type;
-never a nested CLI subprocess.
+Never the `task` tool with any skill name; never a nested CLI subprocess. Never emit
+`@speckit.*` or `/speckit.*` — all github-speckit steps are skills invoked via the `skill` tool.
 
 Before each provider step invocation in this stage, run provider availability validation. If
-validation fails, trigger install recovery immediately for the resolved provider. If post-install
-validation still fails, stop and ask the user to manually install/fix the provider or restart
-Copilot / Claude Code / OpenCode, then re-run `speckit-auto`.
+`skill speckit-<command>` fails to resolve, trigger install recovery immediately. If post-install
+validation still fails, stop and ask the user to manually install/fix or restart the host
+session, then re-run `speckit-auto`.
 
 ## Project Context Wiring (mandatory)
 

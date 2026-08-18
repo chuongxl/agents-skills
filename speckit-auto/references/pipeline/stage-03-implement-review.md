@@ -16,33 +16,23 @@ superpowers — the plan path `specs/<feature_folder>/plan.md`.
 
 ## Invocation
 
-Per [../shared/host-adaptation.md](../shared/host-adaptation.md) and the adapter:
+Invoke every step via the `skill` tool using the skill name from the provider adapter's Stage
+Skill Map. Identical on all three hosts:
 
-- **GitHub Copilot:** emit `@speckit.<command> [args]` (agent call). Slash commands are **not
-  visible** on Copilot — never use `/speckit.<command>` here.
-- **Claude Code:** emit `/speckit.<command> [args]` (slash command, visible and callable). For
-  skills-mode layout, the `Skill` tool is also valid.
-- **OpenCode:** use the `skill` tool by the resolved on-disk skill name.
-- **superpowers (all hosts):** use the `skill` tool for every superpowers skill.
+- **github-speckit:** `skill speckit-implement`, `skill speckit-converge`, etc. The `skill` tool
+  returns inline — no turn boundary, no user confirmation, no state file needed per step.
+- **superpowers (all hosts):** `skill subagent-driven-development`, etc.
 
 `speckit-code-review` runs **inline** via the `skill` tool on all hosts — never as a background
-agent — and always with the spec path passed explicitly (`specs/<feature_folder>/spec.md`); an
-ambiguous match makes the skill ask the user, which would be a turn-ending stop inside this
-no-stop zone.
+agent — and always with the spec path passed explicitly (`specs/<feature_folder>/spec.md`).
 
-On Copilot and Claude Code, each `@speckit.<command>` / `/speckit.<command>` call is a **turn
-boundary** — the agent takes over the current turn. Resume in the next turn, read the agent
-output, and validate it before continuing the loop. A missing, truncated, or error output from
-the agent is a failure — trigger recovery; if still failing after recovery, stop and ask the user
-to manually fix or restart the host.
-
-Never the `task` tool with a `speckit.*` / `superpowers:*` agent_type; never a nested CLI
-subprocess.
+Never the `task` tool with any skill name; never a nested CLI subprocess. Never emit `@speckit.*`
+or `/speckit.*`.
 
 Before each provider step invocation in this stage, run provider availability validation. If
-validation fails, trigger install recovery immediately for the resolved provider. If post-install
-validation still fails, stop and ask the user to manually install/fix the provider or restart
-Copilot / Claude Code / OpenCode, then re-run `speckit-auto`.
+`skill speckit-<command>` fails to resolve, trigger install recovery immediately. If post-install
+validation still fails, stop and ask the user to manually install/fix or restart the host
+session, then re-run `speckit-auto`.
 
 ## Large Scope (condensed)
 
