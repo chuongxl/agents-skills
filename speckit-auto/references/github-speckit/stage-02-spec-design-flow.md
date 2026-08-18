@@ -41,13 +41,16 @@ Do not hand-write or "fill in" spec/plan/tasks/analyze outputs outside github-sp
 
 ## Prompt Wiring Rules
 
-Reuse the Stage 01 Project Context
-([../shared/preflight-guidelines-context.md](../shared/preflight-guidelines-context.md)) for every
-stage below — never reread `architecture.md`. If a stage needs more architecture detail than the
-cached `summary` provides, lazy-load the specific file(s) `architecture.md` itself links to
-(`linked_guidelines`, per that file's Step 4) — driven entirely by what this project's own
-`architecture.md` references, never a fixed file-name assumption — then reuse it from
-`loaded_guidelines` for the rest of the run.
+Pass the Stage 01 Project Context
+([../shared/preflight-guidelines-context.md](../shared/preflight-guidelines-context.md)) into every
+stage below as its starting basis — it already carries what Stage 01 read from `architecture.md`,
+so prefer it over redoing that work from scratch. Let that context guide whether more is needed:
+if a stage's decision needs detail the cached `summary` doesn't cover, use the context's own
+`linked_guidelines` to open the specific file(s) `architecture.md` references, and re-read
+`architecture.md` itself when the cached fields aren't enough for that decision. What to (re)read
+is driven entirely by this project's own `architecture.md` and the Project Context built from it —
+never a fixed file-name assumption. Cache anything newly read in `loaded_guidelines` so later
+stages in the same run can reuse it instead of reading it again.
 
 - `specify`: requirement text (or normalized Jira intake output) **+ Project Context `summary`**
 - `clarify`: current `spec.md`
