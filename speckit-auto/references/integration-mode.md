@@ -44,6 +44,10 @@ Take the **first** match:
 If a stored file exists but is unparseable or holds an unsupported value, warn, ignore it, and fall
 through to the next level.
 
+When Stage 01 creates/reuses a linked worktree, shared `branching.md` must mirror the repo-local
+`.speckit/integration.json` into that linked worktree path so the same resolved mode is available
+from the branch checkout too.
+
 Once resolved, record it in run state as `integration` and reuse it for every stage of the run.
 Never re-read the file mid-run and never switch provider mid-run.
 

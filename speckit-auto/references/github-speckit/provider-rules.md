@@ -17,6 +17,8 @@ Also loads [../shared/host-adaptation.md](../shared/host-adaptation.md) for the 
    require `speckit.constitution` success, re-check, then continue in the same turn. All of this
    runs inside the Stage 01 linked worktree branch. On `Stop`, halt and report that installation is
    required. Only a concrete install/init/constitution failure stops the run otherwise.
+2a. Even when install recovery is not needed, Stage 01 must still run `speckit.constitution` once
+    through the github-speckit channel and require success before entering Stage 02. Never skip.
 3. `stage_invocation_mode` is host-dependent:
    - **GitHub Copilot** — `slash-agent`: invoke repo slash commands (`/speckit.specify`, …). For
      `speckit.constitution` after install, use the repo slash-agent channel (not `skill` tool).
@@ -28,6 +30,13 @@ Also loads [../shared/host-adaptation.md](../shared/host-adaptation.md) for the 
 5. Stage 03 order is fixed: run `speckit.implement → speckit.converge` repeatedly until converge reports no gaps, then run `speckit-code-review`; after that, loop `speckit.implement → speckit-code-review` until review status is `pass`.
 6. Stage 02 order is fixed: `specify → clarify → plan → checklist → tasks → analyze`.
 7. Artifacts use the Spec Kit layout `specs/<issue_id>-<short_title>/` (see Stage 01).
+8. For github-speckit provider, Stage 02 and Stage 03 artifacts must be produced by github-speckit
+   stage agents (`speckit.specify`, `speckit.clarify`, `speckit.plan`, `speckit.checklist`,
+   `speckit.tasks`, `speckit.analyze`, `speckit.implement`, `speckit.converge`). `speckit-auto`
+   must never synthesize spec/plan/tasks content itself.
+9. If a required github-speckit stage cannot be invoked via the resolved host channel (slash-agent
+   on Copilot/Claude, `skill` on OpenCode), stop and report the concrete invocation error. Do not
+   continue with a manual fallback.
 
 ## Invocation
 

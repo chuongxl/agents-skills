@@ -32,6 +32,8 @@ Never attempt `task` with a `speckit.*` agent_type on any host.
 
 Never emit a capability disclaimer before attempting these — make the stage invocation now
 (SKILL.md premise applies here too).
+If any required stage invocation fails, stop and report the concrete error from that invocation.
+Do not hand-write or "fill in" spec/plan/tasks/analyze outputs outside github-speckit agents.
 
 ## Prompt Wiring Rules
 
@@ -43,6 +45,8 @@ Never emit a capability disclaimer before attempting these — make the stage in
 - `analyze`: `spec.md`, `plan.md`, `tasks.md` — read-only consistency check across artifacts; report conflicts/gaps/ambiguities
 
 If `speckit.analyze` reports issues, fix at source (`specify/clarify/plan/checklist/tasks`) and rerun `speckit.analyze` before Stage 03.
+All such fixes must be via re-invoking the corresponding github-speckit stage agent, not manual
+artifact authoring by `speckit-auto`.
 
 ## Payload Budget + Large Scope Partitioning
 

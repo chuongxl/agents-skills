@@ -27,6 +27,8 @@ fields to those sub-skills so workspace assignment and architecture compliance a
 
 Never stop with a generic runtime/capability disclaimer before attempting the real call. Only stop
 if a concrete tool call fails with a quoted error message.
+If a required github-speckit stage invocation fails, stop and report that exact error. Do not
+switch to manual implementation or direct file-edit fallback for Stage 03 execution.
 
 ## Heavy Payload Prevention + Implementation Partitioning
 
@@ -129,28 +131,25 @@ PHASE 2 — Code review loop
     - Only SEC-*/CODE-*/TEST-* fixes → go directly to R6
     - Whenever a Stage 02 artifact was regenerated above, re-run the Stage 02 Mandatory
       Self-Review Gate (read-only, no interview) before R6 — global rule 10a
-  R6 — Apply fixes DIRECTLY using file-editing tools (this turn, right now):
-    For EACH item in corrective action list:
-      1. Open the specific file listed in suggested_fix_area / file field
-      2. Read the relevant method/lines
-      3. Write the fix inline using edit/create file tools
-      4. Move to next item
+  R6 — Apply fixes by re-invoking github-speckit agents (this turn, right now):
+    - Build a focused correction prompt from corrective action list and invoke repo
+      `speckit.implement` with that prompt.
+    - If FR/NFR/ARCH fixes require artifact changes, re-run the routed Stage 02 agents first
+      (`plan/checklist/tasks/analyze`) exactly as defined in R5, then invoke `speckit.implement`.
     Rules for R6:
-      - DO NOT delegate to speckit.implement for code-only or test-coverage issues
-      - DO NOT produce a prose response to the user — just make the edits
-      - DO NOT end the turn after making edits — continue Stage 03 flow immediately
-      - If a fix requires a new file, create it with the create file tool
-      - If you don't have enough context to fix an item, read the file first, then fix
-  R7 — Run speckit.implement to apply broader changes if needed, then return to R1
+      - Do NOT bypass github-speckit by manually authoring the implementation as speckit-auto.
+      - Do NOT end the turn after one retry — continue Stage 03 flow immediately.
+  R7 — Re-run speckit-code-review and continue loop (R1)
 ```
 
 ## Loop Invariants
 
 - Never exit this stage with `status = failed`; never end a turn or write a prose summary after
-  one — the review result is data to act on and the next action is always file edits.
+  one — the review result is data to act on and the next action is always another github-speckit
+  stage invocation.
 - Never ask the user for help during this loop; the only stop is the global rule 20 circuit breaker.
 - Run `speckit.converge` until it reports converged before entering the code-review loop.
 - Retain only `state_file`, the top `fixes[]`, and the one category file needed for the current fix.
-- Never delegate to `speckit.implement` for code-only or test-coverage failures — edit files directly.
+- Never replace github-speckit Stage 03 execution with manual artifact creation by speckit-auto.
 - On iteration 3+ with the same failure, escalate fix depth (rewrite the method, not patch a line).
 - Log each iteration: `[Review loop #N] status=failed, scope=<code|tasks|plan>, fixing: <summary>`

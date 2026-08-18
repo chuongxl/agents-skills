@@ -47,7 +47,12 @@ data and immediately invoke the next required step, in the same turn.
 10b. Entering Stage 03 is a **mandatory handoff**, never a stop. In default mode, ask the single Stage 02 → Stage 03 start-implementation confirmation, then enter Stage 03 in the same turn on approval. In `--yolo` mode, skip that confirmation and enter Stage 03 directly. Finishing Stage 02 is never by itself a reason to end the turn. See the provider's Stage 03 Entry Step.
 11. **Stage 03 is a NO-STOP ZONE in BOTH default and `--yolo` modes.** No human approval gates, no pauses, no prompts fire inside Stage 03. This overrides all interview-flow and mode-based gate rules. The only *success* exit is `status = pass` from `speckit-code-review`; the only other permitted exit is the rule 20 circuit breaker. This is the canonical statement of the no-stop rule — stage files reference it rather than restating exceptions.
 12. **A `failed` result from `speckit-code-review` is NEVER a stop condition in any mode.** Do NOT produce a prose summary of the result. Do NOT end the turn. Immediately apply fixes and loop again.
-13. For code-only or test-coverage failures, directly edit the specific files named in the review result (`suggested_fix_area`, `file`, `method/function`) using file-editing tools, in the same turn. Do NOT delegate to the provider's implementation step.
+13. For code-only or test-coverage failures, apply fixes in the same turn using the selected
+provider's mandatory execution channel:
+    - github-speckit provider: re-invoke github-speckit stage agents (especially
+      `speckit.implement`); do not synthesize Stage 02/03 artifacts manually.
+    - providers that allow direct edit fallback: directly edit the specific files named in the
+      review result (`suggested_fix_area`, `file`, `method/function`) using file-editing tools.
 14. Apply fixes, re-run `speckit-code-review`, and repeat until `status = pass`.
 15. After Stage 03 exits with `pass`, routing is mandatory: default mode → Stage 04; `--yolo` mode → Stage 05.
 16. In default mode, Stage 04 is mandatory and must never be skipped.

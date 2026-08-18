@@ -49,6 +49,10 @@ framework install, guidelines load, intake, or any provider stage call):
    - Every subsequent Stage 01 step (framework source check, framework install recovery, init, and
      provider stage calls) must execute from this linked worktree path on this branch. If a
      framework is missing there, install it there.
+   - If `<repo-root>/.speckit/integration.json` exists in the source checkout, ensure
+     `<worktree_path>/.speckit/integration.json` also exists with the same content before provider
+     Stage 01 continues (create `<worktree_path>/.speckit/` if needed). This keeps the selected
+     integration mode visible inside the linked worktree branch context.
 8. **Rename alignment step (required once intake resolves final feature name):**
    - if current branch name differs, run `git branch -m <final-name>` inside the linked worktree
    - if current worktree path differs from canonical `<repo-root>/.worktrees/<final-name>`, move it

@@ -9,8 +9,9 @@ Load with this file:
 - [../shared/preflight-guidelines-context.md](../shared/preflight-guidelines-context.md) — project context
 
 Execution order for this stage:
-**worktree + branch setup (shared) → Speckit source check → install recovery if missing → guidelines load →
-intake (shared) → artifact path → Stage 02 entry (`speckit.specify`, also the executability proof).**
+**worktree + branch setup (shared) → Speckit source check → install recovery if missing →
+mandatory `speckit.constitution` success gate → guidelines load → intake (shared) → artifact path
+→ Stage 02 entry (`speckit.specify`, also the executability proof).**
 
 Only the Speckit-specific steps are described below; everything else lives in the shared files.
 
@@ -53,6 +54,17 @@ on Copilot and Claude Code, the `skill` tool by the stage's resolved skill name 
 attempt the `task` tool with a `speckit.*` agent_type — it always fails with `Unknown agent_type`.
 Only a concrete error from the real invocation is reportable as a runtime failure (quote it), and
 only after the source check passed.
+
+## Mandatory Constitution Gate (Never Skip)
+
+After source check/install recovery and before Stage 02, invoke `speckit.constitution` through the
+resolved github-speckit host channel and require success:
+
+- Copilot / Claude Code: repo slash-agent invocation path (for example `/speckit.constitution`)
+- OpenCode: `skill` tool by resolved `speckit-constitution` name
+
+If this invocation fails, stop and report the exact error. Do not continue to Stage 02 or Stage 03
+without a successful `speckit.constitution` invocation in the current run.
 
 ## Preflight Guidelines Context Load (Required)
 
