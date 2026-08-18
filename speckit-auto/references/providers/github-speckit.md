@@ -114,32 +114,35 @@ turn. It never switches provider and never runs `specify init` directly inside t
 4. **Ask the user once**: `Install GitHub Speckit` / `Stop` (the install commands above run only
    after this confirm). `Stop` → halt and report that installation is required. (Steps 1–2 may run
    before or after the ask; the gate below never runs before the ask.)
-5. **Initialize into the MAIN REPO checkout as skills (mandatory success gate)**:
+5. **Initialize into BOTH the main repo checkout AND the worktree as skills (mandatory success gate)**:
+
+   **Main checkout:**
    ```
-   cd <repo-root>   # main checkout — NOT the worktree path
+   cd <repo-root>   # main checkout
    specify init . --integration <host-key> --integration-options="--skills"
    ```
+
+   **Worktree:**
+   ```
+   cd <worktree-path>
+   specify init . --integration <host-key> --integration-options="--skills"
+   ```
+
    Examples: `specify init . --integration copilot --integration-options="--skills"`
             `specify init . --integration claude --integration-options="--skills"`
             `specify init . --integration opencode --integration-options="--skills"`
-   This installs `speckit-<command>` skills under `<repo-root>/.github/skills/`. This command must
-   succeed or the run stops with the exact failing output quoted. **Do not run this inside the
-   worktree.**
-6. **Copy provider files into the worktree**:
-   ```
-   cp -r <repo-root>/.github/skills <worktree-path>/.github/
-   ```
-   Only copy — do not re-run `specify init` in the worktree. If the worktree `.github/` dir does
-   not exist, create it first.
-7. **Post-install validation (hard gate)**:
+
+   Both commands must succeed, installing `speckit-<command>` skills under `.github/skills/` in
+   each location. If either fails, stop and report the exact failing output quoted.
+6. **Post-install validation (hard gate)**:
    a. Re-run the Stage 01 source check: verify all nine `speckit-<command>` skills exist at
-      `.github/skills/speckit-<command>/SKILL.md` in the **worktree**.
+      `.github/skills/speckit-<command>/SKILL.md` in the **main repo checkout** (`<repo-root>`).
    b. Invoke `speckit-constitution` via the `skill` tool with prompt
       `"constitution project to understand the project architecture"` and confirm it returns
       successfully (inline, same turn — no turn boundary, no user ask needed).
    c. If either check fails: **stop and ask the user to restart the host session (Copilot /
       Claude Code / OpenCode), then re-run `speckit-auto`.**
-8. **On pass**: continue the pipeline in the same turn.
+7. **On pass**: continue the pipeline in the same turn.
 
 ## Runtime Validation Failure Handling (any step)
 

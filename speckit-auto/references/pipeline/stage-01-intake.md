@@ -65,23 +65,20 @@ A **complete** set → continue to section 3 (no install step). Do not defer thi
    [../providers/github-speckit.md](../providers/github-speckit.md) or
    [../providers/superpowers.md](../providers/superpowers.md) for the RESOLVED provider.
 2. **Ask the user once** via the host ask tool: `Install <framework>` / `Stop`. `Stop` → halt.
-3. **Install on the base branch (main module only — never directly on the worktree):**
-   - `cd <repo-root>` (the main checkout, not the worktree path).
-   - Run the adapter's exact install commands there:
+3. **Install on the main repo checkout AND the worktree:**
+   - First, `cd <repo-root>` (the main checkout) and run the adapter's install commands:
      - github-speckit → CLI install + `specify version` sanity +
        `specify init . --integration <host-key> --integration-options="--skills"` + validate skill
        files.
      - superpowers → the host's plugin/clone+copy command + on-disk verification.
-   - The install writes provider files (e.g. `.github/skills/speckit-*/`) into the main checkout.
-4. **Copy provider files into the worktree:**
-   - After a successful install on the main checkout, copy the installed provider layout into the
-     worktree. For github-speckit: `cp -r <repo-root>/.github/skills <worktree-path>/.github/`.
-     For superpowers: copy the equivalent on-disk skill directories.
-   - Do not re-run `specify init` inside the worktree — copy only.
-5. **Validate + re-check (hard gate)** — re-run the probe from "Detect" against the **main repo
-   checkout** (`<repo-root>`). On pass, copy provider files into the worktree (step 4), then
-   continue to section 3 in the same turn.
-6. **If validation fails after install** — stop immediately. **Ask the user to restart the host
+   - Then, `cd <worktree-path>` and run the same `specify init` command again:
+     - github-speckit: `specify init . --integration <host-key> --integration-options="--skills"`
+     - superpowers: copy/install equivalent into the worktree directory.
+   - Both must succeed. If either fails, stop and report the exact error.
+4. **Validate + re-check (hard gate)** — re-run the probe from "Detect" against the **main repo
+   checkout** (`<repo-root>`). On pass, continue to section 3 in the same turn.
+
+5. **If validation fails after install** — stop immediately. **Ask the user to restart the host
    session (Copilot / Claude Code / OpenCode), then re-run `speckit-auto`.**
 
 Never switch provider because a framework is missing; never fall back to a global/external
