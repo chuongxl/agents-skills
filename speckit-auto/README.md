@@ -1,6 +1,6 @@
 # Speckit Auto — Spec-Driven Delivery Pipeline
 
-**Version**: 0.3.0
+**Version**: 0.3.1
 **Author**: Alex Nguyen
 
 ## Overview
@@ -22,8 +22,9 @@ layout, and fix-application style differ (provider adapters under `references/pr
 
 The pipeline:
 
-1. **Stage 01 — Preflight + Intake**: linked worktree + feature branch, framework availability
-   check (auto-install on user confirmation if missing), project context from
+1. **Stage 01 — Preflight + Intake**: linked worktree + feature branch, mandatory startup
+   framework recovery gate (checks provider skills/agents and auto-installs on user confirmation
+   if missing), project context from
    `docs/guidelines/architecture.md`, Jira intake via `jira-to-speckit` when `--issue` is used.
 2. **Stage 02 — Spec / Design**: spec, plan, tasks via the provider's stages, with review
    interviews (default mode) or autonomous self-review (YOLO), a mandatory self-review gate, and a
@@ -87,7 +88,7 @@ repo map.
 | "Which provider?" on every run | Run `--integration <provider>` once to persist |
 | Jira intake fails | Ensure root `.env` has all three `JIRA_*` keys; test with `jira-to-speckit` directly |
 | Stage 03 review loop doesn't converge | Simplify the spec's acceptance criteria; avoid vague language ("elegant", "performant") |
-| Missing framework | The skill asks once to install it for the resolved host; answer `Install` |
+| Missing framework | Startup recovery always runs first; answer `Install` to repair provider skills/agents for the resolved host |
 
 ## Notes
 

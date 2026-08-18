@@ -12,7 +12,7 @@ license: MIT
 allowed-tools: bash glob grep view create edit skill
 metadata:
   author: Alex Nguyen
-  version: "0.3.0"
+  version: "0.3.1"
 ---
 
 # Speckit Auto
@@ -62,7 +62,18 @@ load.
    Never infer the provider from repo contents — a missing framework installation is handled by
    its provider's install recovery, never by switching provider.
 
-5. Load [references/shared/operating-rules.md](references/shared/operating-rules.md), the
+5. **Startup Recovery Gate (mandatory, runs at skill start).** Immediately after provider
+   resolution, run the Stage 01 framework source check + install recovery flow for the resolved
+   provider before any Stage 02/03/04 action:
+   - `github-speckit`: if repo `speckit.*` agents are incomplete/missing for the host layout, run
+     install recovery to initialize the provider and re-check.
+   - `superpowers`: if required provider skills are incomplete/missing, run install recovery and
+     re-check.
+   This gate is mandatory on every pipeline invocation. A complete provider check continues
+   without install; an incomplete check must run recovery now (user may choose `Install` / `Stop`
+   per the provider adapter).
+
+6. Load [references/shared/operating-rules.md](references/shared/operating-rules.md), the
    provider adapter [references/providers/github-speckit.md](references/providers/github-speckit.md)
    or [references/providers/superpowers.md](references/providers/superpowers.md) for the resolved
    provider, then enter Stage 01 **immediately, in this same turn**.

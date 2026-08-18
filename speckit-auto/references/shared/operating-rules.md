@@ -44,11 +44,13 @@ This list is exhaustive.
    provider from repo contents — a missing framework installation is handled by install recovery,
    never by switching provider.
 
-3. **Missing framework → install recovery, one ask.** Preflight checks framework availability;
-   if missing, fetch the install guide, ask the user once (`Install` / `Stop`), and on `Install`
-   perform the install, run the provider's mandatory success gates (e.g. `specify init`, the
-   constitution/bootstrap check), re-check, and continue in the same turn. `Stop` halts with a
-   report that installation is required.
+3. **Startup recovery gate is mandatory.** On every pipeline invocation, immediately after
+   provider resolution and before any provider stage work, run the framework availability check
+   for that provider (github-speckit agents or superpowers skills). If incomplete/missing, run
+   install recovery: fetch the install guide, ask the user once (`Install` / `Stop`), and on
+   `Install` perform the install, run the provider's mandatory success gates (e.g. `specify init`,
+   the constitution/bootstrap check), re-check, and continue in the same turn. `Stop` halts with
+   a report that installation is required.
 
 4. **Heavy payload prevention.** Pass only the minimum slices each stage needs (current input +
    relevant excerpts + compact project context). Never forward full prior-stage prose. For large

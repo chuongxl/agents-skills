@@ -43,13 +43,16 @@ be modified: sync its base (same priority/best-effort rules), branch inside it o
 base, and commit submodule changes before the parent pointer update. If none exist or none are
 modified, behavior is unchanged.
 
-## 2. Framework Source Check + Install Recovery (Required — never skip, never abandon)
+## 2. Framework Source Check + Install Recovery (Startup Gate, required every run)
+
+This is the startup recovery gate from entry dispatch. It must execute on every pipeline
+invocation before any provider stage call.
 
 **Detect.** Probe the provider's installed layout for the resolved host per the adapter
 (github-speckit: probe the repo for `constitution`, `specify`, `clarify`, `plan`, `checklist`,
 `tasks`, `analyze`, `implement`, `converge` under the host's layout dirs; superpowers: check the
-session skill list, then the host on-disk skill dirs, then probe `using-superpowers`). Record the
-resolved layout + invocation channel in run state. A **complete** set → continue to section 3.
+session skill list, then the host on-disk skill dirs, then probe `using-superpowers`). Record the resolved layout + invocation channel in run state. A **complete** set → continue to
+section 3 (no install step). Do not defer this check.
 
 **No complete set → RUN install recovery now, do not skip and do not abandon the run:**
 
