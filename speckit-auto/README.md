@@ -41,7 +41,65 @@ Copy the `speckit-auto` folder (with `speckit-code-review` and `jira-to-speckit`
 skill directory: `~/.agents/skills/` (Copilot), `~/.claude/skills/` (Claude Code), or
 `~/.config/opencode/skills/` (OpenCode). The skill is auto-discovered from those locations.
 
-## Usage
+1. **Stage 01: Preflight + Intake** — Validate the requirement, extract context from docs/guidelines, and prepare the project environment for spec authoring.
+2. **Stage 02: Spec / Design** — Author a detailed feature specification including acceptance criteria, edge cases, and architectural decisions.
+3. **Stage 03: Implement + Code Review Loop** — Execute implementation and automatically invoke speckit-code-review until the code passes the spec; no human approval required.
+4. **Stage 04: Human Review + Commit** (default mode only) — Human reviewer validates the implementation against the spec and makes the final decision before merge.
+5. **Stage 05: YOLO Commit Flow** (YOLO mode only) — Automatically merge and commit with zero human checkpoints.
+6. **Stage 06: Spec Completion** — Mark the spec as completed and create a final commit.
+
+**Key rule**: Stage 03 is a **NO-STOP ZONE** in both default and YOLO modes; code review loops continue automatically until the spec is satisfied.
+
+<img width="754" height="501" alt="image" src="https://github.com/user-attachments/assets/bc5e90df-0523-4951-a195-3b740d1d38c6" />
+
+<img width="2120" height="3775" alt="spec-driven-development-Speckit-Auto-Skill drawio" src="https://github.com/user-attachments/assets/cbe59272-6c75-4f33-bdf9-ad7d0f6aaa22" />
+
+### Provider System
+
+Speckit Auto resolves a **provider** at the start of each run using a precedence chain:
+
+1. **Repo-local config**: `.speckit/integration.json` in the repository root
+2. **User home config**: `~/.agents/skills/speckit-auto/.state/integration.json`
+3. **First-run ask**: If neither exists, prompt once, persist, and continue
+
+Supported providers:
+
+| Provider | Location | Use Case |
+|----------|----------|----------|
+| `github-speckit` | Repo-installed GitHub Spec Kit agents | GitHub Actions + Spec Kit environment |
+| `superpowers` | Superpowers skills library (obra/superpowers) | Local, Claude Code, flexible environments |
+
+Each provider includes stage-specific reference files that implement the pipeline logic for that environment.
+
+### YOLO vs Default Mode
+
+**Default Mode** (recommended for critical features):
+- Runs Stages 01–04 with mandatory human checkpoint at Stage 04
+- Requires explicit human approval before code is merged
+- Best for production, regulatory, or high-stakes work
+
+**YOLO Mode** (`--yolo` flag):
+- Skips Stage 04, uses Stage 05 instead
+- Zero human checkpoints; fully automated merge and commit
+- Ideal for internal tools, experiments, or when continuous delivery is the goal
+- All code still passes speckit-code-review before merge
+
+---
+
+## 3. Quick Start
+
+### Installation
+
+#### GitHub Copilot CLI
+Speckit Auto is auto-discovered from `~/.agents/skills/` or the repository's `.github/skills/` path, depending on how the skill is installed. No manual setup is required after copying the skill into one of those locations.
+
+#### Claude Code
+Install the skill from the Superpowers skills library, or copy the skill directory to `~/.claude/skills/`.
+
+#### Local Usage (Standalone)
+Clone the skill and ensure `.env` credentials are configured if using `--issue` with Jira.
+
+### First Use: Default Mode (With Human Review)
 
 ```bash
 # Requirement pipeline (default mode, human review at the end)
