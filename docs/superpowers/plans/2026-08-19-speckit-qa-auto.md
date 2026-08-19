@@ -417,7 +417,7 @@ run:
   slug:                agreement-reset-button
   artifact_dir:        docs/qa/mom-1234-agreement-reset-button
   branch:              test/mom-1234-agreement-reset-button
-  worktree_path:       .worktrees/test-mom-1234-agreement-reset-button
+  worktree_path:       .worktrees/test/mom-1234-agreement-reset-button
   mode:                default | yolo
   full_suite:          false
   stage:               01 | 02 | 03 | 04 | completed
@@ -450,11 +450,12 @@ design:
       commit:          <sha the result was produced on>
 ```
 
-Plus three rules in prose:
+Plus four rules in prose:
 
-1. A stage reads only this file and the artifact folder. **It never reads another stage's reference file.**
-2. A field absent from this contract does not travel between stages. Adding one means editing this file first.
-3. `status: green` is only ever written next to the commit sha the run was produced on. A result with no sha is not a result.
+1. `worktree_path` is always `<repo-root>/.worktrees/<branch>` with the branch name used verbatim. A branch name containing `/` therefore nests. Derive it; never re-spell it — the example above is an instance of the rule, not the rule itself.
+2. A stage reads only this file and the artifact folder. **It never reads another stage's reference file.**
+3. A field absent from this contract does not travel between stages. Adding one means editing this file first.
+4. `status: green` is only ever written next to the commit sha the run was produced on. A result with no sha is not a result.
 
 - [ ] **Step 2: Verify**
 
