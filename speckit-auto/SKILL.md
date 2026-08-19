@@ -38,17 +38,15 @@ load.
    [references/shared/integration-setup.md](references/shared/integration-setup.md) and follow
    its steps. END TURN after — do not enter the pipeline.
 
-4. **Pipeline intent** (no `--integration`): resolve the provider once — first match wins:
-   a. Repo-local `<repo-root>/.speckit/integration.json` → `integration` field.
-   b. Global `<skill-dir>/.state/integration.json` → `integration` field.
-   c. Nothing stored → **First-Run Selection**: ask the user once, exactly two choices with no
-      recommendation (`github-speckit`, `superpowers`); persist the answer as in 3c (repo-local,
-      falling back to global); then continue the pipeline immediately in the same turn — this is a
-      required-input ask, never a stop.
-   An unparseable or unsupported stored value → warn, ignore, fall through to the next level.
-   Record the result as `integration` in run state; never re-read or change it mid-run.
-   Never infer the provider from repo contents — a missing framework installation is handled by
-   its provider's install recovery, never by switching provider.
+4. **Pipeline intent** (no `--integration`): resolve the provider from **exactly one source** —
+   repo-local `<repo-root>/.speckit/integration.json` → `integration` field. There is no global
+   fallback and no first-run prompt:
+   - **Missing file, unparseable content, or an unsupported value** → stop immediately and tell
+     the user to configure the provider first:
+     `/speckit-auto --integration github-speckit` (or `superpowers`).
+   - On success, record the result as `integration` in run state; never re-read or change it
+     mid-run. Never infer the provider from repo contents — a missing framework installation is
+     handled by its provider's install recovery, never by switching provider.
 
 5. Load [references/shared/operating-rules.md](references/shared/operating-rules.md), the
    provider adapter [references/providers/github-speckit.md](references/providers/github-speckit.md)

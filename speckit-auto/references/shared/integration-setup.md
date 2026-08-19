@@ -13,11 +13,11 @@ TURN (the one legitimate no-pipeline turn end in the whole skill). Never enter t
    writing nothing. No value → ask the user once, then continue in the same turn.
 
 2. **Persist** `{"integration": "<value>", "updated_at": "<ISO-8601>", "set_by": "speckit-auto"}`
-   to `<repo-root>/.speckit/integration.json` by default (`mkdir -p` first; root from
-   `git rev-parse --show-toplevel`). Write to the global path
-   `<skill-dir>/.state/integration.json` instead when `--global` is passed or the cwd is not
-   in a git repo. Overwrite silently; report the previous value if one existed. Never stop over a
-   persistence failure — fall back and report.
+   to `<repo-root>/.speckit/integration.json` (`mkdir -p` first; root from
+   `git rev-parse --show-toplevel`). This repo-local file is the **only** provider source — there
+   is no global state. If the cwd is not inside a git repo, stop and tell the user to re-run from
+   the target repository. Overwrite silently; report the previous value if one existed. Never
+   ignore `--global`: if passed, reject it — global state is no longer supported.
 
 3. **Provider install check + setup** (runs immediately after persist):
 
@@ -60,4 +60,4 @@ TURN (the one legitimate no-pipeline turn end in the whole skill). Never enter t
      > ✅ Superpowers is configured. **Please restart your host session (Copilot / Claude Code /
      > OpenCode) now** so the new skills are discovered, then re-run your pipeline command.
 
-5. Report: resolved provider, file path written, scope. **END TURN.**
+5. Report: resolved provider and file path written. **END TURN.**

@@ -39,8 +39,10 @@ This list is exhaustive.
    base checkout. Submodules: branch inside each modified submodule off a synced base, commit
    submodule changes first, then the parent pointer update.
 
-2. **Provider is fixed for the run.** Resolved once from `.speckit/integration.json` precedence
-   (repo-local → global → first-run ask) and never re-read or changed mid-run. Never infer the
+2. **Provider is fixed for the run.** Resolved once from repo-local
+   `<repo-root>/.speckit/integration.json` — the only source; there is no global state and no
+   first-run prompt (missing file → stop and direct the user to
+   `/speckit-auto --integration <provider>`). Never re-read or change it mid-run. Never infer the
    provider from repo contents — a missing framework installation is handled by install recovery,
    never by switching provider.
 

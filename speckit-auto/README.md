@@ -63,10 +63,10 @@ trigger message.
 skill speckit-auto --integration github-speckit   # or superpowers
 ```
 
-Writes `.speckit/integration.json` in the repo (or `<skill-dir>/.state/integration.json` with
-`--global` / outside a git repo). Without a stored provider, the skill asks once on first run and
-persists the answer. Missing framework installations (Spec Kit agents not in the repo, superpowers
-skills not installed) are also repaired on request, per provider.
+Writes `.speckit/integration.json` in the repo — the **only** provider source (no global state).
+Without it, the pipeline stops and asks you to run the command above. Missing framework
+installations (Spec Kit agents not in the repo, superpowers skills not installed) are also
+repaired by this setup command, per provider.
 
 ## Project Context
 
