@@ -791,8 +791,11 @@ Written the way the superpowers skills are written, because that style is legibl
 A file that only makes sense after reading two other files cannot be revised, tested, or loaded on
 its own. Four rules keep the set loose:
 
-1. **Load depth is at most two hops.** `SKILL.md` → one stage file → at most one shared leaf. No
-   third hop. A stage file that needs three shared files at once is doing too much.
+1. **Load depth is at most two hops.** `SKILL.md` → one stage file → shared leaves. No third hop.
+   A stage names every leaf it loads **at the top of the file**, so a reader knows the cost before
+   paying it. There is no cap on the number of leaves: Stage 01 genuinely needs the profile, the
+   guard, and the operating rules at once, and a rule no implementable stage can satisfy is not a
+   rule. Depth is the property worth enforcing; breadth is the property worth disclosing.
 2. **Shared files are leaves.** They may be loaded; they load nothing themselves. `commit.md`,
    `workspace-guard.md`, `selector-verification.md`, `gherkin-conventions.md` each stand alone and
    are readable with no pipeline context.

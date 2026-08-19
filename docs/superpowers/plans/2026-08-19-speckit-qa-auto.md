@@ -51,9 +51,10 @@ Exact values, copied from the spec. Every task's requirements implicitly include
 | `speckit-qa-auto/references/pipeline/stage-03-automate.md` | Materialize → generate → verify → fix loop |
 | `speckit-qa-auto/references/pipeline/stage-04-finish.md` | Report → baselines → commit → push |
 | `test-case/speckit-qa-auto/test-cases.md` | Scenario coverage for the skill itself |
+| `.github/workflows/validate-skills.yml` | Runs the coupling check in CI for this skill by name |
 | `README.md` | Two rows in the skills table |
 
-Twelve tasks. Each ends with a runnable check and a commit.
+Thirteen tasks. Each ends with a runnable check and a commit.
 
 ---
 
@@ -390,21 +391,18 @@ git commit -m "feat(jira-to-speckit): add Xray read mode, v0.3.0"
 
 ---
 
-### Task 3: `speckit-qa-auto` router and run-state contract
+### Task 3: The stage run-state contract
 
-The router and the data contract ship together: the router is meaningless without knowing what stages exchange, and `run-state.md` is the file every later task writes against.
+`run-state.md` is the file every later task writes against, so it comes before all of them.
+
+The router (`SKILL.md`) deliberately does **not** ship here — it links to nine reference files that Tasks 4–11 create, and a router written now would leave `validate_skills.py` red for eight consecutive tasks, hiding real errors behind an expected failure. `discover_skills` only treats a directory as a skill once it contains `SKILL.md`, so until Task 12 writes it, `speckit-qa-auto/` is invisible to that validator and every task's verification stays honest.
 
 **Files:**
-- Create: `speckit-qa-auto/SKILL.md`
-- Create: `speckit-qa-auto/README.md`
 - Create: `speckit-qa-auto/references/shared/run-state.md`
-- Modify: `README.md` (root skills table — new row)
 
 **Interfaces:**
 - Consumes: nothing.
-- Produces, relied on by every later task:
-  - The run-state field names below. Later tasks must use these exact spellings.
-  - The stage-router table, which fixes the four stage file paths.
+- Produces, relied on by Tasks 4, 6, 8, 9, 10, 11: the run-state field names below. Later tasks must use these exact spellings.
 
 - [ ] **Step 1: Write `references/shared/run-state.md`**
 
@@ -458,67 +456,19 @@ Plus three rules in prose:
 2. A field absent from this contract does not travel between stages. Adding one means editing this file first.
 3. `status: green` is only ever written next to the commit sha the run was produced on. A result with no sha is not a result.
 
-- [ ] **Step 2: Write `SKILL.md`**
-
-Frontmatter, exactly:
-
-```yaml
----
-name: speckit-qa-auto
-description: |
-  Runs an end-to-end QA delivery pipeline from a Jira issue: requirement analysis, BDD test
-  design, selector verification, Playwright-BDD automation, a bounded run-and-fix loop, then
-  human review and a pushed branch. The Gherkin feature file is the single artifact, serving
-  manual testers and automation alike. Use when a Jira story needs test cases and automated
-  tests produced together, from one command.
-compatibility: "Runs on GitHub Copilot, Claude Code, and OpenCode. Discovered from ~/.agents/skills/, ~/.claude/skills/, or ~/.config/opencode/skills/. Requires git, bash, and a Playwright-BDD + TypeScript test repository; network access for Jira and Xray."
-license: MIT
-allowed-tools: bash glob grep view create edit skill
-metadata:
-  author: Alex Nguyen
-  version: "0.1.0"
----
-```
-
-Body sections, in this order, **under 500 words total**:
-
-1. **Entry Dispatch (Do This First, Every Invocation)** — load `references/shared/host-adaptation.md` once; parse `--issue` (required), `--yolo`, `--full-suite`, `--pr`; **a missing `--issue` stops with the reason** (the Jira key is the artifact identity, the `@REQ_` tag, and the dedup key); then load `references/shared/operating-rules.md` and enter Stage 01 in the same turn.
-2. **Stage Router** — a table mapping stage 01/02/03/04 to `references/pipeline/stage-0N-*.md`, plus the shared leaves. Load only the current stage's file.
-3. **Modes** — default has human gates at Stage 02 and Stage 04; `--yolo` skips both but never the selector gate or the self-review gate. Stage 03 is a no-stop zone in both.
-4. **Sub-Skill Dependencies** — a one-row table: `jira-to-speckit`, invoked by name through the `skill` tool, for Jira intake and Xray read.
-5. **Required Inputs** — `--issue <jira-url-or-key>`; `.env` with `JIRA_URL`, `JIRA_USERNAME`, `JIRA_API_TOKEN`, and optionally `XRAY_CLIENT_ID`, `XRAY_CLIENT_SECRET`. Never printed.
-6. **Portability Note** — `allowed-tools` uses Copilot-style names; Claude Code and OpenCode expose the same capabilities under `Bash`, `Read`, `Edit`, `Write`, `Glob`, `Grep`, `skill`. Never refuse because a tool is named differently.
-
-**No stage detail in this file.** No diagrams in this file — all three live in the reference files that own their decision.
-
-- [ ] **Step 3: Write `README.md` (500–1000 words)**
-
-Sections: Overview, Quick Start, Features, Installation, Compatibility, Examples, Configuration, Troubleshooting — matching the shape of `speckit-auto/README.md`. Include the pipeline diagram from spec §Pipeline Flow, and state the four properties a reader most needs: Gherkin is the single artifact; `docs/qa/` is the source of truth; the fix loop may not edit Gherkin; Xray import happens in CI on merge, not here.
-
-- [ ] **Step 4: Add the root README row**
-
-Add to the skills table, matching the existing column order:
-
-```
-| [speckit-qa-auto](./speckit-qa-auto/README.md) | Jira-to-tests QA pipeline. Analyses the story, designs BDD scenarios, verifies selectors against evidence, generates Playwright-BDD tests, runs them with a bounded fix loop, then reports for human review. Gherkin is the single artifact for manual and automated testing alike. | `.github/skills/` or `~/.agents/skills/` | GitHub Copilot, Claude, Local | `--issue <jira-url>`, `--yolo`, `--full-suite`, `--pr` | v0.1.0 / Alex Nguyen |
-```
-
-- [ ] **Step 5: Run the validators**
-
-Run: `python3 tools/validate_skills.py --skill speckit-qa-auto`
-Expected: exit `0`.
+- [ ] **Step 2: Verify**
 
 Run: `python3 tools/validate_coupling.py speckit-qa-auto`
-Expected: `speckit-qa-auto: ok`, exit `0`.
+Expected: `speckit-qa-auto: ok`, exit `0` — `run-state.md` is a leaf, so it links to nothing.
 
-Run: `wc -w speckit-qa-auto/SKILL.md`
-Expected: under 600 words including frontmatter — the router budget of spec §11.1 with margin.
+Run: `python3 tools/validate_skills.py`
+Expected: exit `0`. `speckit-qa-auto/` has no `SKILL.md` yet, so it is not discovered as a skill — this is the reordering working as intended, not a check being skipped.
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 3: Commit**
 
 ```bash
-git add speckit-qa-auto README.md
-git commit -m "feat(speckit-qa-auto): add router and the stage run-state contract"
+git add speckit-qa-auto/references/shared/run-state.md
+git commit -m "docs(speckit-qa-auto): add the stage run-state contract"
 ```
 
 ---
@@ -888,7 +838,85 @@ git commit -m "docs(speckit-qa-auto): add stage 04 finish"
 
 ---
 
-### Task 12: Test cases and full-repository validation
+### Task 12: Router and skill README
+
+Last of the authoring tasks, because `SKILL.md` links to every reference file the previous nine tasks created. Writing it now is the first moment `validate_skills.py` can pass on this skill, and it must pass on the first try.
+
+**Files:**
+- Create: `speckit-qa-auto/SKILL.md`
+- Create: `speckit-qa-auto/README.md`
+- Modify: `README.md` (root skills table — new row)
+
+**Interfaces:**
+- Consumes: every file created in Tasks 3–11, by path.
+- Produces: the entry point. Nothing later depends on it except Task 13's validation.
+
+- [ ] **Step 1: Write `SKILL.md`**
+
+Frontmatter, exactly:
+
+```yaml
+---
+name: speckit-qa-auto
+description: |
+  Runs an end-to-end QA delivery pipeline from a Jira issue: requirement analysis, BDD test
+  design, selector verification, Playwright-BDD automation, a bounded run-and-fix loop, then
+  human review and a pushed branch. The Gherkin feature file is the single artifact, serving
+  manual testers and automation alike. Use when a Jira story needs test cases and automated
+  tests produced together, from one command.
+compatibility: "Runs on GitHub Copilot, Claude Code, and OpenCode. Discovered from ~/.agents/skills/, ~/.claude/skills/, or ~/.config/opencode/skills/. Requires git, bash, and a Playwright-BDD + TypeScript test repository; network access for Jira and Xray."
+license: MIT
+allowed-tools: bash glob grep view create edit skill
+metadata:
+  author: Alex Nguyen
+  version: "0.1.0"
+---
+```
+
+Body sections, in this order, **under 500 words total**:
+
+1. **Entry Dispatch (Do This First, Every Invocation)** — load `references/shared/host-adaptation.md` once; parse `--issue` (required), `--yolo`, `--full-suite`, `--pr`; **a missing `--issue` stops with the reason** (the Jira key is the artifact identity, the `@REQ_` tag, and the dedup key); then load `references/shared/operating-rules.md` and enter Stage 01 in the same turn.
+2. **Stage Router** — a table mapping stage 01/02/03/04 to `references/pipeline/stage-0N-*.md`, plus the shared leaves. Load only the current stage's file.
+3. **Modes** — default has human gates at Stage 02 and Stage 04; `--yolo` skips both but never the selector gate or the self-review gate. Stage 03 is a no-stop zone in both.
+4. **Sub-Skill Dependencies** — a one-row table: `jira-to-speckit`, invoked by name through the `skill` tool, for Jira intake and Xray read.
+5. **Required Inputs** — `--issue <jira-url-or-key>`; `.env` with `JIRA_URL`, `JIRA_USERNAME`, `JIRA_API_TOKEN`, and optionally `XRAY_CLIENT_ID`, `XRAY_CLIENT_SECRET`. Never printed.
+6. **Portability Note** — `allowed-tools` uses Copilot-style names; Claude Code and OpenCode expose the same capabilities under `Bash`, `Read`, `Edit`, `Write`, `Glob`, `Grep`, `skill`. Never refuse because a tool is named differently.
+
+**No stage detail in this file. No diagrams in this file** — all three live in the files that own their decision.
+
+- [ ] **Step 2: Write `speckit-qa-auto/README.md` (500–1000 words)**
+
+Sections: Overview, Quick Start, Features, Installation, Compatibility, Examples, Configuration, Troubleshooting — matching the shape of `speckit-auto/README.md`. Include the pipeline diagram from spec §Pipeline Flow, and state the four properties a reader most needs: Gherkin is the single artifact; `docs/qa/` is the source of truth; the fix loop may not edit Gherkin; Xray import happens in CI on merge, not here.
+
+- [ ] **Step 3: Add the root README row**
+
+Add to the skills table, matching the existing column order:
+
+```
+| [speckit-qa-auto](./speckit-qa-auto/README.md) | Jira-to-tests QA pipeline. Analyses the story, designs BDD scenarios, verifies selectors against evidence, generates Playwright-BDD tests, runs them with a bounded fix loop, then reports for human review. Gherkin is the single artifact for manual and automated testing alike. | `.github/skills/` or `~/.agents/skills/` | GitHub Copilot, Claude, Local | `--issue <jira-url>`, `--yolo`, `--full-suite`, `--pr` | v0.1.0 / Alex Nguyen |
+```
+
+- [ ] **Step 4: Verify**
+
+Run: `python3 tools/validate_skills.py --skill speckit-qa-auto`
+Expected: exit `0`, no unresolved links, no version-table warning. Every path the router names now exists.
+
+Run: `python3 tools/validate_coupling.py speckit-qa-auto`
+Expected: `speckit-qa-auto: ok`.
+
+Run: `wc -w speckit-qa-auto/SKILL.md`
+Expected: under 600 words including frontmatter — the router budget of spec §11.1 with margin.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add speckit-qa-auto/SKILL.md speckit-qa-auto/README.md README.md
+git commit -m "feat(speckit-qa-auto): add the router and skill README"
+```
+
+---
+
+### Task 13: Test cases, CI wiring, and full-repository validation
 
 **Files:**
 - Create: `test-case/speckit-qa-auto/test-cases.md`
@@ -958,9 +986,11 @@ git commit -m "test(speckit-qa-auto): add test cases and wire the coupling check
 
 ## Self-Review Notes
 
-**Spec coverage.** Every numbered spec section maps to a task: Constraint 1 → Task 7; Constraint 2 → Task 2; Constraint 3 → Task 6; §1.1 → Task 2; §2 / §2.1 → Task 5; §3 / §3.1 → Task 7; §4 → Task 8; §5 / §5.1 → Task 9; §6 and §6.1–6.5 → Tasks 4 and 10; §7 / §7.1 → Tasks 4 and 11; §8 → Task 4; §9 → Task 3; §10 → Task 11; §11 → Tasks 3–11; §11.1 / §11.2 → Tasks 1 and 3; §12 → Task 12; §13 needs no task by definition.
+**Spec coverage.** Every numbered spec section maps to a task: Constraint 1 → Task 7; Constraint 2 → Task 2; Constraint 3 → Task 6; §1.1 → Task 2; §2 / §2.1 → Task 5; §3 / §3.1 → Task 7; §4 → Task 8; §5 / §5.1 → Task 9; §6 and §6.1–6.5 → Tasks 4 and 10; §7 / §7.1 → Tasks 4 and 11; §8 → Task 4; §10 → Task 11; §11 → Tasks 3–12; §11.2 → Tasks 1 and 3; §9 and §11.1 → Task 12; §12 → Task 13; §13 needs no task by definition.
 
 **Deliberate omissions.** D4 (Playwright-BDD assumed, no framework abstraction) and D3 (no provider layer) are satisfied by *not* building something, so neither has a task. D6 and D15 (Xray write in CI on merge) are out of the skill's scope by decision; Task 11 documents the handoff and does not implement it.
+
+**Ordering.** The router ships in Task 12, after every file it links to exists, so `validate_skills.py` is never knowingly red mid-build. Until then `speckit-qa-auto/` has no `SKILL.md` and is not discovered as a skill.
 
 **Type consistency.** The run-state field names defined in Task 3 are used unchanged in Tasks 4, 8, 9, 10, and 11. The fourteen profile field names defined in Task 5 are used unchanged in Tasks 8 through 11. The `jira-to-speckit` input names defined in Task 2 (`xray_tests`, `xray_output_path`, `xray_manual_output_path`) are consumed unchanged in Task 8.
 
