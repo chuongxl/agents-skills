@@ -73,6 +73,17 @@ credentials and endpoints documented in [`JIRA_API.md`](JIRA_API.md) (`GET
 returns nothing for Manual and Generic tests** — do not treat an empty export as "no manual tests
 exist." Write the results to `xray_manual_output_path` as a markdown table (key, summary, labels).
 
+When `XRAY_CLIENT_ID` / `XRAY_CLIENT_SECRET` are present, additionally fetch each non-Cucumber
+test's steps through the Xray Cloud GraphQL API and add a steps column to the same table. Those
+steps are what let a reviewer at the design gate judge whether a proposed scenario duplicates
+existing manual coverage — key and summary alone are too thin for that call. The exact GraphQL
+query shape (endpoint, query name, field selection for step text) is **not verified in this
+reference** and must be confirmed against Xray's current GraphQL schema before this call is
+implemented; do not write a query here that looks authoritative and turns out wrong. When Xray
+credentials are absent, or the GraphQL call itself is unavailable or fails, emit the table with
+key/summary/labels only and say so explicitly in the report — so a reader can tell a stepless
+table (steps could not be fetched) from a test that genuinely has no steps.
+
 Both files are optional and named by the caller. Whichever path is not supplied is not written.
 
 Report per file: how many tests, which query ran, and whether the non-Cucumber set could be

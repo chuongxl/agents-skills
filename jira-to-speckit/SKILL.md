@@ -62,10 +62,10 @@ skill's output.
 
 ## Optional Inputs
 
-- `ticket_output_path` — a file path to write the full ticket snapshot to (see step 5b). When
+- `ticket_output_path` — a file path to write the full ticket snapshot to (see step 2b). When
   omitted, no file is written and `Ticket snapshot:` reports `not requested`.
 - `xray_tests` — `true` or `false` (default `false`). When `true`, after the brief is produced,
-  export the Xray tests that cover this issue (see step 5c and
+  export the Xray tests that cover this issue (see step 6 and
   [`references/XRAY_API.md`](references/XRAY_API.md)). Omitting `xray_tests` leaves `0.2.0`
   behaviour exactly unchanged.
 - `xray_output_path` — a file path to write the covering Cucumber tests to, as one concatenated
@@ -260,7 +260,7 @@ Examples:
 The Jira key must stay in the name so any spec folder the caller creates from it is easy to trace
 back to Jira.
 
-### 5c. Export Xray tests (only when `xray_tests` is `true`)
+### 6. Export Xray tests (only when `xray_tests` is `true`)
 
 Follow [`references/XRAY_API.md`](references/XRAY_API.md) exactly:
 
@@ -279,7 +279,7 @@ Follow [`references/XRAY_API.md`](references/XRAY_API.md) exactly:
 
 This step performs no write to Xray, no import, no test-execution creation, and no result upload.
 
-### 6. Return the output and stop
+### 7. Return the output and stop
 
 Produce the Compact Output Template below and end the skill's turn. Do not continue into any
 Speckit stage, review loop, git action, or execution report — that is the caller's responsibility.
