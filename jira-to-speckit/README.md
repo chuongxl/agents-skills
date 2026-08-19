@@ -150,7 +150,46 @@ JIRA_MAX_DESCRIPTION_CHARS=6000
 JIRA_MAX_OUTPUT_CHARS=2500
 JIRA_FETCH_COMMENTS=false
 JIRA_MAX_COMMENTS=5
+
+# Optional: Xray credentials, only needed when xray_tests is requested
+XRAY_CLIENT_ID=your-xray-client-id
+XRAY_CLIENT_SECRET=your-xray-client-secret
 ```
+
+### Optional: Xray Read Mode
+
+Since v0.3.0, the skill can additionally export the Xray tests that cover the Jira issue. This is
+off by default and changes nothing about the `0.2.0` brief-and-snapshot behaviour when unused.
+
+Three optional inputs control it:
+
+| Input | Default | Meaning |
+|---|---|---|
+| `xray_tests` | `false` | Set `true` to export covering Xray tests after the brief is produced. |
+| `xray_output_path` | none | Path to write covering Cucumber tests as one concatenated `.feature` file. Not written if omitted. |
+| `xray_manual_output_path` | none | Path to write covering Manual/Generic tests as a markdown table. Not written if omitted. |
+
+When `xray_tests` is `true`, the skill discovers covering tests with exactly one JQL query, never
+both and never merged:
+
+- **Primary** — `issue in testRequirement("<STORY-KEY>") ORDER BY key ASC`, run whenever the Xray
+  JQL functions are available on the instance.
+- **Fallback** — `issuetype = Test AND issue in linkedIssues("<STORY-KEY>") ORDER BY key ASC`, run
+  only when the Xray JQL functions are unavailable.
+
+Which query ran is always reported back (`Xray query:` in the output template).
+
+**Manual and Generic tests never appear in the Cucumber export.** Xray's `export/cucumber`
+endpoint only returns Cucumber-format tests; Manual and Generic tests are fetched separately
+through the Jira REST API and written to `xray_manual_output_path`. A caller that receives
+Cucumber tests (`xray_output_path` populated) but no Manual tests is looking at **partial
+coverage**, not proof the story has no manual tests — the skill reports explicitly when the
+non-Cucumber set could not be fetched, and this should never be silently assumed.
+
+Missing `XRAY_CLIENT_ID` / `XRAY_CLIENT_SECRET` is a warning, not a stop: the skill reports `xray:
+unavailable` and returns the brief as usual. This skill only reads Xray — it never imports a
+feature file, creates a test execution, or uploads a result; that belongs to CI. See
+[`references/XRAY_API.md`](references/XRAY_API.md) for the exact endpoints.
 
 ### Repository Detection
 
@@ -319,6 +358,8 @@ The full workflow from Jira to pull request:
 ## References
 
 - **Jira API Guide**: See [`references/JIRA_API.md`](references/JIRA_API.md) for detailed API usage
+- **Xray API Guide**: See [`references/XRAY_API.md`](references/XRAY_API.md) for the optional
+  Xray read mode (`xray_tests`)
 - **Speckit Workflow**: The `speckit-auto` skill consumes this skill's brief and owns every
   stage that follows — spec, plan, tasks, implementation, review, and commit.
 

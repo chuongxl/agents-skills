@@ -1,12 +1,12 @@
 ---
 name: jira-to-speckit
-description: Fetch a Jira issue or Jira issue URL using credentials from `.env`, then compact the ticket into a Speckit-ready feature brief (title, business goal, acceptance criteria, constraints, open questions) plus a Jira-key-based feature name, and optionally write a full-fidelity ticket snapshot markdown file for traceability. Use when work starts from Jira and a caller (typically `speckit-auto`) needs a clean, size-bounded intake payload to drive its own spec/plan/task pipeline. This skill only reads Jira, produces that brief, and writes that one snapshot file — it does not run Speckit stages, review loops, git operations, or track execution progress.
-compatibility: Requires network access and Jira REST API access. Requires `.env` entries for `JIRA_URL`, `JIRA_USERNAME`, and `JIRA_API_TOKEN`.
+description: Fetch a Jira issue or Jira issue URL using credentials from `.env`, then compact the ticket into a Speckit-ready feature brief (title, business goal, acceptance criteria, constraints, open questions) plus a Jira-key-based feature name, and optionally write a full-fidelity ticket snapshot markdown file for traceability. Use when work starts from Jira and a caller (typically `speckit-auto`) needs a clean, size-bounded intake payload to drive its own spec/plan/task pipeline. This skill only reads Jira (and, optionally, Xray), produces that brief, and writes at most the files the caller names — it does not run Speckit stages, review loops, git operations, or track execution progress. When `xray_tests` is requested it can additionally export the Xray tests covering the issue, as a Cucumber `.feature` file plus a table of non-Cucumber tests.
+compatibility: Requires network access and Jira REST API access. Requires `.env` entries for `JIRA_URL`, `JIRA_USERNAME`, and `JIRA_API_TOKEN`. Optional Xray read mode requires `XRAY_CLIENT_ID` and `XRAY_CLIENT_SECRET`.
 license: MIT
 allowed-tools: bash view create
 metadata:
   author: Alex Nguyen
-  version: "0.2.0"
+  version: "0.3.0"
 ---
 
 # Jira to Speckit
@@ -43,8 +43,10 @@ workflow below is identical on all three hosts.
 - Does not run spec/plan/tasks clarification or review loops.
 - Does not resolve the target repository, create branches, commit, push, or open pull requests.
 - Does not create or update an execution report.
-- Does not write any file other than the single `ticket_output_path` snapshot, and does not choose
-  that path itself — no snapshot is written when the caller omits it.
+- Does not write any file beyond the three the caller can name: `ticket_output_path`,
+  `xray_output_path`, `xray_manual_output_path`. It writes at most three files, all named by the
+  caller, and does not choose any of these paths itself — a file is written only when the caller
+  supplies its path; whichever path is omitted is not written.
 
 If a caller needs any of the above, it is responsible for performing it itself after receiving this
 skill's output.
@@ -62,6 +64,20 @@ skill's output.
 
 - `ticket_output_path` — a file path to write the full ticket snapshot to (see step 5b). When
   omitted, no file is written and `Ticket snapshot:` reports `not requested`.
+- `xray_tests` — `true` or `false` (default `false`). When `true`, after the brief is produced,
+  export the Xray tests that cover this issue (see step 5c and
+  [`references/XRAY_API.md`](references/XRAY_API.md)). Omitting `xray_tests` leaves `0.2.0`
+  behaviour exactly unchanged.
+- `xray_output_path` — a file path to write the covering Cucumber tests to, as one concatenated
+  `.feature` file. Only used when `xray_tests` is `true`. When omitted, Cucumber tests are not
+  written even if `xray_tests` is `true`.
+- `xray_manual_output_path` — a file path to write the covering Manual/Generic tests to, as a
+  markdown table. Only used when `xray_tests` is `true`. When omitted, this table is not written
+  even if `xray_tests` is `true`.
+
+Optional `.env` credentials for Xray read mode:
+- `XRAY_CLIENT_ID`
+- `XRAY_CLIENT_SECRET`
 
 Optional `.env` tuning for large Jira tickets:
 - `JIRA_MAX_INPUT_CHARS` (default `12000`)
@@ -83,7 +99,12 @@ Optional `.env` tuning for large Jira tickets:
   disk, its contents never go into the return value.
 - Always enforce character budgets before producing the compact brief. The budgets apply to the
   brief only, never to the snapshot file.
-- Write no file other than `ticket_output_path`, and only when the caller supplies it.
+- Write no file other than `ticket_output_path`, `xray_output_path`, or `xray_manual_output_path`,
+  and write each only when the caller supplies its path.
+- Never print Xray credentials (`XRAY_CLIENT_ID`, `XRAY_CLIENT_SECRET`) or the bearer token derived
+  from them. Missing Xray credentials are a warning (`xray: unavailable`), never a stop.
+- Xray read mode is read-only: it performs no import, no test-execution creation, and no result
+  upload. Those belong to CI, not to this skill.
 
 ## Workflow
 
@@ -239,6 +260,25 @@ Examples:
 The Jira key must stay in the name so any spec folder the caller creates from it is easy to trace
 back to Jira.
 
+### 5c. Export Xray tests (only when `xray_tests` is `true`)
+
+Follow [`references/XRAY_API.md`](references/XRAY_API.md) exactly:
+
+1. Resolve `XRAY_CLIENT_ID` / `XRAY_CLIENT_SECRET` from `.env`. Absent → report `xray: unavailable`
+   and continue; this is a warning, never a stop.
+2. Authenticate and discover the covering tests with the one fixed JQL query
+   (`testRequirement`, falling back to `linkedIssues` only when the Xray JQL functions are
+   unavailable). Never merge the two result sets or add label/summary heuristics. Report which
+   query ran.
+3. Split the result by test type: Cucumber tests via the Cucumber export, concatenated into
+   `xray_output_path`; every other type (Manual, Generic) via the Jira REST API, written to
+   `xray_manual_output_path` as a markdown table. Each file is written only when the caller
+   supplied its path.
+4. Report per file: how many tests, which query ran, and whether the non-Cucumber set could be
+   fetched.
+
+This step performs no write to Xray, no import, no test-execution creation, and no result upload.
+
 ### 6. Return the output and stop
 
 Produce the Compact Output Template below and end the skill's turn. Do not continue into any
@@ -257,6 +297,9 @@ Always return the result in this exact shape:
 - Compact brief:
 - Open questions:
 - Truncation note: (state what was truncated/sampled when budgets were applied; also report a failed snapshot write here)
+- Xray tests: (count and path written, or `not requested`, or `xray: unavailable`)
+- Xray query: (`testRequirement` or `linkedIssues`, or omitted when `xray_tests` is not requested)
+- Xray manual tests: (count and path written, or `not requested`, or a note that the non-Cucumber set could not be fetched)
 
 ## Common Edge Cases
 
@@ -271,3 +314,4 @@ Always return the result in this exact shape:
 ## References
 
 - [Jira API guide](references/JIRA_API.md)
+- [Xray API guide](references/XRAY_API.md)
