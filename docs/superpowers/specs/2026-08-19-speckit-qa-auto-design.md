@@ -6,8 +6,8 @@ Scope: new skill `speckit-qa-auto/`; additive change to `jira-to-speckit/` (vers
 
 ## Problem
 
-`speckit-auto` delivers *product code* from a requirement. It has no path for QA work. A tester
-starting from a Jira story today does all of the following by hand, in two disconnected halves:
+No skill in this repository delivers QA work. A tester starting from a Jira story today does all
+of the following by hand, in two disconnected halves:
 
 1. Read the story, derive test scenarios, write manual test cases into Xray.
 2. Later, separately, write Playwright BDD `.feature` files that restate the same scenarios in
@@ -35,9 +35,9 @@ Recorded here because several were user overrides of the first proposal.
 
 | # | Decision | Rationale |
 |---|---|---|
-| D1 | A **new sibling skill**, not a `--track qa` flag on `speckit-auto` | QA changes must not bump the version of a dev skill that is running stably |
+| D1 | A **standalone skill** with its own lifecycle, rather than a QA mode bolted onto an existing delivery skill | QA changes must not force a version bump on a skill that other teams already depend on |
 | D2 | **Full chain in v1**: Jira → analysis → design → Gherkin → automation → run | The Gherkin file is the single artifact for both halves, so splitting v1 would not reduce work |
-| D3 | **No spec provider.** No `.speckit/integration.json`, no `github-speckit`, no `superpowers`, no constitution gate | Those select a *dev spec framework*. Automation test authoring does not use one |
+| D3 | **No spec-framework provider layer** — no provider config file, no provider adapters, no constitution or bootstrap gate | A provider layer exists to select a *product-spec* framework. Authoring automation tests does not use one |
 | D4 | **Playwright-BDD + TypeScript is assumed.** No abstraction over other test frameworks | User directive. Removes a layer of indirection that has no second consumer today |
 | D5 | Repo conventions come from a **repo-local playbook**, discovered — not from a new config file | The reference repo already has one (`mom-auto-testing`). Shared skill owns *process*; repo owns *convention* |
 | D6 | **No Xray write in the pipeline.** Import runs in CI when the PR merges | User directive. Keeps `jira-to-speckit` a pure reader (see D7) |
@@ -117,8 +117,8 @@ produced:
 
 Contract change, stated precisely: the skill now writes **at most two files**, both named by the
 caller — `ticket_output_path` and `xray_output_path`. It still performs no write to any remote
-system, runs no pipeline stage, and performs no git operation. `speckit-auto` calls it without
-`xray_tests` and observes byte-identical behaviour to `0.2.0`.
+system, runs no pipeline stage, and performs no git operation. Existing callers that omit
+`xray_tests` observe the `0.2.0` behaviour unchanged.
 
 ## 2. Repo Profile Discovery
 
@@ -183,16 +183,16 @@ worktree + branch + submodules → repo profile → Jira intake → Xray existin
 → artifact folder init → Stage 02
 ```
 
-1. **Worktree gate.** Adopted from `speckit-auto` operating rule 1: base branch priority
+1. **Worktree gate.** Base branch priority
    `develop → main → master` (local, then remote-tracking), best-effort sync, linked worktree at
    `<repo-root>/.worktrees/<branch>`, `.worktrees/` git-ignored. Branch name
    `<branch_prefix><jira-key>-<slug>`, resolved after intake and renamed in place with
    `git branch -m` when a provisional name was used.
 2. **Frontend source initialization is a hard requirement, not best-effort.** When
    `frontend_source_root` names a submodule, `git submodule update --init` for that path must
-   succeed. This differs deliberately from `speckit-auto`, where the same failure only logs a
-   warning: Stage 02's selector gate reads frontend source, and an empty submodule directory makes
-   that gate unsatisfiable. Failure stops the run with the git error quoted.
+   succeed. It is a stop, not a warning: Stage 02's selector gate reads frontend source, and an
+   empty submodule directory makes that gate unsatisfiable. Failure stops the run with the git
+   error quoted.
 
    No general multi-submodule handling exists (D10). The pipeline expects at most one submodule,
    the frontend, and treats it as **read-only** — Stage 02's selector gate is report-only, and
@@ -280,12 +280,9 @@ by any file edit, does not count. Report the stuck state and stop.
 2. **Human review** — files created and changed, test results, blocked scenarios with reasons,
    proposed `data-testid` additions for the frontend (each with file and line), open questions.
 3. **Verify the workspace baseline (§7.1).** A violation stops the run before any commit.
-4. Commit and push. Adopted from `speckit-auto`'s commit procedure: every commit is conditional on
-   `git status --porcelain` in the worktree — an already-clean tree is a success path, not a
-   failure — then `git pull --rebase origin <branch>` and push.
-
-   Note: `speckit-auto/references/shared/commit.md` as of `5b73276` contains **no** workspace or
-   submodule guard. The mechanism in §7.1 is new to this design, not inherited.
+4. Commit and push. Every commit is conditional on `git status --porcelain` in the worktree — an
+   already-clean tree is a success path, not a failure — then `git pull --rebase origin <branch>`
+   and push.
 5. Push the branch and print a ready-to-use PR title and body. **Do not open the PR** unless
    `--pr` is passed.
 6. Mark the artifact `completed` and make the follow-up commit for that status change.
@@ -414,25 +411,26 @@ speckit-qa-auto/
         ├── selector-verification.md            Constraint 3, generalized
         ├── gherkin-conventions.md              tags, scenario granularity, Xray binding
         ├── workspace-guard.md                  §7.1 baseline capture and verification
-        ├── host-adaptation.md                  adopted from speckit-auto
-        └── commit.md                           adopted from speckit-auto (conditional commit,
-                                                pull-rebase, push); no guard of its own
+        ├── host-adaptation.md                  host detection and tool-name mapping
+        └── commit.md                           conditional commit, pull-rebase, push
 ```
 
-Each file is loaded on demand; `SKILL.md` stays a small router, matching `speckit-auto`'s shape.
-Per `SKILL_SPEC.md`, no link may point outside the skill folder — files adopted from `speckit-auto`
-are **copied**, and other skills are referred to by name in prose.
+Each file is loaded on demand and `SKILL.md` stays a small router, so no single file has to hold
+the whole pipeline. Per `SKILL_SPEC.md`, no link may point outside the skill folder: the skill is
+installed by copying its folder, so every reference file it needs lives inside it, and the one
+sibling skill it calls (`jira-to-speckit`) is invoked by name through the `skill` tool rather than
+linked to.
 
 ## 12. Acceptance Criteria
 
 1. `python3 tools/validate_skills.py` exits `0`.
 2. `README.md` carries a `speckit-qa-auto` row whose version matches its `SKILL.md`, and the
    `jira-to-speckit` row reads `v0.3.0`.
-3. `speckit-auto` invoking `jira-to-speckit` without `xray_tests` shows no behavioural change:
-   no Xray endpoint is contacted, exactly one file is written (the ticket snapshot), and the brief
-   follows the same output template as `0.2.0`.
-4. `test-case/speckit-qa-auto/test-cases.md` exists, following the shape of
-   `test-case/speckit-auto/test-cases.md`.
+3. `jira-to-speckit` invoked without `xray_tests` shows no behavioural change for existing
+   callers: no Xray endpoint is contacted, exactly one file is written (the ticket snapshot), and
+   the brief follows the same output template as `0.2.0`.
+4. `test-case/speckit-qa-auto/test-cases.md` exists, following the shape of the existing files
+   under `test-case/`.
 5. Workspace baseline regression test: with the source checkout holding one already-modified
    tracked file and one already-present untracked file, append to each, then run Stage 04
    verification. Both must be reported as violations. This is the case `git status` comparison
