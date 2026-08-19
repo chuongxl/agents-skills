@@ -26,6 +26,12 @@ jobs:
       - name: Self-test the validator
         run: python3 tools/test_validate_skills.py
 
+      - name: Validate reference-file coupling
+        run: python3 tools/validate_coupling.py speckit-qa-auto
+
+      - name: Self-test the coupling validator
+        run: python3 tools/test_validate_coupling.py
+
       - name: Shell script syntax check
         run: find . -name '*.sh' -not -path './.git/*' -exec bash -n {} +
 
