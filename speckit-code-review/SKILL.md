@@ -6,8 +6,7 @@ description: |
   Produces strict JSON pass/fail with business coverage, missing requirements, code issues, security issues, architecture issues, and unit test coverage.
   Triggers: "speckit code review", "review with spec", "compare code to spec.md", "spec coverage audit",
   "invoke speckit-code-review", "run speckit-code-review".
-compatibility:
-  github-copilot: "Skill auto-discovered from ~/.agents/skills/. Invoked via skill tool."
+compatibility: Runs on GitHub Copilot, Claude Code, and OpenCode. Discovered from ~/.agents/skills/, ~/.claude/skills/, or ~/.config/opencode/skills/. Requires git, bash, and a spec at specs/<feature-folder>/spec.md.
 license: MIT
 allowed-tools: bash glob grep view create edit
 metadata:
@@ -25,11 +24,20 @@ The spec may come from `speckit.specify` (usually already has `FR-*`/`NFR-*` IDs
 
 **Always run inline.** Never dispatch as a background task or sub-agent; the caller needs the JSON in-band.
 
+Portability note: `allowed-tools` uses GitHub Copilot-style names (`bash glob grep view create edit`).
+Claude Code and OpenCode expose the same capabilities under their own names (`Bash`, `Read`, `Edit`,
+`Write`, `Glob`, `Grep`). The review procedure below is identical on all three hosts.
+
 ## Inputs
 
 - `spec.md` for the target feature. If no path is given, resolve from `specs/*/spec.md` using the
   current branch name or changed files; ask the user only if still ambiguous.
-- Review scope = current git change set (staged + unstaged, incl. renames/deletes).
+- Review scope = current git change set (staged + unstaged, incl. renames/deletes), evaluated in
+  the current working directory. Optional `base_ref` input (a commit/ref, e.g. the merge-base with
+  the base branch): when provided, scope = the **union** of `git diff <base_ref>...HEAD` and the
+  working-tree change set, so committed feature work is reviewed even when the tree is clean.
+  `speckit-auto` always passes this. When invoked from `speckit-auto`, the caller must run this
+  skill inline from inside the Stage 01 linked worktree, never from the base checkout.
 
 ## Spec ID
 
@@ -64,7 +72,8 @@ testable requirements to the spec. Never return `pass` against an empty checklis
 ## Procedure
 
 1. Build the requirement checklist (see above).
-2. Resolve the git change set as review scope.
+2. Resolve the git change set as review scope (union with `git diff <base_ref>...HEAD` when a
+   `base_ref` was passed).
 3. **Project guidelines (conditional)** — if `docs/guidelines/architecture.md` exists, load
    [references/project-guidelines-review.md](references/project-guidelines-review.md) and follow its
    Steps 1–4 to load only the guideline files matching the changed-file categories. Skip silently

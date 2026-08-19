@@ -10,7 +10,8 @@ How to install the skills in this repository into each supported agent.
 | GitHub Copilot (repo) | `.github/skills/` | one repository |
 | Claude Code | `~/.claude/skills/` | user-wide |
 | Claude Code (repo) | `.claude/skills/` | one repository |
-| OpenCode | `~/.opencode/skills/` | user-wide |
+| OpenCode | `~/.config/opencode/skills/` | user-wide |
+| OpenCode (repo) | `.opencode/skills/` | one repository |
 
 ## 2. Copy the skills you want
 
@@ -85,6 +86,10 @@ Choose an integration provider once; the choice is persisted:
 speckit-auto --integration github-speckit   # repo-installed GitHub Spec Kit agents
 speckit-auto --integration superpowers      # the obra/superpowers skills library
 ```
+
+Invocation differs per host: `/speckit-auto ...` on GitHub Copilot and Claude Code, or the same
+flags embedded in a natural-language message on OpenCode (which has no skill slash commands).
+`speckit-auto` auto-detects the host at runtime via `references/shared/host-adaptation.md`.
 
 ## Keeping Installs Consistent
 
