@@ -1,23 +1,20 @@
-# Host Adaptation (GitHub Copilot / Claude Code / OpenCode)
+# Shared: Host Adaptation (GitHub Copilot / Claude Code / OpenCode)
 
-This skill runs on three host agents: **GitHub Copilot**, **Claude Code**, and **OpenCode**. The
-pipeline logic is identical on all three; only the discovery directory, tool names, and invocation
-channel differ. Load this file once at entry dispatch, resolve the host, and keep it fixed for the
-whole run.
+This skill runs on three host agents. The pipeline is identical on all three; only the discovery
+directory, tool names, and invocation channel differ. Load once at entry dispatch; the host is
+fixed for the whole run.
 
-## Host Detection (resolve once, first match wins)
+## Host Detection (first match wins)
 
 1. **Discovery directory** — the folder this `SKILL.md` was loaded from implies the host:
-   - `~/.agents/skills/`, `.github/skills/`, `~/.copilot/skills/` → **GitHub Copilot**
-   - `~/.claude/skills/`, `.claude/skills/` → **Claude Code**
-   - `~/.config/opencode/skills/`, `.opencode/skills/` → **OpenCode**
-2. **Tool-surface confirmation** (disambiguate overlapping dirs, e.g. `~/.agents/skills/`):
-   - Repo slash-agents under `.github/agents/` and a `copilot` CLI → Copilot
-   - `Skill` tool (capitalized) and `.claude/skills/` present → Claude Code
-   - A `<available_skills>` context block with `skill`-tool loading and no skill slash commands →
-     OpenCode
-3. If still ambiguous, default to **GitHub Copilot** and note the assumption in the run state. The
-   Stage 01 source check is authoritative regardless — it probes actual repo files.
+   `~/.agents/skills/`, `.github/skills/`, `~/.copilot/skills/` → Copilot;
+   `~/.claude/skills/`, `.claude/skills/` → Claude Code;
+   `~/.config/opencode/skills/`, `.opencode/skills/` → OpenCode.
+2. **Tool-surface confirmation** when directories overlap: repo slash-agents under `.github/agents/`
+   + `copilot` CLI → Copilot; a `Skill` tool + `.claude/skills/` → Claude Code; an
+   `<available_skills>` block with `skill`-tool loading and no skill slash commands → OpenCode.
+3. If still ambiguous, default to GitHub Copilot and note the assumption. The Stage 01 source
+   check is authoritative regardless — it probes actual repo files.
 
 ## Per-Host Map
 
@@ -25,43 +22,32 @@ whole run.
 |--------|----------------|-------------|----------|
 | Skill dirs | `~/.agents/skills/`, `.github/skills/`, `~/.copilot/skills/` | `~/.claude/skills/`, `.claude/skills/` | `~/.config/opencode/skills/`, `.opencode/skills/`, plus `.claude/skills/` / `.agents/skills/` |
 | Tool names | `bash glob grep view create edit skill` | `Bash Read Edit Write Glob Grep Skill` | `bash glob grep view create edit skill` |
-| Invocation channel | `skill` tool; repo skills also surface as `/name` slash commands | `Skill` tool; user-invocable skills surface as `/name` | `skill` tool only — no skill slash commands |
-| Skill trigger / flags | `/skill-name <flags...>` body | `/skill-name` body or `$ARGUMENTS` | flags embedded in the natural-language message that triggered the skill |
+| Invocation channel | `skill` tool for all skills (including `speckit-*`) | `Skill` tool for all skills (including `speckit-*`) | `skill` tool for all skills |
+| Flags | slash-command body | slash-command body / `$ARGUMENTS` | embedded in the natural-language trigger message |
 | Mid-run resume marker | the skill tool list in tool context | `<skill-context name="...">` | `<available_skills>` block |
+| Ask tool (default mode) | `ask_user` | `AskUser` | `question` |
 
-Rule: never refuse to act because a tool is named differently than `allowed-tools`. The capabilities
+Never refuse to act because a tool is named differently from `allowed-tools` — the capabilities
 are equivalent across all three hosts.
 
-## github-speckit Provider Layout (per host)
+## Skill Invocation (canonical statement)
 
-Probe order for the Stage 01 source check; install with the host's `--integration` key.
+All skills — including `speckit-*` repo-installed skills — are invoked via the `skill` tool by
+name on every host. The `skill` tool returns inline in the same turn. There are no slash commands,
+no agent calls, and no turn boundaries for skill invocations.
 
-| Host | `specify init` key | Installed layout to probe | Invocation |
-|------|--------------------|---------------------------|------------|
-| GitHub Copilot | `copilot` | `.github/skills/speckit-<command>/SKILL.md` (skills mode, default) **or** `.github/agents/speckit.<command>.agent.md` + `.github/prompts/speckit.<command>.prompt.md` (commands mode, `--integration-options="--commands"`) | `/speckit.<command>` slash command |
-| Claude Code | `claude` | `.claude/skills/speckit-<command>/SKILL.md` | `/speckit.<command>` slash command (user-invocable skills) or `Skill` tool |
-| OpenCode | `opencode` | `.opencode/skills/speckit-<command>/SKILL.md`, then `.agents/skills/`, then `.claude/skills/` | `skill` tool by the resolved skill name; no slash commands |
+```
+skill speckit-constitution "constitution project to understand the project architecture"
+skill speckit-specify
+skill speckit-implement
+...
+```
 
-`<command>` is one of: `specify`, `clarify`, `plan`, `checklist`, `tasks`, `analyze`, `implement`,
-`converge`. Skills-mode installs name the folder `speckit-<command>`; the slash command is always
-`/speckit.<command>`.
+Never invoke skills by shelling out to a `copilot`, `claude`, or `opencode` CLI subprocess —
+that starts an unrelated, unbounded nested session. Never use the `task` tool with a skill name.
+If a skill cannot be resolved by the `skill` tool, it is a provider validation failure — trigger
+install recovery per the provider adapter.
 
-## superpowers Provider Layout (per host)
-
-| Host | Skill dirs to probe | Install |
-|------|---------------------|---------|
-| GitHub Copilot | `~/.agents/skills/<name>/SKILL.md`, repo `.agents/skills/<name>/SKILL.md`, `~/.copilot/installed-plugins/<marketplace>/superpowers/skills/<name>/SKILL.md` | `copilot plugin marketplace add obra/superpowers-marketplace` then `copilot plugin install superpowers@superpowers-marketplace` |
-| Claude Code | `~/.claude/skills/<name>/SKILL.md`, `.claude/skills/<name>/SKILL.md` | `/plugin marketplace add obra/superpowers-marketplace` then `/plugin install superpowers@superpowers-marketplace` (fallback: `claude plugin marketplace add ...`) |
-| OpenCode | `~/.config/opencode/skills/<name>/SKILL.md`, `.opencode/skills/<name>/SKILL.md` | Ask the user **Install** / **Stop** first. On Install: `git clone https://github.com/obra/superpowers.git /tmp/superpowers && mkdir -p <opencode skills dir> && cp -R /tmp/superpowers/skills/* <opencode skills dir>/` |
-
-`<name>` is a superpowers skill such as `brainstorming`, `debugging`, `executing`, `planning`,
-`writing-plans`, `systematic-testing`. The availability probe globs all of them.
-
-## Rules
-
-- The host is resolved once at entry dispatch and never changes mid-run.
-- The provider's Stage 01 source check is authoritative for layout; this file only lists candidates.
-- The `--integration` key passed to `specify init` must match the resolved host (`copilot` /
-  `claude` / `opencode`). Never pass a key that does not match the resolved host.
-- If the host-specific install command is not available in this environment, stop and report the
-  exact manual command from the table above instead of guessing an alternative.
+Provider-specific install keys, probe layouts, and install commands live in the provider
+adapters: [../providers/github-speckit.md](../providers/github-speckit.md) and
+[../providers/superpowers.md](../providers/superpowers.md).

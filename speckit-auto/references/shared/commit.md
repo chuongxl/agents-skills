@@ -1,60 +1,62 @@
-# Shared: Commit Procedure (Provider-Agnostic)
+# Shared: Commit + Push Procedure (Provider-Agnostic)
 
-Used by Stage 04 (default mode, after human approval) and Stage 05 (`--yolo`). The procedure is
-identical; only the commit message source differs — Stage 04 asks the user, Stage 05 auto-generates
-`feat(<artifact_id>): <short summary from the spec or Jira summary>`.
+Used by: the Stage 02 → Stage 03 spec/plan commit gate, Stage 04 human-review commit (default
+mode), and the Stage 04 YOLO auto-commit. The procedure is identical; only the commit message
+source differs:
 
-`artifact_id` is provider-independent and always defined: the Jira issue key in `--issue` runs,
-otherwise the artifact folder's prefix-slug (e.g. `007-user-export`). Never emit a literal
-`<issue_id>` placeholder.
+| Call site | Message |
+|-----------|---------|
+| Stage 02 → 03 gate | auto: `docs(<artifact_id>): add spec, plan, and tasks` |
+| Stage 04 default | asked from the user |
+| Stage 04 YOLO | auto: `feat(<artifact_id>): <short summary from the spec or Jira summary>` |
+
+`artifact_id` is always defined: the Jira issue key in `--issue` runs, otherwise the artifact
+folder's prefix-slug (e.g. `007-user-export`). Never emit a literal `<issue_id>` placeholder.
 
 ## Conditional Commit (Critical)
 
-**Stage 03 may already have committed.** Implementer subagents (`subagent-driven-development`) and
-`speckit.implement` both commit as they go, so the working tree is often clean by the time this
-stage runs. An empty commit attempt exits non-zero, and global rule 19 would turn that into a false
-pipeline failure at the very last step. Every commit below is therefore conditional.
+Implementers commit as they go, so the tree is often already clean by the time this runs; an
+empty commit attempt exits non-zero and would produce a false failure. Every commit is therefore
+conditional:
 
-1. Check what is actually uncommitted, in each repo before committing there:
-   `git status --porcelain`
-2. **Empty output → skip the commit for that repo** and log
-   `already committed during Stage 03 (<n> commits on <branch>)`. This is a success path, not a
-   failure. Verify the work is really there with `git log <base-branch>..HEAD --oneline`.
+1. Check `git status --porcelain` in each repo before committing there.
+2. **Empty output → skip that repo's commit** and log `already committed during Stage 03 (<n>
+   commits on <branch>)`; verify the work with `git log <base-branch>..HEAD --oneline`. This is a
+   success path, not a failure.
 3. Non-empty → commit as below.
 
 ## With Submodules
 
-If git submodules exist and were modified:
-
-1. For each modified submodule whose status is dirty, commit **inside that submodule first**:
-   - `git add -A`
-   - `git commit -m "<commit-message>"`
-2. Then, in the parent repo, commit the submodule pointer update and any parent changes. Re-check
-   the parent's status **after** the submodule commits — a submodule commit dirties the parent
-   pointer, so the parent may need a commit even when it looked clean a moment earlier:
-   - `git add -A`
-   - `git commit -m "<commit-message>"`
+If modified submodules exist: commit inside each dirty submodule first (`git add -A` →
+`git commit -m "<message>"`), then commit the parent pointer update and any parent changes. Re-check
+the parent status **after** the submodule commits — a submodule commit dirties the parent pointer,
+so the parent may need a commit even when it looked clean moments earlier.
 
 ## Without Submodules
 
-If no submodules were modified and the tree is dirty:
+`git add -A` → `git commit -m "<message>"`.
 
-- `git add -A`
-- `git commit -m "<commit-message>"`
+## Branch Sync + Push (Required)
 
-## Reporting
+After the commit decision (including the already-clean success path):
 
-Report the resulting commits (hash + subject). If nothing needed committing, report the Stage 03
-commits instead — never report "no commit" as a failure.
+1. `git pull --rebase origin <branch>` — if the remote branch does not exist yet, continue to push
+   (new branch path). On conflicts: resolve, `git add <files>`, `git rebase --continue`, repeat; if
+   unresolvable, stop and report.
+2. Push: first push `git push -u origin <branch>`; subsequent `git push origin <branch>`.
+3. Push failure → stop and report the exact error.
 
-## Failure Handling
+The stage must leave the implementation commit(s) available on the remote feature branch.
 
-If a commit that was actually needed fails, stop and report the exact failure. A skipped commit on
-an already-clean tree is **not** a failure and never stops the pipeline.
+## Reporting and Failure Handling
+
+Report resulting commits (hash + subject) and the pushed branch. If nothing needed committing,
+report the Stage 03 commits instead — never report "no commit" as a failure. A failed commit that
+was actually needed, a failed push, or an unresolved rebase is a failure for the stage; a skipped
+commit on an already-clean tree is not.
 
 ## Scratch Must Already Be Ignored
 
-`git add -A` here would otherwise sweep run scratch into the feature commit. Stage 01 guarantees
-`.speckit/` (and `.superpowers/` in superpowers mode) are git-ignored — see
-[scratch-hygiene.md](scratch-hygiene.md). The relocated `ticket.md` inside the artifact folder is
-**not** scratch and is committed with the rest of the artifacts.
+`git add -A` would otherwise sweep run scratch into the feature commit. Stage 01 guarantees
+`.superpowers/` in superpowers mode may be git-ignored if needed. The relocated `ticket.md`
+inside the artifact folder is **not** scratch and is committed with the artifacts.

@@ -5,13 +5,13 @@ all three host agents (GitHub Copilot, Claude Code, OpenCode).
 
 | ID | Scenario | Preconditions | Steps | Expected result | Provider coverage |
 |---|---|---|---|---|---|
-| T01 | Setup: valid `--integration github-speckit` | No config exists | Run `/speckit-auto --integration github-speckit` | Writes repo-local `.speckit/integration.json`, reports resolved provider, file path, scope, next command | Both |
-| T02 | Setup: valid `--integration superpowers` | No config exists | Run `/speckit-auto --integration superpowers` | Writes repo-local `.speckit/integration.json`, reports resolved provider, file path, scope, next command | Both |
+| T01 | Setup: valid `--integration github-speckit` | No config exists | Run `/speckit-auto --integration github-speckit` | Writes repo-local `.speckit/integration.json`, reports resolved provider, file path, next command | Both |
+| T02 | Setup: valid `--integration superpowers` | No config exists | Run `/speckit-auto --integration superpowers` | Writes repo-local `.speckit/integration.json`, reports resolved provider, file path, next command | Both |
 | T03 | Setup: alias normalization | Any | Run `/speckit-auto --integration github` or `/speckit-auto --integration superpower` | Normalizes to supported provider and persists canonical value | Both |
 | T04 | Setup: invalid integration value | Any | Run `/speckit-auto --integration banana` | Fails fast, reports only supported values, writes nothing | Both |
-| T05 | First-run provider selection | No repo-local/global integration config | Run `/speckit-auto "..."` | Prompts once, persists chosen provider, continues same turn | Both |
-| T06 | Repo-local config precedence | Repo-local and global config both exist | Run `/speckit-auto "..."` | Uses repo-local provider, ignores global | Both |
-| T07 | Global config fallback | No repo-local config, global exists | Run `/speckit-auto "..."` | Uses global provider | Both |
+| T05 | Missing provider config | No `.speckit/integration.json` in repo | Run `/speckit-auto "..."` | Stops immediately, tells user to run `/speckit-auto --integration <provider>` first; no pipeline stage runs | Both |
+| T06 | Unparseable / unsupported stored value | `.speckit/integration.json` has bad JSON or unknown provider | Run `/speckit-auto "..."` | Stops with the same configure-first message; no fallback | Both |
+| T07 | Setup: `--global` rejected | Any | Run `/speckit-auto --integration github-speckit --global` | Rejects `--global` (global state unsupported); nothing written globally | Both |
 | T08 | Manual requirement intake | Provider already resolved | Run `/speckit-auto "add X"` | Starts Stage 01 immediately from requirement text | Both |
 | T09 | Jira intake happy path | `.env` has Jira creds, valid issue URL | Run `/speckit-auto --issue <url>` | Invokes `jira-to-speckit`, gets compact brief + ticket snapshot path, continues pipeline same turn | Both |
 | T10 | Jira URL resolution from turn text | No explicit `--issue`, but URL appears in user message | Paste Jira URL in text | Treats as `--issue` mode and runs Jira intake | Both |
@@ -49,9 +49,9 @@ all three host agents (GitHub Copilot, Claude Code, OpenCode).
 
 ## Provider-specific checks
 
-- `github-speckit`: stage refs stay under `references/github-speckit/` and output mentions repo-installed agents.
-- `superpowers`: stage refs stay under `references/superpowers/` and output mentions `superpowers:*` skills.
-- Both: the chosen provider never changes mid-run.
+- `github-speckit`: pipeline stage refs live under `references/pipeline/` and the provider adapter under `references/providers/github-speckit.md`; output mentions repo-installed agents.
+- `superpowers`: pipeline stage refs live under `references/pipeline/` and the provider adapter under `references/providers/superpowers.md`; output mentions `superpowers:*` skills.
+- Both: the chosen provider never changes mid-run; stage files load only the selected provider's adapter.
 
 ## Minimum pass criteria
 
