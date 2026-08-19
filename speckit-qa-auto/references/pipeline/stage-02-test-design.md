@@ -14,8 +14,8 @@ Xray already covers, with every UI element resolved to real evidence before appr
 ## What This Stage Receives
 
 Per `run-state.md`, read only from `execution-report.md` and the artifact folder — never from
-`stage-01-intake.md`: `run.artifact_dir`, `profile.*`, `xray.query`, `xray.cucumber_tests`,
-`xray.manual_tests`, and, on disk inside `run.artifact_dir`, `ticket.md`,
+`stage-01-intake.md`: `run.jira_key`, `run.artifact_dir`, `profile.*`, `xray.query`,
+`xray.cucumber_tests`, `xray.manual_tests`, and, on disk inside `run.artifact_dir`, `ticket.md`,
 `existing-tests.feature`, and `existing-tests-manual.md`. `existing-tests.feature` is empty and
 `existing-tests-manual.md` absent when Xray was unavailable at Stage 01 — that absence is itself
 an input to step 2.2.
@@ -107,6 +107,13 @@ The failure mode this guards against is `--yolo` quietly becoming "skip every ga
 single approval it is documented to skip; a design nobody looked at, shipped straight into
 automation, is exactly what the selector and self-review gates exist to prevent.
 
+The same limit applies one level down, inside step 2.3: `--yolo` may not assign a `surface` on its
+own where the classification is genuinely ambiguous. An ambiguous scenario is the one case
+`--yolo` asks, because a wrong guess here defeats the selector gate two ways at once — guessing
+`api` or `manual` for what is really a `ui` scenario skips 2.4 entirely, and guessing `ui` for what
+is really `manual` or `api` blocks a scenario that never needed the gate. `--yolo` removes the
+2.8 approval prompt, not the human's say over a genuinely unclear classification.
+
 ## Dedup Is A Rule, Not A Judgement (design spec §5.1, D13)
 
 Two runs over the same story, with Xray unchanged, must produce an identical set of labels — so
@@ -172,5 +179,6 @@ enter Stage 03 in the same turn.
 | "The Manual test's summary clearly covers this, mark it SKIP" | Manual tests are advisory only. No automatic SKIP is possible against them — surface the overlap at 2.8 and let the human decide |
 | "Xray was unavailable, so there's nothing to dedup against — just leave the field blank" | Blank looks like it ran and found nothing. Record `dedup: not-run` with the reason, every time |
 | "It's `--yolo`, skip the selector gate too and save a round trip" | `--yolo` skips only the 2.8 approval. The selector gate and self-review still run in full |
+| "It's `--yolo`, this scenario's surface is unclear but I'll just pick one and move on" | An ambiguous `surface` is the one case `--yolo` still asks. Guessing wrong either skips the selector gate on a real UI scenario or blocks one that never needed it |
 | "One selector is still unresolved, but the rest of the map is done — good enough to pass 2.7" | Self-review checks every element of every `ui` scenario. One unresolved row fails the gate; resolve it or mark the scenario blocked |
 | "This failed self-review before, I'll just approve it at 2.8 and fix it in Stage 03" | Stage 03's fix loop cannot edit `.feature` files at all (`operating-rules.md`). A design defect that reaches 2.8 unfixed stays a defect through automation |
