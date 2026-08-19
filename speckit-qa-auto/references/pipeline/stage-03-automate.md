@@ -1,10 +1,12 @@
 # Stage 03: Automate
 
-Loads: [operating-rules.md](../shared/operating-rules.md),
-[gherkin-conventions.md](../shared/gherkin-conventions.md). Two leaves, so the reader knows the
-cost before paying it (design spec §11.2 rule 1). It links to no other file under
-`references/pipeline/` — Stage 02 is not linked back to, and its successor is named, never linked:
-**enter Stage 04** at the end of this stage, same turn.
+Loads: [run-state.md](../shared/run-state.md), [operating-rules.md](../shared/operating-rules.md),
+[gherkin-conventions.md](../shared/gherkin-conventions.md). Three leaves, so the reader knows the
+cost before paying it (design spec §11.2 rule 1). `run-state.md` is declared because this stage
+reads and updates `design.scenarios[]` by field name — `attempts` above all, which is what bounds
+the fix loop across turns. It links to no other file under `references/pipeline/` — Stage 02 is
+not linked back to, and its successor is named, never linked: **enter Stage 04** at the end of this
+stage, same turn.
 
 ◀ NO-STOP ZONE. Stage 03 opens once Stage 02's human gate (or its `--yolo` skip) has passed and
 the design artifacts are committed. From that point until every scenario in scope carries a
@@ -88,12 +90,22 @@ job alone (`commit.md`). A result with no sha attached is not a result (`run-sta
 ### 3.5 Coverage review loop
 
 Once every scenario in the current run scope carries a verdict, check three things across the whole
-batch: every acceptance criterion in `test-design.md`'s coverage matrix has at least one passing
-scenario; every row of the selector map was used by generated code; and repo conventions hold —
+batch: every acceptance criterion in `test-design.md`'s coverage matrix **whose covering scenarios
+are in automation scope** — `surface: ui` or `surface: api`, and not marked
+`blocked: needs-design-change` — has at least one passing scenario; every row of the selector map
+was used by generated code; and repo conventions hold —
 page objects go through the base page, selectors stay centralized, no test data is hardcoded in
 step definitions, and no `waitForTimeout` appears anywhere. A failure here is not a stop. It feeds
 the next fix-loop iteration for whichever scenario or file the failure traces to, under the same
 3-attempt budget 3.4 already spends.
+
+The scope qualifier on the first check is what keeps this loop from being unexitable. A criterion
+covered only by a `surface: manual` scenario has no passing scenario by construction — nothing ever
+automates it — and the same is true of a criterion covered only by a scenario the fix loop marked
+`blocked: needs-design-change`. Counting either as a coverage failure would feed a fix loop that
+cannot succeed, forever, against a check whose failure is explicitly not a stop. Such a criterion is
+**reported** in Stage 04's coverage-matrix status as covered by a manual or a blocked scenario,
+not retried here.
 
 ## Run Scope
 
@@ -120,6 +132,7 @@ is Stage 04's job, not this stage's.
 
 Written into run state:
 
+- `run.stage: 03`, written on entering this stage, so a run interrupted inside it resumes here
 - `design.scenarios[].status` — `green` or `blocked`; never left `pending` for a scenario the run
   scope included
 - `design.scenarios[].attempts` — the number of fix-loop edit-and-rerun cycles spent
@@ -131,6 +144,9 @@ And, on disk: the materialized `.feature` subset at `feature_path`, and the gene
 
 ## Enter Stage 04
 
-Once every scenario in scope carries a verdict — `green` or `blocked` — and the coverage review
-loop in 3.5 has passed, enter Stage 04 in the same turn. There is no human gate in this stage, and
-nothing here waits for one.
+Once every scenario in scope carries a verdict — `green` or `blocked` — enter Stage 04 in the same
+turn. That verdict on every scenario is the entire exit condition. 3.5 is a review loop that feeds
+3.4, not a gate on this exit: a coverage-review failure is explicitly not a stop, so making the exit
+conditional on 3.5 passing would invent a fourth way for the stage to end — hanging — for exactly
+the runs that carry a manual or blocked scenario. There is no human gate in this stage, and nothing
+here waits for one.

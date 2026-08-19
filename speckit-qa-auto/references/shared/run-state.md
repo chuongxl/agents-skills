@@ -35,6 +35,7 @@ baselines:
   workspace_baseline:  {path, head_sha, worktree_diff_sha256, index_diff_sha256, untracked}
   frontend_baseline:   {path, head_sha, worktree_diff_sha256, index_diff_sha256, untracked}
   frontend_edits_approved: false
+  untracked_fingerprint: full | degraded   # degraded: untracked cap hit, paths and sizes only
 
 xray:
   query:               testRequirement | linkedIssues | not-run

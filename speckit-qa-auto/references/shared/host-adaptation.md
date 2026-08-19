@@ -32,7 +32,7 @@ mid-run risks a stage seeing a different host than the one that started it.
 | write | `create` | `Write` | `create` |
 | edit | `edit` | `Edit` | `edit` |
 | glob | `glob` | `Glob` | `glob` |
-| grep | `grep` | `grep` | `grep` |
+| grep | `grep` | `Grep` | `grep` |
 | skill | `skill` | `Skill` | `skill` |
 
 ## The One Rule

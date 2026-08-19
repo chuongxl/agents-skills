@@ -134,7 +134,8 @@ skill speckit-qa-auto --yolo --issue https://jira.example.com/browse/MOM-1234
 # Run the full suite instead of the default affected-domain scope
 skill speckit-qa-auto --issue MOM-1234 --full-suite
 
-# Print PR title/body and leave opening the PR to a flag-driven step
+# Also open the pull request after pushing, from the printed title and body
+# (without --pr the run prints that text and leaves opening the PR to a human)
 skill speckit-qa-auto --issue MOM-1234 --pr
 ```
 

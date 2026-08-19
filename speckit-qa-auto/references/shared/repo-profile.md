@@ -51,7 +51,9 @@ Xray API call — and **lowercase in every path**: the artifact directory, the b
 resume glob. Paths and globs are case-sensitive on Linux CI even where a developer's macOS
 checkout forgives them, so a run that creates `docs/qa/mom-1234-…` and later resumes by globbing
 `MOM-1234-*` finds nothing and silently starts a second artifact folder. A story `MOM-1234`
-therefore resolves `artifact_root` to `docs/qa/mom-1234-<slug>`, never `docs/qa/MOM-1234-<slug>`.
+therefore resolves its `artifact_dir` to `docs/qa/mom-1234-<slug>`, never `docs/qa/MOM-1234-<slug>`.
+`artifact_root` itself stays `docs/qa` — the shared root every ticket folder hangs under, and the
+one place the `.repo-profile.json` cache below lives.
 
 ## What Is Cached, And What Is Not
 

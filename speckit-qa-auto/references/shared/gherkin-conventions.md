@@ -12,10 +12,12 @@ One `.feature` file serves three consumers, and nothing is authored twice:
 | `playwright-bdd` | The spec that `bddgen` compiles into Playwright tests |
 | Xray (via CI on merge) | A Cucumber Test issue, created or updated in place |
 
-There is no translation step between formats. The file authored at `feature_path` (see
-`repo-profile.md`'s field table) under `docs/qa/<jira-key>-<slug>/` is the source of truth; the
-copy materialized into the test tree in Stage 03 is a derived subset of it, never a second
-authoring.
+There is no translation step between formats. The file authored in the artifact folder —
+`<run.artifact_dir>/<domain>-<aspect>.feature`, under `docs/qa/<jira-key>-<slug>/` — is the source
+of truth; the copy materialized into the test tree at `feature_path` (see `repo-profile.md`'s field
+table) in Stage 03 is a derived subset of it, never a second authoring. `feature_path` names the
+derived copy and nothing else: flow runs one direction only, artifact → test tree, and authoring
+straight into the test tree would leave the artifact — the one thing CI imports from — behind.
 
 ## Tags
 

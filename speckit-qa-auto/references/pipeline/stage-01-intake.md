@@ -1,9 +1,13 @@
 # Stage 01: Intake
 
-Loads: [repo-profile.md](../shared/repo-profile.md), [workspace-guard.md](../shared/workspace-guard.md),
-[operating-rules.md](../shared/operating-rules.md). Three leaves, so the reader knows the cost
-before paying it (design spec §11.2 rule 1). It links to no other file under `references/pipeline/`
-— its successor is named, never linked: **enter Stage 02** at the end of this stage, same turn.
+Loads: [run-state.md](../shared/run-state.md), [repo-profile.md](../shared/repo-profile.md),
+[workspace-guard.md](../shared/workspace-guard.md),
+[operating-rules.md](../shared/operating-rules.md). Four leaves, so the reader knows the cost
+before paying it (design spec §11.2 rule 1). `run-state.md` is declared because this stage writes
+the run-state yaml every later stage reads: written from memory instead of from the contract, the
+field names drift, and a drifted field is one no reader finds. It links to no other file under
+`references/pipeline/` — its successor is named, never linked: **enter Stage 02** at the end of
+this stage, same turn.
 
 No human gate. Takes a Jira issue key or browse URL and leaves behind an isolated worktree, two
 integrity baselines, a discovered repo profile, and the artifact folder Stage 02 designs from.
@@ -33,7 +37,8 @@ until the reasons are stated:
 
 ```
 repo profile (read-only) → source baseline → worktree + branch gate → frontend init + FE baseline
-→ Jira intake → Xray existing tests → artifact folder → resume check → Stage 02
+→ Jira intake (fetch → slug → artifact folder → `ticket.md`) → Xray existing tests
+→ artifact folder init (`execution-report.md`) + resume check → Stage 02
 ```
 
 ### 1. Repo profile
@@ -85,9 +90,23 @@ deferred to later in the run.
 
 ### 6. Jira intake
 
-Invoke `jira-to-speckit` by name through the `skill` tool, default mode, with
-`ticket_output_path = <artifact_dir>/ticket.md`. This resolves the Jira title that step 3's branch
-rename and the artifact folder name both need.
+Invoke `jira-to-speckit` by name through the `skill` tool, default mode. This is the call that
+resolves the Jira title — which both step 3's branch rename and the artifact folder name need.
+
+`ticket_output_path` therefore cannot simply be handed `<artifact_dir>/ticket.md` and left at that:
+`artifact_dir` is `<artifact_root>/<jira-key>-<slug>` and the slug comes from that same title, the
+identical ordering problem step 3 hits with the branch name. Resolve it the way step 3 does, in
+order rather than in one move:
+
+1. Invoke the skill and read the issue.
+2. Derive the slug from the returned title; record `run.slug` and `run.artifact_dir`.
+3. Create the artifact folder at `run.artifact_dir`.
+4. Put `ticket.md` inside it — passing the resolved `ticket_output_path = <artifact_dir>/ticket.md`
+   where the skill can be given the path up front, or moving a provisionally written file into the
+   folder where it cannot, exactly as step 3 renames a provisional branch with `git branch -m`.
+
+Only after move 3 is `<artifact_dir>/…` a path anything may be written to — step 7's Xray outputs
+included.
 
 ### 7. Xray existing tests
 
@@ -103,7 +122,13 @@ this stage only records that the fetch did not happen.
 
 An existing `<jira-key>-*` artifact folder — matched with the jira-key **lowercase**, per the case
 rule below — is reused, never duplicated under a new slug. `execution-report.md` inside that
-folder names the stage to resume from.
+folder names the stage to resume from, in `run.stage` / `run.resume_from`.
+
+A folder step 6 just created has no `execution-report.md` yet. Write it here, with the run-state
+yaml block `run-state.md` specifies, carrying every field listed under "What This Stage Produces"
+below. Every later stage reads its state from that file and the artifact folder and never from this
+stage's prose (`run-state.md` rule 2), so a missing `execution-report.md` leaves Stage 02 with
+nothing at all to read.
 
 ## Case Rule
 
@@ -120,10 +145,20 @@ Written into run state (`run-state.md` is the authority on shape; nothing here t
 stages that is not a field in that contract):
 
 - `run.jira_key`, `run.slug`, `run.artifact_dir`, `run.branch`, `run.worktree_path`
+- `run.mode` — `default | yolo` — and `run.full_suite` — `true | false`. Both are parsed at entry
+  dispatch and neither reaches Stage 03 or Stage 04 unless this stage records them; an unrecorded
+  `run.full_suite` is a `--full-suite` flag Stage 03 has no way to see and therefore ignores.
+- `run.stage` — written on entering this stage, and by every stage on entering itself, so step 8's
+  resume has a value to read. Only Stage 04 writes the terminal `completed`; a run state that never
+  holds a non-terminal stage cannot be resumed from one.
+- `profile.*` — every field step 1 resolved, recorded here rather than left in this stage's working
+  memory. Stage 02 reads it and Stage 03 reads every field of it, and neither may read this file
+  (`run-state.md` rule 2), so an unrecorded profile field is a field that does not exist downstream.
 - `baselines.workspace_baseline`, `baselines.frontend_baseline`
 - `xray.query`, `xray.cucumber_tests`, `xray.manual_tests`
 
-And, on disk, the artifact folder with `ticket.md`, `existing-tests.feature`, and
+And, on disk, the artifact folder holding `execution-report.md` — **created by this stage**, per
+step 8, carrying the run-state yaml block above — plus `ticket.md`, `existing-tests.feature`, and
 `existing-tests-manual.md`.
 
 ## Enter Stage 02

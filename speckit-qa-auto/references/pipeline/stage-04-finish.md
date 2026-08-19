@@ -1,10 +1,14 @@
 # Stage 04: Finish
 
-Loads: [workspace-guard.md](../shared/workspace-guard.md), [commit.md](../shared/commit.md). Two
-leaves, so the reader knows the cost before paying it (design spec §11.2 rule 1). It links to no
-other file under `references/pipeline/` — its predecessor is not linked back to, and it has no
-successor: this is the last stage the skill runs. After the steps below, the pipeline ends; only a
-human opening the PR (or re-running with `--pr`) follows.
+Loads: [run-state.md](../shared/run-state.md), [operating-rules.md](../shared/operating-rules.md),
+[workspace-guard.md](../shared/workspace-guard.md), [commit.md](../shared/commit.md). Four leaves,
+so the reader knows the cost before paying it (design spec §11.2 rule 1) — every leaf cited below
+by rule or turn-ending-condition number is declared here, since a cited file that goes undeclared
+is read from memory instead of from the file. It links to no other file under
+`references/pipeline/` — its predecessor is not linked back to, and it has no successor: this is
+the last stage the skill runs. After the steps below the pipeline ends — with the pull request
+opened at 4.6 when `--pr` was passed, and otherwise left for a human to open from the text 4.6
+printed.
 
 This is the pipeline's second and final human gate (design spec §7, marked ◀ HUMAN GATE). Stage 03
 left every scenario in run scope with a verdict — `green` or `blocked` — and this stage turns that
@@ -76,10 +80,11 @@ found.
 
 ### 4.4 Tag blocked scenarios
 
-On approval at 4.2, write `@not-automated` into the **artifact** version of each scenario
-`design.scenarios[].status: blocked` — the `.feature` file(s) in `run.artifact_dir`, never the
-materialized copy at `feature_path`, since a blocked scenario was never materialized into it
-(Stage 03, 3.0 and the Two Degenerate Cases in `gherkin-conventions.md`).
+On approval at 4.2 — or, under `--yolo`, directly, there being no 4.2 approval to wait for — write
+`@not-automated` into the **artifact** version of every scenario at `status: blocked`: the
+`.feature` file(s) in `run.artifact_dir`, never the materialized copy at `feature_path`, since a
+blocked scenario was never materialized into it (Stage 03, 3.0 and the Two Degenerate Cases in
+`gherkin-conventions.md`).
 
 This happens here, at the human gate, and not inside Stage 03's fix loop, because it is a different
 kind of edit. Stage 03 may not edit any `.feature` file, in the artifact or the copy, without
@@ -88,6 +93,17 @@ is stuck. Writing `@not-automated` is still an edit to that same file. Deferring
 in the pipeline where a human has just reviewed and approved the blocked list is what makes it
 permissible: this is a human-gated edit, not a fix-loop edit, and the tag it produces keeps the
 automation status visible both in the file itself and in Xray once CI imports it.
+
+**Under `--yolo` the tag is written without an approval, and that is the rule, not an oversight.**
+`--yolo` skips 4.2, so there is no approval left to condition the edit on, and both alternatives are
+worse. Writing nothing would ship blocked scenarios untagged — losing exactly the automation-status
+visibility this tag exists to keep, in the file and in Xray once CI imports it, on the runs that got
+the least human attention. And no judgement is being delegated: `@not-automated` records a fact
+Stage 03 already determined — this scenario was not automated — not a decision about what the
+scenario should say, which is the kind of edit the forbidden set actually protects. What 4.2's
+approval adds in default mode is the human's chance to object first; passing `--yolo` is that human
+delegating the objection in advance, by definition. Read the paragraph above as naming why the edit
+is not a fix-loop edit, not as requiring an approval `--yolo` has already given.
 
 `surface: manual` scenarios need no tag here — they were never candidates for automation and carry
 their one-line reason in the artifact already (`gherkin-conventions.md`'s Surface table).
@@ -107,9 +123,17 @@ Report the resulting commit(s) — hash and subject — and the branch pushed, p
 ### 4.6 Print the PR text, then mark the artifact completed
 
 Print a ready-to-use PR title and body: the story key and slug, the coverage summary, the blocked
-and manual scenarios called out by name, and a link back to `run.artifact_dir`. **Do not open the
-PR** — that only happens when `--pr` was passed to the invocation, and even then it is the one step
-in this stage this file does not itself perform; it is the flag's effect, not a default.
+and manual scenarios called out by name, and a link back to `run.artifact_dir`.
+
+**When `--pr` was passed, open the pull request here**, after 4.5's push, from exactly the title and
+body just printed — through whatever PR mechanism the host has: the `gh` CLI where it is installed
+and authenticated (`gh pr create --base <base branch> --head <run.branch> --title … --body …`),
+otherwise the host's own equivalent. Report the resulting PR URL alongside 4.5's commit and branch.
+If no mechanism is available, say so in the report and leave the printed text as the handoff — a
+stated limitation, not a silent skip.
+
+**When `--pr` was not passed, the stage prints the text and stops there.** The flag is what decides;
+opening a PR nobody asked for is not a default.
 
 Then set `run.stage: completed` in `execution-report.md` and make the follow-up commit for that
 status change, pushed the same way 4.5 pushed — `commit.md`'s procedure governs every commit this
@@ -121,12 +145,12 @@ and reports exactly as it would have at 4.5.
 
 Written into run state:
 
-- `run.stage: completed`
+- `run.stage` — `04` on entering this stage, then `completed` at 4.6, the one terminal value
 - `design.scenarios[]` unchanged in shape — 4.1 reads these fields, it does not add new ones
 
 And, on disk: the updated `execution-report.md`, `@not-automated` tags written into the blocked
-scenarios' artifact `.feature` file(s), the pushed branch, and the printed PR title and body (not a
-PR — that is `--pr`'s effect, or a human's later action).
+scenarios' artifact `.feature` file(s), the pushed branch, the printed PR title and body, and — when
+`--pr` was passed — the pull request 4.6 opened from that text.
 
 ## Never Writes To Xray
 
@@ -153,9 +177,9 @@ curl -H "Authorization: Bearer $token" -F "file=@features.zip" \
   "https://xray.cloud.getxray.app/api/v2/import/feature?projectKey=$XRAY_PROJECT_KEY"
 ```
 
-Scenarios tagged `@TEST_<key>` update in place; untagged scenarios create new Test issues. Writing
-the resulting keys back into the `.feature` files closes the loop and is a v2 concern (design spec
-§10, §13) — nothing this stage does.
+Scenarios tagged `@TEST_<TEST-KEY>` update in place; untagged scenarios create new Test issues.
+Writing the resulting keys back into the `.feature` files closes the loop and is a v2 concern
+(design spec §10, §13) — nothing this stage does.
 
 ## Red Flags — thoughts that mean a gate or the push discipline is being bent
 

@@ -1,10 +1,13 @@
 # Stage 02: Test Design
 
-Loads: [selector-verification.md](../shared/selector-verification.md),
-[gherkin-conventions.md](../shared/gherkin-conventions.md). Two leaves, so the reader knows the
-cost before paying it (design spec §11.2 rule 1). It links to no other file under
-`references/pipeline/` — its predecessor is not linked back to, and its successor is named, never
-linked: **enter Stage 03** at the end of this stage, same turn.
+Loads: [run-state.md](../shared/run-state.md), [operating-rules.md](../shared/operating-rules.md),
+[selector-verification.md](../shared/selector-verification.md),
+[gherkin-conventions.md](../shared/gherkin-conventions.md). Four leaves, so the reader knows the
+cost before paying it (design spec §11.2 rule 1). Every leaf this file cites by rule or condition
+number is declared here: the `Loads:` line is the disclosure §11.2 rule 1 rests on, and a cited
+file that goes undeclared is read from memory instead of from the file. It links to no other file
+under `references/pipeline/` — its predecessor is not linked back to, and its successor is named,
+never linked: **enter Stage 03** at the end of this stage, same turn.
 
 This is the pipeline's main human gate (design spec §5, marked ◀ HUMAN GATE). Everything Stage 03
 automates and Stage 04 reports on treats this stage's output as settled. It turns the acceptance
@@ -65,7 +68,7 @@ This gate does not skip under `--yolo` — see "`--yolo` Skips The Approval, Not
 Into `<artifact_dir>/<domain>-<aspect>.feature` — the artifact folder Stage 01 left behind, never
 the repo's test tree. Materializing into the test tree is Stage 03's job, and only for scenarios
 that survive design here. Tag per `gherkin-conventions.md`: `@REQ_<STORY-KEY>` at Feature level,
-`@TEST_<TEST-key>` at Scenario level only on `UPDATE` rows, plus the profile's `existing_tags`
+`@TEST_<TEST-KEY>` at Scenario level only on `UPDATE` rows, plus the profile's `existing_tags`
 carried through unchanged.
 
 ### 2.6 Write `test-design.md`
@@ -127,7 +130,7 @@ values do not split otherwise-identical scenarios.
 | Condition | Label |
 |---|---|
 | Key matches an exported Cucumber scenario, step sequence identical | `SKIP (covered by <TEST-key>)` |
-| Key matches, step sequence differs | `UPDATE <TEST-key>` — carries `@TEST_<TEST-key>`, import updates in place |
+| Key matches, step sequence differs | `UPDATE <TEST-key>` — carries `@TEST_<TEST-KEY>`, import updates in place |
 | No key match anywhere | `NEW` |
 | An existing test's key matches nothing in the new design | `REVIEW <TEST-key>` — reported at the human gate, never deleted or modified by the pipeline |
 
@@ -158,6 +161,7 @@ report full coverage.
 
 Written into run state:
 
+- `run.stage: 02`, written on entering this stage, so a run interrupted inside it resumes here
 - `design.selector_evidence` — `source | live-dom | fallback`, from step 2.4
 - `design.scenarios[]` — one entry per scenario, each carrying `name`, `surface`, `dedup`, and
   `status: pending` (Stage 03 is what moves a scenario off `pending`)
@@ -180,5 +184,5 @@ enter Stage 03 in the same turn.
 | "Xray was unavailable, so there's nothing to dedup against — just leave the field blank" | Blank looks like it ran and found nothing. Record `dedup: not-run` with the reason, every time |
 | "It's `--yolo`, skip the selector gate too and save a round trip" | `--yolo` skips only the 2.8 approval. The selector gate and self-review still run in full |
 | "It's `--yolo`, this scenario's surface is unclear but I'll just pick one and move on" | An ambiguous `surface` is the one case `--yolo` still asks. Guessing wrong either skips the selector gate on a real UI scenario or blocks one that never needed it |
-| "One selector is still unresolved, but the rest of the map is done — good enough to pass 2.7" | Self-review checks every element of every `ui` scenario. One unresolved row fails the gate; resolve it or mark the scenario blocked |
+| "One selector is still unresolved, but the rest of the map is done — good enough to pass 2.7" | Self-review checks every element of every `ui` scenario. One unresolved row fails the gate, and it has exactly three exits: resolve the element, record a semantic fallback with the user's acknowledgement (`selector-verification.md`), or stop the run (Turn-Ending Condition 7). Marking the scenario blocked is not one of them — this stage leaves every scenario `pending`, and `blocked` is a Stage 03 verdict |
 | "This failed self-review before, I'll just approve it at 2.8 and fix it in Stage 03" | Stage 03's fix loop cannot edit `.feature` files at all (`operating-rules.md`). A design defect that reaches 2.8 unfixed stays a defect through automation |

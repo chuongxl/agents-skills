@@ -77,8 +77,9 @@ git -C "$P" ls-files --others --exclude-standard
 ## Untracked Cap
 
 If the untracked set exceeds 2000 files or 50 MB, fingerprint paths and sizes only, and record
-`untracked_fingerprint: degraded` in `execution-report.md` — a stated limitation beats an unbounded
-hashing pass.
+`baselines.untracked_fingerprint: degraded` in `execution-report.md`'s run-state block — a stated
+limitation beats an unbounded hashing pass, and a limitation recorded in the run-state contract is
+one Stage 04 can still read when it re-verifies.
 
 ## On Violation
 
