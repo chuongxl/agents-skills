@@ -28,14 +28,20 @@ Must complete before any other action in this stage or any provider call. Real g
    reuse if the branch's worktree exists; `git worktree add` (creating the branch from the synced
    base) if not. Reruns: if an artifact folder from a prior run exists, resolve it first (see
    Intake → Artifact Identity) and use that final name directly.
+   **Mandatory — mirror run config into the worktree.** A fresh worktree never contains uncommitted
+   or untracked files from the source checkout, so `<repo-root>/.speckit/integration.json` must be
+   copied explicitly right after the worktree exists (reuse or new):
+   `mkdir -p <worktree>/.speckit && cp <repo-root>/.speckit/integration.json <worktree>/.speckit/integration.json`.
+   Run this on every entry to this stage (not only on first creation). If the source file is
+   absent, skip the copy — provider resolution already ran from the source checkout and the value
+   is in run state.
 5. Before intake the final branch name may be unknown — use a provisional branch (`<issue_id>`
    in `--issue` mode, a requirement slug in manual mode; no timestamps). **Rename step:** as soon
    as intake resolves the final `<issue_id>-<short_title>` / `<NNN>-<slug>` and the current name
    differs, run `git branch -m <final-name>` and, when safe, `git worktree move` to the canonical
    path. Local-only, safe before any push.
 6. Confirm the branch is checked out in the worktree; set `branch_created: true`, `branch_name`,
-   `worktree_path` in run state. Every subsequent step executes **from this worktree**. Mirror
-   `.speckit/integration.json` from the source checkout into the worktree if present.
+   `worktree_path` in run state. Every subsequent step executes **from this worktree**.
 
 **Submodules (condensed):** only for repos that use them, lazily when a submodule path is about to
 be modified: sync its base (same priority/best-effort rules), branch inside it off the synced
