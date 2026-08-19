@@ -28,10 +28,6 @@ mandatory, never skipped) and **YOLO** (no human interactions).
 Ask for the commit message, then run the commit + push procedure in
 [../shared/commit.md](../shared/commit.md) with that message.
 
-**Optional PR (superpowers only, default mode):** `finishing-a-development-branch` may be invoked
-**only after** the commit/push above and **only** to open a PR — never for branch lifecycle,
-merge, or worktree cleanup, and never in YOLO mode.
-
 ## YOLO Path
 
 Skip every human review/approval interaction. Auto-generate the commit message
@@ -46,6 +42,16 @@ After the implementation commit succeeded:
    or add `Status: completed`.
 2. Commit the status update: `git add <spec-path>` and
    `git commit -m "chore(spec): mark <artifact_id> completed"`.
+
+## Final Step — `finishing-a-development-branch` (superpowers only)
+
+**Runs only after ALL of the above have succeeded** (human approval or YOLO auto-approve,
+implementation commit/push, spec completion commit). Never called in Stage 03, never called
+before approval, never called to commit or push code.
+
+Invoke `skill finishing-a-development-branch` with no prompt. It handles any final branch
+lifecycle actions (e.g. opening a PR in default mode). If the skill is not available or fails,
+log the error and continue — this step is non-blocking and does not affect pipeline success.
 
 ## Failure Handling
 

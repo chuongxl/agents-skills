@@ -21,7 +21,7 @@ through the `skill` tool on all three hosts.
 | Stage 03 native advisory review (first PHASE-2 entry only) | `requesting-code-review` |
 | Review feedback evaluation discipline | `receiving-code-review` |
 | Completion evidence gate | `verification-before-completion` |
-| Stage 04 optional PR (default mode, after pipeline commits) | `finishing-a-development-branch` |
+| Stage 04 final step (after approval + all commits; superpowers only) | `finishing-a-development-branch` |
 | Parallel independent work | `dispatching-parallel-agents` |
 
 Skill-name resolution precedence, per step: exact name in this session's available-skills list →

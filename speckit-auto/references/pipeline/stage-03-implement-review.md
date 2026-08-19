@@ -65,9 +65,10 @@ questions, no "do you approve?" prompts, no pauses, no report-and-stop on failed
   never ask the user what to do.
 - Superpowers gate skills are subordinated: `verification-before-completion` is a check to run,
   not a place to stop; `requesting-code-review` verdicts never exit the stage;
-  `receiving-code-review` never authorizes ending the turn; the implementation skill reporting
-  "all tasks complete" or its terminal "finish the branch" handoff are data, not exits (no PR,
-  merge, branch/worktree deletion inside this stage).
+  `receiving-code-review` never authorizes ending the turn; `finishing-a-development-branch` is
+  **never called in Stage 03** — it belongs only to Stage 04 after final approval. The
+  implementation skill reporting "all tasks complete" or its terminal "finish the branch" handoff
+  are data, not exits (no PR, merge, branch/worktree deletion inside this stage).
 
 ## Review Range (superpowers)
 
@@ -149,7 +150,8 @@ PHASE 2 — Code review loop
 
 `status = pass` from `speckit-code-review` is the **only** normal exit from Stage 03. When it
 fires, immediately load and execute [stage-04-finish.md](stage-04-finish.md) **in the same turn**
-— no summary, no turn end, no user question before Stage 04 begins:
+— no summary, no turn end, no user question before Stage 04 begins. **Never invoke
+`finishing-a-development-branch` here — it fires only in Stage 04 after final approval.**
 
 - **Default mode:** Stage 04 human review + commit (mandatory, never skipped).
 - **`--yolo` mode:** Stage 04 YOLO auto-commit path.

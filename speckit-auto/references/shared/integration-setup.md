@@ -40,7 +40,7 @@ TURN (the one legitimate no-pipeline turn end in the whole skill). Never enter t
          [../providers/github-speckit.md](../providers/github-speckit.md) or
          [../providers/superpowers.md](../providers/superpowers.md)):
          - **github-speckit:** install CLI → `specify version` sanity →
-           `specify init . --integration <host-key> --integration-options="--skills"` →
+           `specify init . --integration <host-key> --integration-options="--skills" --force` →
            verify all nine skill files exist.
          - **superpowers:** run the host's plugin/clone+copy command → verify on-disk skills.
       5. If any install step fails → stop, report the exact error, and tell the user to fix it
