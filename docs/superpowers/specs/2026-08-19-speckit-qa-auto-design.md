@@ -771,7 +771,7 @@ speckit-qa-auto/
         ├── gherkin-conventions.md              tags, scenario granularity, Xray binding
         ├── workspace-guard.md                  both baselines: capture and verification
         ├── host-adaptation.md                  host detection and tool-name mapping
-        └── commit.md                           conditional commit, pull-rebase, push
+        └── commit.md                           conditional commit, fast-forward-only push
 ```
 
 Per `SKILL_SPEC.md`, no link may point outside the skill folder: the skill is installed by copying
