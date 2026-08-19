@@ -458,6 +458,13 @@ only reads, so it is safe to run against the source checkout before any worktree
 8. **Resume.** An existing `<jira-key>-*` artifact folder is reused, never duplicated with a new
    slug. `execution-report.md` names the stage to resume from.
 
+**Case, stated once so it is never guessed.** The Jira key is uppercase everywhere it names the
+issue — `run.jira_key`, the `@REQ_` / `@TEST_` tags, and every Jira or Xray API call. It is
+**lowercase in every path**: the artifact directory, the branch name, and the resume glob. Paths
+and globs are case-sensitive on Linux CI even where a developer's macOS checkout forgives them, so
+a run that creates `docs/qa/mom-1234-…` and later resumes by globbing `MOM-1234-*` finds nothing
+and silently starts a second artifact folder.
+
 ## 5. Stage 02 — Test Design ◀ HUMAN GATE
 
 | Step | Action |
