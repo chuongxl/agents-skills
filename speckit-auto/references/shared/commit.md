@@ -57,5 +57,6 @@ commit on an already-clean tree is not.
 
 ## Scratch Must Already Be Ignored
 
-`git add -A` would otherwise sweep run scratch into the feature commit. The relocated
-`ticket.md` inside the artifact folder is **not** scratch and is committed with the artifacts.
+`git add -A` would otherwise sweep run scratch into the feature commit. Stage 01 guarantees
+`.superpowers/` in superpowers mode may be git-ignored if needed. The relocated `ticket.md`
+inside the artifact folder is **not** scratch and is committed with the artifacts.

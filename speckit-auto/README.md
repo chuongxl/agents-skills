@@ -93,7 +93,7 @@ repo map.
 ## Notes
 
 - Jira credentials live only in the gitignored root `.env`; never printed, never committed.
-- The relocated Jira ticket snapshot (`<artifact_folder>/ticket.md`) is committed with the
-  artifacts.
+- Run state (`.superpowers/`) is git-ignored; the relocated Jira ticket snapshot
+  (`<artifact_folder>/ticket.md`) is committed with the artifacts.
 - The Jira execution report (`<artifact_folder>/execution-report.md`, `--issue` runs only)
   tracks stage progress and blockers — no token or cost estimates.

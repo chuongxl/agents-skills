@@ -96,8 +96,8 @@ fallback `repo_map`.
 
 ## 4. Scratch Hygiene
 
-Stage 04 commits with `git add -A`, so before Stage 03 keep the relocated `ticket.md` out of
-scratch handling. The relocated `ticket.md` is **not** scratch — never gitignore it.
+Stage 04 commits with `git add -A`, so before Stage 03 ensure `.superpowers/` (superpowers only)
+is git-ignored if needed. The relocated `ticket.md` is **not** scratch — never gitignore it.
 
 ## 5. Intake
 
