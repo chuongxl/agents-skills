@@ -46,6 +46,22 @@ bounded capability, invoke the implementation step once per package until the qu
 parallel only for independent packages (superpowers: `dispatching-parallel-agents`). Per-package
 outputs merge into the single plan/tasks artifact. Pass only minimum slices per invocation.
 
+## Workspace Pre-Flight (hard gate — runs before PHASE 1)
+
+Implementation fails silently or blocks when task workspaces are absent from the worktree, so
+verify them first:
+
+1. Collect every distinct `workspace` path from the tasks artifact.
+2. For each one missing or empty inside the worktree:
+   - **Listed in `.gitmodules`** → initialize it now:
+     `git -C <worktree> submodule update --init <path>`, then branch inside it off a synced base
+     per the Stage 01 submodule rules. Init failure → retry once; still failing → stop and report
+     the exact git error.
+   - **NOT in `.gitmodules`** → stop with an actionable error naming the missing directories and
+     stating they must be present in the repo (added as submodules or committed) before Stage 03
+     can run — never guess remotes, never switch to the main checkout.
+3. Only then enter PHASE 1.
+
 ## Submodules (condensed)
 
 Modified submodules: branch inside each one off a synced base (Stage 01 rules), commit submodule

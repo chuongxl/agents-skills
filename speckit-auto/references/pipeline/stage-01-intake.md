@@ -43,10 +43,14 @@ Must complete before any other action in this stage or any provider call. Real g
 6. Confirm the branch is checked out in the worktree; set `branch_created: true`, `branch_name`,
    `worktree_path` in run state. Every subsequent step executes **from this worktree**.
 
-**Submodules (condensed):** only for repos that use them, lazily when a submodule path is about to
-be modified: sync its base (same priority/best-effort rules), branch inside it off the synced
-base, and commit submodule changes before the parent pointer update. If none exist or none are
-modified, behavior is unchanged.
+**Submodules (condensed):** only for repos that use them. A fresh worktree never has submodules
+initialized — their directories exist but are empty, which breaks every later stage. Right after
+the worktree exists (step 4), if `.gitmodules` is present, run
+`git -C <worktree> submodule update --init --recursive` (best-effort: failure → log a warning and
+defer to the Stage 03 workspace pre-flight, never a stop). Then, lazily when a submodule path is
+about to be modified: sync its base (same priority/best-effort rules), branch inside it off the
+synced base, and commit submodule changes before the parent pointer update. If none exist or none
+are modified, behavior is unchanged.
 
 ## 2. Mandatory Provider Gate
 
