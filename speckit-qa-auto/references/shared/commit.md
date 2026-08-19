@@ -4,9 +4,14 @@ Needs at load time: nothing. This file is a leaf — it links to no other file, 
 
 ## Overview
 
-Stage 04 is the only place this pipeline commits and pushes. It runs after both baselines have
-been re-verified clean, so this procedure assumes that check already passed — a baseline
-violation stops the run before any of the steps below.
+Stage 04 is the only place this pipeline **pushes**, and the only place it makes a commit whose
+message is human-approved. Stage 03 makes local, unpushed commits as scenarios resolve, so that
+every recorded result names a real, committed tree rather than an uncommitted working state — see
+`run-state.md` rule 4: `status: green` is only ever written next to the commit sha the run was
+produced on. This procedure governs both: the incremental commits a stage makes as it goes, and
+Stage 04's own commit-then-push. Stage 04 runs after both baselines have been re-verified clean, so
+the push half of this procedure assumes that check already passed — a baseline violation stops the
+run before any commit step.
 
 ## Conditional Commit
 
