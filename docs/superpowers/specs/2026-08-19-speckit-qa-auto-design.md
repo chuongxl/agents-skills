@@ -53,6 +53,10 @@ Recorded here because several were user overrides of the first proposal.
 | D16 | The **push is fast-forward only**; a diverged remote stops the run instead of rebasing | Review round 2. A rebase after verification reports a green result for a tree that was never run. See §7 step 4 |
 | D17 | Every scenario carries a **surface** — `ui`, `api`, or `manual` — and the selector gate binds only to `ui` | Review round 2. A manual-only or API scenario has no elements to resolve; the gate would block a valid design. See Constraint 3 |
 | D18 | The profile cache holds **only human answers**, with source provenance hashes for everything derived | Review round 2. A cache that is committed and read first becomes config; a stale playbook would apply silently. See §2 |
+| D19 | Selector resolution is a **user choice among evidence sources**, not a single hard-coded path | Review round 3. Frontend source is one way to get evidence; a live DOM is another. The gate binds to *evidence*, not to grep. See Constraint 3 |
+| D20 | Live DOM inspection runs in a **subagent** | Review round 3. A DOM dump is large and single-use; only the selector map needs to reach the main context |
+| D21 | Process flow is expressed in **graphviz at decision points and loops only** | Review round 3. Linear steps are numbered lists. A diagram of a straight line teaches nothing and costs tokens. See §11.1 |
+| D22 | Reference files are **loosely coupled**: stages hand off through run state on disk, never by requiring each other's prose | Review round 3. A file that only makes sense after reading two others cannot be revised, tested, or loaded on its own. See §11.2 |
 
 ## Constraint 1: The Gherkin File Is The Only Test Artifact
 
@@ -99,10 +103,75 @@ scenario touches, grep the frontend source for `data-testid`, and produce a sele
 every element resolves to one of three states — existing testid, proposed testid (with the exact
 file and line to add it), or semantic fallback (role/label/text).
 
-This design promotes it from a sub-flow to a **hard gate on Stage 02**. It cannot be skipped, not
-even in `--yolo`. When the frontend source is unavailable the run stops; it never guesses a
-selector. Guessed selectors are the dominant cause of red tests, and every red test costs a fix
-iteration.
+This design promotes it from a sub-flow to a **hard gate on Stage 02**. The gate binds to
+**evidence**, not to one technique (D19): every element of every UI scenario must resolve against
+something real before Gherkin is approved. Guessed selectors are the dominant cause of red tests,
+and every red test costs a fix iteration.
+
+There are three evidence sources, and which one applies is a **user choice presented at the gate**
+— the same shape as a design-section approval, not a silent branch:
+
+| Source | Available when | Produces |
+|---|---|---|
+| **Repository source** | `frontend_source_root` resolves to a readable tree | `grep` for `selector_attribute`; existing testid, or a proposed one with file and line |
+| **Live DOM** | The host exposes browser automation **and** the app is reachable | Real attributes read from the running application (D20 — in a subagent) |
+| **Semantic fallback** | Always | `role` / label / text strategy, recorded as an accepted risk |
+
+```dot
+digraph selector_resolution {
+    "Scenario needs selectors" [shape=ellipse];
+    "Frontend source in repo?" [shape=diamond];
+    "Ask: which evidence source?" [shape=diamond];
+    "Browser automation and app reachable?" [shape=diamond];
+    "Offer live DOM inspection?" [shape=diamond];
+    "grep source for selector_attribute" [shape=box];
+    "Propose data-testid for missing elements" [shape=box];
+    "Dispatch subagent to read live DOM" [shape=box];
+    "Record semantic fallback as accepted risk" [shape=box];
+    "STOP: no evidence and fallback declined" [shape=octagon, style=filled, fillcolor=red, fontcolor=white];
+    "Every element resolved" [shape=doublecircle];
+
+    "Scenario needs selectors" -> "Frontend source in repo?";
+
+    "Frontend source in repo?" -> "Ask: which evidence source?" [label="yes"];
+    "Ask: which evidence source?" -> "grep source for selector_attribute" [label="source, report only"];
+    "Ask: which evidence source?" -> "Propose data-testid for missing elements" [label="source + propose"];
+    "Ask: which evidence source?" -> "Browser automation and app reachable?" [label="live DOM"];
+
+    "Frontend source in repo?" -> "Browser automation and app reachable?" [label="no"];
+    "Browser automation and app reachable?" -> "Offer live DOM inspection?" [label="yes"];
+    "Browser automation and app reachable?" -> "Offer live DOM inspection?" [label="no", style=dotted];
+    "Offer live DOM inspection?" -> "Dispatch subagent to read live DOM" [label="accepted"];
+    "Offer live DOM inspection?" -> "Record semantic fallback as accepted risk" [label="declined, fallback ok"];
+    "Offer live DOM inspection?" -> "STOP: no evidence and fallback declined" [label="declined, no fallback"];
+
+    "grep source for selector_attribute" -> "Every element resolved";
+    "Propose data-testid for missing elements" -> "Every element resolved";
+    "Dispatch subagent to read live DOM" -> "Every element resolved";
+    "Record semantic fallback as accepted risk" -> "Every element resolved";
+}
+```
+
+**The choice is asked, never assumed.** When frontend source is present the user still picks:
+report-only, propose-testids, or go to the live DOM anyway — a stale checkout makes source the
+wrong evidence, and only the user knows that.
+
+**Live DOM inspection runs in a subagent (D20).** The subagent receives the element list and the
+application URL, drives the host's browser automation, and returns **only the selector map**. A DOM
+dump is large, single-use, and would crowd out the design context for no benefit. It reads; it
+never interacts destructively and never submits forms.
+
+Prerequisites for the live option, from the repo profile and `.env`: an application base URL and,
+when the app requires it, credentials. Missing either → the option is not offered, because a login
+wall returns a selector map for the login page and nothing else.
+
+**Semantic fallback is a recorded risk, not a free pass.** Choosing it writes
+`selector_evidence: fallback` plus the user's acknowledgement into `test-design.md`, and the Stage
+04 report repeats it. Fallback-derived selectors are the likeliest to consume Stage 03 fix
+iterations; saying so up front is the point.
+
+**`--yolo` has a fixed order and never invents evidence**: repository source if readable, else live
+DOM if available, else **stop**. It does not choose fallback on the user's behalf.
 
 **The gate binds to UI scenarios only (D17).** Step 2.3 assigns every scenario a `surface`:
 
@@ -119,6 +188,61 @@ disappear.
 
 `--yolo` may not assign `surface` on its own where the classification is genuinely ambiguous; an
 ambiguous scenario is the one case `--yolo` asks.
+
+## Pipeline Flow
+
+Gates and loops only — the steps inside each stage are numbered lists in §4 to §7, not diagrams
+(D21).
+
+```dot
+digraph qa_pipeline {
+    "Jira issue" [shape=ellipse];
+    "Stage 01: intake" [shape=box];
+    "Stage 02: test design" [shape=box];
+    "Every element resolved?" [shape=diamond];
+    "Self-review passes?" [shape=diamond];
+    "Human approves design?" [shape=diamond];
+    "Stage 03: automate" [shape=box];
+    "Scenario green?" [shape=diamond];
+    "Needs Gherkin change?" [shape=diamond];
+    "Fix: selectors, waits, page objects, data" [shape=box];
+    "Mark blocked, continue" [shape=box];
+    "More scenarios?" [shape=diamond];
+    "Stage 04: report, baselines, commit" [shape=box];
+    "Baselines and remote clean?" [shape=diamond];
+    "STOP: report, never rewrite" [shape=octagon, style=filled, fillcolor=red, fontcolor=white];
+    "Branch pushed" [shape=doublecircle];
+
+    "Jira issue" -> "Stage 01: intake";
+    "Stage 01: intake" -> "Stage 02: test design";
+    "Stage 02: test design" -> "Every element resolved?";
+    "Every element resolved?" -> "Stage 02: test design" [label="no, resolve"];
+    "Every element resolved?" -> "Self-review passes?" [label="yes"];
+    "Self-review passes?" -> "Stage 02: test design" [label="no, fix at source"];
+    "Self-review passes?" -> "Human approves design?" [label="yes"];
+    "Human approves design?" -> "Stage 02: test design" [label="revisions"];
+    "Human approves design?" -> "Stage 03: automate" [label="approved"];
+
+    "Stage 03: automate" -> "Scenario green?";
+    "Scenario green?" -> "More scenarios?" [label="yes"];
+    "Scenario green?" -> "Needs Gherkin change?" [label="no"];
+    "Needs Gherkin change?" -> "Mark blocked, continue" [label="yes"];
+    "Needs Gherkin change?" -> "Fix: selectors, waits, page objects, data" [label="no, attempts left"];
+    "Needs Gherkin change?" -> "Mark blocked, continue" [label="no, 3 attempts spent"];
+    "Fix: selectors, waits, page objects, data" -> "Scenario green?";
+    "Mark blocked, continue" -> "More scenarios?";
+    "More scenarios?" -> "Stage 03: automate" [label="yes"];
+    "More scenarios?" -> "Stage 04: report, baselines, commit" [label="no"];
+
+    "Stage 04: report, baselines, commit" -> "Baselines and remote clean?";
+    "Baselines and remote clean?" -> "Branch pushed" [label="yes"];
+    "Baselines and remote clean?" -> "STOP: report, never rewrite" [label="no"];
+}
+```
+
+Stage 03 is the only region with no human edge: once entered, it runs to a scenario verdict or to
+the circuit breaker (§6.5). Every loop in it is bounded — 3 fix attempts per scenario, 5 identical
+failures overall.
 
 ## 1. Skill Inventory
 
@@ -341,7 +465,7 @@ only reads, so it is safe to run against the source checkout before any worktree
 | 2.1 | **Requirement analysis** — acceptance criteria to a list of testable behaviours. A blocking ambiguity is asked **once**; a non-blocking one is recorded under Open Questions and the run continues |
 | 2.2 | **Dedup against Xray** — §5.1. Every behaviour labelled `NEW`, `UPDATE <TEST-key>`, `SKIP (covered by <TEST-key>)`, or `REVIEW <TEST-key>` |
 | 2.3 | **Scenario design** — Gherkin, one behaviour per scenario, negative and boundary cases included. Every scenario assigned a `surface` (`ui` / `api` / `manual`, see Constraint 3). Coverage matrix: acceptance criterion → scenarios |
-| 2.4 | **Selector gate (hard)** — §Constraint 3, applied to `surface: ui` scenarios only. Report-only by default. Frontend edits require explicit approval, are recorded in run state for the §4 step 5 frontend baseline, and land on a separate frontend branch inside the submodule, never mixed into the test branch |
+| 2.4 | **Selector gate (hard)** — §Constraint 3, applied to `surface: ui` scenarios only. The evidence source is **asked**, not assumed: repository source, live DOM via subagent, or recorded semantic fallback. Frontend edits require explicit approval, are recorded in run state for the §4 step 5 frontend baseline, and land on a separate frontend branch inside the submodule, never mixed into the test branch |
 | 2.5 | **Write `.feature`** into `docs/qa/<key>/`. Tags: `@REQ_<story>` at Feature level; `@TEST_<key>` at Scenario level only for `UPDATE` rows; plus the profile's `existing_tags` |
 | 2.6 | **Write `test-design.md`** — scenarios, coverage matrix, selector map, page objects to create or modify, test data and mock plan, dedup decisions, open questions |
 | 2.7 | **Self-review gate** — every acceptance criterion covered · no `TODO`/`TBD`/placeholder · every element of every `surface: ui` scenario resolved in the selector map · every `surface: api` scenario naming its endpoint and fixture · every `surface: manual` scenario carrying a reason · every behaviour carrying a dedup label. Fix at source and re-verify. The same check failing 3 consecutive times stops the run |
@@ -403,8 +527,46 @@ data, mocks.
 - adding `.skip`, `@fixme`, or any tag whose effect is to stop the scenario running
 - narrowing `scoped_run_cmd` so a red scenario is no longer selected
 
+```dot
+digraph fix_loop_boundary {
+    "Scenario is red" [shape=ellipse];
+    "Is the failure environmental?" [shape=diamond];
+    "Would the fix change Gherkin?" [shape=diamond];
+    "Attempts left?" [shape=diamond];
+    "Same failure 5x with no file change?" [shape=diamond];
+    "STOP: infrastructure, no attempt consumed" [shape=octagon, style=filled, fillcolor=red, fontcolor=white];
+    "STOP: circuit breaker" [shape=octagon, style=filled, fillcolor=red, fontcolor=white];
+    "Edit selectors, waits, page objects, data" [shape=box];
+    "Mark blocked: needs-design-change" [shape=box];
+    "Scenario resolved" [shape=doublecircle];
+
+    "Scenario is red" -> "Is the failure environmental?";
+    "Is the failure environmental?" -> "STOP: infrastructure, no attempt consumed" [label="yes"];
+    "Is the failure environmental?" -> "Would the fix change Gherkin?" [label="no"];
+    "Would the fix change Gherkin?" -> "Mark blocked: needs-design-change" [label="yes"];
+    "Would the fix change Gherkin?" -> "Attempts left?" [label="no"];
+    "Attempts left?" -> "Mark blocked: needs-design-change" [label="no, 3 spent"];
+    "Attempts left?" -> "Same failure 5x with no file change?" [label="yes"];
+    "Same failure 5x with no file change?" -> "STOP: circuit breaker" [label="yes"];
+    "Same failure 5x with no file change?" -> "Edit selectors, waits, page objects, data" [label="no"];
+    "Edit selectors, waits, page objects, data" -> "Scenario is red" [label="re-run"];
+    "Mark blocked: needs-design-change" -> "Scenario resolved";
+}
+```
+
 These exist because a fix loop with write access to its own success criteria will make every test
 pass and prove nothing.
+
+### Red Flags in the fix loop — thoughts that mean STOP
+
+| Thought | Reality |
+|---|---|
+| "This assertion is too strict for the real app" | The assertion was approved at Stage 02. Mark blocked; do not relax it |
+| "A short `waitForTimeout` is the pragmatic fix here" | It is the flake you will chase next sprint. Use an explicit wait condition |
+| "Just tag it `@fixme` so the suite is green" | A green suite that skips the scenario is a false report |
+| "The Gherkin has a typo, one word will not hurt" | Any Gherkin edit reopens the Stage 02 gate. One word included |
+| "Narrow the grep so this scenario is out of scope" | Changing what runs to change the result is the same defect as changing the assertion |
+| "It failed the same way 5 times but I will try once more" | That is the circuit breaker. Report the stuck state |
 
 ### 6.3 Blocked scenarios
 
@@ -538,9 +700,10 @@ Exhaustive. Any other reason to stop is invalid.
 5. Stage 01 frontend-source initialization failure, or Stage 02 selector gate with no frontend
    source
 6. Stage 03 infrastructure failure (§6.4) or circuit breaker (§6.5)
-7. A Stage 04 baseline violation — source checkout (§7.1) or frontend (§4 step 5)
-8. A diverged remote branch at Stage 04 push (§7 step 4)
-9. Stage 04 (default mode), or pipeline completion in `--yolo`
+7. Constraint 3: no evidence source available and the user declines semantic fallback
+8. A Stage 04 baseline violation — source checkout (§7.1) or frontend (§4 step 5)
+9. A diverged remote branch at Stage 04 push (§7 step 4)
+10. Stage 04 (default mode), or pipeline completion in `--yolo`
 
 ## 9. Invocation, Modes And Flags
 
@@ -594,6 +757,7 @@ speckit-qa-auto/
     │   ├── stage-03-automate.md
     │   └── stage-04-finish.md
     └── shared/
+        ├── run-state.md                        the data contract between stages (§11.2 rule 3)
         ├── operating-rules.md                  §6.2, §6.4, §6.5, §8
         ├── repo-profile.md                     §2 discovery procedure and field list
         ├── selector-verification.md            Constraint 3, generalized
@@ -603,11 +767,45 @@ speckit-qa-auto/
         └── commit.md                           conditional commit, pull-rebase, push
 ```
 
-Each file is loaded on demand and `SKILL.md` stays a small router, so no single file has to hold
-the whole pipeline. Per `SKILL_SPEC.md`, no link may point outside the skill folder: the skill is
-installed by copying its folder, so every reference file it needs lives inside it, and the one
-sibling skill it calls (`jira-to-speckit`) is invoked by name through the `skill` tool rather than
-linked to.
+Per `SKILL_SPEC.md`, no link may point outside the skill folder: the skill is installed by copying
+its folder, so every reference file it needs lives inside it, and the one sibling skill it calls
+(`jira-to-speckit`) is invoked by name through the `skill` tool rather than linked to.
+
+### 11.1 Authoring style
+
+Written the way the superpowers skills are written, because that style is legible under load.
+
+| Rule | Consequence |
+|---|---|
+| `SKILL.md` is a **router**, under ~500 words | Entry dispatch, the stage table, required inputs. No stage detail |
+| Each reference file states **what it needs at the top** | A reader knows the cost before loading |
+| **Sections, not narrative** — Overview, When to Use, the rule, Common Mistakes | Findable by scanning |
+| **Graphviz only at decision points and bounded loops** (D21) | The three diagrams in this spec are the full set: pipeline gates, selector resolution, fix loop. Linear steps stay numbered lists |
+| Diagrams follow `graphviz-conventions.dot` | Diamond = question, box = action, plaintext = literal command, ellipse = state, octagon = warning, doublecircle = entry/exit. Labels carry meaning; never `step1`, `helper2` |
+| **Rules over prose** where a rule exists | "Forbidden, without exception: …" beats a paragraph explaining why one should not |
+| A **Red Flags table** on every file that enforces a discipline | Names the rationalization and answers it — §6.2 and Constraint 3 are the two that need one |
+| **Cross-reference, never repeat** | Duplicated instructions drift, and the drift is silent |
+
+### 11.2 Coupling rules (D22)
+
+A file that only makes sense after reading two other files cannot be revised, tested, or loaded on
+its own. Four rules keep the set loose:
+
+1. **Load depth is at most two hops.** `SKILL.md` → one stage file → at most one shared leaf. No
+   third hop. A stage file that needs three shared files at once is doing too much.
+2. **Shared files are leaves.** They may be loaded; they load nothing themselves. `commit.md`,
+   `workspace-guard.md`, `selector-verification.md`, `gherkin-conventions.md` each stand alone and
+   are readable with no pipeline context.
+3. **Stages hand off through run state on disk, not through each other's prose.** Stage 03 reads
+   `execution-report.md` and the artifact folder — never `stage-02-test-design.md`. The contract
+   between stages is a **data shape**, written down once in `references/shared/run-state.md`, so a
+   stage can be rewritten without touching its neighbours.
+4. **No stage file references another stage file.** A stage names its successor only as "enter
+   Stage 03", never by linking to it. `SKILL.md`'s router owns the ordering; the stages do not.
+
+Test for rule 3: a stage file should be reviewable by someone who has read only it, its declared
+shared leaves, and `run-state.md`. If that reader cannot tell what the stage receives and what it
+must leave behind, the contract is in the wrong place.
 
 ## 12. Acceptance Criteria
 
@@ -630,7 +828,12 @@ linked to.
    identical set of `NEW` / `UPDATE` / `SKIP` / `REVIEW` labels.
 8. Blocked-scenario round trip: with one scenario blocked, the test tree omits it, `docs/qa/` keeps
    it, and the §10 import command picks it up.
-9. A dry run against a real Jira story in the reference repository reaches the Stage 02 human gate
+9. Selector evidence branch: with `frontend_source_root` absent, the run offers live DOM
+   inspection rather than stopping; declining it with fallback accepted records
+   `selector_evidence: fallback` in `test-design.md`; declining both stops the run.
+10. Coupling check (§11.2): no file under `references/shared/` links to another reference file,
+   and no stage file links to another stage file.
+11. A dry run against a real Jira story in the reference repository reaches the Stage 02 human gate
    with: a coverage matrix over every acceptance criterion, a selector map in which every element
    is resolved, and dedup labels against existing Xray tests.
 
@@ -645,3 +848,7 @@ linked to.
 - Detecting writes to gitignored files in the source checkout (§7.1 known limits).
 - Reverting a leaked change in the source checkout — the run reports, never rewrites.
 - Automatically applying proposed `data-testid` attributes to frontend source without approval.
+- Live DOM inspection against an application that is not already running and reachable — the
+  skill never starts, deploys, or seeds the application under test.
+- Browser interaction beyond reading: the inspection subagent never submits forms, mutates data,
+  or triggers modal dialogs.
