@@ -32,9 +32,12 @@ Claude Code and OpenCode expose the same capabilities under their own names (`Ba
 
 - `spec.md` for the target feature. If no path is given, resolve from `specs/*/spec.md` using the
   current branch name or changed files; ask the user only if still ambiguous.
-- Review scope = current git change set (staged + unstaged, incl. renames/deletes). This is
-  evaluated in the current working directory — when invoked from `speckit-auto`, the caller must
-  run this skill inline from inside the Stage 01 linked worktree, never from the base checkout.
+- Review scope = current git change set (staged + unstaged, incl. renames/deletes), evaluated in
+  the current working directory. Optional `base_ref` input (a commit/ref, e.g. the merge-base with
+  the base branch): when provided, scope = the **union** of `git diff <base_ref>...HEAD` and the
+  working-tree change set, so committed feature work is reviewed even when the tree is clean.
+  `speckit-auto` always passes this. When invoked from `speckit-auto`, the caller must run this
+  skill inline from inside the Stage 01 linked worktree, never from the base checkout.
 
 ## Spec ID
 
@@ -69,7 +72,8 @@ testable requirements to the spec. Never return `pass` against an empty checklis
 ## Procedure
 
 1. Build the requirement checklist (see above).
-2. Resolve the git change set as review scope.
+2. Resolve the git change set as review scope (union with `git diff <base_ref>...HEAD` when a
+   `base_ref` was passed).
 3. **Project guidelines (conditional)** — if `docs/guidelines/architecture.md` exists, load
    [references/project-guidelines-review.md](references/project-guidelines-review.md) and follow its
    Steps 1–4 to load only the guideline files matching the changed-file categories. Skip silently

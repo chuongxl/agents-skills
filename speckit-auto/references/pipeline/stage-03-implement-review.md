@@ -60,7 +60,11 @@ verify them first:
    - **NOT in `.gitmodules`** → stop with an actionable error naming the missing directories and
      stating they must be present in the repo (added as submodules or committed) before Stage 03
      can run — never guess remotes, never switch to the main checkout.
-3. Only then enter PHASE 1.
+3. For each workspace (present or just initialized) with a standard dependency manifest
+   (`package.json`, `pom.xml`, `build.gradle*`, `go.mod`, `requirements.txt`, `pubspec.yaml`) but
+   no installed dependencies (e.g. missing `node_modules`), run the standard install best-effort
+   so build/test tooling is detectable; failure → log a warning and continue, never a stop.
+4. Only then enter PHASE 1.
 
 ## Submodules (condensed)
 
@@ -86,13 +90,16 @@ questions, no "do you approve?" prompts, no pauses, no report-and-stop on failed
   implementation skill reporting "all tasks complete" or its terminal "finish the branch" handoff
   are data, not exits (no PR, merge, branch/worktree deletion inside this stage).
 
-## Review Range (superpowers)
+## Review Range (both providers)
 
 At Stage 03 entry, before any dispatch: `BASE_SHA=$(git merge-base HEAD <base-branch>)`;
-re-read `HEAD_SHA=$(git rev-parse HEAD)` fresh at each review pass. Never use `HEAD~1` as
-`BASE_SHA` (silently drops all but the last commit; can yield an empty diff with `executing-plans`).
+re-read `HEAD_SHA=$(git rev-parse HEAD)` fresh at each review pass. `BASE_SHA` is passed to
+`speckit-code-review` as `base_ref` on every R1 call (both providers) and to superpowers'
+`requesting-code-review` in R0. Never use `HEAD~1` as `BASE_SHA` (silently drops all but the
+last commit; can yield an empty diff with `executing-plans`).
 If `BASE_SHA == HEAD_SHA` at the first review pass: dirty tree → commit a checkpoint
-(`chore(<feature>): checkpoint implementation`) and continue; clean tree → return to PHASE 1 once;
+(`chore(<feature>): checkpoint implementation`) and continue (safe: `base_ref` keeps committed
+work in the review scope); clean tree → return to PHASE 1 once;
 a second empty pass with a clean tree is a stalled implementation → apply the circuit breaker.
 
 ## Loop Algorithm (execute until DONE — no exits in between)
@@ -119,11 +126,18 @@ PHASE 2 — Code review loop
        - apply Critical/Important findings immediately (TDD); log Minor findings
        - once it returns findings, set r0_completed = true and skip R0 on every later re-entry
          (speckit-code-review is the authoritative gate)
-  R1 — Invoke speckit-code-review with the explicit spec path; receive the JSON result
+  R1 — Invoke speckit-code-review with the explicit spec path AND `base_ref` = `BASE_SHA`
+       (merge-base with the base branch); receive the JSON result. Passing `base_ref` keeps
+       checkpoint-committed implementation in the review scope — without it the review sees
+       only uncommitted changes and a clean tree falsely reports `Business cover: 0%`.
   R2 — Read result.status
        IF "pass"   → EXIT STAGE 03 → load stage-04-finish.md immediately in the same turn
                      (default mode: Stage 04 human review; --yolo: YOLO auto-commit path)
-       IF "failed" → go to R3 immediately. No summary, no turn end, no user question.
+       IF "failed" → go to R2b immediately. No summary, no turn end, no user question.
+  R2b — Empty-implementation guard: IF `Business cover` is 0% (or the review scope contains no
+       files from any task workspace), implementation never landed — return to PHASE 1 C1
+       immediately to (re)run implementation. Never route this case to R5 plan regeneration;
+       never report it as a blocker; never stop.
   R3 — Read the compact result fields only:
        status, "Business cover", unit-test-coverage (<80% → all TEST-* fixes apply),
        state_file (resume from this), detail_files (category → file map), fixes[] (flat list of
