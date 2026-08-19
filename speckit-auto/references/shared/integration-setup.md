@@ -16,8 +16,7 @@ TURN (the one legitimate no-pipeline turn end in the whole skill). Never enter t
    to `<repo-root>/.speckit/integration.json` by default (`mkdir -p` first; root from
    `git rev-parse --show-toplevel`). Write to the global path
    `<skill-dir>/.state/integration.json` instead when `--global` is passed or the cwd is not
-   in a git repo. Overwrite silently; report the previous value if one existed. Add `.speckit/`
-   to `.gitignore` only if `.gitignore` exists and doesn't already ignore it. Never stop over a
+   in a git repo. Overwrite silently; report the previous value if one existed. Never stop over a
    persistence failure — fall back and report.
 
 3. **Provider install check + setup** (runs immediately after persist):
