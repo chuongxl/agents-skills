@@ -44,6 +44,8 @@ Recorded here because several were user overrides of the first proposal.
 | D7 | Xray lives **inside `jira-to-speckit`**, not in a separate skill | User directive. Feasible without breaking its contract precisely because of D6 — read-only stays read-only |
 | D8 | **`docs/qa/<key>/` is the source of truth** for `.feature`; Stage 03 copies into the test tree | User directive. One authored version, one derived version, one direction of flow |
 | D9 | Fix loop **may not edit Gherkin** | Without this the pipeline makes tests green by weakening them. See §6.2 |
+| D10 | **No submodule leak-guard machinery.** At most one submodule (frontend), read-only by default | User directive. Ordered multi-submodule commit guarding has no second consumer here |
+| D11 | The workspace guard is **content-aware**, not `git status` string comparison | User defect report. A status string cannot distinguish "already dirty" from "dirty and then modified again". See §7.1 |
 
 ## Constraint 1: The Gherkin File Is The Only Test Artifact
 
@@ -186,11 +188,16 @@ worktree + branch + submodules → repo profile → Jira intake → Xray existin
    `<repo-root>/.worktrees/<branch>`, `.worktrees/` git-ignored. Branch name
    `<branch_prefix><jira-key>-<slug>`, resolved after intake and renamed in place with
    `git branch -m` when a provisional name was used.
-2. **Submodules are a hard requirement, not best-effort.** `git submodule update --init --recursive`
-   must succeed when `.gitmodules` exists. This differs deliberately from `speckit-auto`, where the
-   same failure only logs a warning: Stage 02's selector gate reads frontend source, and an empty
-   submodule directory makes that gate unsatisfiable. Failure stops the run with the git error
-   quoted.
+2. **Frontend source initialization is a hard requirement, not best-effort.** When
+   `frontend_source_root` names a submodule, `git submodule update --init` for that path must
+   succeed. This differs deliberately from `speckit-auto`, where the same failure only logs a
+   warning: Stage 02's selector gate reads frontend source, and an empty submodule directory makes
+   that gate unsatisfiable. Failure stops the run with the git error quoted.
+
+   No general multi-submodule handling exists (D10). The pipeline expects at most one submodule,
+   the frontend, and treats it as **read-only** — Stage 02's selector gate is report-only, and
+   approved frontend edits go to a separate frontend branch, never to the test branch. The §7.1
+   baseline is what enforces that read-only status.
 3. **Repo profile** — §2.
 4. **Jira intake** — `jira-to-speckit`, default mode, writing `ticket.md`.
 5. **Xray existing tests** — `jira-to-speckit` with `xray_tests: true`, writing
@@ -272,12 +279,71 @@ by any file edit, does not count. Report the stuck state and stop.
    summary, coverage matrix status.
 2. **Human review** — files created and changed, test results, blocked scenarios with reasons,
    proposed `data-testid` additions for the frontend (each with file and line), open questions.
-3. Commit and push, following `speckit-auto`'s commit procedure including the submodule leak-guard:
-   commit inside each modified submodule first, then the parent pointer. Every commit is
-   conditional on `git status --porcelain`; an already-clean tree is a success path.
-4. Push the branch and print a ready-to-use PR title and body. **Do not open the PR** unless
+3. **Verify the workspace baseline (§7.1).** A violation stops the run before any commit.
+4. Commit and push. Adopted from `speckit-auto`'s commit procedure: every commit is conditional on
+   `git status --porcelain` in the worktree — an already-clean tree is a success path, not a
+   failure — then `git pull --rebase origin <branch>` and push.
+
+   Note: `speckit-auto/references/shared/commit.md` as of `5b73276` contains **no** workspace or
+   submodule guard. The mechanism in §7.1 is new to this design, not inherited.
+5. Push the branch and print a ready-to-use PR title and body. **Do not open the PR** unless
    `--pr` is passed.
-5. Mark the artifact `completed` and make the follow-up commit for that status change.
+6. Mark the artifact `completed` and make the follow-up commit for that status change.
+
+### 7.1 Workspace Baseline (Content-Aware)
+
+All pipeline work happens inside `<repo-root>/.worktrees/<branch>`. The source checkout is the
+developer's own working tree and must come out of the run untouched. Two layers enforce that.
+
+**Prevention (primary).** Every git command carries an explicit `git -C <worktree_path>`, and every
+file path is resolved against `worktree_path`. A bare `git` invocation or a repo-relative path that
+resolves against the process working directory is a defect, not a style preference.
+
+**Detection (backstop).** Prevention fails silently when it fails at all, so Stage 01 records a
+baseline of the source checkout and Stage 04 re-computes it before committing.
+
+`git status --porcelain` is **not** sufficient for this. Its output is a status letter plus a path,
+so it is blind to any change that does not alter the letter:
+
+| Baseline state | Agent action | `status` output | Detected? |
+|---|---|---|---|
+| `src/foo.ts` already modified | adds 50 more lines | unchanged: ` M src/foo.ts` | **no** |
+| `notes.txt` already untracked | rewrites its contents | unchanged: `?? notes.txt` | **no** |
+| `src/bar.ts` clean | modifies it | `""` → ` M src/bar.ts` | yes |
+| no such file | creates it | `""` → `?? new.txt` | yes |
+
+The blind spot is exactly the case worth protecting: paths that were already dirty before the run,
+which is the normal state of a developer's checkout mid-task.
+
+The baseline is therefore content-addressed. Field name `workspace_baseline` — not
+`*_baseline_status`, since it no longer holds status strings:
+
+```
+workspace_baseline:
+  path:                  <source checkout root>
+  head_sha:              git -C <path> rev-parse HEAD
+  worktree_diff_sha256:  sha256( git -C <path> diff --binary HEAD )
+  index_diff_sha256:     sha256( git -C <path> diff --cached --binary HEAD )
+  untracked:             [ {path, size, sha256}, ... ]   # git ls-files --others --exclude-standard
+```
+
+- `diff --binary HEAD` captures every tracked change, staged or not, byte for byte.
+- `diff --cached --binary HEAD` is kept separately so a pure staging change — `git add` with no
+  content edit, which leaves `diff HEAD` identical — is still detected.
+- `untracked` needs its own fingerprint because no `git diff` form covers untracked files.
+  `--exclude-standard` keeps ignored trees such as `node_modules/` out. If the untracked set
+  exceeds 2000 files or 50 MB, fingerprint paths and sizes only, and record
+  `untracked_fingerprint: degraded` in `execution-report.md` — a stated limitation beats an
+  unbounded hashing pass.
+
+Any difference at Stage 04 stops the run before committing and reports the differing paths, with
+the baseline and current hashes. The run does not attempt to revert the source checkout: undoing a
+developer's working tree without asking is worse than the leak.
+
+**Known limits, stated rather than hidden.** Gitignored files — `.env` above all — appear in
+neither `git diff` nor `ls-files --others --exclude-standard`, so a write to one is not detected.
+Detection also runs only at Stage 04, so it reports a leak rather than preventing it; prevention is
+the `-C <worktree_path>` discipline above.
 
 ## 8. Turn-Ending Conditions
 
@@ -287,9 +353,11 @@ Exhaustive. Any other reason to stop is invalid.
 2. A genuinely missing required input, after one ask
 3. The Stage 02 human gate (default mode)
 4. Stage 02 self-review failing the same check 3 consecutive times
-5. Stage 01 submodule initialization failure, or Stage 02 selector gate with no frontend source
+5. Stage 01 frontend-source initialization failure, or Stage 02 selector gate with no frontend
+   source
 6. Stage 03 infrastructure failure (§6.4) or circuit breaker (§6.5)
-7. Stage 04 (default mode), or pipeline completion in `--yolo`
+7. A Stage 04 workspace baseline violation (§7.1)
+8. Stage 04 (default mode), or pipeline completion in `--yolo`
 
 ## 9. Invocation, Modes And Flags
 
@@ -345,8 +413,10 @@ speckit-qa-auto/
         ├── repo-profile.md                     §2 discovery procedure and field list
         ├── selector-verification.md            Constraint 3, generalized
         ├── gherkin-conventions.md              tags, scenario granularity, Xray binding
+        ├── workspace-guard.md                  §7.1 baseline capture and verification
         ├── host-adaptation.md                  adopted from speckit-auto
-        └── commit.md                           adopted from speckit-auto, incl. leak-guard
+        └── commit.md                           adopted from speckit-auto (conditional commit,
+                                                pull-rebase, push); no guard of its own
 ```
 
 Each file is loaded on demand; `SKILL.md` stays a small router, matching `speckit-auto`'s shape.
@@ -363,7 +433,11 @@ are **copied**, and other skills are referred to by name in prose.
    follows the same output template as `0.2.0`.
 4. `test-case/speckit-qa-auto/test-cases.md` exists, following the shape of
    `test-case/speckit-auto/test-cases.md`.
-5. A dry run against a real Jira story in the reference repository reaches the Stage 02 human gate
+5. Workspace baseline regression test: with the source checkout holding one already-modified
+   tracked file and one already-present untracked file, append to each, then run Stage 04
+   verification. Both must be reported as violations. This is the case `git status` comparison
+   misses.
+6. A dry run against a real Jira story in the reference repository reaches the Stage 02 human gate
    with: a coverage matrix over every acceptance criterion, a selector map in which every element
    is resolved, and dedup labels against existing Xray tests.
 
@@ -374,4 +448,7 @@ are **copied**, and other skills are referred to by name in prose.
 - Test frameworks other than Playwright-BDD + TypeScript (D4).
 - Creating test executions or test plans in Xray.
 - Modifying CI workflow files.
+- General multi-submodule support and ordered submodule commits (D10).
+- Detecting writes to gitignored files in the source checkout (§7.1 known limits).
+- Reverting a leaked change in the source checkout — the run reports, never rewrites.
 - Automatically applying proposed `data-testid` attributes to frontend source without approval.
