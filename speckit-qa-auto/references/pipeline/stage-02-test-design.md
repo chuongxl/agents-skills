@@ -1,0 +1,176 @@
+# Stage 02: Test Design
+
+Loads: [selector-verification.md](../shared/selector-verification.md),
+[gherkin-conventions.md](../shared/gherkin-conventions.md). Two leaves, so the reader knows the
+cost before paying it (design spec §11.2 rule 1). It links to no other file under
+`references/pipeline/` — its predecessor is not linked back to, and its successor is named, never
+linked: **enter Stage 03** at the end of this stage, same turn.
+
+This is the pipeline's main human gate (design spec §5, marked ◀ HUMAN GATE). Everything Stage 03
+automates and Stage 04 reports on treats this stage's output as settled. It turns the acceptance
+criteria Stage 01 captured in `ticket.md` into approved Gherkin, deduplicated against whatever
+Xray already covers, with every UI element resolved to real evidence before approval.
+
+## What This Stage Receives
+
+Per `run-state.md`, read only from `execution-report.md` and the artifact folder — never from
+`stage-01-intake.md`: `run.artifact_dir`, `profile.*`, `xray.query`, `xray.cucumber_tests`,
+`xray.manual_tests`, and, on disk inside `run.artifact_dir`, `ticket.md`,
+`existing-tests.feature`, and `existing-tests-manual.md`. `existing-tests.feature` is empty and
+`existing-tests-manual.md` absent when Xray was unavailable at Stage 01 — that absence is itself
+an input to step 2.2.
+
+## Execution Order
+
+The eight steps below run in the order design spec §5 fixes.
+
+### 2.1 Requirement analysis
+
+Turn `ticket.md`'s acceptance criteria into a list of testable behaviours. A blocking ambiguity —
+one that would make a behaviour impossible to write correctly either way — is asked **once**. A
+non-blocking one is recorded under Open Questions in `test-design.md` and the run continues; not
+every open question earns a stop.
+
+### 2.2 Dedup against Xray
+
+Every behaviour from 2.1 is labelled `NEW`, `UPDATE <TEST-key>`, `SKIP (covered by <TEST-key>)`,
+or `REVIEW <TEST-key>`. This is a mechanical rule, not a judgement call — see "Dedup Is A Rule, Not
+A Judgement" below. The stage records its own `xray.dedup: ran | not-run` here; Stage 01
+deliberately left that field unset, since it only records that the Xray fetch happened, not
+whether dedup ran against the result.
+
+### 2.3 Scenario design
+
+Gherkin, one behaviour per scenario (`gherkin-conventions.md`, "Scenario Granularity"). Negative
+and boundary cases are their own scenarios, not extra `And` steps folded onto the happy path. Every
+scenario is assigned a `surface` — `ui`, `api`, or `manual` — matching `design.scenarios[].surface`
+in the run-state contract. Build the coverage matrix: acceptance criterion → the scenario(s) that
+cover it. A criterion with no row is not yet designed.
+
+### 2.4 Selector gate (hard)
+
+Applies to `surface: ui` scenarios only — an `api` scenario names its endpoint and fixture instead,
+and a `manual` scenario carries its one-line reason; neither has elements to resolve. Follow
+`selector-verification.md` in full: the evidence source is **asked**, never assumed — repository
+source, live DOM via subagent, or a recorded semantic fallback. Frontend edits proposed here are
+report-only unless the human explicitly approves them; an approval sets
+`baselines.frontend_edits_approved: true`, is recorded for the Stage 04 frontend baseline
+re-verification, and lands on a separate frontend branch inside the submodule — never mixed into
+the test branch or the same commit as test artifacts.
+
+This gate does not skip under `--yolo` — see "`--yolo` Skips The Approval, Not The Gates" below.
+
+### 2.5 Write `.feature`
+
+Into `<artifact_dir>/<domain>-<aspect>.feature` — the artifact folder Stage 01 left behind, never
+the repo's test tree. Materializing into the test tree is Stage 03's job, and only for scenarios
+that survive design here. Tag per `gherkin-conventions.md`: `@REQ_<STORY-KEY>` at Feature level,
+`@TEST_<TEST-key>` at Scenario level only on `UPDATE` rows, plus the profile's `existing_tags`
+carried through unchanged.
+
+### 2.6 Write `test-design.md`
+
+Into the same artifact folder: the scenarios, the coverage matrix, the selector map (per
+`selector-verification.md`, "The Selector Map Shape"), page objects to create or modify, the test
+data and mock plan, the dedup decisions from 2.2 (including `dedup: not-run` when it applies), and
+Open Questions from 2.1.
+
+### 2.7 Self-review gate
+
+Every one of these must hold, checked mechanically, not asked about:
+
+- Every acceptance criterion from `ticket.md` is covered by at least one scenario
+- No `TODO`, `TBD`, or other placeholder anywhere in the `.feature` file or `test-design.md`
+- Every element of every `surface: ui` scenario resolves in the selector map
+- Every `surface: api` scenario names its endpoint and its request/response fixture
+- Every `surface: manual` scenario carries its one-line reason
+- Every behaviour carries a dedup label from step 2.2
+
+A failing check is fixed at its source — in the scenario, the selector map, or the design, not by
+loosening the check — then re-verified. **The same check failing 3 consecutive times stops the
+run** (`operating-rules.md`, Turn-Ending Condition 4).
+
+### 2.8 Human gate
+
+Present the summary: the coverage matrix, the dedup labels, the selector map, and Open Questions.
+Take approval or revisions — a revision returns to whichever of 2.1–2.7 it affects and re-runs
+self-review before returning here. On approval, commit the design artifacts, take the single
+start-automation confirmation, and **enter Stage 03 in the same turn** — there is no second prompt
+between approval and automation starting.
+
+## `--yolo` Skips The Approval, Not The Gates
+
+`--yolo` skips step 2.8's human approval. It does **not** skip step 2.4's selector gate, and it
+does **not** skip step 2.7's self-review gate. Those two are hard gates regardless of mode — see
+`operating-rules.md`'s Turn-Ending Conditions 4, 5, and 7, none of which are conditioned on mode.
+The failure mode this guards against is `--yolo` quietly becoming "skip every gate" instead of the
+single approval it is documented to skip; a design nobody looked at, shipped straight into
+automation, is exactly what the selector and self-review gates exist to prevent.
+
+## Dedup Is A Rule, Not A Judgement (design spec §5.1, D13)
+
+Two runs over the same story, with Xray unchanged, must produce an identical set of labels — so
+matching is defined mechanically, never left to a model deciding whether two scenarios "look like"
+the same test.
+
+**Normalized scenario key** — lowercase; strip tags, the leading `Scenario:` / `Scenario Outline:`
+prefix, punctuation, and collapsed whitespace; strip quoted literals and numbers so parameter
+values do not split otherwise-identical scenarios.
+
+| Condition | Label |
+|---|---|
+| Key matches an exported Cucumber scenario, step sequence identical | `SKIP (covered by <TEST-key>)` |
+| Key matches, step sequence differs | `UPDATE <TEST-key>` — carries `@TEST_<TEST-key>`, import updates in place |
+| No key match anywhere | `NEW` |
+| An existing test's key matches nothing in the new design | `REVIEW <TEST-key>` — reported at the human gate, never deleted or modified by the pipeline |
+
+Matching runs only against `existing-tests.feature` — the Cucumber export, which is Gherkin and
+therefore has a normalized key to compare. `REVIEW` never triggers a delete or an edit of the
+existing test; it is a report line for the human at 2.8, nothing more.
+
+### Non-Cucumber Tests Are Advisory (D14)
+
+`existing-tests-manual.md` is a markdown table — key, summary, labels, and steps when available —
+not Gherkin, so no normalized key can be computed against it and no key match is possible. Manual
+and Generic Xray tests from that file are presented at the 2.8 human gate as *possible overlap,
+decide yourself*. **They never produce an automatic `SKIP`.** Silently treating a Manual test as
+uncovered creates a duplicate test; silently treating it as covered drops real coverage. Neither
+error is acceptable from an automated read of a summary line, so a human decides — the pipeline
+does not.
+
+### When Xray Was Unavailable
+
+If Stage 01 recorded that the Xray fetch did not happen, `existing-tests.feature` is empty and
+`existing-tests-manual.md` is absent. Every behaviour from 2.1 is labelled `NEW`, and
+`test-design.md` records `dedup: not-run` with the reason Stage 01 gave for the unavailability. An
+unrun dedup must never be indistinguishable from one that ran and found nothing — `not-run` and "ran,
+zero matches" are different facts, and collapsing them would let a credentials outage silently
+report full coverage.
+
+## What This Stage Produces
+
+Written into run state:
+
+- `design.selector_evidence` — `source | live-dom | fallback`, from step 2.4
+- `design.scenarios[]` — one entry per scenario, each carrying `name`, `surface`, `dedup`, and
+  `status: pending` (Stage 03 is what moves a scenario off `pending`)
+- `xray.dedup` — `ran | not-run`, from step 2.2
+
+And, on disk inside `run.artifact_dir`: the `.feature` file(s) from 2.5 and `test-design.md` from
+2.6.
+
+## Enter Stage 03
+
+Once the human gate is passed (or skipped under `--yolo`) and the design artifacts are committed,
+enter Stage 03 in the same turn.
+
+## Red Flags — thoughts that mean a gate is being bent
+
+| Thought | Reality |
+|---|---|
+| "These two scenarios are basically the same test, I'll call it a SKIP" | Dedup is a normalized-key match, not a similarity judgement. Compute the key and the step sequence; do not eyeball it |
+| "The Manual test's summary clearly covers this, mark it SKIP" | Manual tests are advisory only. No automatic SKIP is possible against them — surface the overlap at 2.8 and let the human decide |
+| "Xray was unavailable, so there's nothing to dedup against — just leave the field blank" | Blank looks like it ran and found nothing. Record `dedup: not-run` with the reason, every time |
+| "It's `--yolo`, skip the selector gate too and save a round trip" | `--yolo` skips only the 2.8 approval. The selector gate and self-review still run in full |
+| "One selector is still unresolved, but the rest of the map is done — good enough to pass 2.7" | Self-review checks every element of every `ui` scenario. One unresolved row fails the gate; resolve it or mark the scenario blocked |
+| "This failed self-review before, I'll just approve it at 2.8 and fix it in Stage 03" | Stage 03's fix loop cannot edit `.feature` files at all (`operating-rules.md`). A design defect that reaches 2.8 unfixed stays a defect through automation |
