@@ -19,8 +19,8 @@ Search, stopping at the first source that answers each field:
 4. Inference — `package.json` scripts, `playwright.config.ts`, and one existing
    `.feature` / `.steps.ts` pair read as a worked example
 
-Run-only, read-only, against the source checkout, before any worktree exists (see
-`operating-rules.md` for where this sits in the Stage 01 sequence). A field that no source
+Run-only, read-only, against the source checkout, before any worktree exists — discovery is safe
+to run this early precisely because it only reads (design spec §4 step 1). A field that no source
 answers is asked of the human, once.
 
 ## Field Reference
@@ -45,10 +45,13 @@ the pipeline stages — never rename, re-case, or reshape one.
 | `branch_prefix` | `test/` |
 | `artifact_root` | `docs/qa` |
 
-Any example path built from a Jira key follows the case rule stated in `run-state.md` and
-`operating-rules.md`: the key is uppercase where it names the issue, lowercase in every path. A
-story `MOM-1234` resolves `artifact_root` to `docs/qa/mom-1234-<slug>`, never
-`docs/qa/MOM-1234-<slug>`.
+Any example path built from a Jira key follows this rule (design spec §4 step 8): the key is
+uppercase where it names the issue — `run.jira_key`, the `@REQ_` / `@TEST_` tags, every Jira or
+Xray API call — and **lowercase in every path**: the artifact directory, the branch name, the
+resume glob. Paths and globs are case-sensitive on Linux CI even where a developer's macOS
+checkout forgives them, so a run that creates `docs/qa/mom-1234-…` and later resumes by globbing
+`MOM-1234-*` finds nothing and silently starts a second artifact folder. A story `MOM-1234`
+therefore resolves `artifact_root` to `docs/qa/mom-1234-<slug>`, never `docs/qa/MOM-1234-<slug>`.
 
 ## What Is Cached, And What Is Not
 
