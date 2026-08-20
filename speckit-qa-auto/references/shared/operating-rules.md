@@ -14,15 +14,20 @@ Exhaustive. Any other reason to stop is invalid.
 
 1. A concrete tool or runtime error, with the error text quoted
 2. A genuinely missing required input, after one ask
-3. The Stage 02 human gate (default mode)
+3. The Stage 02 human gate — including the runs that end there for good: `--design-only`, and
+   `run.code_state: pending`, both of which finish design and stop by design, not by failure
 4. Stage 02 self-review failing the same check 3 consecutive times
-5. Stage 01 frontend-source initialization failure, or Stage 02 selector gate with no frontend
-   source
+5. Stage 01 frontend-source initialization failure, or the Stage 03 entry selector gate with no
+   frontend source
 6. Stage 03 infrastructure failure (§6.4) or circuit breaker (§6.5)
-7. Constraint 3: no evidence source available and the user declines semantic fallback
+7. Constraint 3: no evidence source available at the Stage 03 entry gate and the user declines
+   semantic fallback
 8. A Stage 04 baseline violation — source checkout (§7.1) or frontend (§4 step 5)
 9. A diverged remote branch at Stage 04 push (§7 step 4)
-10. Stage 04 (default mode), or pipeline completion in `--yolo`
+10. The Stage 04 human gate, or pipeline completion after it
+11. Stage 03 reached with `run.code_state: pending` or `design.selector_evidence: deferred` — the
+    selector gate has not run, and generating against unverified selectors is what it exists to
+    prevent
 
 ## Fix Loop Rules
 

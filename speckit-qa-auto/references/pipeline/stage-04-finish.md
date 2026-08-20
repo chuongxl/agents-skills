@@ -19,7 +19,7 @@ confirm the developer's own checkout came out of the run untouched.
 
 Per `run-state.md` rule 2, read only from `execution-report.md` and the artifact folder — never
 from `stage-03-automate.md`: `run.jira_key`, `run.artifact_dir`, `run.branch`,
-`run.worktree_path`, `run.mode`, `baselines.workspace_baseline`, `baselines.frontend_baseline`,
+`run.worktree_path`, `baselines.workspace_baseline`, `baselines.frontend_baseline`,
 `baselines.frontend_edits_approved`, `design.selector_evidence`, and every entry of
 `design.scenarios[]` as Stage 03 left them — each carrying `status: green | blocked`, `attempts`,
 `blocked_reason` when blocked, and `commit`. On disk, inside `run.artifact_dir`: the `.feature`
@@ -45,17 +45,19 @@ Present, for approval:
 - Test results — pass/blocked per scenario, each naming its commit
 - Blocked scenarios with reasons
 - Proposed `data-testid` additions for the frontend, each with file and line (the report-only
-  proposals `selector-verification.md`'s selector gate produced at Stage 02, carried forward
-  unapplied unless `baselines.frontend_edits_approved` is true)
+  proposals `selector-verification.md`'s selector gate produced at the head of Stage 03, carried
+  forward unapplied unless `baselines.frontend_edits_approved` is true)
 - `design.selector_evidence` — `source | live-dom | fallback` — including the fallback
   acknowledgement recorded at Stage 02 when the evidence source was `fallback`
   (`selector-verification.md`, "Semantic Fallback Is A Recorded Risk": "The Stage 04 report
-  repeats it")
+  repeats it"). Never `deferred` — that value means the gate never ran, and a run carrying it
+  cannot have reached this stage
 - Open questions carried from `test-design.md`
 
-`--yolo` skips this review's approval, the same way it skips the Stage 02 approval — it does not
-skip 4.3's baseline verification, which is unconditional regardless of mode (`operating-rules.md`,
-Turn-Ending Condition 8).
+This approval always runs — no flag skips it. Neither does 4.3's baseline verification, which is
+unconditional (`operating-rules.md`, Turn-Ending Condition 8) and would remain so even if this
+review were ever made optional: the two answer different questions, and a human saying "the tests
+look right" is not a human saying "my checkout came out of this run untouched."
 
 ### 4.3 Verify both baselines
 
@@ -80,8 +82,7 @@ found.
 
 ### 4.4 Tag blocked scenarios
 
-On approval at 4.2 — or, under `--yolo`, directly, there being no 4.2 approval to wait for — write
-`@not-automated` into the **artifact** version of every scenario at `status: blocked`: the
+On approval at 4.2, write `@not-automated` into the **artifact** version of every scenario at `status: blocked`: the
 `.feature` file(s) in `run.artifact_dir`, never the materialized copy at `feature_path`, since a
 blocked scenario was never materialized into it (Stage 03, 3.0 and the Two Degenerate Cases in
 `gherkin-conventions.md`).
@@ -93,17 +94,6 @@ is stuck. Writing `@not-automated` is still an edit to that same file. Deferring
 in the pipeline where a human has just reviewed and approved the blocked list is what makes it
 permissible: this is a human-gated edit, not a fix-loop edit, and the tag it produces keeps the
 automation status visible both in the file itself and in Xray once CI imports it.
-
-**Under `--yolo` the tag is written without an approval, and that is the rule, not an oversight.**
-`--yolo` skips 4.2, so there is no approval left to condition the edit on, and both alternatives are
-worse. Writing nothing would ship blocked scenarios untagged — losing exactly the automation-status
-visibility this tag exists to keep, in the file and in Xray once CI imports it, on the runs that got
-the least human attention. And no judgement is being delegated: `@not-automated` records a fact
-Stage 03 already determined — this scenario was not automated — not a decision about what the
-scenario should say, which is the kind of edit the forbidden set actually protects. What 4.2's
-approval adds in default mode is the human's chance to object first; passing `--yolo` is that human
-delegating the objection in advance, by definition. Read the paragraph above as naming why the edit
-is not a fix-loop edit, not as requiring an approval `--yolo` has already given.
 
 `surface: manual` scenarios need no tag here — they were never candidates for automation and carry
 their one-line reason in the artifact already (`gherkin-conventions.md`'s Surface table).

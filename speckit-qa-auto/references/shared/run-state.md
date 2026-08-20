@@ -18,14 +18,25 @@ one run-state block per artifact folder, updated in place as the run progresses.
 ```yaml
 run:
   jira_key:            MOM-1234
+  anchor_type:         story | epic | test
   slug:                agreement-reset-button
   artifact_dir:        docs/qa/mom-1234-agreement-reset-button
   branch:              test/mom-1234-agreement-reset-button
   worktree_path:       .worktrees/test/mom-1234-agreement-reset-button
-  mode:                default | yolo
+  mode:                default
+  design_only:         false
+  code_state:          landed | pending
   full_suite:          false
-  stage:               01 | 02 | 03 | 04 | completed
+  stage:               00 | 01 | 02 | 03 | 04 | completed
   resume_from:         02
+
+discovery:
+  ran:                 true | false
+  framework:           playwright-bdd | none
+  linked_issues:       [{key, issue_type, relation, status}]
+  xray_tests:          [{key, test_type, summary, requirement}]
+  repo_tests:          [{feature_path, scenarios, tags}]
+  orphan_features:     ["src/tests/login/login-auth.feature"]
 
 profile:
   # every field re-derived each run from the playbook; see repo-profile.md
@@ -44,11 +55,12 @@ xray:
   dedup:               ran | not-run
 
 design:
-  selector_evidence:   source | live-dom | fallback
+  selector_evidence:   source | live-dom | fallback | deferred
   scenarios:
     - name:            Verify the Reset button is renamed
       surface:         ui | api | manual
       dedup:           NEW | UPDATE MOM-5678 | SKIP MOM-5678 | REVIEW MOM-5678
+      source_manual_test: MOM-5678     # absent unless converted from a Manual Xray test
       status:          pending | green | blocked
       blocked_reason:  needs-design-change
       attempts:        0
@@ -66,3 +78,21 @@ design:
    this file first.
 4. `status: green` is only ever written next to the commit sha the run was produced on. A result
    with no sha is not a result.
+5. **`discovery.*` holds evidence, never verdicts.** Every entry is something that was found —
+   an issue key, a test key, a file path, a tag — and nothing under `discovery` is a judgement
+   about whether a behaviour is already covered. Coverage labels live in `design.scenarios[].dedup`
+   and are produced only by the normalized-key rule. Discovery is gathered by subagents, whose
+   output varies run to run; a dedup label that varied run to run would break the guarantee that
+   two runs over unchanged inputs produce an identical label set.
+6. **`run.code_state: pending` forbids Stage 03.** Pending means the feature's code has not
+   landed, so no selector can resolve against anything real. A run in that state ends after
+   Stage 02 with `resume_from` naming the selector gate, and resumes once the code exists. Stage 03
+   entered against `code_state: pending` would automate against selectors nobody could verify.
+7. **`selector_evidence: deferred` is not `fallback`.** `fallback` means evidence was sought and a
+   semantic strategy was accepted as a recorded risk. `deferred` means there was nothing to seek
+   yet. Collapsing the two would make every pre-code run look like a risky run and drain the
+   meaning out of the one value that flags real selector risk in the Stage 04 report.
+8. `run.anchor_type` records what the `--issue` argument resolved to. `story` covers one
+   requirement; `epic` fans out to its children and produces one `.feature` per child; `test`
+   anchors on an existing Xray test and takes its requirement as the `@REQ_` target. The field is
+   written at intake and never re-derived downstream.

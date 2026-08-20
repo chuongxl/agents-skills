@@ -44,12 +44,13 @@ contract:
 
 | `surface` | Meaning | Selector gate | Stage 03 |
 |---|---|---|---|
-| `ui` | Drives the application through its interface | **Applies.** Every element resolves, or the run stops | Automated |
+| `ui` | Drives the application through its interface | **Applies**, at the head of Stage 03. Every element resolves, or its scenario is blocked | Automated |
 | `api` | Exercises an endpoint or a service contract, no interface | Does not apply. The scenario must instead name its endpoint and request/response fixture | Automated |
 | `manual` | Cannot or should not be automated — visual judgement, external system, physical device | Does not apply | Not automated; lives in the artifact only |
 
 A `surface: ui` scenario with zero UI elements is a design error, not a pass — it means the
-scenario was misclassified, not that the gate found nothing to check. A `surface: manual` scenario
+scenario was misclassified, not that the gate found nothing to check. The design stage names those
+elements; the Stage 03 entry gate resolves them to selectors. A `surface: manual` scenario
 needs an explicit one-line reason recorded beside it; without the reason, self-review fails,
 because `manual` is otherwise the easiest way to make the selector gate disappear without actually
 earning that exemption.

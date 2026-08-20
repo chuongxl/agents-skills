@@ -1,30 +1,64 @@
 # Stage 03: Automate
 
 Loads: [run-state.md](../shared/run-state.md), [operating-rules.md](../shared/operating-rules.md),
-[gherkin-conventions.md](../shared/gherkin-conventions.md). Three leaves, so the reader knows the
-cost before paying it (design spec §11.2 rule 1). `run-state.md` is declared because this stage
-reads and updates `design.scenarios[]` by field name — `attempts` above all, which is what bounds
+[gherkin-conventions.md](../shared/gherkin-conventions.md),
+[selector-verification.md](../shared/selector-verification.md). Four leaves, so the reader knows the
+cost before paying it (design spec §11.2 rule 1). `selector-verification.md` is declared because the
+selector gate opens this stage; it is no longer a design-stage concern, and reading it from memory
+is exactly how a moved gate goes on being applied where it used to live. `run-state.md` is declared
+because this stage reads and updates `design.scenarios[]` by field name — `attempts` above all, which is what bounds
 the fix loop across turns. It links to no other file under `references/pipeline/` — Stage 02 is
 not linked back to, and its successor is named, never linked: **enter Stage 04** at the end of this
 stage, same turn.
 
-◀ NO-STOP ZONE. Stage 03 opens once Stage 02's human gate (or its `--yolo` skip) has passed and
-the design artifacts are committed. From that point until every scenario in scope carries a
+◀ NO-STOP ZONE. Stage 03 opens once Stage 02's human gate has passed and the design artifacts are
+committed. From that point until every scenario in scope carries a
 verdict, nothing in this stage asks a question, waits for approval, or pauses for confirmation.
-There are exactly three ways this stage ends: a verdict recorded against every scenario in scope,
-an infrastructure stop (`operating-rules.md`, "Infrastructure Failure Is Not Test Failure"), or the
-circuit breaker (`operating-rules.md`, "Circuit Breaker"). No fourth exit exists.
+Once the no-stop zone is open there are exactly three ways this stage ends: a verdict recorded
+against every scenario in scope, an infrastructure stop (`operating-rules.md`, "Infrastructure
+Failure Is Not Test Failure"), or the circuit breaker (`operating-rules.md`, "Circuit Breaker"). No
+fourth exit exists inside the zone. The entry gate below can end the stage before the zone opens —
+that is a fourth exit from the *stage*, and deliberately not one from the *zone*.
+
+## Entry Gate: Resolve The Intent Map
+
+Runs first, before any step below, and before the no-stop zone opens. Follow
+`selector-verification.md` in full.
+
+1. **Refuse `code_state: pending`.** A run whose code has not landed must not have reached this
+   stage; Stage 02 ends such runs at `resume_from: 02.4`. Reaching here with
+   `selector_evidence: deferred` means that exit was missed — stop and report, rather than generate
+   against selectors nobody could verify.
+2. **Ask the evidence source and resolve.** Repository source, live DOM via subagent, or a recorded
+   semantic fallback, per `selector-verification.md`, "The Choice Is Asked, Never Assumed". Write
+   `design.selector_evidence`. This is the one question this stage asks, and asking it here — rather
+   than after three scenarios have been generated against the wrong source — is what keeps it
+   answerable.
+3. **Turn the element intent map into a selector map.** One row per element, each resolving to an
+   existing selector, a proposed one with file and line, or a named semantic fallback.
+4. **Block, do not stop, on an element that is not there.** Per `selector-verification.md`, "An
+   Element That Does Not Exist Is A Design Verdict, Not A Stop": mark that scenario
+   `blocked: needs-design-change` and continue with the rest. It costs no fix-loop attempt — the
+   verdict is known before the first attempt could be spent.
+
+Frontend edits proposed here are report-only unless the human explicitly approves them; an approval
+sets `baselines.frontend_edits_approved: true`, is recorded for the Stage 04 frontend baseline
+re-verification, and lands on a separate frontend branch inside the submodule — never mixed into the
+test branch or the same commit as test artifacts.
+
+The no-stop zone opens once every `surface: ui` scenario in scope either carries a complete selector
+map or carries a `blocked` verdict.
 
 ## What This Stage Receives
 
 Per `run-state.md` rule 2, read only from `execution-report.md` and the artifact folder — never
 from `stage-02-test-design.md`: `run.artifact_dir`, `run.branch`, `run.worktree_path`,
-`run.full_suite`, `run.mode`, every field of `profile.*` (`repo-profile.md`'s fourteen-field
+`run.full_suite`, every field of `profile.*` (`repo-profile.md`'s fourteen-field
 table — `feature_path`, `steps_path`, `page_path`, `selectors_path`, `testdata_path`,
 `generate_cmd`, `scoped_run_cmd`, `selector_attribute`, `existing_tags`, and the rest), and
-`design.scenarios[]` and `design.selector_evidence` as Stage 02 left them — every scenario at
-`status: pending`. On disk, inside `run.artifact_dir`: the `.feature` file(s) from Stage 02's step
-2.5, and `test-design.md` for its coverage matrix, selector map, and test data/mock plan.
+`design.scenarios[]` as Stage 02 left them — every scenario at `status: pending` — and
+`run.code_state`, which the entry gate checks before anything else. On disk, inside `run.artifact_dir`: the `.feature` file(s) from Stage 02's step
+2.5, and `test-design.md` for its coverage matrix, element intent map, and test data/mock plan.
 
 ## Execution Order
 
@@ -52,15 +86,15 @@ passing verdict.
 
 Work one scenario package at a time, in dependency order — a scenario sharing `Background:` setup
 or a page object with another goes after whichever it depends on. Pass each package only the
-slices of `test-design.md` it needs: its own rows of the coverage matrix and selector map, never
-the whole document, and never the whole of Stage 02's prose.
+slices of `test-design.md` it needs: its own rows of the coverage matrix and of the selector map the
+entry gate produced, never the whole document, and never the whole of Stage 02's prose.
 
 ### 3.2 Generate
 
 Produce `*.steps.ts` at `steps_path`, page objects at `page_path`, selectors at `selectors_path`,
-and test data or mocks at `testdata_path` — all per `repo-profile.md`'s field table. Only selectors
-already present in the approved selector map from `test-design.md` may be used; a missing selector
-is a Stage 02 defect surfaced here, not something to resolve by inventing one.
+and test data or mocks at `testdata_path` — all per `repo-profile.md`'s field table. Only selectors already present in the selector map the entry gate
+produced may be used; a missing selector is a gate defect surfaced here, not something to resolve by
+inventing one.
 
 ### 3.3 Verify
 
@@ -92,7 +126,7 @@ job alone (`commit.md`). A result with no sha attached is not a result (`run-sta
 Once every scenario in the current run scope carries a verdict, check three things across the whole
 batch: every acceptance criterion in `test-design.md`'s coverage matrix **whose covering scenarios
 are in automation scope** — `surface: ui` or `surface: api`, and not marked
-`blocked: needs-design-change` — has at least one passing scenario; every row of the selector map
+`blocked: needs-design-change` — has at least one passing scenario; every row of the entry gate's selector map
 was used by generated code; and repo conventions hold —
 page objects go through the base page, selectors stay centralized, no test data is hardcoded in
 step definitions, and no `waitForTimeout` appears anywhere. A failure here is not a stop. It feeds
@@ -133,6 +167,8 @@ is Stage 04's job, not this stage's.
 Written into run state:
 
 - `run.stage: 03`, written on entering this stage, so a run interrupted inside it resumes here
+- `design.selector_evidence` — `source | live-dom | fallback`, written by the entry gate. Never
+  `deferred`: that value means the gate has not run, and this stage does not open until it has
 - `design.scenarios[].status` — `green` or `blocked`; never left `pending` for a scenario the run
   scope included
 - `design.scenarios[].attempts` — the number of fix-loop edit-and-rerun cycles spent

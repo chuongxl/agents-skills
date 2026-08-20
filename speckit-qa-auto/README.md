@@ -1,14 +1,15 @@
 # Speckit QA Auto — Jira-to-Tests QA Pipeline
 
-**Version**: 0.1.0
+**Version**: 0.2.0
 **Author**: Alex Nguyen
 
 ## Overview
 
-Speckit QA Auto runs a complete QA delivery pipeline from a single Jira issue: it reads the
-story, designs BDD test scenarios, verifies every UI selector against real evidence, generates
-Playwright-BDD automation, runs it through a bounded run-and-fix loop, and finishes with a human
-review and a pushed branch. Four properties matter most for anyone reading its output:
+Speckit QA Auto runs a complete QA delivery pipeline from a single Jira issue: it discovers what
+already exists, reads the story, designs BDD test scenarios, verifies every UI selector against real
+evidence, generates Playwright-BDD automation, runs it through a bounded run-and-fix loop, and
+finishes with a human review and a pushed branch. Six properties matter most for anyone reading its
+output:
 
 1. **The Gherkin `.feature` file is the single artifact.** It is the manual tester's test case,
    the spec `playwright-bdd` compiles into automation, and the Cucumber Test Xray imports on
@@ -16,12 +17,20 @@ review and a pushed branch. Four properties matter most for anyone reading its o
 2. **`docs/qa/<jira-key>-<slug>/` is the source of truth.** The `.feature` file(s) there are
    authored and approved at Stage 02. The project's test tree (for example `src/tests/…`) holds
    only a **derived, scenario-level subset**, materialized by Stage 03 and never edited directly.
-3. **The Stage 03 fix loop may not edit Gherkin.** It may fix selectors, waits, page objects,
+3. **Discovery runs before design.** Linked issues, existing Xray tests (Cucumber *and* Manual), and
+   the repository's own `.feature` files are swept first, so a scenario is never designed in
+   ignorance of coverage that already exists.
+4. **Design can complete before the code does.** Writing test cases ahead of implementation is
+   normal practice, so it is a supported path, not a workaround: the selector gate runs at the head
+   of Stage 03, and a pre-code run finishes design, gets approved, and resumes into automation once
+   the feature lands.
+5. **The Stage 03 fix loop may not edit Gherkin.** It may fix selectors, waits, page objects,
    step definitions, test data, and mocks. A scenario that needs a different assertion or step is
    marked `blocked: needs-design-change`, never bent to pass.
-4. **Xray import happens in CI, on merge — not inside this skill.** The pipeline never writes to
+6. **Xray import happens in CI, on merge — not inside this skill.** The pipeline never writes to
    Xray; a CI job reads `docs/qa/` (the complete approved set, automated, blocked, and manual
-   scenarios alike) and imports it after the branch merges.
+   scenarios alike) and imports it after the branch merges. Bootstrap writes that job for
+   repositories that do not have one.
 
 ## Quick Start
 
@@ -30,9 +39,19 @@ skill speckit-qa-auto --issue https://jira.example.com/browse/MOM-1234
 ```
 
 On GitHub Copilot / Claude Code, invoke as `/speckit-qa-auto --issue <jira-url-or-key>`; on
-OpenCode, embed the flags in the trigger message. `--issue` is required on every invocation — the
-Jira key is the artifact folder's identity, the `@REQ_` tag on every scenario, and the dedup key
-against existing Xray coverage.
+OpenCode, embed the flags in the trigger message. `--issue` is required on every invocation.
+
+It accepts three kinds of key:
+
+| Anchor | Produces |
+|---|---|
+| A **story** | One `.feature` set for that requirement |
+| An **epic** | One `.feature` per child issue, each tagged with the child's key |
+| An existing **Xray test** | Scenarios converted from that test, tagged with the requirement it links to |
+
+One argument, three resolutions — never a second entry flag. The Jira key is the artifact folder's
+identity, the `@REQ_` tag, the dedup key, and the resume glob; a second way in would mean a second
+identity for all four.
 
 ## Pipeline Flow
 
@@ -42,11 +61,16 @@ files, not diagrams.
 ```dot
 digraph qa_pipeline {
     "Jira issue" [shape=ellipse];
-    "Stage 01: intake" [shape=box];
+    "Stage 01: intake + discovery" [shape=box];
+    "Test framework present?" [shape=diamond];
+    "Bootstrap: framework, test tree, CI import job" [shape=box];
     "Stage 02: test design" [shape=box];
-    "Every element resolved?" [shape=diamond];
     "Self-review passes?" [shape=diamond];
     "Human approves design?" [shape=diamond];
+    "Code landed, and not --design-only?" [shape=diamond];
+    "END: design approved, resume later" [shape=doublecircle];
+    "Stage 03 entry: selector gate" [shape=box];
+    "Every element resolved?" [shape=diamond];
     "Stage 03: automate" [shape=box];
     "Scenario green?" [shape=diamond];
     "Needs Gherkin change?" [shape=diamond];
@@ -58,15 +82,23 @@ digraph qa_pipeline {
     "STOP: report, never rewrite" [shape=octagon, style=filled, fillcolor=red, fontcolor=white];
     "Branch pushed" [shape=doublecircle];
 
-    "Jira issue" -> "Stage 01: intake";
-    "Stage 01: intake" -> "Stage 02: test design";
-    "Stage 02: test design" -> "Every element resolved?";
-    "Every element resolved?" -> "Stage 02: test design" [label="no, resolve"];
-    "Every element resolved?" -> "Self-review passes?" [label="yes"];
+    "Jira issue" -> "Stage 01: intake + discovery";
+    "Stage 01: intake + discovery" -> "Test framework present?";
+    "Test framework present?" -> "Bootstrap: framework, test tree, CI import job" [label="no"];
+    "Bootstrap: framework, test tree, CI import job" -> "Stage 02: test design";
+    "Test framework present?" -> "Stage 02: test design" [label="yes"];
+
+    "Stage 02: test design" -> "Self-review passes?";
     "Self-review passes?" -> "Stage 02: test design" [label="no, fix at source"];
     "Self-review passes?" -> "Human approves design?" [label="yes"];
     "Human approves design?" -> "Stage 02: test design" [label="revisions"];
-    "Human approves design?" -> "Stage 03: automate" [label="approved"];
+    "Human approves design?" -> "Code landed, and not --design-only?" [label="approved"];
+    "Code landed, and not --design-only?" -> "END: design approved, resume later" [label="no"];
+    "Code landed, and not --design-only?" -> "Stage 03 entry: selector gate" [label="yes"];
+
+    "Stage 03 entry: selector gate" -> "Every element resolved?";
+    "Every element resolved?" -> "Mark blocked, continue" [label="no, element absent from code"];
+    "Every element resolved?" -> "Stage 03: automate" [label="yes"];
 
     "Stage 03: automate" -> "Scenario green?";
     "Scenario green?" -> "More scenarios?" [label="yes"];
@@ -85,26 +117,38 @@ digraph qa_pipeline {
 }
 ```
 
-Stage 03 is the only region with no human edge: once entered, it runs to a scenario verdict or to
-the circuit breaker. Every loop inside it is bounded — 3 fix attempts per scenario, 5 identical
-failures overall.
+Stage 03's automation region is the only part with no human edge: once the entry selector gate has
+passed, it runs to a scenario verdict or to the circuit breaker. Every loop inside it is bounded —
+3 fix attempts per scenario, 5 identical failures overall.
 
 ## Features
 
+- **Discovery before design** — three concurrent sweeps (Jira linkage, Xray tests, repository
+  tests) gather evidence, never verdicts, so dedup stays a mechanical rule rather than a subagent's
+  opinion.
 - **Requirement analysis and Xray dedup** — Stage 02 labels every behaviour `NEW`, `UPDATE`,
   `SKIP`, or `REVIEW` against a normalized scenario key, never a similarity judgement.
-- **Selector gate bound to evidence, not technique** — every `surface: ui` scenario resolves its
-  elements against repository source, a live-DOM read (dispatched to a subagent), or a recorded
-  semantic-fallback risk, chosen by the user at the gate.
+- **Manual test conversion** — existing Manual test cases become Gherkin scenarios imported as
+  **new** Cucumber tests linked to the originals, never as overwrites; every deviation from the
+  original is itemized at the gate.
+- **Selector gate bound to evidence, not technique** — at the head of Stage 03, every `surface: ui`
+  scenario resolves its elements against repository source, a live-DOM read (dispatched to a
+  subagent), or a recorded semantic-fallback risk, chosen by the user at the gate.
+- **Pre-code design** — `code_state: pending` finishes and approves a design with no frontend to
+  read, records `selector_evidence: deferred` (which is *not* `fallback`), and resumes into
+  automation when the feature lands.
+- **Bootstrap for repositories with no test framework** — Playwright-BDD, the test tree, a base page,
+  a worked example, the conventions playbook, and the Xray import CI workflow.
 - **Playwright-BDD generation** — step definitions, page objects, selectors, and test data, per
   the discovered repo profile's conventions.
 - **Bounded fix loop** — up to 3 fix attempts per scenario and a 5-failure circuit breaker;
   environmental failures stop the run instead of burning attempts.
-- **Two human gates** — design approval (Stage 02) and commit/push approval (Stage 04) in default
-  mode; both skip under `--yolo`, but the selector and self-review gates never do.
+- **Two human gates, and no flag skips them** — design approval (Stage 02) and commit/push approval
+  (Stage 04), plus the self-review and selector gates.
 - **Content-aware workspace guard** — two integrity baselines (source checkout and frontend
   submodule) verified before any commit; a violation stops the run, never reverted automatically.
-- **Portable across three hosts** — GitHub Copilot, Claude Code, and OpenCode.
+- **Portable across three hosts** — GitHub Copilot, Claude Code, and OpenCode; subagent dispatch
+  degrades to inline execution where the host offers none.
 
 ## Installation
 
@@ -119,17 +163,24 @@ dependency — into the host's skill directory. The skill is auto-discovered fro
 | Claude Code | `~/.claude/skills/` |
 | OpenCode | `~/.config/opencode/skills/` |
 
-Requires `git`, `bash`, and a Playwright-BDD + TypeScript test repository, plus network access for
-Jira and, optionally, Xray. At most one frontend submodule is assumed.
+Requires `git`, `bash`, and a TypeScript repository, plus network access for Jira and, optionally,
+Xray. A Playwright-BDD test tree is used when present and created by bootstrap when absent. At most
+one frontend submodule is assumed.
 
 ## Examples
 
 ```bash
-# Default mode: human gates at design and finish
+# Default: discovery, design, selector gate, automation, both human gates
 skill speckit-qa-auto --issue MOM-1234
 
-# Autonomous: skips both approvals, never the selector or self-review gates
-skill speckit-qa-auto --yolo --issue https://jira.example.com/browse/MOM-1234
+# Approved Gherkin now, automation later — the run stops after the design gate
+skill speckit-qa-auto --issue MOM-1234 --design-only
+
+# Whole epic: one .feature per child issue, one design gate for the batch
+skill speckit-qa-auto --issue MOM-100
+
+# Convert an existing Manual Xray test into automation
+skill speckit-qa-auto --issue MOM-5678
 
 # Run the full suite instead of the default affected-domain scope
 skill speckit-qa-auto --issue MOM-1234 --full-suite
@@ -145,8 +196,8 @@ skill speckit-qa-auto --issue MOM-1234 --pr
 
 | Variable | Required | Purpose |
 |---|---|---|
-| `JIRA_URL`, `JIRA_USERNAME`, `JIRA_API_TOKEN` | yes | Jira intake (Stage 01) |
-| `XRAY_CLIENT_ID`, `XRAY_CLIENT_SECRET` | no | Existing-test read at Stage 01; absence degrades to a warning |
+| `JIRA_URL`, `JIRA_USERNAME`, `JIRA_API_TOKEN` | yes | Jira intake and discovery (Stage 01) |
+| `XRAY_CLIENT_ID`, `XRAY_CLIENT_SECRET` | no | Existing-test sweep at Stage 01; absence degrades to a warning |
 
 None of these are ever printed. Repo-specific conventions (test paths, run commands, the
 selector attribute, the Xray project key) are discovered, not configured — see
@@ -154,13 +205,20 @@ selector attribute, the Xray project key) are discovered, not configured — see
 `docs/qa/.repo-profile.json`, alongside a provenance hash per source so a changed playbook is
 never applied silently.
 
+The Xray import CI job needs `XRAY_CLIENT_ID`, `XRAY_CLIENT_SECRET`, and `XRAY_PROJECT_KEY` as
+repository secrets. Bootstrap writes the workflow but cannot set them, and says so.
+
 ## Troubleshooting
 
 | Symptom | Fix |
 |---|---|
-| Run stops asking for `--issue` | Required on every invocation; pass a Jira key or browse URL |
-| Xray read reports `xray: unavailable` | Add `XRAY_CLIENT_ID` / `XRAY_CLIENT_SECRET`; the run continues with dedup `not-run` |
+| Run stops asking for `--issue` | Required on every invocation; pass a story, epic, or Xray test key |
+| Xray sweep reports unavailable | Add `XRAY_CLIENT_ID` / `XRAY_CLIENT_SECRET`; the run continues with dedup `not-run` |
+| Run ends after Stage 02 with `resume_from: 02.4` | The feature's code has not landed. Design is approved and committed; re-run once it has |
+| Bootstrap asks to create files | The repository has no Playwright-BDD test tree. Approve the listed paths, or stop and point the run at a repository that has one |
+| Xray import CI job fails | Its three secrets are not set by bootstrap; set them in repository settings |
 | Selector gate has no evidence source to offer | Frontend source unreadable and no reachable app/browser automation; accept the fallback risk or fix the checkout |
-| Stage 02 self-review fails the same check 3 times | Stops by design — fix the scenario, selector map, or design at its source |
+| A scenario is blocked at the selector gate | The element is not in the built feature — design and implementation disagree. Resolve at design, not by substituting a fallback selector |
+| Stage 02 self-review fails the same check 3 times | Stops by design — fix the scenario, intent map, or design at its source |
 | Stage 04 reports a baseline violation | Checkout or frontend submodule changed outside the run; never reverted — resolve manually, re-run |
 | Stage 04 push stops on a diverged remote | Fast-forward only, by design; rebase or merge manually, then re-run Stage 04 |
