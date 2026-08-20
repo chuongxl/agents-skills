@@ -180,11 +180,20 @@ both and never merged:
 Which query ran is always reported back (`Xray query:` in the output template).
 
 **Manual and Generic tests never appear in the Cucumber export.** Xray's `export/cucumber`
-endpoint only returns Cucumber-format tests; Manual and Generic tests are fetched separately
-through the Jira REST API and written to `xray_manual_output_path`. A caller that receives
-Cucumber tests (`xray_output_path` populated) but no Manual tests is looking at **partial
-coverage**, not proof the story has no manual tests — the skill reports explicitly when the
-non-Cucumber set could not be fetched, and this should never be silently assumed.
+endpoint only returns Cucumber-format tests; Manual and Generic tests are fetched separately —
+metadata through the Jira REST API, and **their steps through Xray's GraphQL API** — and written to
+`xray_manual_output_path`. A caller that receives Cucumber tests (`xray_output_path` populated) but
+no Manual tests is looking at **partial coverage**, not proof the story has no manual tests — the
+skill reports explicitly when the non-Cucumber set could not be fetched, and this should never be
+silently assumed.
+
+**Since v0.4.0 the manual table carries verbatim test steps.** A Manual test's steps are its
+content; key, summary, and labels are only metadata about it. Steps are recorded one row per raw
+step object, in Xray's own Action / Data / Expected Result columns, in original order, with unedited
+wording and no invented section headers — because a caller reads this table either to judge whether
+coverage already exists or to convert the test into Gherkin, and both read an edit as the original.
+When steps cannot be fetched the table is emitted without them and the report says so: a stepless
+table and a test with genuinely no steps are different facts.
 
 Missing `XRAY_CLIENT_ID` / `XRAY_CLIENT_SECRET` is a warning, not a stop: the skill reports `xray:
 unavailable` and returns the brief as usual. This skill only reads Xray — it never imports a

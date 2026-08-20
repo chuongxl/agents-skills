@@ -1,6 +1,6 @@
 ---
 name: jira-to-speckit
-description: Fetch a Jira issue or Jira issue URL using credentials from `.env`, then compact the ticket into a Speckit-ready feature brief (title, business goal, acceptance criteria, constraints, open questions) plus a Jira-key-based feature name, and optionally write a full-fidelity ticket snapshot markdown file for traceability. Use when work starts from Jira and a caller (typically `speckit-auto`) needs a clean, size-bounded intake payload to drive its own spec/plan/task pipeline. This skill only reads Jira (and, optionally, Xray), produces that brief, and writes at most the files the caller names — it does not run Speckit stages, review loops, git operations, or track execution progress. When `xray_tests` is requested it can additionally export the Xray tests covering the issue, as a Cucumber `.feature` file plus a table of non-Cucumber tests.
+description: Fetch a Jira issue or Jira issue URL using credentials from `.env`, then compact the ticket into a Speckit-ready feature brief (title, business goal, acceptance criteria, constraints, open questions) plus a Jira-key-based feature name, and optionally write a full-fidelity ticket snapshot markdown file for traceability. Use when work starts from Jira and a caller (typically `speckit-auto`) needs a clean, size-bounded intake payload to drive its own spec/plan/task pipeline. This skill only reads Jira (and, optionally, Xray), produces that brief, and writes at most the files the caller names — it does not run Speckit stages, review loops, git operations, or track execution progress. When `xray_tests` is requested it can additionally export the Xray tests covering the issue, as a Cucumber `.feature` file plus a table of non-Cucumber tests carrying their verbatim Xray steps.
 compatibility: Requires network access and Jira REST API access. Requires `.env` entries for `JIRA_URL`, `JIRA_USERNAME`, and `JIRA_API_TOKEN`. Optional Xray read mode requires `XRAY_CLIENT_ID` and `XRAY_CLIENT_SECRET`.
 license: MIT
 allowed-tools: bash view create
@@ -271,11 +271,15 @@ Follow [`references/XRAY_API.md`](references/XRAY_API.md) exactly:
    unavailable). Never merge the two result sets or add label/summary heuristics. Report which
    query ran.
 3. Split the result by test type: Cucumber tests via the Cucumber export, concatenated into
-   `xray_output_path`; every other type (Manual, Generic) via the Jira REST API, written to
-   `xray_manual_output_path` as a markdown table. Each file is written only when the caller
-   supplied its path.
-4. Report per file: how many tests, which query ran, and whether the non-Cucumber set could be
-   fetched.
+   `xray_output_path`; every other type (Manual, Generic) via the Jira REST API for metadata **and
+   Xray's GraphQL API for their steps** (`XRAY_API.md` §5), written to `xray_manual_output_path` as
+   a markdown table. Each file is written only when the caller supplied its path.
+4. Record every step **verbatim** — one row per raw step object, original order, unedited wording,
+   no invented section headers (`XRAY_API.md` §6). A caller uses this table to judge whether
+   coverage already exists, or to convert the test into Gherkin; both read an edit as the original.
+5. Report per file: how many tests, which query ran, whether the non-Cucumber set could be fetched,
+   and whether their steps could be fetched. A table without steps and a test with no steps are
+   different facts and must not print the same way.
 
 This step performs no write to Xray, no import, no test-execution creation, and no result upload.
 
@@ -300,6 +304,7 @@ Always return the result in this exact shape:
 - Xray tests: (count and path written, or `not requested`, or `xray: unavailable`)
 - Xray query: (`testRequirement` or `linkedIssues`, or omitted when `xray_tests` is not requested)
 - Xray manual tests: (count and path written, or `not requested`, or a note that the non-Cucumber set could not be fetched)
+- Xray manual steps: (`fetched`, or `unavailable` with the reason — omitted when no non-Cucumber tests were found)
 
 ## Common Edge Cases
 

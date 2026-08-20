@@ -60,6 +60,12 @@ matched mechanically. A Manual test has prose steps, so it cannot — it is advi
 decision, and it is also the raw material a Manual-to-Gherkin conversion reads. Losing the type
 collapses two very different downstream paths into one.
 
+**The steps themselves go to disk, not into `discovery.xray_tests[]`.** The sweep writes them
+verbatim into `existing-tests-manual.md` in the artifact folder, and the run-state entries carry
+keys, types, summaries, and requirements only. This is what lets the bounds below hold while a
+conversion still has the full step text to work from: the content lives in a file anything can read,
+and only the index travels through run state.
+
 ### Sweep 3 — Repository tests
 
 Scan the test tree the repo profile named. Returns three things at once:
