@@ -52,11 +52,27 @@ Present, for approval:
 - Proposed `data-testid` additions for the frontend, each with file and line (the report-only
   proposals `selector-verification.md`'s selector gate produced at the head of Stage 03, carried
   forward unapplied unless `baselines.frontend_edits_approved` is true)
-- `design.selector_evidence` — `source | live-dom | fallback` — including the fallback
+- `design.selector_evidence` — `source | live-dom | fallback | n/a` — including the fallback
   acknowledgement recorded at Stage 02 when the evidence source was `fallback`
   (`selector-verification.md`, "Semantic Fallback Is A Recorded Risk": "The Stage 04 report
-  repeats it"). Never `deferred` — that value means the gate never ran, and a run carrying it
+  repeats it"). It is a roll-up over `surface: ui` scenarios by the precedence in `run-state.md`
+  rule 16, and the per-scenario values are the authority, so report a mixed run by its scenarios
+  rather than by the summary alone. `n/a` means the scope held no `ui` scenario and there was
+  nothing to resolve. Never `deferred` — that value means the gate never ran, and a run carrying it
   cannot have reached this stage
+- **Impact scenarios approved at the Stage 02 gate**, each with the flow and evidence path it came
+  from
+- **`design.adversarial_review` and `design.review_mode`.** A run that shipped with an inline review,
+  or with `issues-open`, says so in the artifact a human reads last — not only in a gate they saw
+  once and scrolled past
+- **Recommended regression**: the existing tests the impact sweep's test-inventory branch found, per
+  flow. A list to run or schedule, **not a run** — Stage 03 deliberately did not execute them, for
+  the reason its Run Scope section gives.
+
+  A flow is **approved** when at least one of its scenarios is in `impact.approved_scenarios[]`.
+  That list names scenarios and never flows (`run-state.md` rule 10), so "approved flow" is derived
+  here rather than stored. A flow whose scenarios were **all dropped** still has its tests reported,
+  marked as such: the human dropped a scenario, not the observation that tests exist on that surface
 - Open questions carried from `test-design.md`
 
 This approval always runs — no flag skips it. Neither does 4.3's baseline verification, which is

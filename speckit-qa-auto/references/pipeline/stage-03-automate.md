@@ -39,7 +39,12 @@ Runs first, before any step below, and before the no-stop zone opens. Follow
    than after three scenarios have been generated against the wrong source — is what keeps it
    answerable.
 3. **Turn the element intent map into a selector map.** One row per element, each resolving to an
-   existing selector, a proposed one with file and line, or a named semantic fallback.
+   existing selector, a proposed one with file and line, or a named semantic fallback. Each
+   scenario's own value is written to `design.scenarios[].selector_evidence`, and the run-level
+   field is the roll-up over the `surface: ui` ones (`run-state.md` rule 16). A run whose scope
+   holds no `ui` scenario at all has nothing to resolve: every scenario carries `n/a`, the roll-up
+   is `n/a`, and step 2's question is not asked. `n/a` is not `deferred` — nothing was skipped,
+   there was nothing to seek — and Turn-Ending Condition 11 does not fire on it.
 4. **Block, do not stop, on an element that is not there.** Per `selector-verification.md`, "An
    Element That Does Not Exist Is A Design Verdict, Not A Stop": mark that scenario
    `blocked: needs-design-change` and continue with the rest. It costs no fix-loop attempt — the
@@ -152,6 +157,20 @@ full-suite run only happens under the explicit `--full-suite` flag (`run.full_su
 running everything is slow and rarely what a single ticket needs. `scoped_run_cmd`'s tag filter is
 what enforces this scope at 3.3; narrowing that filter to dodge a red scenario is itself a forbidden
 fix-loop edit (`operating-rules.md`).
+
+The impact `.feature` file is a second input to **materialization** and generation, and its
+scenarios get `design.scenarios[]` entries like any other. The scoped run command covers exactly the
+scenarios that have such entries — both files' — and is **not** widened to sweep in the pre-existing
+tests of the flows those scenarios touch.
+
+That restraint is arithmetic, not caution. This stage's exit condition is a verdict recorded against
+every scenario in scope, and its fix loop budgets attempts per entry in `design.scenarios[]`. A
+pre-existing test pulled in by a broadened tag filter has no entry, so no attempts budget and no
+path to a verdict — inside a no-stop zone that cannot end until every in-scope scenario has one.
+Widening the command would manufacture in-scope work this stage has no mechanism to discharge. Those
+tests are reported by Stage 04 as recommended regression instead, where a human can run them.
+
+`@IMPACT` is not part of the tag filter either, for the same reason (`gherkin-conventions.md`).
 
 ## Blocked And Manual Scenarios
 
