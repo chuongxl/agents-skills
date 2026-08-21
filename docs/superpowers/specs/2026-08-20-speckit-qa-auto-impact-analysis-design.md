@@ -1,6 +1,6 @@
 # speckit-qa-auto — Adversarial Design Review and Impact Analysis
 
-Date: 2026-08-20 (round 2: 2026-08-21, after adversarial review)
+Date: 2026-08-20 (round 2 and round 3: 2026-08-21, after two adversarial reviews)
 Status: approved (design), not yet implemented
 Extends [`2026-08-19-speckit-qa-auto-design.md`](2026-08-19-speckit-qa-auto-design.md); decision
 numbering continues from that document's D22.
@@ -10,8 +10,8 @@ numbering continues from that document's D22.
 | Kind | Files |
 |---|---|
 | New | `references/shared/impact-analysis.md`; `assets/adversarial-review-prompt.md` |
-| Edited | `references/shared/discovery.md`, `run-state.md`, `host-adaptation.md`, `gherkin-conventions.md`; `references/pipeline/stage-01-intake.md`, `stage-02-test-design.md`, `stage-03-automate.md`, `stage-04-finish.md`; `SKILL.md`; the skill's own `README.md` |
-| Edited outside the skill | root `README.md` — the skills-table row's version badge, which `tools/validate_skills.py:292` compares against `SKILL.md`; `tools/validate_coupling.py` — new check C3 (see §8); `test-case/speckit-qa-auto/` — new rows and one fixture |
+| Edited | `references/shared/discovery.md`, `run-state.md`, `host-adaptation.md`, `gherkin-conventions.md`, `operating-rules.md`, `selector-verification.md`, `manual-conversion.md`; `references/pipeline/stage-01-intake.md`, `stage-02-test-design.md`, `stage-03-automate.md`, `stage-04-finish.md`; `SKILL.md`; the skill's own `README.md` |
+| Edited outside the skill | root `README.md` — the skills-table row's version badge, which `tools/validate_skills.py:292` compares against `SKILL.md`, **and that row's flags column, which `--impact` changes**; `tools/validate_coupling.py` — new check C3 (see §8); `test-case/speckit-qa-auto/` — new rows and one fixture |
 
 Two files share a name and are not the same file: the **leaf** `references/shared/impact-analysis.md`
 (how the sweep works) and the **artifact** `impact-candidates.md` (what one run found). The artifact
@@ -77,7 +77,7 @@ clean in the way the first draft claimed.
 Isolation is retained as a **preference**, not a precondition: a fresh context is less anchored on
 a conclusion it did not reach, which is a real but unquantified benefit. It is recorded per run
 (`design.review_mode`) precisely so the benefit can be measured against real runs rather than
-asserted — the same standard §9 applies to the second-reviewer question.
+asserted — the same standard §11 applies to the second-reviewer question.
 
 Two things follow, and both were wrong in round 1:
 
@@ -88,7 +88,8 @@ Two things follow, and both were wrong in round 1:
 
 ## Design Decisions
 
-Rows marked ⟲ were revised in round 2 after adversarial review.
+Rows marked ⟲ were revised in round 2; ⟲⟲ marks a row revised again in round 3. Both rounds
+followed an adversarial review, and this was the third and last the design's own bound allows.
 
 | # | Decision | Rationale |
 |---|---|---|
@@ -98,18 +99,24 @@ Rows marked ⟲ were revised in round 2 after adversarial review.
 | D26 | Sweep 4 runs **entity mutation traceability** and **test inventory**; domain-vocabulary search is rejected | They answer different questions. Vocabulary search on a mature project returns most of the system — "noise priced as signal" |
 | D27 | Sweep 4 returns **flows with evidence paths**, never the word *affected* | Rule 5 applied to the new sweep |
 | D28 ⟲ | Step 2.1 reads the **whole ticket** at every depth. No rule is keyed to the heading named "Out-Scope", and depth never narrows the read | A rule keyed to that heading patches one ticket layout. Round 2: depth must not narrow the read either — narrowing the read *is* the Class A behaviour, and the pass that would authorize it is the pass being audited |
-| D29 ⟲ | `design.scenarios[].selector_evidence` is added per scenario; the top-level field becomes the **weakest value present** | Round 2 corrected the rationale. The case first given — `deferred` beside `source` — **cannot occur**: `source` is written only by the Stage 03 entry gate, that gate never runs at `code_state: pending`, and `deferred` is written only at `pending`. The real case is a landed run where one element resolves from `source` and another needs `live-dom` or `fallback`; that distinction is per element, is what rule 7 exists to protect, and is collapsed today |
+| D29 ⟲⟲ | `design.scenarios[].selector_evidence` is added per scenario. The top-level field becomes a **reporting roll-up with an explicit precedence** — `deferred` > `fallback` > `live-dom` > `source` — computed over `surface: ui` scenarios only; `api` and `manual` scenarios take `n/a` and are excluded |  Round 2 corrected the rationale. The case first given — `deferred` beside `source` — **cannot occur**: `source` is written only by the Stage 03 entry gate, that gate never runs at `code_state: pending`, and `deferred` is written only at `pending`. The real case is a landed run where one element resolves from `source` and another needs `live-dom` or `fallback`; that distinction is per element, is what rule 7 exists to protect, and is collapsed today. Round 3: "weakest" was undefined over an enum rule 7 calls non-comparable, and a landed run of only `api` scenarios would have rolled up to `deferred` — which turn-ending condition 11 stops on. The precedence is declared as a reporting convention; the per-scenario field stays the authority, which is what keeps rule 7 intact |
 | D30 | Impact scenarios inherit `run.code_state` from the anchor feature | The invariant does not exist until the anchor's code lands. Follows from rule 6 unchanged |
 | D31 ⟲ | Step 2.7b: a review pass with **three fixed attack tasks** and brainstorming's approve-unless-serious calibration. Isolation is preferred, not required | Round 2: rationale moved from isolation to the questions asked (Constraint 5). The calibration clause is carried over deliberately — an uncalibrated reviewer floods the gate, the human learns to skim, and the mechanism inverts into what it was built to prevent |
 | D32 ⟲ | `run.design_depth` is resolved **in Stage 01**, from `ticket.md`, before Sweep 4. It scales **only** Sweep 4's entity breadth and `test-design.md` verbosity. It never scales the read and never disables a gate or 2.7b. Ratchets up only | Round 2 fixed two defects: it was resolved in Stage 02 while scaling a Stage 01 sweep, and at `trivial` it narrowed the read to the AC table — reproducing Class A under a new name |
-| D33 ⟲ | **2.7b degrades to inline like every other dispatch.** `design.review_mode` records which ran | Round 2 replaced the round-1 carve-out. Its argument rested on the isolation attribution Constraint 5 retracts, and an unfalsifiable exception sentence would let any future step hollow out the general rule. Zero review on a supported host is a worse outcome than a weaker review that says it is weaker |
+| D33 ⟲⟲ | **2.7b degrades to inline like every other dispatch.** `design.review_mode` records which ran, and `adversarial_review` has **three** values, not four | Round 2 replaced the round-1 carve-out. Its argument rested on the isolation attribution Constraint 5 retracts, and an unfalsifiable exception sentence would let any future step hollow out the general rule. Zero review on a supported host is a worse outcome than a weaker review that says it is weaker. Round 3: `not-run` was left in the enum after this decision deleted the only condition that could produce it — a value nothing writes is one a reader assumes means something |
 | D34 | Step 2.7 gains an **ambiguity check**: any ticket line admitting two readings is resolved to one, explicitly, with both readings named | Brainstorming's spec self-review has this check; 2.7's six did not. `Out-Scope` admitting both *not-built* and *must-not-happen* is exactly a two-reading line |
-| **D35** | **Impact scenarios are designed at 2.4b — before 2.7, 2.7b, and the gate — over every sweep candidate and declared flow. The human approves or drops individual scenarios at 2.8** | Round 2. In round 1 they were authored at 2.9, after the gate: never checked by 2.7, never seen by 2.7b, never approved, yet automated by Stage 03. It also made attack task 2 — the entire Class B fix — terminate in a finding nothing could consume, and specified 2.7b to receive a file that did not exist yet. Deciding on concrete scenarios is also a better gate question than deciding on abstract flow names |
+| **D35** ⟲ | **Impact scenarios are designed at 2.4b — before 2.7, 2.7b, and the gate — over every sweep candidate and declared flow. The human approves or drops individual scenarios at 2.8** | Round 2. In round 1 they were authored at 2.9, after the gate: never checked by 2.7, never seen by 2.7b, never approved, yet automated by Stage 03. It also made attack task 2 — the entire Class B fix — terminate in a finding nothing could consume, and specified 2.7b to receive a file that did not exist yet. Deciding on concrete scenarios is also a better gate question than deciding on abstract flow names. Round 3 closed the drop lifecycle: a candidate is satisfied by a scenario **or by a recorded drop**, additions at the gate re-enter 2.4b rather than authoring at 2.8, and 2.4b is bounded by the gate the way a conversion batch is |
 | **D36** | **Sweep 4 runs after sweeps 1–3, not concurrently with them** | Round 2. Branch B consumes sweep 2's Xray list and sweep 3's repo-test list. `discovery.md`'s "share no inputs and no ordering" is amended to scope that claim to sweeps 1–3 |
-| **D37** | **`UPDATE` is forbidden in the impact file. A normalized-key match there labels `REVIEW <TEST-key>` instead** | Round 2. Impact scenarios cover flows other stories own, so a match is likelier here than anywhere. `UPDATE` carries `@TEST_<TEST-KEY>` into a file tagged `@REQ_MOM-12194`; CI would update that test in place and move another story's test under this story's requirement. `REVIEW` is the existing label for *a human decides* |
-| **D38** | **All three anchor types are defined** (§7). `epic` runs Sweep 4, depth, and 2.7b **per child**; `test` runs 2.7b with a **fidelity task set** | Round 2. The design assumed `story` throughout while D25 and D32 said the gate and review run always |
-| **D39** | **Stage 03 widens materialization, never the run command.** Branch B's existing tests become a Stage 04 regression recommendation | Round 2. A pre-existing test pulled into a widened run command has no run-state entry, no attempts budget, and no verdict path — inside a no-stop zone whose exit condition is a verdict per scenario |
-| **D40** | **Acceptance criteria are split into deterministic checks and eval cases**, and the eval cases name a fixture and require agreement across runs | Round 2. Four round-1 criteria asserted that a model pass would return a specific judgement. One passing run does not distinguish a mechanism from luck, and every existing row in `test-cases.md` is deterministic |
+| **D37** ⟲ | **`UPDATE` and `SKIP` are both forbidden in the impact file. A normalized-key match there labels `REVIEW-OVERLAP <TEST-key>`** | Round 2. Impact scenarios cover flows other stories own, so a match is likelier here than anywhere. `UPDATE` carries `@TEST_<TEST-KEY>` into a file tagged `@REQ_MOM-12194`; CI would update that test in place and move another story's test under this story's requirement. Round 3: reusing `REVIEW` was wrong — the dedup table defines it as *an existing test matches nothing in the new design*, the opposite direction, in the same field with no discriminator. `SKIP` is forbidden for the same ownership reason `UPDATE` is: an identical-steps match means another story's test may already assert this invariant, and deciding that automatically is exactly the move D37 exists to prevent |
+| **D38** ⟲ | **All three anchor types are defined** (§7), with a **per-child run-state shape** for `epic`, a batch bound, and a **bidirectional** fidelity task set that `epic`-anchored conversions also receive | Round 2. The design assumed `story` throughout while D25 and D32 said the gate and review run always. Round 3: naming the three anchors was not enough — the fields were flat scalars with no child dimension, the fan-out had no ceiling before a gate one human reads, and the fidelity task asked only what the Gherkin *omits*, while `manual-conversion.md` treats a silent *addition* as equally indistinguishable from mistranslation |
+| **D39** ⟲ | **Stage 03 widens materialization, never the run command.** Branch B's existing tests become a Stage 04 regression recommendation | Round 2. A pre-existing test pulled into a widened run command has no run-state entry, no attempts budget, and no verdict path — inside a no-stop zone whose exit condition is a verdict per scenario. Round 3 defined the term the recommendation reads from: a flow is **approved** when at least one of its scenarios is in `approved_scenarios[]`, and a flow whose scenarios were all dropped still has its Branch B tests reported — a human dropped a scenario, not the observation that tests exist there |
+| **D40** ⟲ | **Acceptance criteria are split into deterministic checks and eval cases**, and the eval cases name a fixture and require agreement across runs | Round 2. Four round-1 criteria asserted that a model pass would return a specific judgement. One passing run does not distinguish a mechanism from luck, and every existing row in `test-cases.md` is deterministic. Round 3 rebuilt E4: `review_mode` is an observation of host capability with no flag to force it, and E1 was constructed to succeed every time, so comparing two ceilings could not discriminate. E4 now runs over E3's harder fixture and is recorded observationally |
+| **D41** | **C3 checks backticked citations, not markdown links** | Round 3. Every markdown link in a stage file already sits on its own `Loads:` line, so a link-based check is tautologically satisfied and measures nothing. Leaves are cited in prose as `` `commit.md` ``, and four such citations are undeclared today — `stage-03-automate.md` cites `repo-profile.md` and `commit.md`; `stage-04-finish.md` cites `gherkin-conventions.md` and `selector-verification.md`. Declaring them is part of this change: a check that passes on a codebase holding four live violations is evidence it is not looking |
+| **D42** | **Dedup is a rule applied wherever a scenario is created, not a step that runs once at 2.2** | Round 3. 2.2 precedes 2.4b, so impact scenarios had no step to label them while 2.7 required every behaviour to carry a label — and scenarios added by a 2.7b loop reopened the same gap. The rule is already defined as mechanical and position-independent ("Dedup Is A Rule, Not A Judgement"); saying so explicitly costs nothing and removes the ordering trap |
+| **D43** | **2.4b is bounded by the gate, not by the candidate count**, in the words `manual-conversion.md` already uses | Round 3. A `cross-cutting` sweep over several entities, times one scenario per candidate, times a per-child fan-out, arrives at a gate that is one human reading one output. The skill already owns this principle for conversion batches; a second ceiling would give one idea two spellings |
+| **D44** | **The impact gate becomes turn-ending condition 12** in `operating-rules.md` | Round 3. That list declares itself *"Exhaustive. Any other reason to stop is invalid."* A run that stops for want of an impact answer is a stop, and a stop absent from an exhaustive list is one a later reader deletes as a bug |
+| **D45** | **`@IMPACT` is skill-owned, not written into the profile's `existing_tags`** | Round 3. `existing_tags` is a *discovered repository convention* (D5); writing a skill-invented tag into it inverts the split between process, which this skill owns, and convention, which the repo owns. Whether the tag participates in `scoped_run_cmd`'s filter is stated too, because a tag nothing filters on is decoration |
+| **D46** | **Stage 02 may re-run Sweep 4 by loading `impact-analysis.md` conditionally. `sweep_breadth_stale` is deleted** | Round 3. The field's justification — "a stage never reads another stage's reference file" — misapplied the rule: Sweep 4 lives in a *shared leaf*, which Stage 02 may load exactly as it conditionally loads `manual-conversion.md`. The escape hatch offered instead ("request a resume") named no reachable `resume_from` value, and nothing ever cleared the flag. Re-running the sweep is both possible and simpler than a field explaining why it is not |
 
 ## 1. Sweep 4 — Impact Candidates
 
@@ -121,7 +128,9 @@ evidence for 2.7b's second attack task first, and a gate input second.
 1. Resolve the anchor's primary entity from `ticket.md`. MOM-12194 resolves to
    `work_order_candidate`.
 2. Find every write operation against that entity in the frontend source and, where reachable, the
-   API schema. In the reference repo this is one file:
+   API schema. In the reference repo this is one file — `om-mom-frontend/src/graphql/work-order-candidate.graphql`
+   in `om-mom-e2e-speckit-auto`, whose MOM-12194 artifacts live on branch
+   `test/mom-12194-receive-invoice-info-from-apm` (commit `7fa828f`), not on `main`:
 
    | Operation | File |
    |---|---|
@@ -169,7 +178,7 @@ runs, with less ammunition for task 2, and the gate says so.
 ```yaml
 run:
   design_depth:        trivial | standard | cross-cutting   # resolved in Stage 01 (D32)
-  depth_raised_in_02:  false      # a 2.7b finding raised it after Sweep 4 had run
+  depth_raised_in_02:  false      # a 2.7b finding raised it; Stage 02 re-runs the sweep (D46)
 
 impact:
   ran:                 true | false
@@ -187,13 +196,17 @@ impact:
     - name:            "Cancelling a work order ..."
       reason:          "cancel is blocked upstream for interfaced candidates"
   acknowledged_empty:  false
-  sweep_breadth_stale: false      # true when depth_raised_in_02 and the sweep is not re-run
+  by_child:                       # `epic` anchors only (D38); absent otherwise
+    MOM-12195:
+      entities:            ["work_order"]
+      candidates:          []
+      approved_scenarios:  []
+      acknowledged_empty:  true
 
 design:
-  selector_evidence:   deferred   # roll-up: weakest value present (D29)
-  adversarial_review:  approved | issues-fixed | issues-open | not-run
+  selector_evidence:   deferred   # roll-up by declared precedence, ui only (D29)
+  adversarial_review:  approved | issues-fixed | issues-open       # three values (D33)
   review_mode:         isolated | inline          # D33
-  review_reason:       no-subagent-dispatch       # present only when not-run
   review_rounds:       1                          # 0..3
   scenarios:
     - name:            Invoice No is displayed as a hyperlink
@@ -202,11 +215,12 @@ design:
       impact:          true
       impact_flow:     RefreshWorkOrderCandidates
       origin:          extraction | adversarial-review
-      dedup:           NEW | REVIEW MOM-5678      # never UPDATE in the impact file (D37)
-      selector_evidence: source
+      surface:         ui | api | manual
+      dedup:           NEW | REVIEW-OVERLAP MOM-5678   # never UPDATE, never SKIP (D37)
+      selector_evidence: source | live-dom | fallback | deferred | n/a   # n/a: api, manual
 ```
 
-Rules 9–14, following the existing eight:
+Rules 9–16, following the existing eight:
 
 > **9. `impact.declared[]` and `impact.candidates[]` are never merged into one list.** A flow the
 > human declared and the sweep also found is a cross-confirmation; a flow only one produced is a
@@ -217,21 +231,43 @@ Rules 9–14, following the existing eight:
 > name. An empty list is meaningless alone — it is read with `acknowledged_empty`, the record that a
 > person said there is no impact. `ran: false` implies neither.
 
-> **11. `design.adversarial_review: not-run` is never written because the reviewer found nothing.**
-> A review that ran and approved writes `approved`; one that ran out of rounds with findings open
-> writes `issues-open`. `not-run` means the review did not happen. All four values reach the gate
-> and the Stage 04 report.
+> **11. `design.adversarial_review` has exactly three values, and none of them means "did not
+> run".** A review that approved writes `approved`; one whose findings were fixed writes
+> `issues-fixed`; one leaving round three with findings still open writes `issues-open`. A fourth
+> value, `not-run`, was carried over from the draft that let a host without subagent dispatch skip
+> the step — D33 deleted that condition, and a value nothing can write is one a reader assumes
+> means something. Failure to perform the review at all is an infrastructure stop under
+> `operating-rules.md`, not a run-state value.
 
 > **12. `run.design_depth` may scale Sweep 4's entity breadth and document verbosity. It may never
 > scale what 2.1 reads, and never disable a gate or 2.7b.** It ratchets up only. A raise inside
-> Stage 02 sets `depth_raised_in_02` and `sweep_breadth_stale`; it does not retroactively re-run a
-> Stage 01 sweep, and the gate states that rather than implying a breadth the run never had.
+> Stage 02 sets `depth_raised_in_02` and re-runs Sweep 4 at the new breadth by loading
+> `impact-analysis.md` — a shared leaf, loadable by any stage that needs it, exactly as Stage 02
+> already conditionally loads `manual-conversion.md` (D46).
 
-> **13. `design.review_mode` is recorded on every run, including `not-run`** (where it records what
-> was attempted). It exists to make the isolation preference measurable across real runs instead of
-> assumed.
+> **13. `design.review_mode` is recorded on every run.** It exists to make the isolation preference
+> measurable across real runs instead of assumed — the standard §11 applies to the second-reviewer
+> question, applied to this design's own retained hypothesis.
 
-> **14. Scenarios in the impact file may carry `NEW` or `REVIEW`, never `UPDATE`** (D37).
+> **14. Scenarios in the impact file carry `NEW` or `REVIEW-OVERLAP <TEST-key>`, never `UPDATE` and
+> never `SKIP`** (D37). `REVIEW-OVERLAP` is a distinct label, not a reuse of `REVIEW`: the dedup
+> table defines `REVIEW <TEST-key>` as *an existing test matching nothing in the new design*, and an
+> impact match runs the other direction. One field carrying both directions under one name leaves
+> the gate and the Stage 04 report unable to tell them apart.
+
+> **15. A candidate is satisfied by a scenario **or** by a recorded drop.** 2.7's check that every
+> entry in `impact.candidates[]` has a scenario reads `impact.dropped_scenarios[]` as equally
+> satisfying. Without this, a gate revision that drops a candidate's only scenario re-enters 2.7,
+> fails the check, and fails it again on every retry — three consecutive failures being turn-ending
+> condition 4. The same rule is what lets a resumed run honour a drop instead of regenerating the
+> scenario a human already rejected.
+
+> **16. `design.selector_evidence` is a reporting roll-up over `surface: ui` scenarios only,** by
+> the declared precedence `deferred` > `fallback` > `live-dom` > `source`. `api` and `manual`
+> scenarios carry `n/a` and are excluded. Rule 7 says `deferred` and `fallback` are not comparable
+> as *evidence*, and they are not — this precedence is a display order for one summary field, and
+> the per-scenario value stays the authority. The exclusion is load-bearing: a landed run of only
+> `api` scenarios would otherwise roll up to `deferred`, which turn-ending condition 11 stops on.
 
 ## 3. Artifact Layout
 
@@ -324,12 +360,36 @@ Feature: Existing flows respect the APM invoice attachment
     Then the attached candidate remains and its invoice information is unchanged
 ```
 
-`@REQ_` sits at Feature level; `@IMPACT` is a new tag, additive to the profile's `existing_tags`.
+`@REQ_` sits at Feature level. `@IMPACT` is a **skill-owned** tag, not an addition to the profile's
+`existing_tags` (D45): `existing_tags` records a convention this pipeline *discovered* in the
+repository (D5), and writing a skill-invented tag into it inverts the split between the process this
+skill owns and the conventions the repo owns. The profile's own tags are carried through unchanged
+beside it, as on any other scenario. `@IMPACT` does not appear in `scoped_run_cmd`'s filter —
+impact scenarios are selected by having `design.scenarios[]` entries, like every other scenario, and
+a tag that changed the run scope would reopen exactly the widening D39 refuses.
 
-Impact scenarios pass through 2.2's dedup with one change (D37): a normalized-key match labels
-`REVIEW <TEST-key>`, never `UPDATE`. An existing Change Setting test asserting that refresh removes
-candidates has a different key and labels `NEW` — and that pair is exactly what a human should see,
-since the two describe a conditional behaviour whose condition is new.
+**Dedup runs here, on these scenarios, as they are created.** 2.2 precedes this step, so a step-based
+reading would leave impact scenarios unlabelled while 2.7 requires every behaviour to carry a label.
+Dedup is a rule, not a position (D42): the same normalized-key rule 2.2 states is applied wherever a
+scenario comes into existence, including on a 2.7b loop.
+
+One change applies here and nowhere else (D37): a key match labels `REVIEW-OVERLAP <TEST-key>` —
+never `UPDATE`, never `SKIP`. Both of those would decide, automatically, that another story's test
+now belongs to this one. An existing Change Setting test asserting that refresh *removes* candidates
+has a different key and labels `NEW`; that pair is exactly what a human should see, since the two
+describe a conditional behaviour whose condition is new.
+
+**A candidate is satisfied by a scenario or by a recorded drop** (rule 15). This step reads
+`impact.dropped_scenarios[]` before designing: a candidate a human already rejected on an earlier
+run is not re-designed, and the resume path at `02.4` therefore does not regenerate the scenarios
+that run's gate threw out.
+
+**The batch is bounded by the gate, not by the candidate count** (D43). The ceiling is what one
+human will actually read at one sitting — the same rule `manual-conversion.md` states for a
+conversion batch, and the same reasoning: a run producing more scenarios than anyone reads has moved
+the bottleneck from writing to reviewing and hidden it behind an approval nobody could give
+properly. When the candidate list exceeds that, design the batch, **say the batch was split**, and
+carry the remainder into the run that follows.
 
 ### 5.3 Step 2.7, three checks added
 
@@ -337,9 +397,12 @@ The six existing checks stand, applied to both files. Added:
 
 - **Ambiguity (D34).** No line of the ticket admitted into scope is left with two readings. The
   resolution is written in `test-design.md` with both readings named.
-- Every entry in `impact.candidates[]` and every unmatched entry in `impact.declared[]` has at
-  least one scenario in the impact file.
-- No scenario in the impact file carries `UPDATE`.
+- Every entry in `impact.candidates[]`, and every unmatched entry in `impact.declared[]`, is
+  **satisfied** — by at least one scenario in the impact file, or by an entry in
+  `impact.dropped_scenarios[]` (rule 15). Requiring a scenario alone would deadlock the gate: a
+  revision that drops a candidate's only scenario re-enters this check, fails it, and fails it again
+  on every retry, which turn-ending condition 4 stops on after three.
+- No scenario in the impact file carries `UPDATE` or `SKIP`.
 
 `Do not allow user/system modify any candidate has attached to APM's invoice` reads either as *this
 release does not build modification* or as *the system must prevent modification*. Both are
@@ -377,11 +440,14 @@ carried over in intent:
 
 **Mode (D33).** Preferably a subagent. Where dispatch is unavailable, it runs inline with the same
 prompt and the same tasks, and `design.review_mode: inline` is recorded and shown at the gate. It
-is never skipped for want of dispatch.
+is never skipped for want of dispatch, which is why `adversarial_review` has no `not-run` value
+(rule 11).
 
 **Loop.** `Issues Found` routes by task: findings from tasks 1 and 3 return to 2.1; findings from
 task 2 return to 2.4b. Either path re-runs 2.7 and then re-reviews. Scenarios added carry
-`origin: adversarial-review`.
+`origin: adversarial-review`, and they are **labelled where they are created** — dedup is a rule,
+not a step that ran once at 2.2 (D42). Without that, a scenario added on a loop reaches 2.7's
+"every behaviour carries a dedup label" check with none.
 
 **Bounds.** Every dispatch of 2.7b is one round, whatever caused the re-entry, capped at **three**
 (matching `operating-rules.md`'s three-strikes rule). Exiting round 3 with findings open writes
@@ -389,30 +455,51 @@ task 2 return to 2.4b. Either path re-runs 2.7 and then re-reviews. Scenarios ad
 A fourth round would mean extraction and reviewer disagree persistently, which is a question for a
 person, not for another loop.
 
-A finding that raises `design_depth` sets `depth_raised_in_02` and `sweep_breadth_stale` (rule 12).
-Stage 01's sweep is not re-run from inside Stage 02 — a stage never reads another stage's reference
-file — so the gate reports the sweep ran at the lower breadth, and the human may approve anyway or
-request a resume.
+A finding that raises `design_depth` sets `depth_raised_in_02` and **re-runs Sweep 4 at the new
+breadth** (rule 12, D46). Stage 02 loads `impact-analysis.md` to do it — a shared leaf, loadable by
+whichever stage needs it, exactly as this stage already conditionally loads `manual-conversion.md`.
+An earlier draft refused the re-run on the grounds that "a stage never reads another stage's
+reference file"; that rule governs *pipeline* files reading each other, and the sweep does not live
+in one. The escape hatch offered instead — asking the human to request a resume — named no
+reachable `run.resume_from` value, and nothing ever cleared the staleness flag it set.
 
 ### 5.5 Step 2.8, human gate
 
 | Section | Content |
 |---|---|
-| Depth | `design_depth` with its reason; `sweep_breadth_stale` when set — stated so it can be disagreed with |
+| Depth | `design_depth` with its reason, and whether a 2.7b finding raised it mid-run — stated so it can be disagreed with |
 | Coverage | AC matrix, dedup labels, element intent map, Open Questions |
-| Review | `approved` / `issues-fixed` with each finding and disposition / **`issues-open` with findings verbatim** / **`not-run` with reason**, plus `review_mode` |
+| Review | `approved` / `issues-fixed` with each finding and disposition / **`issues-open` with findings verbatim** — plus `review_mode` |
 | Impact | Every designed impact scenario with its candidate's evidence path and provenance; `declared[]` alongside `candidates[]`; existing tests per candidate |
 
-The impact section requires one of: keep a subset of the scenarios, keep a subset plus additions, or
-state explicitly that no feature is impacted (writing `acknowledged_empty: true` and dropping all).
-**Without one of those three answers the run does not continue** — this is the one place where a
-human's absence of knowledge and a human's assertion of no impact must not look alike.
+The impact section requires one of three answers, and **without one of them the run does not
+continue** — turn-ending condition 12 (D44). This is the one place where a human's absence of
+knowledge and a human's assertion of no impact must not look alike.
+
+| Answer | Effect |
+|---|---|
+| Keep a subset | The rest are dropped; see below |
+| Keep a subset **and name a flow nobody found** | A revision that **returns to 2.4b**, re-runs 2.7 and 2.7b, and comes back here |
+| No feature is impacted | Writes `acknowledged_empty: true`, drops all, deletes the impact file |
+
+The middle row is why "nothing authors Gherkin after this gate" survives literally: an addition is
+not written at 2.8. It re-enters the step that authors impact scenarios and passes every check the
+first batch passed, under the revision rule this gate already has — *a revision returns to whichever
+step it affects and re-runs self-review before returning here*. A human naming a flow the sweep
+missed is the Class B case working as designed; letting them hand-write a scenario past 2.7 and
+2.7b would be the same hole in a new place.
 
 Impact scenarios are presented **unapproved by default**. A pre-checked list converts the human's
 job from deciding to noticing, and a reviewer who is only noticing approves everything.
 
-Dropped scenarios are removed from the `.feature` file before commit and retained with their
-reasons in `impact-candidates.md` and `impact.dropped_scenarios[]`.
+Dropped scenarios are removed from the `.feature` file before commit and retained with their reasons
+in `impact-candidates.md` and `impact.dropped_scenarios[]` — which is also what satisfies 2.7 on the
+re-run (rule 15), and what keeps the next run from re-litigating the decision.
+
+**When every impact scenario is dropped, the impact `.feature` file is deleted, not left empty.**
+Same reason 2.4b declines to write one: an empty feature file is materialized by Stage 03 and
+imported by CI as a file containing no tests. `gherkin-conventions.md`'s degenerate-case rule covers
+scenarios blocked at Stage 03 and does not reach a file emptied at the gate, so this is stated here.
 
 The 2.8 next-hop table (`code_state` × `design_only`) is unchanged. Nothing authors Gherkin after
 this gate.
@@ -441,11 +528,17 @@ Impact scenarios inherit `run.code_state` (D30). `pending` ends the run after St
 **Stage 04.** Three additions to the report:
 
 - Approved impact scenarios, with the flow and evidence path each came from.
-- `design.adversarial_review` and `design.review_mode`. A run that shipped without a review, or
-  with an inline one, must say so in the artifact a human reads last — not only in a gate they saw
-  once.
-- **Recommended regression**: Branch B's existing tests for each approved flow, as a list for a
-  human to run or schedule. It is a recommendation, not a run.
+- `design.adversarial_review` and `design.review_mode`. A run that shipped with an inline review, or
+  with findings still open, must say so in the artifact a human reads last — not only in a gate they
+  saw once.
+- **Recommended regression**: Branch B's existing tests per flow, as a list for a human to run or
+  schedule. It is a recommendation, not a run.
+
+  A flow is **approved** when at least one of its scenarios is in `impact.approved_scenarios[]` —
+  the derivation matters because rule 10 makes that list name scenarios, never flows, so "approved
+  flow" is computed and not stored. A flow whose scenarios were **all dropped** still has its tests
+  reported, marked as such: the human dropped a scenario, not the observation that tests exist on
+  that surface, and dropping the report too would discard the one thing Branch B contributes.
 
 **`host-adaptation.md`.** Its enumeration — *"Two parts of the pipeline dispatch subagents"* — is
 now four: discovery's sweeps 1–3, Sweep 4, the selector gate's live-DOM read, and 2.7b. The
@@ -462,18 +555,43 @@ that a file carrying it may not contain `UPDATE` rows (D37).
 | `epic` | **Per child**, each child's entity, each child's own depth | **Per child**, three tasks, against that child's `.feature` and impact file |
 | `test` | Over the requirement the test links to; skipped when it links to none | **Fidelity task set** (below) |
 
-`epic` already fans out to one `.feature` per child; impact analysis follows the same fan-out rather
-than inventing an epic-level entity that no ticket names. Each child gets its own impact file inside
-that child's artifact folder, and the gate presents them per child.
+### 7.1 `epic` — one folder, per-child fields
+
+`epic` already fans out to one `.feature` per child; impact analysis follows that fan-out rather than
+inventing an epic-level entity no ticket names.
+
+**It does not fan out to more folders.** An epic run has exactly one artifact folder — the epic's,
+named `<epic-key>-<slug>` — because that name is the `@REQ_` target, the dedup key, and the resume
+glob, and a second folder would be a second identity. A round-2 draft said "each child gets its own
+impact file inside that child's artifact folder", which described folders an epic run does not have.
+Child impact files live in the epic's folder, named for the child, beside that child's `.feature`.
+
+The per-child values live under `impact.by_child`, keyed by child issue key (§2). Without it, the
+fields are flat scalars and an epic's second child overwrites its first — the shape has to carry the
+dimension the fan-out creates, or the fan-out is not represented at all.
+
+**The gate stays one review.** Per-child depth, sweep, and review multiply quickly, and the ceiling
+is D43's: what one human reads at one sitting. An epic wider than that is split, and the split is
+stated. `manual-conversion.md` already says this for conversion batches, in those words.
+
+### 7.2 `test` — a bidirectional fidelity set
 
 `test` anchors run `manual-conversion.md`, whose gate asks whether the translation is faithful, not
-whether the test is a good idea. Attack tasks 1 and 3 have no subject there — there is no ticket
-prose to mine and no heading to misclassify. 2.7b runs instead with:
+whether the test is a good idea. Attack tasks 1 and 3 have no subject there: no ticket prose to
+mine, no heading to misclassify. 2.7b runs instead with:
 
-1. **Fidelity.** What does the source Manual test assert that the Gherkin does not?
+1. **Fidelity, both directions.** What does the source Manual test assert that the Gherkin does not
+   — and what does the Gherkin assert that the source does not? `manual-conversion.md` treats an
+   added boundary case, a one-case-into-three split, and a dropped step alike, because a silent
+   addition is *"indistinguishable from a mistranslation"*. A task asking only what was dropped
+   audits one of the two ways a conversion goes wrong.
 2. **Created invariants.** Unchanged, when the linked requirement exists; skipped when it does not.
 
-The gate and the impact section still run at every anchor type (D25), with `acknowledged_empty` the
+**An `epic` anchor whose children are conversions gets this set too, per child.** `manual-conversion.md`
+is loaded for `anchor_type: test` **or** `epic`, so an epic-anchored conversion batch given the story
+task set would receive no fidelity review at all — the one review that anchor's gate turns on.
+
+The gate and the impact section run at every anchor type (D25), with `acknowledged_empty` the
 correct answer when a conversion creates no invariant.
 
 ## 8. Validator Change (C3)
@@ -483,9 +601,31 @@ correct answer when a conversion creates no invariant.
 that a file's links resolve or stay within its declared `Loads:` set, so the round-1 acceptance
 criterion asserting it was unverifiable.
 
-**C3:** every markdown link in a `references/pipeline/` file resolves to an existing path, and each
-resolved target under `references/shared/` appears in that file's `Loads:` line. This is the check
-the skill's loose-coupling design (D22) has always relied on and never had.
+A link-based check would measure nothing. **Every markdown link in a stage file already sits on the
+`Loads:` line itself** — verified across all four stage files — so "each linked leaf is declared" is
+tautologically true, and "every link resolves" is already covered by `validate_skills.py`. Round 3
+caught this: the first version of C3 would have passed on a skill holding four live violations.
+
+Leaves are cited in prose in backticks, not links, and that is where the coupling actually leaks.
+
+**C3:** in a `references/pipeline/` file, every backticked `` `<name>.md` `` citation that resolves
+to a file under `references/shared/` must appear on that file's `Loads:` line. Artifact filenames
+(`ticket.md`, `test-design.md`, `execution-report.md`, `existing-tests-manual.md`) and other stage
+files are excluded — a stage naming its successor is required behaviour, not a leak.
+
+This is the invariant `stage-02-test-design.md` states in its own header — *"Every leaf this file
+cites by rule or condition number is declared here: the `Loads:` line is the disclosure §11.2 rule 1
+rests on, and a cited file that goes undeclared is read from memory instead of from the file"* — and
+it has never been machine-checked. **It fails today in four places**, all of which this change
+fixes:
+
+| File | Cites, undeclared |
+|---|---|
+| `stage-03-automate.md` | `repo-profile.md`, `commit.md` |
+| `stage-04-finish.md` | `gherkin-conventions.md`, `selector-verification.md` |
+
+Failing on landing is the point. A validator that passes the moment it is written has not been
+shown to look at anything.
 
 ## 9. Acceptance Criteria (D40)
 
@@ -497,25 +637,43 @@ the skill's loose-coupling design (D22) has always relied on and never had.
 3. `impact.ran: false` and `impact.candidates: []` are distinguishable.
 4. A declared flow the sweep also found records `source: both`; `declared[]` and `candidates[]`
    remain separate fields.
-5. Every entry in `impact.candidates[]` has ≥1 scenario in the impact file before 2.7 passes.
-6. No scenario in the impact file carries `UPDATE`; a key match there carries `REVIEW`.
+5. Every entry in `impact.candidates[]` is satisfied before 2.7 passes by ≥1 scenario in the impact
+   file **or** an entry in `impact.dropped_scenarios[]`; a gate revision that drops a candidate's
+   only scenario does not fail 2.7 on the re-run.
+6. No scenario in the impact file carries `UPDATE` or `SKIP`; a key match there carries
+   `REVIEW-OVERLAP`, a label distinct from `REVIEW`.
 7. Both `.feature` files carry `@REQ_` at Feature level.
-8. `adversarial_review` takes one of four values; `issues-open` has a gate row and a Stage 04 line;
-   `review_mode` is written on every run.
+8. `adversarial_review` takes one of **three** values; no code path writes `not-run`; `issues-open`
+   has a gate row and a Stage 04 line; `review_mode` is written on every run.
 9. `review_rounds` never exceeds 3, and a depth raise consumes a round.
-10. A depth raise inside Stage 02 sets `depth_raised_in_02` and `sweep_breadth_stale`, and does not
-    re-run Sweep 4.
-11. Nothing writes Gherkin after 2.8; the 2.8 next-hop table is unchanged.
+10. A depth raise inside Stage 02 sets `depth_raised_in_02` and **re-runs Sweep 4** at the new
+    breadth; no `sweep_breadth_stale` field exists.
+11. Nothing writes Gherkin at 2.8; an addition named at the gate re-enters 2.4b and passes 2.7 and
+    2.7b before returning. The 2.8 next-hop table is unchanged.
 12. `design_depth: trivial` still runs 2.1 over the whole ticket, 2.7b, and 2.8.
 13. On a host without dispatch, 2.7b runs inline and records `review_mode: inline`.
 14. A `pending` run writes both files and ends after Stage 02 with `resume_from: 02.4`.
-15. `design.selector_evidence` equals the weakest per-scenario value present.
+15. `design.selector_evidence` follows the precedence `deferred` > `fallback` > `live-dom` >
+    `source` over `surface: ui` scenarios only; `api` and `manual` scenarios carry `n/a`, and a
+    landed run containing no `ui` scenario does not roll up to `deferred`.
 16. Stage 03's scoped run command covers only scenarios with `design.scenarios[]` entries.
 17. Reviewer findings, including rejected ones, remain in `test-design.md` §9; dropped impact
     scenarios remain in `impact-candidates.md`.
-18. `epic` produces one impact file per child; `test` runs the fidelity task set.
+18. `epic` produces one impact file per child **inside the epic's single artifact folder**, with
+    per-child values under `impact.by_child`; `test` runs the bidirectional fidelity set, and so
+    does an `epic` whose children are conversions.
 19. `tools/validate_skills.py` passes, including the root README version badge at `0.3.0`.
-20. `tools/validate_coupling.py` passes C1, C2, and the new C3.
+20. `tools/validate_coupling.py` passes C1, C2, and the new C3 — and C3, run against the skill
+    **before** this change's stage-file edits, reports the four undeclared citations named in §8. A
+    C3 that passes on the pre-change tree has not been shown to check anything.
+21. Every impact scenario carries a dedup label at the moment it is created, including those added
+    on a 2.7b loop.
+22. `operating-rules.md` lists the impact gate as turn-ending condition 12.
+23. `@IMPACT` does not appear in the profile's `existing_tags` and does not appear in
+    `scoped_run_cmd`'s filter.
+24. `test-case/speckit-qa-auto/test-cases.md`'s existing AC07 row is amended: it currently requires
+    byte-identical scenario sets across two runs, which §5.6 says was never guaranteed. Its
+    determinism claim is narrowed to dedup labels.
 
 ### 9.2 Eval cases — manual, recorded, not CI gates
 
@@ -527,13 +685,33 @@ this design asked for.
 
 | # | Fixture | Expected |
 |---|---|---|
-| E1 | The real MOM-12194 `ticket.md` plus a `test-design.md` covering only the eight AC rows | Task 1 names the `Do not allow user/system modify...` line |
-| E2 | E1 plus `impact.candidates[]` containing `RefreshWorkOrderCandidates` with its evidence path | Task 2 names the refresh invariant |
-| E3 | `test-case/speckit-qa-auto/fixtures/constraint-under-notes.md` — the same constraint filed under a heading named `Notes` | Task 1 names it, with no rule anywhere keyed to a heading |
-| E4 | E1 run with `review_mode: inline` | Compared against E1's isolated rate; the difference is the evidence rule 13 exists to collect |
+Each fixture is a **complete 2.7b input set** — `ticket.md`, both `.feature` files, `test-design.md`,
+`impact-candidates.md`, and a depth with its reason — not a single file. They live under
+`test-case/speckit-qa-auto/fixtures/<name>/`, one directory per case; the repository has no prior
+`fixtures/` convention, so this establishes one.
 
-E3 is the criterion that distinguishes this design from a rule keyed to `Out-Scope`. E4 is the one
-that tests Constraint 5's retained preference rather than assuming it.
+| # | Fixture | Expected |
+|---|---|---|
+| E1 | `fixtures/out-scope-constraint/` — the real MOM-12194 `ticket.md` (branch `test/mom-12194-…`, commit `7fa828f`) with a `test-design.md` covering only the eight AC rows | Task 1 names the `Do not allow user/system modify…` line |
+| E2 | E1's set, with `impact-candidates.md` carrying `RefreshWorkOrderCandidates` and its evidence path | Task 2 names the refresh invariant |
+| E3 | `fixtures/constraint-under-notes/` — the same constraint filed under a heading named `Notes`, with an AC table complete without it | Task 1 names it, with no rule anywhere keyed to a heading |
+| E4 | E3's set, run `inline` and run `isolated` | The two rates, recorded side by side |
+
+E3 is the case that distinguishes this design from a rule keyed to `Out-Scope`: if the mechanism
+only fires on that heading, E3 fails and the design is what it was accused of being. Its AC table
+must be complete without the constraint, or a reviewer could find the gap from the AC table alone
+and the fixture proves nothing.
+
+**E4 runs over E3, not E1.** E1 is built so the finding is expected every time, and comparing two
+ceilings cannot discriminate — a round-2 draft made exactly that mistake. E3 is the harder case, so
+its rate has room to differ. `review_mode` is otherwise an observation of host capability with no
+flag to force it, and "no flag skips a gate" forecloses adding one casually; E4 is therefore run by
+executing the reviewer both ways against a fixture directory, outside a pipeline run.
+
+**What a rate obliges.** A case below 3/3 does not block this design — it is recorded, and it is the
+input to the §11 question of whether one adversarial pass needs a second. A rate nobody writes down
+is a design decision made by forgetting; a rate written down with no consequence named is the same
+thing with extra steps, which is why the consequence is named here.
 
 ## 10. What This Does Not Do
 
