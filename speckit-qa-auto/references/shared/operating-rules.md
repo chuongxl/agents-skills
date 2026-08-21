@@ -28,6 +28,9 @@ Exhaustive. Any other reason to stop is invalid.
 11. Stage 03 reached with `run.code_state: pending` or `design.selector_evidence: deferred` — the
     selector gate has not run, and generating against unverified selectors is what it exists to
     prevent
+12. The Stage 02 gate's impact section with no answer given — the run cannot distinguish a human
+    who does not know from a human asserting there is no impact, and that distinction is the
+    section's entire purpose
 
 ## Fix Loop Rules
 

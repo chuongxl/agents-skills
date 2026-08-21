@@ -44,8 +44,9 @@ capability up by row, not by exact tool-name string match.
 
 ## Subagent Dispatch Is A Capability, Not A Tool Name
 
-Two parts of the pipeline dispatch subagents: discovery's three sweeps, and the selector gate's
-live-DOM read. The tool that does it is named differently on each host and is absent on some tool
+Four parts of the pipeline dispatch subagents: discovery's three sweeps, the impact sweep that
+follows them, the selector gate's live-DOM read, and the design stage's adversarial review. The tool
+that does it is named differently on each host and is absent on some tool
 surfaces entirely, so it is deliberately not in the table above — probe the current tool surface for
 a subagent-dispatch capability rather than matching a name.
 
@@ -57,6 +58,17 @@ degrading silently.
 This is why the sweeps were specified to return structured lists rather than prose in the first
 place. A contract that only works when a subagent is available is a contract that breaks on the
 hosts that need it most.
+
+**The adversarial review is covered by this rule too, and an earlier draft exempted it.** That draft
+argued its context isolation *was* the capability rather than merely what inline costs, so a host
+without dispatch should record no review at all. The argument does not hold: the design document the
+reviewer reads states the extraction's own boundary in its opening line, so a "clean" context was
+never clean in the way claimed. What makes that review find what self-review cannot is the question
+it asks — scoped by the ticket rather than by the extraction's list of criteria — and a question
+survives being asked inline. Isolation is retained as a preference and recorded per run in
+`design.review_mode`, so its benefit is measured against real runs rather than asserted. An
+exemption resting on an unfalsifiable sentence would let any later step claim the same one, and the
+rule above would mean nothing.
 
 ## Browser Automation And The Live-DOM Evidence Option
 

@@ -27,6 +27,7 @@ Two tags bind the file to Xray:
 |---|---|---|
 | `@REQ_<STORY-KEY>` | Feature | Links every test in the file to the story as its requirement |
 | `@TEST_<TEST-KEY>` | Scenario | Applied **only** to `UPDATE` rows — binds the scenario to an existing Test issue so import updates it in place instead of creating a duplicate |
+| `@IMPACT` | Feature | Marks a file whose scenarios assert invariants this story imposes on flows other stories own. **Skill-owned**, unlike `existing_tags` below |
 
 Both are **additive**. The profile's `existing_tags` (`@Automation`, `@Regression_Test`, domain
 tags, etc.) stay exactly where they already are on every scenario that carries them — nothing is
@@ -36,6 +37,26 @@ workflow working unchanged after this pipeline starts writing to the same files.
 A `@TEST_<TEST-KEY>` tag is never added to a `NEW` scenario — there is no existing Test issue yet
 to bind to. It is never added to `SKIP` or `REVIEW` scenarios either; those are dedup outcomes, not
 import targets.
+
+`@IMPACT` is **skill-owned**, and that is the difference between it and everything in
+`existing_tags`. `existing_tags` records a convention this pipeline *discovered* in the repository
+and carries through unchanged; writing a skill-invented tag into it would invert the split between
+the process this skill owns and the conventions the repo owns. The profile's own tags sit beside
+`@IMPACT` on an impact file exactly as they sit on any other scenario.
+
+`@IMPACT` does **not** appear in `scoped_run_cmd`'s filter. Impact scenarios are selected for a run
+by having run-state scenario entries, like every other scenario; a tag that changed the run scope
+would pull pre-existing tests of the impacted flows into a no-stop zone that has no verdict path
+for them.
+
+**A file carrying `@IMPACT` may never contain an `UPDATE` or a `SKIP` row.** `UPDATE` carries
+`@TEST_<TEST-KEY>`, and importing that tag from inside a file tagged `@REQ_<STORY-KEY>` would update
+another story's Test issue in place and move it under this story's requirement. `SKIP` is refused
+for the same ownership reason: an identical-steps match means another story's test may already
+assert this invariant, and that is a decision for a human. Impact scenarios cover flows other
+stories own, so such a match is likelier here than anywhere else in the pipeline — a key match in an
+impact file is labelled `REVIEW-OVERLAP <TEST-key>`, a label distinct from `REVIEW`, which means the
+opposite direction: an existing test matching nothing in the new design.
 
 ## Surface
 

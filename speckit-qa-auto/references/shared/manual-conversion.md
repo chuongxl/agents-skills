@@ -99,6 +99,27 @@ Every scenario needs a `@REQ_` tag, and a Manual test does not necessarily have 
 - Neither resolves — ask, once, for the issue that owns the behaviour. A scenario with no
   requirement is a scenario that traces to nothing, and traceability is the reason these tags exist.
 
+## The Adversarial Review Asks Fidelity In Both Directions
+
+A conversion anchor's design stage runs the same adversarial review every anchor runs, but with a
+different task set: there is no ticket prose to mine for uncovered constraints and no heading to
+misclassify, so those tasks have no subject here. What replaces them is fidelity — and it is asked
+**both ways**:
+
+- What does the source Manual test assert that the Gherkin does not — a dropped step, a lost
+  precondition, an assertion softened into a navigation?
+- What does the Gherkin assert that the source does not — an added boundary case, an invented
+  assertion, one case silently split into three?
+
+Both, because this file already treats the two as equivalent: a silent addition is
+*indistinguishable from a mistranslation*. A review asking only what was dropped audits one of the
+two ways a conversion goes wrong and reports clean on the other.
+
+**An `epic` anchor whose children are conversions gets this task set too, per child.** This file is
+loaded for `anchor_type: test` *or* `epic`; giving an epic-anchored batch the story task set would
+leave it with no fidelity review at all — the one review that anchor's gate actually turns on, and
+the largest batches are exactly the epic-anchored ones.
+
 ## Batches Are Bounded By The Gate, Not By The Loop
 
 Converting a backlog is a real workload — hundreds of cases. The unit of work is one anchor, and the

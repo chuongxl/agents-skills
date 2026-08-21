@@ -30,7 +30,14 @@ and its result is evidence to be re-read, not a conclusion to be adopted.
 
 ## The Three Sweeps
 
-Run them concurrently — they share no inputs and no ordering. Each is a subagent that receives the
+Run *these three* concurrently — **these three** share no inputs and no ordering. A fourth sweep,
+impact analysis, runs after them and is specified in its own leaf, `impact-analysis.md`: its
+test-inventory branch consumes Sweep 2's Xray list and Sweep 3's repository-test list, so it is
+sequenced rather than concurrent. Naming that dependency here is what keeps the claim above true
+rather than nearly true — a fourth sweep quietly folded into a set described as order-free would
+make the description false for the whole set.
+
+Each of the three is a subagent that receives the
 anchor and returns one structured list.
 
 ### Sweep 1 — Jira linkage
