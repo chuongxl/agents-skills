@@ -3,10 +3,14 @@
 Loads: [run-state.md](../shared/run-state.md), [operating-rules.md](../shared/operating-rules.md),
 [selector-verification.md](../shared/selector-verification.md),
 [gherkin-conventions.md](../shared/gherkin-conventions.md), and — only when this run converts
-existing Manual tests — [manual-conversion.md](../shared/manual-conversion.md). Four leaves always,
-a fifth conditionally, so the reader knows the cost before paying it (design spec §11.2 rule 1). The
-conditional load is the point: a story with no existing manual coverage never pays for the file that
-governs converting it. Every leaf this file cites by rule or condition
+existing Manual tests — [manual-conversion.md](../shared/manual-conversion.md), and — only when a
+review finding raises `run.design_depth` — [impact-analysis.md](../shared/impact-analysis.md). Four
+leaves always, two more conditionally, so the reader knows the cost before paying it (design spec
+§11.2 rule 1). The conditional loads are the point: a story with no existing manual coverage never
+pays for the file that governs converting it, and a run whose depth is never raised never pays for
+the sweep specification. `impact-analysis.md` is loaded to **re-run** the sweep at a wider breadth,
+never to run it for the first time — Stage 01 owns the first run, and this stage reads its result
+from run state. Every leaf this file cites by rule or condition
 number is declared here: the `Loads:` line is the disclosure §11.2 rule 1 rests on, and a cited
 file that goes undeclared is read from memory instead of from the file. It links to no other file
 under `references/pipeline/` — its predecessor is not linked back to, and its successor is named,
@@ -26,16 +30,36 @@ Per `run-state.md`, read only from `execution-report.md` and the artifact folder
 `existing-tests-manual.md` absent when Xray was unavailable at Stage 01 — that absence is itself
 an input to step 2.2.
 
+Also `run.design_depth` with the reason Stage 01 recorded for it, `impact.*`, and
+`impact-candidates.md` on disk. This stage does not run the impact sweep; it reads what Stage 01
+left behind. `impact-analysis.md` is therefore declared as a **conditional** load, and only for the
+one case that needs it: a review finding that raises `design_depth`, which re-runs the sweep at the
+new breadth.
+
 ## Execution Order
 
-The eight steps below run in the order design spec §5 fixes.
+The steps below run in the order design spec §5 fixes. They are numbered 2.1 through 2.8, with
+2.4b inserted between 2.4 and 2.5 — the numbering marks position, not a count.
 
 ### 2.1 Requirement analysis
 
-Turn `ticket.md`'s acceptance criteria into a list of testable behaviours. A blocking ambiguity —
-one that would make a behaviour impossible to write correctly either way — is asked **once**. A
-non-blocking one is recorded under Open Questions in `test-design.md` and the run continues; not
-every open question earns a stop.
+Turn the **whole ticket** into a list of testable behaviours — every section, at every depth, not
+the acceptance-criteria table alone. A blocking ambiguity — one that would make a behaviour
+impossible to write correctly either way — is asked **once**. A non-blocking one is recorded under
+Open Questions in `test-design.md` and the run continues; not every open question earns a stop.
+
+**No rule attaches to any heading name.** Headings are how a writer organized their thoughts, not a
+schema. A rule keyed to `Out-Scope` patches one ticket layout and misses the next one that files its
+constraint under `Notes`, and a section titled for exclusions routinely mixes *we are not building
+this* with *the system must not do this* — the first is out of scope, the second is a behaviour to
+test. Judge each sentence by what it says.
+
+Which lines are testable constraints is a judgement, and it is the judgement this step has already
+got wrong once: a story whose exclusions section carried "do not allow user/system modify any
+candidate has attached to APM's invoice" produced eight scenarios, none of them that one, and a
+coverage matrix reporting that no criterion was uncovered. The answer is not a stricter rule here —
+a stricter rule would have the same author and the same blind spot. It is the second question asked
+at 2.7b, whose scope this step does not set.
 
 ### 2.2 Dedup against Xray
 
@@ -44,6 +68,18 @@ or `REVIEW <TEST-key>`. This is a mechanical rule, not a judgement call — see 
 A Judgement" below. The stage records its own `xray.dedup: ran | not-run` here; Stage 01
 deliberately left that field unset, since it only records that the Xray fetch happened, not
 whether dedup ran against the result.
+
+**Dedup is a rule, not a position in the order.** The normalized-key match is applied wherever a
+scenario comes into existence — including the impact scenarios designed at 2.4b, which is after this
+point, and including scenarios added when 2.7b sends the design back for another round. A
+step-shaped reading would leave both unlabelled while 2.7 requires every behaviour to carry a label.
+
+Two labels are forbidden in the impact file, and nowhere else: `UPDATE` and `SKIP`. A key match
+there is labelled `REVIEW-OVERLAP <TEST-key>` — a distinct label, not a reuse of `REVIEW`, which
+this stage defines as *an existing test matching nothing in the new design*, the opposite direction.
+One field carrying both directions under one name leaves the gate and the Stage 04 report unable to
+tell them apart. See `gherkin-conventions.md` for why the other two are refused: either would
+decide, with no human involved, that another story's Test issue now belongs to this one.
 
 ### 2.3 Scenario design
 
@@ -81,10 +117,58 @@ there was nothing to resolve against, which is a different fact from a fallback 
 for the reason `selector-verification.md`, "Deferred Is Not Fallback" gives. A `pending` run ends
 after 2.8 rather than entering Stage 03; see "Design Can Complete Before The Code Does" below.
 
+### 2.4b Impact design
+
+Design at least one scenario for every entry in `impact.candidates[]`, and for every entry in
+`impact.declared[]` the sweep did not find. This is provisional — the human keeps or drops each
+scenario at 2.8, and `impact.approved_scenarios[]` records what survived.
+
+**Designing before approval, rather than after it, is the whole point of this step's position.** In
+an earlier draft impact scenarios were authored after the gate: they passed none of 2.7's checks,
+were never seen by the reviewer at 2.7b, were approved by nobody, and were still automated by Stage
+03 and shipped by Stage 04. It also left 2.7b's second attack task with nowhere to put a finding — a
+reviewer naming an uncovered invariant had no step to hand it to, so the one mechanism aimed at
+cross-feature impact terminated in a report nothing consumed.
+
+Each scenario states the **invariant**, not the new feature — what must remain true of behaviour
+that already existed once this story ships:
+
+```gherkin
+@REQ_MOM-12194 @IMPACT @Regression_Test
+Feature: Existing flows respect the APM invoice attachment
+
+  Scenario: Refreshing candidates does not remove a candidate attached to an APM invoice
+    Given a work order candidate is attached to an APM invoice
+    When the user changes the work order setting and candidates are refreshed
+    Then the attached candidate remains and its invoice information is unchanged
+```
+
+`@REQ_` sits at Feature level and `@IMPACT` beside it, per `gherkin-conventions.md`. The file is
+`<domain>-<aspect>-impact.feature` — the main file's name plus `-impact`, derived and never
+separately chosen, because the artifact folder's name is the identity everything else indexes on.
+
+**A candidate is satisfied by a scenario or by a recorded drop.** Read `impact.dropped_scenarios[]`
+before designing: a candidate a human rejected on an earlier run is not re-designed, so a resumed
+run does not regenerate what that run's gate threw out. This is also what keeps 2.7 from
+deadlocking — see `run-state.md` rule 15.
+
+**The batch is bounded by the gate, not by the candidate count.** The ceiling is what one human will
+actually read at one sitting, the same rule `manual-conversion.md` states for a conversion batch and
+for the same reason: a run producing more scenarios than anyone reads has not saved anybody
+anything, it has moved the bottleneck from writing to reviewing and hidden it behind an approval
+nobody could give properly. When the list exceeds that, design the batch, **say the batch was
+split**, and carry the remainder into the run that follows.
+
+**When both lists are empty** — whether the sweep found nothing or could not run — no impact
+`.feature` file is written. An empty feature file would be materialized by Stage 03 and imported by
+CI as a file containing no tests. The gate's impact section still runs; its content is the sweep's
+`ran` and `reason`, and the answer a human still has to give.
+
 ### 2.5 Write `.feature`
 
-Into `<artifact_dir>/<domain>-<aspect>.feature` — the artifact folder Stage 01 left behind, never
-the repo's test tree. Materializing into the test tree is Stage 03's job, and only for scenarios
+Into `<artifact_dir>/<domain>-<aspect>.feature`, and — when 2.4b designed any — into
+`<artifact_dir>/<domain>-<aspect>-impact.feature`. Both go in the artifact folder Stage 01 left
+behind, never the repo's test tree. Materializing into the test tree is Stage 03's job, and only for scenarios
 that survive design here. Tag per `gherkin-conventions.md`: `@REQ_<STORY-KEY>` at Feature level,
 `@TEST_<TEST-KEY>` at Scenario level only on `UPDATE` rows, plus the profile's `existing_tags`
 carried through unchanged.
@@ -95,6 +179,12 @@ Into the same artifact folder: the scenarios, the coverage matrix, the element i
 `selector-verification.md`, "The Two Map Shapes"), page objects to create or modify, the test
 data and mock plan, the dedup decisions from 2.2 (including `dedup: not-run` when it applies), and
 Open Questions from 2.1.
+
+Two further sections. **§2b — impact coverage**: each candidate, the scenario or scenarios designed
+for it, its evidence path, and whether it came from the sweep, the human, or both. **§9 — review
+findings**, written at 2.7b and kept afterwards, *including findings that were rejected*. A review
+whose findings vanish once fixed leaves the next reader unable to tell a design that was never
+challenged from one that was challenged and held.
 
 ### 2.7 Self-review gate
 
