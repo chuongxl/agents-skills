@@ -2,8 +2,8 @@
 
 Loads: [run-state.md](../shared/run-state.md), [repo-profile.md](../shared/repo-profile.md),
 [workspace-guard.md](../shared/workspace-guard.md),
-[operating-rules.md](../shared/operating-rules.md), [discovery.md](../shared/discovery.md), and —
-only when discovery reports no test framework — [bootstrap.md](../shared/bootstrap.md). Five leaves
+[operating-rules.md](../shared/operating-rules.md), [discovery.md](../shared/discovery.md), [impact-analysis.md](../shared/impact-analysis.md), and —
+only when discovery reports no test framework — [bootstrap.md](../shared/bootstrap.md). Six leaves
 always, a sixth conditionally, so the reader knows the cost before paying it (design spec §11.2
 rule 1). The conditional load is the point: a repository that already has a test tree never pays
 for the file that builds one. `run-state.md` is declared because this stage writes
@@ -17,7 +17,7 @@ integrity baselines, a discovered repo profile, and the artifact folder Stage 02
 
 ## Why This Order Is Not The Obvious Order
 
-The eight steps below run in exactly the order design spec §4 fixes, and that order looks wrong
+The eleven steps below run in exactly the order design spec §4 fixes, and that order looks wrong
 until the reasons are stated:
 
 - **Repo profile discovery runs first, before any worktree exists.** Step 4 (frontend source
@@ -40,8 +40,9 @@ until the reasons are stated:
 
 ```
 repo profile (read-only) → source baseline → worktree + branch gate → frontend init + FE baseline
-→ Jira intake (fetch → slug → artifact folder → `ticket.md`) → discovery sweeps
-→ bootstrap (only when no framework) → artifact folder init (`execution-report.md`) + resume check
+→ Jira intake (fetch → slug → artifact folder → `ticket.md`) → design depth → discovery sweeps
+→ impact sweep → bootstrap (only when no framework)
+→ artifact folder init (`execution-report.md`) + resume check
 → Stage 02
 ```
 
@@ -101,7 +102,7 @@ resolves the Jira title — which both step 3's branch rename and the artifact f
 
 **Resolve `run.anchor_type` from what the key turned out to be** — `story`, `epic`, or `test` — and
 record it. It is resolved from the fetched issue's type, never guessed from the key's shape, and it
-is written once: step 7's first sweep walks different links for each, and the design stage reads it
+is written once: step 8's first sweep walks different links for each, and the design stage reads it
 to decide whether it is designing from acceptance criteria or converting existing tests.
 
 An `epic` anchor names the epic in `run.jira_key` and the artifact folder, and produces one
@@ -120,10 +121,29 @@ order rather than in one move:
    where the skill can be given the path up front, or moving a provisionally written file into the
    folder where it cannot, exactly as step 3 renames a provisional branch with `git branch -m`.
 
-Only after move 3 is `<artifact_dir>/…` a path anything may be written to — step 7's Xray outputs
+Only after move 3 is `<artifact_dir>/…` a path anything may be written to — step 8's Xray outputs
 included.
 
-### 7. Discovery sweeps
+### 7. Resolve `run.design_depth`
+
+Read `ticket.md` and classify the design effort — `trivial`, `standard`, or `cross-cutting` —
+recording the value **with the reason for it**. A single surface with no new entity write and no new
+state a record can hold is `trivial`; one entity and one screen doing ordinary CRUD or display is
+`standard`; a new entity write, a new state a record can hold, or an explicit prohibition anywhere
+in the ticket is `cross-cutting`.
+
+Depth is resolved here, and not in the stage that consumes it, for two reasons. The impact sweep two
+steps below scales its entity breadth by this field, and a field resolved after the step that reads
+it is the ordering defect design spec §4 already caught once. And reading the whole ticket to
+classify costs nothing, because the design stage reads all of it at every depth anyway.
+
+That is the second half of the rule and the more important half: **depth never narrows what gets
+read.** An earlier draft let `trivial` restrict the read to the acceptance-criteria table — which is
+exactly the behaviour that let a stated constraint go uncovered, re-introduced under a new name and
+authorized by the very pass that would be audited for it. Depth scales the sweep's breadth and the
+design document's length. It scales nothing else, and it disables no gate (`run-state.md` rule 12).
+
+### 8. Discovery sweeps
 
 Run `discovery.md` in full: the three sweeps, concurrently, each in its own subagent, each
 returning a structured list and no judgement. This step generalizes what was once a bare Xray
@@ -140,9 +160,9 @@ Unavailable Xray credentials degrade to a warning, never a stop, and the reason 
 records every behaviour `NEW` and marks dedup `not-run`; this stage only records that the fetch did
 not happen.
 
-**Sweep 3 resolves `discovery.framework`, and that field decides whether step 8 runs at all.**
+**Sweep 3 resolves `discovery.framework`, and that field decides whether step 10 runs at all.**
 `framework: none` means the repository has no Playwright-BDD test tree to generate into. That is
-not a failure and not something to leave for later: it is the condition step 8 exists for.
+not a failure and not something to leave for later: it is the condition step 10 exists for.
 Detecting it here — before a scenario has been designed, two stages before anything would try to
 run `generate_cmd` — is why the sweep is in this stage rather than in the one that needs the
 framework.
@@ -151,7 +171,28 @@ Sweep 3 also records `discovery.orphan_features[]`. Orphans are **reported and l
 per `discovery.md`, "Orphan `.feature` Files Are Reported, Never Adopted" — not copied into the
 artifact root, not rewritten, not deleted.
 
-### 8. Bootstrap — only when `discovery.framework: none`
+### 9. Impact sweep
+
+Run `impact-analysis.md`'s two branches. Write `impact.*` to run state and `impact-candidates.md`
+into `run.artifact_dir`.
+
+**This runs after step 8, not alongside it.** Branch B consumes Sweep 2's Xray list and Sweep 3's
+repository-test list, so it is sequenced. The three sweeps above share no inputs; this one does, and
+saying so is what keeps that claim about them honest.
+
+`impact.declared[]` is populated verbatim from `--impact`, and is **not** merged into
+`impact.candidates[]`. A flow the human declared and the sweep also found is a cross-confirmation; a
+flow only one of them produced is a different signal, and the one the human named that the sweep
+could not reach is the strongest evidence available that the sweep has a blind spot
+(`run-state.md` rule 9). The flag is optional, and its absence answers nothing — the required answer
+is taken at the Stage 02 gate, from a human, and is never inferred from a missing flag.
+
+When the sweep cannot run — no frontend source, an uninitialized submodule, an entity that will not
+resolve — record `impact.ran: false` with the reason. Empty-because-nothing-writes-this-entity and
+empty-because-the-sweep-could-not-run are different facts, the same distinction `discovery.ran`
+already draws, and neither releases the gate.
+
+### 10. Bootstrap — only when `discovery.framework: none`
 
 Skip this step entirely when discovery found a framework. When it did not, load `bootstrap.md` and
 follow it in full: one approval for the complete list of paths, nothing overwritten, and the Xray
@@ -165,7 +206,7 @@ On completion, `discovery.framework` becomes `playwright-bdd` and the `profile.*
 fields name directories and scripts that now exist. A run that reaches Stage 02 with
 `framework: none` still recorded has skipped an approval it should have asked for.
 
-### 9. Resume
+### 11. Resume
 
 An existing `<jira-key>-*` artifact folder — matched with the jira-key **lowercase**, per the case
 rule below — is reused, never duplicated under a new slug. `execution-report.md` inside that
@@ -210,7 +251,7 @@ stages that is not a field in that contract):
   `true | false`. All are parsed at entry dispatch and none reaches Stage 03 or Stage 04 unless
   this stage records them; an unrecorded `run.full_suite` is a `--full-suite` flag Stage 03 has no
   way to see and therefore ignores.
-- `run.stage` — written on entering this stage, and by every stage on entering itself, so step 9's
+- `run.stage` — written on entering this stage, and by every stage on entering itself, so step 11's
   resume has a value to read. Only Stage 04 writes the terminal `completed`; a run state that never
   holds a non-terminal stage cannot be resumed from one.
 - `profile.*` — every field step 1 resolved, recorded here rather than left in this stage's working
@@ -219,12 +260,12 @@ stages that is not a field in that contract):
 - `baselines.workspace_baseline`, `baselines.frontend_baseline`
 - `xray.query`, `xray.cucumber_tests`, `xray.manual_tests`
 - `discovery.*` — every field `discovery.md`'s "What Discovery Writes" names: `ran`, `framework`
-  (updated by step 8 when it ran),
+  (updated by step 10 when it ran),
   `linked_issues[]`, `xray_tests[]`, `repo_tests[]`, `orphan_features[]`. A sweep result held only
   in a subagent's reply is a result no later stage can read (`run-state.md` rule 5)
 
 And, on disk, the artifact folder holding `execution-report.md` — **created by this stage**, per
-step 9, carrying the run-state yaml block above — plus `ticket.md`, `existing-tests.feature`, and
+step 11, carrying the run-state yaml block above — plus `ticket.md`, `existing-tests.feature`, and
 `existing-tests-manual.md`.
 
 ## Enter Stage 02
