@@ -1,6 +1,6 @@
 # Speckit QA Auto — Jira-to-Tests QA Pipeline
 
-**Version**: 0.2.0
+**Version**: 0.3.0
 **Author**: Alex Nguyen
 
 ## Overview
@@ -126,6 +126,17 @@ passed, it runs to a scenario verdict or to the circuit breaker. Every loop insi
 - **Discovery before design** — three concurrent sweeps (Jira linkage, Xray tests, repository
   tests) gather evidence, never verdicts, so dedup stays a mechanical rule rather than a subagent's
   opinion.
+- **Impact analysis** — a fourth sweep, sequenced after those three, traces every write against the
+  story's entity back to the flow that owns it, and lists the existing tests on the same surface.
+  A story that attaches an invoice to a work order candidate creates an invariant for every flow
+  that already writes candidates, and none of those flows' tickets say so. The sweep returns
+  candidates with evidence paths; a human decides at the gate, and cannot decline to answer.
+- **Adversarial design review** — before the human gate, a reviewer attacks the design with three
+  questions scoped by the **ticket** rather than by the design's own list of criteria: which
+  sentences state a rule that no scenario covers, what invariants this story creates for existing
+  flows, and which lines were classified by the heading above them rather than by what they say.
+  Self-review cannot find what its own question excludes; that is why this pass exists and why it
+  is never skipped.
 - **Requirement analysis and Xray dedup** — Stage 02 labels every behaviour `NEW`, `UPDATE`,
   `SKIP`, or `REVIEW` against a normalized scenario key, never a similarity judgement.
 - **Manual test conversion** — existing Manual test cases become Gherkin scenarios imported as

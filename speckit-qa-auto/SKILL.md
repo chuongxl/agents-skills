@@ -2,18 +2,20 @@
 name: speckit-qa-auto
 description: |
   Runs an end-to-end QA delivery pipeline from a Jira issue: discovery of linked issues and
-  existing tests, requirement analysis, BDD test design, selector verification, Playwright-BDD
-  automation, a bounded run-and-fix loop, then human review and a pushed branch. Anchors on a
-  story, an epic, or an existing Xray test; converts existing Manual test cases into Gherkin; and
-  bootstraps a test framework when the repository has none. The Gherkin feature file is the single
-  artifact, serving manual testers and automation alike. Use when a Jira issue needs test cases and
-  automated tests produced together, from one command.
+  existing tests, an impact sweep that finds which existing flows the story imposes new invariants
+  on, requirement analysis over the whole ticket, BDD test design, an adversarial review that
+  attacks the design before a human sees it, selector verification, Playwright-BDD automation, a
+  bounded run-and-fix loop, then human review and a pushed branch. Anchors on a story, an epic, or
+  an existing Xray test; converts existing Manual test cases into Gherkin; and bootstraps a test
+  framework when the repository has none. The Gherkin feature file is the single artifact, serving
+  manual testers and automation alike. Use when a Jira issue needs test cases and automated tests
+  produced together, from one command — including the regression tests the ticket never mentions.
 compatibility: "Runs on GitHub Copilot, Claude Code, and OpenCode. Discovered from ~/.agents/skills/, ~/.claude/skills/, or ~/.config/opencode/skills/. Requires git, bash, and a TypeScript repository; a Playwright-BDD test tree is used when present and created by bootstrap when absent. Network access for Jira and Xray."
 license: MIT
 allowed-tools: bash glob grep view create edit skill
 metadata:
   author: Alex Nguyen
-  version: "0.2.0"
+  version: "0.3.0"
 ---
 
 # Speckit QA Auto
@@ -35,10 +37,44 @@ existing Xray coverage — three parts of the pipeline have no defined behaviour
 | An epic | `epic` | One `.feature` per child issue, each tagged with the child's key |
 | An existing Xray test | `test` | Scenarios converted from that test, tagged with the requirement the test links to |
 
+Impact analysis and the adversarial review run at **every** anchor type, and each type resolves them
+differently:
+
+| Anchor | Impact sweep + depth | Adversarial review |
+|---|---|---|
+| `story` | Once, over the story's entity | Three attack tasks |
+| `epic` | Per child, values under `impact.by_child` | Per child, against that child's files; the **fidelity set** when the children are conversions |
+| `test` | Over the requirement the test links to; skipped when it links to none | **Fidelity set** — both directions |
+
+`epic` fans out because the pipeline already produces one `.feature` per child, and an epic-level
+entity no child's ticket names is one no evidence path can support. **The fan-out adds fields, not
+folders.** An epic run has exactly one artifact folder — the epic's — because that name is the
+`@REQ_` target, the dedup key, and the resume glob, and a second folder would be a second identity.
+Child impact files live in the epic's folder, named for the child, beside that child's `.feature`.
+Per-child values live under `impact.by_child`; without that dimension the fields are flat scalars
+and an epic's second child overwrites its first.
+
+The ceiling is the gate. Per-child depth, sweep, and review multiply quickly, and the gate is one
+human reading one output — an epic wider than that is split, and the split is stated, in the words
+`references/shared/manual-conversion.md` already uses for a conversion batch.
+
+`test` swaps the task set because attack tasks 1 and 3 have no subject in a conversion: there is no
+ticket prose to mine for constraints and no heading to misclassify. Fidelity replaces them, asked
+**both** ways — what the Gherkin omits *and* what it adds — because a silent addition is
+indistinguishable from a mistranslation. An `epic` whose children are conversions gets that set too,
+per child; giving it the story tasks would leave the largest batches with no fidelity review at all.
+
 One argument, three resolutions — never a second entry flag. The artifact folder is named
 `<jira-key>-<slug>` and that name is also the `@REQ_` target, the dedup key, and the glob the resume
 check matches; a second way in would mean a second identity, and every one of those four things
 would need a second definition.
+
+`--impact "<flow>[, <flow>...]"` is optional, and is **not** a second entry flag: `--issue` remains
+required and remains the only anchor. It populates `impact.declared[]` verbatim, and that list is
+never merged into what the sweep found — a flow both produced is a cross-confirmation, a flow only
+the sweep found is a gap in the human's memory, and a flow only the human named is a gap in the
+sweep's reach. Its absence answers nothing; the required answer is taken from a human at the
+Stage 02 gate.
 
 Once `--issue` is present, load `references/shared/operating-rules.md` and enter Stage 01 in the
 same turn.
@@ -59,6 +95,7 @@ Shared leaves, each loaded only by the stage that needs it, never all at once:
 `references/shared/run-state.md` (the state contract every stage reads and writes),
 `references/shared/operating-rules.md`, `references/shared/workspace-guard.md`,
 `references/shared/repo-profile.md`, `references/shared/discovery.md`,
+`references/shared/impact-analysis.md`,
 `references/shared/selector-verification.md`, `references/shared/gherkin-conventions.md`,
 `references/shared/host-adaptation.md`, `references/shared/commit.md`.
 
@@ -76,6 +113,12 @@ Stage 03. **No flag skips a gate.** An earlier `--yolo` flag that skipped the tw
 removed: its documented effect was to skip approvals, but its actual effect was to let a run whose
 Xray dedup never ran ship every scenario as `NEW`, with no human ever seeing the `not-run` label —
 which creates a duplicate Xray test for every scenario a team already had.
+
+No flag disables the adversarial review at 2.7b or the impact section of the Stage 02 gate either.
+`run.design_depth` scales how wide the impact sweep looks and how long the design document runs; it
+never scales what the ticket read covers, and it never turns a check off. Narrowing the read is the
+defect the review exists to catch, and the pass that would authorize the narrowing is the pass being
+audited.
 
 Stage 03 remains a no-stop zone: once entered, it runs to a verdict on every scenario in scope, an
 infrastructure stop, or the circuit breaker, and asks no question along the way.
@@ -98,6 +141,7 @@ skill is installed on its own. Refer to it by name only.
 ## Required Inputs
 
 - `--issue <jira-url-or-key>` — required; see Entry Dispatch.
+- `--impact "<flow>[, <flow>...]"` — optional; see Entry Dispatch.
 - `.env` in the repository root: `JIRA_URL`, `JIRA_USERNAME`, `JIRA_API_TOKEN` — required for
   intake. `XRAY_CLIENT_ID`, `XRAY_CLIENT_SECRET` — optional, enable the Xray read in Stage 01.
   None of these are ever printed.
