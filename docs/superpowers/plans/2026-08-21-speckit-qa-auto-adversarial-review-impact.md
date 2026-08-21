@@ -61,7 +61,7 @@ prose, in backticks, and that is where the coupling actually leaks.
 - Consumes: `relative_links(text)` from `validate_skills` — already imported.
 - Produces: `check_skill(skill_dir) -> list[str]`, unchanged signature. New error strings begin `"{rel}: cites "`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Add to `tools/test_validate_coupling.py`, above `main()`:
 
@@ -124,14 +124,14 @@ punish the workaround another rule requires.
 
 Register all four in `main()`, after `test_stage_may_link_to_a_shared_leaf(tmp)`.
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `python3 tools/test_validate_coupling.py`
 Expected: `FAIL - citing an undeclared leaf in backticks is one error` and its companion assertion.
 The other three pass vacuously — no C3 exists yet, so no errors are produced. That is expected:
 they are guard tests, written now so that Step 3 cannot satisfy Step 1 by over-reaching.
 
-- [ ] **Step 3: Implement C3**
+- [x] **Step 3: Implement C3**
 
 Extend the module docstring's rule list:
 
@@ -183,7 +183,7 @@ Membership in `references/shared/` is what separates a leaf citation from an art
 **not** add an allow-list of `ticket.md` / `execution-report.md`: a hard-coded list is one more
 thing to keep in sync, and the filesystem already answers the question.
 
-- [ ] **Step 4: Run the tests, then run C3 against the real skill**
+- [x] **Step 4: Run the tests, then run C3 against the real skill**
 
 ```bash
 python3 tools/test_validate_coupling.py
@@ -202,7 +202,7 @@ with exactly four errors:**
 written has not been shown to look at anything. If this run reports `ok`, the citation pass is not
 firing — stop and fix it before Step 5, which would otherwise be resolving nothing.
 
-- [ ] **Step 5: Resolve the four violations — declare or reword, per citation**
+- [x] **Step 5: Resolve the four violations — declare or reword, per citation**
 
 The four are not the same kind of citation, and declaring all four would make the `Loads:` line lie
 in the other direction, promising a load the stage never performs.
@@ -222,7 +222,7 @@ state rather than from the file, reword to name the concept without the filename
 Update each stage's `Loads:` line, **and its leaf-count sentence** — both stages open by naming how
 many leaves they load, and a count left stale is the same defect one level up.
 
-- [ ] **Step 6: Run the full check suite**
+- [x] **Step 6: Run the full check suite**
 
 ```bash
 python3 tools/test_validate_coupling.py
@@ -233,7 +233,7 @@ python3 -m compileall -q tools */scripts
 ```
 Expected: `speckit-qa-auto: ok` — earned this time rather than assumed.
 
-- [ ] **Step 7: Add the test-case row**
+- [x] **Step 7: Add the test-case row**
 
 In `test-case/speckit-qa-auto/test-cases.md`, after the `AC10` row:
 
@@ -244,7 +244,7 @@ In `test-case/speckit-qa-auto/test-cases.md`, after the `AC10` row:
 The second sentence is the part that matters: it records that the check was demonstrated to fail,
 so a later reader cannot mistake a passing run for an unexercised one.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add tools/validate_coupling.py tools/test_validate_coupling.py \
@@ -276,7 +276,7 @@ Run-state rule 3 makes this the first authoring task: a field absent from the co
 - Produces: `run.design_depth`, `run.depth_raised_in_02`, the whole `impact:` block including `impact.by_child`, `design.adversarial_review`, `design.review_mode`, `design.review_rounds`, and `design.scenarios[].{impact, impact_flow, origin, surface, selector_evidence}`. Tasks 5–9 read these names verbatim; a typo here becomes a field nothing finds.
 - **Does not produce:** `sweep_breadth_stale` or `design.review_reason`. Both appeared in a draft and were removed — the first because Stage 02 can re-run the sweep by loading a shared leaf (D46), the second because D33 deleted the only condition that could write `not-run`. Do not reintroduce either; a field nothing writes is one a reader assumes means something.
 
-- [ ] **Step 1: Add the new fields to the `yaml` field reference**
+- [x] **Step 1: Add the new fields to the `yaml` field reference**
 
 Under `run:`, after `full_suite:`:
 
@@ -342,7 +342,7 @@ And extend the `scenarios:` example with a second entry:
 
 Add `selector_evidence:` to the first `scenarios[]` entry too — it is now per scenario.
 
-- [ ] **Step 2: Amend rule 7 and add rules 9–14**
+- [x] **Step 2: Amend rule 7 and add rules 9–14**
 
 Rule 7 currently governs a single top-level `selector_evidence`. Append to it:
 
@@ -367,7 +367,7 @@ found in review rather than stating a preference:
   with `api` and `manual` carrying `n/a`. Without the exclusion, a landed run of only `api`
   scenarios rolls up to `deferred`, which turn-ending condition 11 stops on.
 
-- [ ] **Step 3: Verify the contract is self-consistent**
+- [x] **Step 3: Verify the contract is self-consistent**
 
 ```bash
 grep -c "^> \*\*[0-9]\+\." speckit-qa-auto/references/shared/run-state.md
@@ -382,11 +382,11 @@ Expected: the first returns each name in both the yaml block and at least one ru
 returns **nothing outside rule 11's explanation of why `not-run` was removed** — a stray field
 reintroduced by copying an older draft is the likeliest way this task goes wrong.
 
-- [ ] **Step 4: Run the full check suite**
+- [x] **Step 4: Run the full check suite**
 
 Expected: `speckit-qa-auto: ok`; `validate_skills.py` reports 0 errors. `run-state.md` is a shared leaf — if C1 fires, a link was added to a file that must have none.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add speckit-qa-auto/references/shared/run-state.md
@@ -412,7 +412,7 @@ Two new authored files, both self-contained. `impact-analysis.md` is a shared le
 - Consumes: `impact.*` field names from Task 2.
 - Produces: the Sweep 4 contract Task 5 (Stage 01) executes, and the prompt template Task 7 (Stage 02) dispatches.
 
-- [ ] **Step 1: Write `references/shared/impact-analysis.md`**
+- [x] **Step 1: Write `references/shared/impact-analysis.md`**
 
 Open with the leaf declaration this repo uses:
 
@@ -433,14 +433,14 @@ Then the content of spec §1, in this repository's prose register. Required sect
 7. **When A Sweep Cannot Run** — `ran: false` with `reason`; empty-because-nothing-writes-this-entity and empty-because-the-sweep-could-not-run are different facts, and neither releases the gate.
 8. **Red Flags** table — thoughts that mean the sweep has exceeded its mandate. Model it on `discovery.md`'s. At minimum: "this flow obviously breaks, I'll mark it affected"; "the human didn't declare it so it must not matter"; "one more hop would find the related entity"; "credentials are missing, record zero and move on".
 
-- [ ] **Step 2: Verify the leaf links to nothing**
+- [x] **Step 2: Verify the leaf links to nothing**
 
 ```bash
 grep -nE '\]\([^)]*\.md' speckit-qa-auto/references/shared/impact-analysis.md
 ```
 Expected: no output. Any hit is a C1 violation — reference sibling files by name in prose, never by link.
 
-- [ ] **Step 3: Write `assets/adversarial-review-prompt.md`**
+- [x] **Step 3: Write `assets/adversarial-review-prompt.md`**
 
 A template, not a document. It must carry, verbatim and in this order:
 
@@ -457,11 +457,11 @@ A template, not a document. It must carry, verbatim and in this order:
   Follow it with the reason, so a future editor does not trim it: an uncalibrated reviewer floods the gate, the human learns to skim, and the mechanism inverts into what it was built to prevent.
 - **Output format**: `Approved | Issues Found`; issues as `[Section]: [issue] — [why it matters]`; recommendations advisory and non-blocking; the final message is the whole review, read as data.
 
-- [ ] **Step 4: Run the full check suite**
+- [x] **Step 4: Run the full check suite**
 
 Expected: `speckit-qa-auto: ok`, 0 errors. `assets/` is permitted by `SKILL_SPEC.md`'s folder layout and is not subject to C1/C2/C3.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add speckit-qa-auto/references/shared/impact-analysis.md speckit-qa-auto/assets/adversarial-review-prompt.md
@@ -485,7 +485,7 @@ Three small, mechanical edits to existing leaves. Folded into one task because a
 - Modify: `speckit-qa-auto/references/shared/operating-rules.md` — turn-ending condition 12
 - Modify: `speckit-qa-auto/references/shared/manual-conversion.md` — the fidelity set is bidirectional and reaches `epic`
 
-- [ ] **Step 1: Scope `discovery.md`'s ordering claim**
+- [x] **Step 1: Scope `discovery.md`'s ordering claim**
 
 `discovery.md` currently says under "The Three Sweeps": *"Run them concurrently — they share no inputs and no ordering."* That claim is true of sweeps 1–3 and false of Sweep 4, whose Branch B consumes sweeps 2 and 3. Amend the sentence to scope it, and add a short paragraph naming Sweep 4 without linking to it:
 
@@ -498,7 +498,7 @@ dependency here is what keeps the concurrency claim above true rather than nearl
 
 Reference `impact-analysis.md` by name only — a link would be a C1 violation in a shared leaf.
 
-- [ ] **Step 2: Correct `host-adaptation.md`'s enumeration**
+- [x] **Step 2: Correct `host-adaptation.md`'s enumeration**
 
 The file says *"Two parts of the pipeline dispatch subagents: discovery's three sweeps, and the selector gate's live-DOM read."* Replace with:
 
@@ -519,7 +519,7 @@ is measured against real runs rather than asserted. An exemption resting on an u
 sentence would let any later step claim the same one, and the rule above would mean nothing.
 ```
 
-- [ ] **Step 3: Add `@IMPACT` to `gherkin-conventions.md`**
+- [x] **Step 3: Add `@IMPACT` to `gherkin-conventions.md`**
 
 Add a row to the tag table (after the `@TEST_` row):
 
@@ -544,7 +544,7 @@ stories own, so that match is likelier here than anywhere else in the pipeline �
 impact file is labelled `REVIEW <TEST-key>` and decided by a human.
 ```
 
-- [ ] **Step 3b: Add turn-ending condition 12 to `operating-rules.md`**
+- [x] **Step 3b: Add turn-ending condition 12 to `operating-rules.md`**
 
 The list opens with *"Exhaustive. Any other reason to stop is invalid."* The impact gate stops a
 run, so it belongs there or the list is wrong about itself — and a stop absent from an exhaustive
@@ -556,7 +556,7 @@ list is one a later reader deletes as a bug.
     section's entire purpose
 ```
 
-- [ ] **Step 3c: Make `manual-conversion.md`'s fidelity review bidirectional and reach `epic`**
+- [x] **Step 3c: Make `manual-conversion.md`'s fidelity review bidirectional and reach `epic`**
 
 The file already treats deviations as bidirectional — it says a silent addition is
 *"indistinguishable from a mistranslation"* — but the adversarial task set built on it must say so
@@ -566,7 +566,7 @@ conversions receives this set per child rather than the story set. `manual-conve
 loaded for `anchor_type: test` **or** `epic`; giving an epic-anchored batch the story tasks would
 leave it with no fidelity review at all — the one review that anchor's gate turns on.
 
-- [ ] **Step 4: Verify**
+- [x] **Step 4: Verify**
 
 ```bash
 grep -n "these three share no inputs" speckit-qa-auto/references/shared/discovery.md
@@ -580,7 +580,7 @@ Expected: the first five each return a line; the last returns nothing — **no l
 anything**, and C1 fires if one does. Sibling leaves are referred to by name in backticks, which is
 also what Task 1's fourth guard test exists to keep legal.
 
-- [ ] **Step 5: Run the full check suite, then commit**
+- [x] **Step 5: Run the full check suite, then commit**
 
 ```bash
 git add speckit-qa-auto/references/shared/discovery.md speckit-qa-auto/references/shared/host-adaptation.md \
@@ -605,11 +605,11 @@ gherkin-conventions.md gains @IMPACT and the ban on UPDATE inside it."
 - Consumes: `impact-analysis.md` (Task 3), `run.design_depth` and `impact.*` (Task 2).
 - Produces: `run.design_depth` and a populated `impact.*` for Stage 02 to read; `impact-candidates.md` on disk in `run.artifact_dir`.
 
-- [ ] **Step 1: Declare the new leaf on the `Loads:` line**
+- [x] **Step 1: Declare the new leaf on the `Loads:` line**
 
 Add `[impact-analysis.md](../shared/impact-analysis.md)` to the `Loads:` line and update the count sentence — it currently reads "Five leaves always, a sixth conditionally". It becomes six always, a seventh conditionally. **C3 fails if the leaf is linked in the body without being declared here**, which is the check Task 1 added.
 
-- [ ] **Step 2: Insert the two steps in the execution-order block**
+- [x] **Step 2: Insert the two steps in the execution-order block**
 
 The block currently ends `… → Jira intake (…) → discovery sweeps → bootstrap (only when no framework) → artifact folder init …`. It becomes:
 
@@ -619,7 +619,7 @@ The block currently ends `… → Jira intake (…) → discovery sweeps → boo
 + resume check → Stage 02
 ```
 
-- [ ] **Step 3: Add step 7 — resolve `run.design_depth`**
+- [x] **Step 3: Add step 7 — resolve `run.design_depth`**
 
 Insert between the current step 6 (Jira intake) and step 7 (Discovery sweeps), renumbering the rest. Content: resolve `trivial | standard | cross-cutting` from `ticket.md`, using the spec §5.1 signal table, and record the classification **with its reason**. State why it lives here rather than in Stage 02:
 
@@ -634,7 +634,7 @@ uncovered, re-introduced under a new name and authorized by the very pass that w
 it.
 ```
 
-- [ ] **Step 4: Add the impact sweep step after the discovery sweeps step**
+- [x] **Step 4: Add the impact sweep step after the discovery sweeps step**
 
 ```markdown
 ### 8. Impact sweep
@@ -652,7 +652,7 @@ a flow both produced is a cross-confirmation, and a flow only one produced is a 
 taken at the Stage 02 gate, from a human, never inferred from a missing flag.
 ```
 
-- [ ] **Step 5: Renumber and re-check every internal step reference**
+- [x] **Step 5: Renumber and re-check every internal step reference**
 
 The file cites step numbers in its "Why This Order Is Not The Obvious Order" section and inside later steps. Two insertions shift every step from the old 7 onward by two.
 
@@ -661,7 +661,7 @@ grep -nE "\bstep [0-9]+\b" speckit-qa-auto/references/pipeline/stage-01-intake.m
 ```
 Read every hit and confirm it names the step it means. This file has been broken by stale step references before — the skill's own history records fixing exactly this after the bootstrap insertion.
 
-- [ ] **Step 6: Run the full check suite, then commit**
+- [x] **Step 6: Run the full check suite, then commit**
 
 Expected: `speckit-qa-auto: ok`. A C3 failure here means step 1 was skipped — the leaf is linked but not declared.
 
@@ -687,11 +687,11 @@ Splitting Stage 02 across two tasks is deliberate: a reviewer can accept the wid
 - Consumes: `impact.candidates[]`, `impact.declared[]`, `run.design_depth` (Tasks 2, 5); `@IMPACT` and the `UPDATE` ban (Task 4).
 - Produces: `<domain>-<aspect>-impact.feature` in `run.artifact_dir`; `design.scenarios[]` entries carrying `impact: true`, `impact_flow`, `origin`; `test-design.md` §2b.
 
-- [ ] **Step 1: Update `Loads:` and "What This Stage Receives"**
+- [x] **Step 1: Update `Loads:` and "What This Stage Receives"**
 
 The stage reads `impact.*` from run state and `impact-candidates.md` from the artifact folder. Add both to the receives list. Do **not** add `impact-analysis.md` to `Loads:` — Stage 02 does not run the sweep; it reads what Stage 01 left in run state. Adding it would be a leaf the stage pays for and never uses.
 
-- [ ] **Step 2: Generalize step 2.1**
+- [x] **Step 2: Generalize step 2.1**
 
 Replace *"Turn `ticket.md`'s acceptance criteria into a list of testable behaviours"* with a whole-ticket read, and state the reason a heading rule was rejected:
 
@@ -708,7 +708,7 @@ coverage matrix reporting no criterion uncovered. The answer is not a stricter r
 second question asked at 2.7b, whose scope this step does not set.
 ```
 
-- [ ] **Step 3: State at 2.2 that dedup is a rule, not a position, and add the impact labels**
+- [x] **Step 3: State at 2.2 that dedup is a rule, not a position, and add the impact labels**
 
 ```markdown
 Dedup is a **rule**, not a step that runs once here. The normalized-key match above is applied
@@ -724,7 +724,7 @@ See `gherkin-conventions.md` for why `UPDATE` and `SKIP` are refused: either wou
 human, that another story's Test issue now belongs to this one.
 ```
 
-- [ ] **Step 4: Add step 2.4b — impact design**
+- [x] **Step 4: Add step 2.4b — impact design**
 
 ```markdown
 ### 2.4b Impact design
@@ -761,11 +761,11 @@ CI as a file containing no tests. The gate's impact section still runs; its cont
 `ran` and `reason`, and the answer a human still has to give.
 ```
 
-- [ ] **Step 5: Update steps 2.5 and 2.6**
+- [x] **Step 5: Update steps 2.5 and 2.6**
 
 2.5 writes **both** files. 2.6's `test-design.md` gains **§2b** (impact coverage: candidate → scenario → evidence path → provenance) and **§9** (reserved for the review findings Task 7 writes).
 
-- [ ] **Step 6: Verify**
+- [x] **Step 6: Verify**
 
 ```bash
 grep -n "2.4b" speckit-qa-auto/references/pipeline/stage-02-test-design.md
@@ -774,7 +774,7 @@ grep -nE "acceptance criteria into a list" speckit-qa-auto/references/pipeline/s
 ```
 Expected: the first two return lines; the third returns nothing — the old narrow instruction is gone, not merely supplemented.
 
-- [ ] **Step 7: Run the full check suite, then commit**
+- [x] **Step 7: Run the full check suite, then commit**
 
 ```bash
 git add speckit-qa-auto/references/pipeline/stage-02-test-design.md
@@ -797,7 +797,7 @@ so all three see them and the reviewer's findings have somewhere to land."
 - Consumes: `assets/adversarial-review-prompt.md` (Task 3); `design.adversarial_review`, `review_mode`, `review_rounds`, `depth_raised_in_02` (Task 2); `impact-analysis.md` (Task 3), loaded conditionally when a finding raises depth; the 2.4b outputs (Task 6).
 - Produces: `test-design.md` §9; `impact.approved_scenarios[]` and `impact.dropped_scenarios[]`.
 
-- [ ] **Step 1: Add three checks to step 2.7**
+- [x] **Step 1: Add three checks to step 2.7**
 
 Note the second check's wording: it is satisfied by a **scenario or a recorded drop**. Requiring a
 scenario alone deadlocks the gate — a revision dropping a candidate's only scenario re-enters 2.7,
@@ -816,7 +816,7 @@ To the existing six:
 - No scenario in the impact file carries `UPDATE`.
 ```
 
-- [ ] **Step 2: Add step 2.7b — adversarial review**
+- [x] **Step 2: Add step 2.7b — adversarial review**
 
 ```markdown
 ### 2.7b Adversarial review
@@ -858,7 +858,7 @@ instead — asking the human to request a resume — named no reachable `run.res
 nothing ever cleared the staleness flag it set.
 ```
 
-- [ ] **Step 3: Rewrite step 2.8's gate presentation**
+- [x] **Step 3: Rewrite step 2.8's gate presentation**
 
 Four sections — Depth, Coverage, Review, Impact — as spec §5.5's table gives them. Then:
 
@@ -895,7 +895,7 @@ scenarios blocked at Stage 03 and does not reach a file emptied at the gate, so 
 
 Leave the `code_state` × `design_only` next-hop table **unchanged**. Add one sentence beneath it: nothing authors Gherkin after this gate.
 
-- [ ] **Step 4: Extend "What This Stage Produces"**
+- [x] **Step 4: Extend "What This Stage Produces"**
 
 Add `design.adversarial_review`, `design.review_mode`, `design.review_rounds`,
 `impact.approved_scenarios[]`, `impact.dropped_scenarios[]`, `run.depth_raised_in_02`,
@@ -903,14 +903,14 @@ and `run.depth_raised_in_02`. **Not** `sweep_breadth_stale` and **not** `review_
 removed in review, and reintroducing either by copying an older draft is the likeliest way this
 task goes wrong.
 
-- [ ] **Step 5: Verify the old red-flag rows do not contradict the new steps**
+- [x] **Step 5: Verify the old red-flag rows do not contradict the new steps**
 
 ```bash
 grep -n -A 30 "Red Flags" speckit-qa-auto/references/pipeline/stage-02-test-design.md
 ```
 Read every row. Any row implying design ends at 2.7, or that the gate is the last checkpoint before Stage 03, needs the 2.7b step folded in.
 
-- [ ] **Step 6: Run the full check suite, then commit**
+- [x] **Step 6: Run the full check suite, then commit**
 
 ```bash
 git add speckit-qa-auto/references/pipeline/stage-02-test-design.md
@@ -931,7 +931,7 @@ measured rather than assumed."
 - Modify: `speckit-qa-auto/references/pipeline/stage-03-automate.md` — "Run Scope"
 - Modify: `speckit-qa-auto/references/pipeline/stage-04-finish.md` — the report
 
-- [ ] **Step 1: Rewrite Stage 03's "Run Scope"**
+- [x] **Step 1: Rewrite Stage 03's "Run Scope"**
 
 Keep the existing paragraph and add:
 
@@ -950,7 +950,7 @@ mechanism to discharge. Those tests are reported by Stage 04 as recommended regr
 where a human can run them.
 ```
 
-- [ ] **Step 2: Add three report additions to Stage 04**
+- [x] **Step 2: Add three report additions to Stage 04**
 
 ```markdown
 - **Impact scenarios**: each approved one with the flow and evidence path it came from.
@@ -968,14 +968,14 @@ where a human can run them.
   the human dropped a scenario, not the observation that tests exist on that surface.
 ```
 
-- [ ] **Step 3: Verify**
+- [x] **Step 3: Verify**
 
 ```bash
 grep -n "not widened\|recommended regression\|Recommended regression" speckit-qa-auto/references/pipeline/stage-03-automate.md speckit-qa-auto/references/pipeline/stage-04-finish.md
 ```
 Expected: hits in both files.
 
-- [ ] **Step 4: Run the full check suite, then commit**
+- [x] **Step 4: Run the full check suite, then commit**
 
 ```bash
 git add speckit-qa-auto/references/pipeline/stage-03-automate.md speckit-qa-auto/references/pipeline/stage-04-finish.md
@@ -995,7 +995,7 @@ tests become a Stage 04 regression recommendation instead."
 - Modify: `speckit-qa-auto/README.md` — version and the new capabilities
 - Modify: `README.md` (repo root) — the skills-table row badge **and that row's flags column**, which `--impact` changes
 
-- [ ] **Step 1: Document the anchor-type matrix**
+- [x] **Step 1: Document the anchor-type matrix**
 
 Spec §7's table belongs in `SKILL.md` beside the existing anchor table, because `--issue` is where the three types are already introduced:
 
@@ -1026,15 +1026,15 @@ audits one of the two ways a conversion goes wrong. An `epic` whose children are
 this set too, per child: `manual-conversion.md` loads for `test` **or** `epic`, so giving that batch
 the story tasks would leave it with no fidelity review at all.
 
-- [ ] **Step 2: Add `--impact` to Entry Dispatch and Required Inputs**
+- [x] **Step 2: Add `--impact` to Entry Dispatch and Required Inputs**
 
 Parse `--impact "<flow>[, <flow>...]"`. Optional. It populates `impact.declared[]` verbatim and is never merged with sweep output. Say plainly that it is **not** a second entry flag: `--issue` remains required and remains the only anchor.
 
-- [ ] **Step 3: Update the leaf inventory and the Modes section**
+- [x] **Step 3: Update the leaf inventory and the Modes section**
 
 Add `impact-analysis.md` to the always-loaded shared list. Note that `assets/adversarial-review-prompt.md` is an asset, not a leaf — it is dispatched, not loaded. In "Modes", add that no flag disables 2.7b or the impact section of the gate, alongside the existing statement that no flag skips a gate.
 
-- [ ] **Step 4: Bump the version in all three places**
+- [x] **Step 4: Bump the version in all three places**
 
 ```bash
 grep -n 'version:' speckit-qa-auto/SKILL.md
@@ -1044,7 +1044,7 @@ Set `metadata.version: "0.3.0"` in SKILL.md; update the skill README's version l
 
 Also refresh SKILL.md's `description` — it must still be 40–1024 characters and state what the skill does **and** when to use it. Add the two new capabilities (impact analysis, adversarial design review) without letting it exceed the ceiling.
 
-- [ ] **Step 5: Run the full check suite**
+- [x] **Step 5: Run the full check suite**
 
 This is the task where a version mismatch surfaces:
 
@@ -1053,7 +1053,7 @@ python3 tools/validate_skills.py
 ```
 Expected: `PASS  speckit-qa-auto`, no `root README declares v…` error. That error means step 4 missed the root README, which is a different file from the skill's own.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add speckit-qa-auto/SKILL.md speckit-qa-auto/README.md README.md
@@ -1075,7 +1075,7 @@ Acceptance criteria split in two, because they are two different kinds of claim.
 - Create: `test-case/speckit-qa-auto/fixtures/constraint-under-notes/` — a **directory**, holding a complete 2.7b input set
 - Create: `test-case/speckit-qa-auto/fixtures/out-scope-constraint/` — the same, built from the real MOM-12194 artifacts
 
-- [ ] **Step 1: Write the E3 fixture**
+- [x] **Step 1: Write the E3 fixture**
 
 A fixture is a **complete 2.7b input set**, not one file: `ticket.md`, both `.feature` files,
 `test-design.md`, `impact-candidates.md`, and a depth with its reason. 2.7b takes five inputs, and a
@@ -1095,7 +1095,7 @@ commit `7fa828f`. Copy them in rather than referencing a branch a checkout may n
 
 E3 is the case that distinguishes this design from a rule keyed to the word `Out-Scope`. If the mechanism only fires on that heading, E3 fails and the design is what it was accused of being.
 
-- [ ] **Step 2: Add the deterministic rows**
+- [x] **Step 2: Add the deterministic rows**
 
 Twenty-four rows from spec §9.1, in the existing table's column shape (ID / spec item / scenario /
 preconditions / steps / expected result). Continue the existing numbering — `AC12` was taken by
@@ -1107,7 +1107,7 @@ never deterministic — 2.1 is a model pass, and 2.7b now adds to the set. Narro
 **dedup labels**, which is what rule 5 actually guarantees. Leaving it asserting something the
 design now denies would make the first honest run look like a regression.
 
-- [ ] **Step 3: Add the eval-case section**
+- [x] **Step 3: Add the eval-case section**
 
 A separate section below the table, headed so no one mistakes it for a CI gate:
 
@@ -1136,7 +1136,7 @@ the input to the spec §11 question of whether one adversarial pass needs a seco
 writes down is a design decision made by forgetting; a rate written down with no consequence named
 is the same thing with extra steps.
 
-- [ ] **Step 4: Verify**
+- [x] **Step 4: Verify**
 
 ```bash
 python3 tools/validate_skills.py
@@ -1146,7 +1146,7 @@ grep -n "Eval cases" test-case/speckit-qa-auto/test-cases.md
 ```
 Expected: validator passes; both fixture directories exist and each holds five inputs; the AC row count has grown by 24 over its pre-Task-10 value; the eval section is present; `AC07` no longer claims byte-identical scenario sets.
 
-- [ ] **Step 5: Run the full check suite, then commit**
+- [x] **Step 5: Run the full check suite, then commit**
 
 ```bash
 git add test-case/speckit-qa-auto/
