@@ -19,6 +19,30 @@ because each is exactly the case a plausible-looking implementation would silent
 | AC10 | 10 | Coupling check | `speckit-qa-auto/` complete | Run `python3 tools/validate_coupling.py speckit-qa-auto` | Output `speckit-qa-auto: ok` — no file under `references/shared/` links to another reference file, and no file under `references/pipeline/` links to another stage file |
 | AC11 | 11 | Dry run reaches Stage 02 human gate | Reference repository (`om-mom-e2e-playwright`) checked out; Jira and Xray credentials configured in `.env`; a real story key in that project | Run `/speckit-qa-auto --issue <real-story-key>` in default mode against the reference repo checkout, through Stage 01 and Stage 02 up to (not past) step 2.8 | The run reaches the Stage 02 human gate presenting a coverage matrix covering every acceptance criterion in the story, a selector map with every element resolved (no unresolved rows), and dedup labels (`NEW`/`UPDATE`/`SKIP`/`REVIEW`) against the story's existing Xray tests |
 | AC12 | C3 | Cited leaves are declared | `speckit-qa-auto/` complete | Run `python3 tools/validate_coupling.py speckit-qa-auto` | Output `speckit-qa-auto: ok` — every shared leaf a stage file cites in backticks is named on that stage's `Loads:` line. Run against the tree as it stood before this change's stage-file edits, the same command reports four errors: `stage-03` citing `repo-profile.md` and `commit.md`, `stage-04` citing `gherkin-conventions.md` and `selector-verification.md`. That the check was demonstrated to fail is what distinguishes a passing run from an unexercised one |
+| AC13 | §9.1.1 | Depth resolved before the sweep | A run has reached the end of Stage 01 | Read `execution-report.md`'s run-state block | `run.design_depth` is present and is written before `impact.*`, with the reason recorded |
+| AC14 | §9.1.2 | Impact sweep is sequenced, not concurrent | `speckit-qa-auto/` complete | Read `references/shared/discovery.md`'s sweep section and `references/pipeline/stage-01-intake.md` step 9 | `discovery.md`'s no-ordering claim is scoped to the three sweeps; step 9 states it runs after step 8 and why |
+| AC15 | §9.1.3 | Unrun sweep is distinguishable from an empty one | A run where the frontend source is absent | Read `impact.ran` and `impact.reason` in `execution-report.md` | `ran: false` with a reason, distinct from `ran: true` with `candidates: []` |
+| AC16 | §9.1.4 | Declarations and findings stay separate | A run invoked with `--impact "Change Setting"` where the sweep also finds that flow | Read `impact.declared[]` and `impact.candidates[]` | Both fields are present; the flow appears in `candidates[]` with `source: both`; `declared[]` is not merged away |
+| AC17 | §9.1.5 | A candidate is satisfied by a scenario or a drop | A gate revision drops a candidate's only scenario, then self-review re-runs | Re-run Stage 02 step 2.7 | The check passes, satisfied by the `impact.dropped_scenarios[]` entry; the run does not reach three consecutive failures |
+| AC18 | §9.1.6 | Impact file forbids UPDATE and SKIP | An impact scenario whose normalized key matches an existing Cucumber test | Read the impact `.feature` and `design.scenarios[]` | The label is `REVIEW-OVERLAP <TEST-key>`; no `UPDATE` or `SKIP` appears in the impact file |
+| AC19 | §9.1.7 | @REQ_ sits at Feature level in both files | A run that designed impact scenarios | Read both `.feature` files in `run.artifact_dir` | `@REQ_<STORY-KEY>` appears at Feature level in each; not at Scenario level |
+| AC20 | §9.1.8 | adversarial_review has three values | `speckit-qa-auto/` complete | `grep -rn "not-run" speckit-qa-auto/references/shared/run-state.md` | The only occurrence is rule 11's explanation of why the value was removed; the enum lists three values |
+| AC21 | §9.1.9 | Review rounds are bounded at three | A run whose reviewer returns findings on every round | Read `design.review_rounds` and `design.adversarial_review` | `review_rounds` never exceeds 3; leaving round 3 with findings open writes `issues-open` |
+| AC22 | §9.1.10 | A depth raise re-runs the sweep | A 2.7b finding raises `run.design_depth` | Read `run.depth_raised_in_02` and `impact.entities` | `depth_raised_in_02: true`; the sweep re-ran at the wider breadth; no `sweep_breadth_stale` field exists anywhere |
+| AC23 | §9.1.11 | Nothing authors Gherkin at the gate | A human names a flow nobody found, at 2.8 | Follow the run | The addition returns to 2.4b, passes 2.7 and 2.7b, and comes back to the gate; the 2.8 next-hop table is unchanged |
+| AC24 | §9.1.12 | trivial depth still runs every check | A run classified `design_depth: trivial` | Read `test-design.md` and `execution-report.md` | Step 2.1 read the whole ticket; 2.7b ran; the 2.8 gate ran with its impact section |
+| AC25 | §9.1.13 | The review degrades to inline | A host with no subagent-dispatch capability | Run Stage 02 through 2.7b | The review runs with the same prompt and tasks; `design.review_mode: inline` is recorded and shown at the gate |
+| AC26 | §9.1.14 | A pending run writes both files and stops | A story whose code has not landed, with impact candidates found | Run Stage 01–02 | Both `.feature` files are written; the run ends after Stage 02 with `run.resume_from: 02.4` |
+| AC27 | §9.1.15 | selector_evidence roll-up excludes api and manual | A landed run whose scope holds only `surface: api` scenarios | Read `design.selector_evidence` and each `design.scenarios[].selector_evidence` | Each scenario carries `n/a`; the roll-up is `n/a`, never `deferred`; Turn-Ending Condition 11 does not fire |
+| AC28 | §9.1.16 | Stage 03 does not widen the run command | A run with approved impact scenarios | Read `scoped_run_cmd` as executed at 3.3 | It covers only scenarios holding `design.scenarios[]` entries; no pre-existing test of an impact flow is pulled in |
+| AC29 | §9.1.17 | Findings and drops survive | A run where the reviewer raised findings and the human dropped a scenario | Read `test-design.md` §9 and `impact-candidates.md` | Every finding appears with its disposition, rejected ones included; every dropped scenario appears with its reason |
+| AC30 | §9.1.18 | epic fans out fields, not folders | An `epic` anchor with two children | Read `run.artifact_dir` and `impact.by_child` | One artifact folder, named for the epic; one impact file per child inside it; per-child values under `impact.by_child` |
+| AC31 | §9.1.18b | test anchor runs the fidelity set | A `test` anchor conversion run | Read the reviewer prompt as dispatched | Attack tasks 1 and 3 are replaced by the bidirectional fidelity task; an `epic` of conversions receives the same |
+| AC32 | §9.1.19 | Version agrees in three places | `speckit-qa-auto/` complete | Run `python3 tools/validate_skills.py` | Exit `0`; `speckit-qa-auto` reports `0` errors; `SKILL.md`, the skill README, and the root README row all read `0.3.0` |
+| AC33 | §9.1.20 | C3 was demonstrated to fail | `speckit-qa-auto/` complete | Run `python3 tools/validate_coupling.py speckit-qa-auto`; then run it against the tree before this change's stage-file edits | `ok` now; four errors before — `stage-03` citing `repo-profile.md` and `commit.md`, `stage-04` citing `gherkin-conventions.md` and `selector-verification.md` |
+| AC34 | §9.1.21 | Impact scenarios carry a dedup label at creation | A run where 2.7b added an impact scenario on a loop | Read `design.scenarios[]` for entries with `origin: adversarial-review` | Each carries a `dedup` value; none is unlabelled when 2.7 re-runs |
+| AC35 | §9.1.22 | The impact gate is turn-ending condition 12 | `speckit-qa-auto/` complete | Read `references/shared/operating-rules.md`'s turn-ending list | Condition 12 names the Stage 02 gate's impact section with no answer given |
+| AC36 | §9.1.23 | @IMPACT is skill-owned and out of the filter | A run that designed impact scenarios | Read `profile.existing_tags` and `scoped_run_cmd` | `@IMPACT` is absent from `existing_tags` and absent from the tag filter |
 
 ## AC05 — Workspace baseline regression
 
@@ -120,11 +144,21 @@ Judgement") is a mechanical string transform, not a per-run judgement call.
 
 **Expected result**
 
-The two label sets are identical: the same behaviours, in the same order, each carrying the same
-label and the same referenced `TEST-key` where applicable. This follows because the normalized
-scenario key (lowercase; tags, the `Scenario:`/`Scenario Outline:` prefix, punctuation, and
-whitespace stripped; quoted literals and numbers stripped) is a pure function of the scenario text
-and the fixed export — nothing in the matching rule depends on model judgement or run order.
+**Each behaviour present in both runs carries the same label**, referencing the same `TEST-key`
+where applicable. This follows because the normalized scenario key (lowercase; tags, the
+`Scenario:`/`Scenario Outline:` prefix, punctuation, and whitespace stripped; quoted literals and
+numbers stripped) is a pure function of the scenario text and the fixed export — nothing in the
+matching rule depends on model judgement or run order.
+
+**The scenario *set* is not part of this guarantee, and an earlier version of this case wrongly
+required it to be** ("the same behaviours, in the same order"). Step 2.1 is a model pass, and step
+2.7b can add scenarios the first run did not produce. What rule 5 guarantees is that the labelling
+of a given scenario is identical across runs, not that two runs enumerate the same scenarios. A run
+that legitimately finds one more behaviour would have failed this case as written, which would have
+made the first honest improvement look like a regression.
+
+Compare labels behaviour-by-behaviour on the intersection, and record any behaviour present in only
+one run rather than failing on it.
 
 ## AC08 — Blocked-scenario round trip
 
@@ -212,9 +246,49 @@ source.
 - AC05 and AC06 both demonstrate the same fact from opposite ends: a status-letter or parent-repo
   diff comparison alone reports no violation, while the content-addressed baseline comparison
   catches it.
-- AC07 produces byte-for-byte identical label sets across two independent runs.
+- AC07 produces identical labels for every behaviour present in both runs.
 - AC08 shows the test tree and `docs/qa/` diverge in exactly the documented way — the blocked
   scenario is missing from one and present, tagged, in the other — and that only `docs/qa/` is fit
   to zip for import.
 - AC09 shows all three terminal outcomes of the selector gate reachable from one starting
   precondition: offer-and-accept, offer-declined-with-fallback, and offer-declined-with-stop.
+
+## Eval cases — manual, recorded, not CI gates
+
+E1–E4 assert that a model pass returns a specific judgement. **One passing run does not distinguish
+a mechanism from luck**, so each runs **three times** and the number of runs producing the expected
+finding is recorded below. A case that does not reach 3/3 is recorded at its rate, not quietly
+dropped — the rate is the evidence this design asked for, and a rate nobody writes down is a design
+decision made by forgetting.
+
+Each fixture is a **complete 2.7b input set** in its own directory under
+`test-case/speckit-qa-auto/fixtures/` — `ticket.md`, the `.feature` file(s), `test-design.md`,
+`impact-candidates.md`, and a depth with its reason. The reviewer takes five inputs; a fixture
+supplying one cannot be run. The repository had no prior `fixtures/` convention, so these establish
+one.
+
+| # | Fixture | Attack task | Expected finding | Runs |
+|---|---|---|---|---|
+| E1 | `fixtures/out-scope-constraint/` | 1 | Names `ticket.md`'s line "Do not allow user/system modify any candidate has attached to APM's invoice", which no scenario covers although the coverage matrix reports none uncovered | `_/3` |
+| E2 | `fixtures/out-scope-constraint/` | 2 | Names the invariant `RefreshWorkOrderCandidates` creates — a candidate attached to an invoice must survive a refresh — citing `work-order-candidate.graphql:123` | `_/3` |
+| E3 | `fixtures/constraint-under-notes/` | 1 | Names the line "A charge that has been included in a settlement must not be re-rated or re-assigned…", filed under a heading called `Notes` | `_/3` |
+| E4 | `fixtures/constraint-under-notes/`, run once with an isolated reviewer and once inline | 1 | Both rates, recorded side by side | isolated `_/3`, inline `_/3` |
+
+**E3 is the case that matters most.** It is what distinguishes this design from a rule keyed to the
+word `Out-Scope`. Its acceptance-criteria table is deliberately complete without the constraint: if
+the table were internally incomplete, a reviewer could find the gap from the table alone and the
+fixture would prove nothing about reading the whole ticket. If the mechanism only fires on that one
+heading, E3 fails and the design is what it was accused of being.
+
+**E4 runs over E3's fixture, not E1's.** E1 is constructed so the finding is expected every time,
+and comparing two rates at the ceiling cannot discriminate between an isolated reviewer and an
+inline one — an earlier draft of this design made exactly that mistake. E3 is the harder case, so
+its rate has room to differ. `design.review_mode` is otherwise an observation of host capability
+with no flag to force it, and "no flag skips a gate" forecloses adding one casually; E4 is therefore
+run by dispatching the reviewer both ways against the fixture directory, outside a pipeline run.
+
+**What a rate obliges.** A case below 3/3 does not block this design. It is recorded, and it is the
+input to the open question of whether one adversarial pass needs a second one auditing it — a
+question the design deliberately deferred to evidence from real runs rather than settling by
+argument. A rate written down with no consequence named would be the same omission with extra steps,
+which is why the consequence is named here.
