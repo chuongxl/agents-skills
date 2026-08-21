@@ -39,7 +39,8 @@ new breadth.
 ## Execution Order
 
 The steps below run in the order design spec §5 fixes. They are numbered 2.1 through 2.8, with
-2.4b inserted between 2.4 and 2.5 — the numbering marks position, not a count.
+2.4b inserted between 2.4 and 2.5 and 2.7b between 2.7 and 2.8 — the numbering marks position,
+not a count.
 
 ### 2.1 Requirement analysis
 
@@ -196,16 +197,101 @@ Every one of these must hold, checked mechanically, not asked about:
 - Every `surface: api` scenario names its endpoint and its request/response fixture
 - Every `surface: manual` scenario carries its one-line reason
 - Every behaviour carries a dedup label from step 2.2
+- **No line of the ticket admitted into scope is left with two readings.** Each such line is
+  resolved to one reading, and the resolution is written in `test-design.md` with **both** readings
+  named. A line reading either as *this release does not build it* or as *the system must prevent
+  it* is exactly the shape that has produced an uncovered constraint here before, and none of the
+  six checks above looked for one.
+- Every entry in `impact.candidates[]`, and every unmatched entry in `impact.declared[]`, is
+  **satisfied** — by at least one scenario in the impact file, or by an entry in
+  `impact.dropped_scenarios[]` (`run-state.md` rule 15). Requiring a scenario alone deadlocks the
+  gate: a revision that drops a candidate's only scenario re-enters this check, fails it, and fails
+  it again on every retry, which Turn-Ending Condition 4 stops on after three.
+- No scenario in the impact file carries `UPDATE` or `SKIP`
 
 A failing check is fixed at its source — in the scenario, the element intent map, or the design,
 not by loosening the check — then re-verified. **The same check failing 3 consecutive times stops the
 run** (`operating-rules.md`, Turn-Ending Condition 4).
 
+### 2.7b Adversarial review
+
+Dispatch a reviewer with `assets/adversarial-review-prompt.md`, giving it `ticket.md`, both
+`.feature` files, `test-design.md`, `impact-candidates.md`, and `run.design_depth` with its reason.
+
+**Why a second pass exists at all.** 2.7 asks *"is every acceptance criterion covered?"* and takes
+its list of criteria from the pass being checked. That check is satisfiable while the ticket is
+uncovered, because a criterion the extraction never admitted was one is not in the list it iterates.
+2.7b asks *"which sentences in the ticket state a rule the system must uphold?"* — a question scoped
+by the ticket rather than by the extraction. **The difference is the question, not the context.**
+`test-design.md` states the extraction's boundary in its own opening line, so a reviewer holding it
+was never isolated in the way an earlier draft claimed, and that draft's exemption for this step has
+been withdrawn accordingly.
+
+**Mode.** Prefer a subagent — a fresh context is less anchored on a conclusion it did not reach,
+which is a real but unquantified benefit. Where dispatch is unavailable, run inline with the same
+prompt and the same tasks, and record `design.review_mode: inline`. It is never skipped for want of
+dispatch, which is why `design.adversarial_review` has no `not-run` value (`run-state.md` rule 11).
+
+**Loop.** `Issues Found` routes by task: findings from tasks 1 and 3 return to 2.1, findings from
+task 2 return to 2.4b. Either path re-runs 2.7 and then re-reviews. Scenarios added carry
+`origin: adversarial-review`, and are labelled where they are created — dedup is a rule, not a step
+that already ran.
+
+**Bounds.** Every dispatch is one round, whatever caused the re-entry, capped at **three** — the
+same three-strikes bound `operating-rules.md` sets everywhere else. Leaving the third round with
+findings still open writes `design.adversarial_review: issues-open`; those findings go to the gate
+verbatim and a human decides. A fourth round would mean the extraction and the reviewer disagree
+persistently, which is a question for a person and not for another loop.
+
+A finding that raises `run.design_depth` sets `run.depth_raised_in_02` and **re-runs the impact
+sweep at the new breadth**, by loading `impact-analysis.md` — a shared leaf, loadable by whichever
+stage needs it, exactly as this stage conditionally loads `manual-conversion.md`. An earlier draft
+refused that re-run citing "a stage never reads another stage's reference file"; that rule governs
+*pipeline* files reading each other, and the sweep does not live in one. The escape hatch that draft
+offered instead — asking the human to request a resume — named no reachable `run.resume_from` value,
+and nothing ever cleared the staleness flag it set.
+
+Findings and their dispositions are written to `test-design.md` §9, **including rejected ones**.
+
 ### 2.8 Human gate
 
-Present the summary: the coverage matrix, the dedup labels, the element intent map, and Open
-Questions. Take approval or revisions — a revision returns to whichever of 2.1–2.7 it affects and
-re-runs self-review before returning here. On approval, commit the design artifacts.
+Present four sections:
+
+| Section | Content |
+|---|---|
+| Depth | `run.design_depth` with its reason, and whether a review finding raised it mid-run — stated so it can be disagreed with |
+| Coverage | The coverage matrix, the dedup labels, the element intent map, Open Questions |
+| Review | `approved`, `issues-fixed` with each finding and its disposition, or `issues-open` with the open findings verbatim — plus `design.review_mode` |
+| Impact | Every designed impact scenario with its candidate's evidence path and provenance; `impact.declared[]` alongside `impact.candidates[]`; the existing tests found per candidate |
+
+Take approval or revisions — a revision returns to whichever of 2.1–2.7b it affects and re-runs
+self-review before returning here. On approval, commit the design artifacts.
+
+The impact section requires one of three answers, and **without one of them the run does not
+continue** (`operating-rules.md`, Turn-Ending Condition 12). This is the one place in the pipeline
+where a human's absence of knowledge and a human's assertion of no impact must not look alike: a
+sweep returning nothing is not evidence, and only a person can say which of the two it was.
+
+| Answer | Effect |
+|---|---|
+| Keep a subset | The rest are dropped; see below |
+| Keep a subset **and name a flow nobody found** | A revision that **returns to 2.4b**, re-runs 2.7 and 2.7b, and comes back here |
+| No feature is impacted | Writes `impact.acknowledged_empty: true`, drops all, deletes the impact file |
+
+The middle row is why *nothing authors Gherkin after this gate* survives literally: an addition is
+not written at 2.8. It re-enters the step that authors impact scenarios and passes every check the
+first batch passed. A human naming a flow the sweep missed is this design working; letting them
+hand-write a scenario past 2.7 and 2.7b would be the same hole in a new place.
+
+Impact scenarios are presented **unapproved by default**. A pre-checked list converts the human's
+job from deciding to noticing, and a reviewer who is only noticing approves everything.
+
+Dropped scenarios are removed from the `.feature` file before commit and kept, with their reasons,
+in `impact-candidates.md` and `impact.dropped_scenarios[]` — which is what satisfies 2.7 on the
+re-run, and what keeps the next run from re-litigating a decision a human already made. **When every
+impact scenario is dropped the file is deleted, not left empty**, for the reason 2.4b declines to
+write one: an empty feature file is materialized by Stage 03 and imported by CI as a file containing
+no tests.
 
 Where the run goes from there depends on two fields and nothing else:
 
@@ -287,12 +373,22 @@ Written into run state:
   here, since the value that records how elements actually resolved is written by the Stage 03 entry
   gate, not by this stage
 - `run.code_state` — `landed | pending`, resolved at 2.4
-- `design.scenarios[]` — one entry per scenario, each carrying `name`, `surface`, `dedup`, and
-  `status: pending` (Stage 03 is what moves a scenario off `pending`)
+- `design.scenarios[]` — one entry per scenario, each carrying `name`, `surface`, `dedup`, `origin`,
+  and `status: pending` (Stage 03 is what moves a scenario off `pending`); impact scenarios also
+  carry `impact: true` and `impact_flow`
 - `xray.dedup` — `ran | not-run`, from step 2.2
+- `design.adversarial_review`, `design.review_mode`, and `design.review_rounds`, from 2.7b
+- `impact.approved_scenarios[]`, `impact.dropped_scenarios[]`, and `impact.acknowledged_empty`, all
+  written by the human at 2.8
+- `run.depth_raised_in_02`, when a review finding raised the depth
 
-And, on disk inside `run.artifact_dir`: the `.feature` file(s) from 2.5 and `test-design.md` from
-2.6.
+Not `sweep_breadth_stale`, and not `design.review_reason`. Both appeared in earlier drafts of this
+design and were removed — the first because this stage can load the sweep's leaf and re-run it, the
+second because the condition that would have written `not-run` no longer exists. A field nothing
+writes is one a reader assumes means something.
+
+And, on disk inside `run.artifact_dir`: the `.feature` file(s) from 2.5, `test-design.md` from 2.6
+including its §2b and §9, and `impact-candidates.md` updated with each candidate's decision.
 
 ## Enter Stage 03
 
@@ -310,5 +406,9 @@ approved, and committed, and the run has produced exactly what it was asked for.
 | "Xray was unavailable, so there's nothing to dedup against — just leave the field blank" | Blank looks like it ran and found nothing. Record `dedup: not-run` with the reason, every time |
 | "The code isn't written yet, so I'll leave the elements vague and let Stage 03 work them out" | The intent map is required in full here. `code_state: pending` defers *resolving* elements to selectors, never *naming* them |
 | "This is `--design-only`, so self-review can be lighter" | `--design-only` changes where the run stops, not what it checks. Every 2.7 check runs in full |
+| "2.7 passed, so the design is checked — 2.7b is a formality" | 2.7 takes its list of criteria from the pass it checks, so it is satisfiable while the ticket is uncovered. That is the entire reason 2.7b exists, and it is the check most likely to be skipped precisely because 2.7 reported clean |
+| "This host can't dispatch a subagent, so the review can't run" | It runs inline, with the same prompt and the same tasks, recorded as `review_mode: inline`. What makes it work is the question it asks, not the context it holds |
+| "The sweep found nothing, so the impact section can be skipped at the gate" | An empty sweep is not evidence of no impact — the knowledge lives in a human's head. The section asks its question on every run, and `acknowledged_empty: true` is a person's answer, not a default |
+| "The human dropped every impact scenario, so the empty file is harmless" | Delete it. Stage 03 materializes it and CI imports it as a file containing no tests |
 | "One element is unnamed, but the rest of the map is done — good enough to pass 2.7" | Self-review checks every element of every `ui` scenario. One missing row fails the gate. Name it, or reclassify the scenario's `surface` with a reason — marking the scenario blocked is not an exit here, since this stage leaves every scenario `pending` and `blocked` is a Stage 03 verdict |
 | "This failed self-review before, I'll just approve it at 2.8 and fix it in Stage 03" | Stage 03's fix loop cannot edit `.feature` files at all (`operating-rules.md`). A design defect that reaches 2.8 unfixed stays a defect through automation |
