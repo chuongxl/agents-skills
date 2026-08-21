@@ -3,8 +3,10 @@
 Loads: [run-state.md](../shared/run-state.md), [operating-rules.md](../shared/operating-rules.md),
 [gherkin-conventions.md](../shared/gherkin-conventions.md),
 [selector-verification.md](../shared/selector-verification.md),
-[repo-profile.md](../shared/repo-profile.md). Five leaves, so the reader knows the
-cost before paying it (design spec §11.2 rule 1). `repo-profile.md` is declared because this stage
+[repo-profile.md](../shared/repo-profile.md), [commit.md](../shared/commit.md). Six leaves, so the
+reader knows the cost before paying it (design spec §11.2 rule 1). `commit.md` is declared because
+3.4 commits after every scenario verdict, and which paths it may stage depends on `run.isolation` —
+a staging rule read from memory is how `git add -A` reappears in the mode that forbids it. `repo-profile.md` is declared because this stage
 resolves `generate_cmd`, `scoped_run_cmd`, and `testdata_path` against that file's field table —
 it was cited here and left undeclared until the coupling check C3 started reading citations rather
 than links. `selector-verification.md` is declared because the
@@ -61,8 +63,8 @@ map or carries a `blocked` verdict.
 ## What This Stage Receives
 
 Per `run-state.md` rule 2, read only from `execution-report.md` and the artifact folder — never
-from `stage-02-test-design.md`: `run.artifact_dir`, `run.branch`, `run.worktree_path`,
-`run.full_suite`, every field of `profile.*` (`repo-profile.md`'s fourteen-field
+from `stage-02-test-design.md`: `run.artifact_dir`, `run.branch`, `run.isolation`,
+`run.workspace_path`, `baselines.owned_paths[]`, `run.full_suite`, every field of `profile.*` (`repo-profile.md`'s fourteen-field
 table — `feature_path`, `steps_path`, `page_path`, `selectors_path`, `testdata_path`,
 `generate_cmd`, `scoped_run_cmd`, `selector_attribute`, `existing_tags`, and the rest), and
 `design.scenarios[]` as Stage 02 left them — every scenario at `status: pending` — and
@@ -126,9 +128,13 @@ reveals it, whether or not attempts remain. An environmental failure is not a fi
 all: it stops the run immediately with the error quoted, per `operating-rules.md`'s
 infrastructure-failure rule, and consumes no attempt.
 
-When a scenario resolves — `green` or `blocked` — commit the worktree locally (`git add -A && git
-commit`, no push) so `design.scenarios[].commit` names a real sha. Pushing the branch is Stage 04's
-job alone. A result with no sha attached is not a result (`run-state.md` rule 4).
+When a scenario resolves — `green` or `blocked` — commit locally, no push, so
+`design.scenarios[].commit` names a real sha. Stage the way `commit.md`'s "Conditional Commit"
+table requires for this run's `run.isolation`: `git add -A` under `worktree`, and `git add --
+<owned_paths>` under `branch`, where `add -A` is forbidden because it would sweep the developer's
+in-flight edits into a test commit (`run-state.md` rule 17). Every command carries an explicit
+`-C <workspace_path>`. Pushing the branch is Stage 04's job alone. A result with no sha attached is
+not a result (`run-state.md` rule 4).
 
 ### 3.5 Coverage review loop
 

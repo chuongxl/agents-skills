@@ -85,8 +85,8 @@ Scan the test tree the repo profile named. Returns three things at once:
 - `discovery.orphan_features[]`: see below.
 
 `discovery.framework` is what a missing test framework is detected by, and detecting it here — at
-Stage 01, before a worktree has been branched, before a submodule has been initialized, before a
-single scenario has been designed — is the whole point of putting the sweep this early. The
+Stage 01, before a single scenario has been designed and two stages before anything would run
+`generate_cmd` — is the whole point of putting the sweep this early. The
 alternative is discovering it when the automation stage runs a `generate_cmd` that was never
 installed, after all of that work.
 

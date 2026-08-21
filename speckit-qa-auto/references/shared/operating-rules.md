@@ -22,7 +22,8 @@ Exhaustive. Any other reason to stop is invalid.
 6. Stage 03 infrastructure failure (§6.4) or circuit breaker (§6.5)
 7. Constraint 3: no evidence source available at the Stage 03 entry gate and the user declines
    semantic fallback
-8. A Stage 04 baseline violation — source checkout (§7.1) or frontend (§4 step 5)
+8. A Stage 04 baseline violation — source checkout (§7.1), in whichever form `run.isolation`
+   selects, or frontend (§4 step 5)
 9. A diverged remote branch at Stage 04 push (§7 step 4)
 10. The Stage 04 human gate, or pipeline completion after it
 11. Stage 03 reached with `run.code_state: pending` or `design.selector_evidence: deferred` — the
@@ -31,6 +32,10 @@ Exhaustive. Any other reason to stop is invalid.
 12. The Stage 02 gate's impact section with no answer given — the run cannot distinguish a human
     who does not know from a human asserting there is no impact, and that distinction is the
     section's entire purpose
+13. The Stage 01 branch gate refused by git under `isolation: branch` — local changes would be
+    overwritten by the switch onto the base branch. The error is quoted and `--parallel-worktree`
+    is named as the way through; the developer's tree is never stashed, forced, or committed to
+    clear the way
 
 ## Fix Loop Rules
 

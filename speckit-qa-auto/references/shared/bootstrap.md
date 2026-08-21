@@ -14,14 +14,14 @@ When `discovery.framework` is `playwright-bdd`, this file is not loaded at all.
 ## Why It Is A Step And Not A Stage
 
 Bootstrapping is setup, and the intake stage is the setup stage — it already discovers conventions,
-creates the worktree, and initializes the frontend submodule. Making bootstrap its own stage would
+cuts the branch the run works on, and initializes the frontend submodule. Making bootstrap its own stage would
 require the intake stage to hand control forward and take it back, and no stage in this pipeline
 links back to another. So it is a conditional step, loaded from its own file so the intake stage
 pays for it only on the runs that need it.
 
 It runs **after** discovery, not before. Nothing in intake up to that point needs a test framework:
-the profile, the baselines, the worktree, the submodule, and all three sweeps work identically on a
-repository that has no tests at all. The first thing that needs a framework is the automation
+the profile, the baselines, the branch gate, the submodule, and all three sweeps work identically
+on a repository that has no tests at all. The first thing that needs a framework is the automation
 stage's `generate_cmd`, and that is two stages away.
 
 ## One Approval, Listing Everything First
@@ -133,6 +133,13 @@ down converts the answers into exactly the discoverable source the next run expe
 `profile.*` fields now backed by directories and commands that exist, `discovery.framework` updated
 to `playwright-bdd`, and on disk: the config, the test tree, the base page, the selectors module,
 the worked example pair, the CI workflow, and `docs/qa/CONVENTIONS.md`.
+
+**The approved path list is also an input to `baselines.owned_paths[]`**, which Stage 01 step 11
+resolves. Bootstrap is the one step in intake that writes outside the five `profile.*_path`
+locations — a `playwright.config.ts` at the repository root, a workflow file under `.github/` — and
+under `isolation: branch` a path the run created but does not own is one no later stage may stage,
+and one Stage 04's second baseline check then reports as a leak. The list presented for approval is the
+list handed forward; there is no second enumeration.
 
 ## Red Flags — thoughts that mean bootstrap is overreaching
 

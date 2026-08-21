@@ -1,6 +1,6 @@
 # Speckit QA Auto — Jira-to-Tests QA Pipeline
 
-**Version**: 0.3.0
+**Version**: 0.4.0
 **Author**: Alex Nguyen
 
 ## Overview
@@ -52,6 +52,23 @@ It accepts three kinds of key:
 One argument, three resolutions — never a second entry flag. The Jira key is the artifact folder's
 identity, the `@REQ_` tag, the dedup key, and the resume glob; a second way in would mean a second
 identity for all four.
+
+### Where the run works
+
+By default the run cuts a branch — `test/<jira-key>-<slug>` — **in the source checkout you are
+already standing in**, off the base branch (`develop → main → master`). That is where a developer
+expects a branch to be, and it costs no second checkout and no second dependency install.
+
+`--parallel-worktree` puts the same branch in a linked worktree at `.worktrees/<branch>` instead.
+Use it for the two cases the default cannot serve: more than one run against the same repository at
+once, and a working tree too dirty for git to switch branches. If git refuses the switch, the run
+stops and names the flag rather than stashing or committing your work to get past it.
+
+The safety property differs, and the skill says so rather than implying otherwise. In worktree mode
+Stage 04 verifies your checkout came out byte-identical. In branch mode it cannot — the pipeline is
+writing there on purpose — so it verifies two narrower things instead: the run staged and wrote only
+inside the paths it owns (`docs/qa/…` and the test tree), and every file you already had modified
+still hashes to what it did at intake. `git add -A` is forbidden in branch mode for that reason.
 
 ## Pipeline Flow
 
@@ -156,8 +173,13 @@ passed, it runs to a scenario verdict or to the circuit breaker. Every loop insi
   environmental failures stop the run instead of burning attempts.
 - **Two human gates, and no flag skips them** — design approval (Stage 02) and commit/push approval
   (Stage 04), plus the self-review and selector gates.
+- **Branch by default, worktree on request** — `--parallel-worktree` opts into an isolated
+  worktree; the default cuts the branch in the checkout you are already in.
 - **Content-aware workspace guard** — two integrity baselines (source checkout and frontend
   submodule) verified before any commit; a violation stops the run, never reverted automatically.
+  In branch mode the checkout-level check becomes a scoped pair — nothing written outside the run's
+  own paths, nothing already-dirty overwritten — because the whole-tree form would flag the run's
+  own output.
 - **Portable across three hosts** — GitHub Copilot, Claude Code, and OpenCode; subagent dispatch
   degrades to inline execution where the host offers none.
 
@@ -199,6 +221,10 @@ skill speckit-qa-auto --issue MOM-1234 --full-suite
 # Also open the pull request after pushing, from the printed title and body
 # (without --pr the run prints that text and leaves opening the PR to a human)
 skill speckit-qa-auto --issue MOM-1234 --pr
+
+# Work in an isolated worktree instead of the current checkout —
+# for parallel runs, or a tree too dirty to switch branches
+skill speckit-qa-auto --issue MOM-1234 --parallel-worktree
 ```
 
 ## Configuration
@@ -231,5 +257,6 @@ repository secrets. Bootstrap writes the workflow but cannot set them, and says 
 | Selector gate has no evidence source to offer | Frontend source unreadable and no reachable app/browser automation; accept the fallback risk or fix the checkout |
 | A scenario is blocked at the selector gate | The element is not in the built feature — design and implementation disagree. Resolve at design, not by substituting a fallback selector |
 | Stage 02 self-review fails the same check 3 times | Stops by design — fix the scenario, intent map, or design at its source |
-| Stage 04 reports a baseline violation | Checkout or frontend submodule changed outside the run; never reverted — resolve manually, re-run |
+| Stage 01 stops: git refuses to switch branches | Local changes conflict with the base branch. Commit or stash them yourself, or re-run with `--parallel-worktree` — the run will not touch your working tree to clear its own way |
+| Stage 04 reports a baseline violation | Something changed outside what the run owns — the frontend submodule, or (branch mode) a file you already had open, or a path outside `docs/qa/` and the test tree. Never reverted — resolve manually, re-run |
 | Stage 04 push stops on a diverged remote | Fast-forward only, by design; rebase or merge manually, then re-run Stage 04 |

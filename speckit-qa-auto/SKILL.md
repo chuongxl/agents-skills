@@ -15,7 +15,7 @@ license: MIT
 allowed-tools: bash glob grep view create edit skill
 metadata:
   author: Alex Nguyen
-  version: "0.3.0"
+  version: "0.4.0"
 ---
 
 # Speckit QA Auto
@@ -23,7 +23,8 @@ metadata:
 ## Entry Dispatch (Do This First, Every Invocation)
 
 Load `references/shared/host-adaptation.md` once and fix the host for the rest of the run. Parse
-the invocation: `--issue <jira-url-or-key>`, `--design-only`, `--full-suite`, `--pr`.
+the invocation: `--issue <jira-url-or-key>`, `--design-only`, `--full-suite`, `--parallel-worktree`,
+`--pr`.
 
 **`--issue` is required.** A missing `--issue` stops the run, with the reason: the Jira key is the
 artifact folder's identity, the `@REQ_` tag every scenario carries, and the dedup key against
@@ -105,9 +106,41 @@ framework) and `references/shared/manual-conversion.md` (Stage 02, when the run 
 Manual Xray tests). A repository that already has a test tree never pays for the file that builds
 one.
 
+## Isolation
+
+The run works on a branch named `<branch_prefix><jira-key>-<slug>`, and `--parallel-worktree`
+decides where that branch lives:
+
+| `run.isolation` | Selected by | Workspace |
+|---|---|---|
+| `branch` | the default | the source checkout itself |
+| `worktree` | `--parallel-worktree` | a linked worktree at `<repo-root>/.worktrees/<branch>` |
+
+**The default is `branch`** because the ordinary run is one developer, one story, one pipeline, and
+a branch in the checkout they are already standing in is where a branch is expected to be. A
+worktree costs a second checkout and its own dependency install before a single test can run, and
+leaves the result in a directory the developer then has to go find.
+
+`--parallel-worktree` buys real isolation, for the two cases the default cannot serve: more than
+one run against the same repository at once, and a checkout too dirty for git to switch branches.
+Both are the same underlying fact — the developer's working tree is already in use.
+
+The two modes are not the same safety property, and the skill does not pretend they are. Under
+`worktree`, Stage 04 verifies the developer's checkout came out of the run byte-identical. Under
+`branch` that guarantee is unavailable — the pipeline is writing into that checkout by design — so
+two narrower ones replace it: the run stages and writes only inside `baselines.owned_paths[]`, and
+every path already dirty at intake still hashes at Stage 04 to what it hashed then.
+`references/shared/workspace-guard.md` is the authority on both, and `git add -A` is forbidden in
+branch mode for the reason `run-state.md` rule 17 gives.
+
+Stage 01's branch gate stops the run when git refuses the switch onto the base branch, quoting the
+error and naming `--parallel-worktree` as the way through. It never stashes, forces, or commits the
+developer's work to clear its own path.
+
 ## Modes
 
-There is one mode. Both human gates — Stage 02 design approval and Stage 04 commit-and-push
+Isolation above is *where* the run works; this section is *what the run skips*, and the answer is
+nothing. There is one mode. Both human gates — Stage 02 design approval and Stage 04 commit-and-push
 approval — always run, and so do the Stage 02 self-review gate and the selector gate at the head of
 Stage 03. **No flag skips a gate.** An earlier `--yolo` flag that skipped the two approvals has been
 removed: its documented effect was to skip approvals, but its actual effect was to let a run whose
@@ -142,6 +175,8 @@ skill is installed on its own. Refer to it by name only.
 
 - `--issue <jira-url-or-key>` — required; see Entry Dispatch.
 - `--impact "<flow>[, <flow>...]"` — optional; see Entry Dispatch.
+- `--parallel-worktree` — optional; see Isolation. Without it the run branches in the source
+  checkout.
 - `.env` in the repository root: `JIRA_URL`, `JIRA_USERNAME`, `JIRA_API_TOKEN` — required for
   intake. `XRAY_CLIENT_ID`, `XRAY_CLIENT_SECRET` — optional, enable the Xray read in Stage 01.
   None of these are ever printed.

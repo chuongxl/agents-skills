@@ -22,7 +22,9 @@ run:
   slug:                agreement-reset-button
   artifact_dir:        docs/qa/mom-1234-agreement-reset-button
   branch:              test/mom-1234-agreement-reset-button
-  worktree_path:       .worktrees/test/mom-1234-agreement-reset-button
+  isolation:           branch | worktree      # branch is the default; --parallel-worktree selects worktree
+  workspace_path:      .                      # isolation: branch   -> the source checkout root
+                                              # isolation: worktree -> .worktrees/test/mom-1234-agreement-reset-button
   mode:                default
   design_only:         false
   code_state:          landed | pending
@@ -49,6 +51,11 @@ baselines:
   frontend_baseline:   {path, head_sha, worktree_diff_sha256, index_diff_sha256, untracked}
   frontend_edits_approved: false
   untracked_fingerprint: full | degraded   # degraded: untracked cap hit, paths and sizes only
+  preexisting_dirty:                       # isolation: branch only; empty under worktree
+    - {path: src/foo.ts, sha256: 9a3f...}  # sha256: null -> path absent from disk at intake
+  owned_paths:                             # isolation: branch only; every write and every git add
+    - docs/qa/mom-1234-agreement-reset-button
+    - src/tests/features
 
 xray:
   query:               testRequirement | linkedIssues | not-run
@@ -108,9 +115,12 @@ design:
 
 ## Rules
 
-1. `worktree_path` is always `<repo-root>/.worktrees/<branch>` with the branch name used
-   verbatim. A branch name containing `/` therefore nests. Derive it; never re-spell it — the
-   example above is an instance of the rule, not the rule itself.
+1. `workspace_path` is the one path every `git -C` and every file path in the run resolves
+   against, and it is derived from `isolation` and `branch`, never re-spelled. Under
+   `isolation: worktree` it is `<repo-root>/.worktrees/<branch>` with the branch name used
+   verbatim, so a branch name containing `/` nests. Under `isolation: branch` — the default — it
+   is the source checkout root, because in that mode the checkout *is* the workspace. The values
+   above are instances of the rule, not the rule itself.
 2. A stage reads only this file and the artifact folder. **It never reads another stage's
    reference file.**
 3. A field absent from this contract does not travel between stages. Adding one means editing
@@ -193,3 +203,14 @@ design:
 > and they are not — this precedence is a display order for one summary field, and the per-scenario
 > value stays the authority. The exclusion is load-bearing: a landed run of only `api` scenarios
 > would otherwise roll up to `deferred`, which a turn-ending condition stops on.
+
+> **17. Under `isolation: branch`, `baselines.owned_paths[]` bounds every write and every `git add`
+> the run makes.** That mode's whole point is that the pipeline works inside the developer's own
+> checkout, so the worktree mode's guarantee — the checkout comes out untouched — is not available
+> and is not claimed. What replaces it is narrower and checkable: the run writes only inside
+> `owned_paths[]`, and every path in `baselines.preexisting_dirty[]` still hashes at Stage 04 to
+> what it hashed at intake. **`git add -A` is forbidden in this mode** for exactly that reason — it
+> stages in-flight work the pipeline did not write into a commit claiming the pipeline wrote it,
+> and no later check can un-commit it. Under `isolation: worktree` neither list is populated or
+> read: the tree is the pipeline's own, `add -A` is safe, and `workspace_baseline` keeps its
+> whole-tree meaning.

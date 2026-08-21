@@ -4,7 +4,7 @@ Loads: [run-state.md](../shared/run-state.md), [repo-profile.md](../shared/repo-
 [workspace-guard.md](../shared/workspace-guard.md),
 [operating-rules.md](../shared/operating-rules.md), [discovery.md](../shared/discovery.md), [impact-analysis.md](../shared/impact-analysis.md), and —
 only when discovery reports no test framework — [bootstrap.md](../shared/bootstrap.md). Six leaves
-always, a sixth conditionally, so the reader knows the cost before paying it (design spec §11.2
+always, a seventh conditionally, so the reader knows the cost before paying it (design spec §11.2
 rule 1). The conditional load is the point: a repository that already has a test tree never pays
 for the file that builds one. `run-state.md` is declared because this stage writes
 the run-state yaml every later stage reads: written from memory instead of from the contract, the
@@ -12,34 +12,38 @@ field names drift, and a drifted field is one no reader finds. It links to no ot
 `references/pipeline/` — its successor is named, never linked: **enter Stage 02** at the end of
 this stage, same turn.
 
-No human gate. Takes a Jira issue key or browse URL and leaves behind an isolated worktree, two
-integrity baselines, a discovered repo profile, and the artifact folder Stage 02 designs from.
+No human gate. Takes a Jira issue key or browse URL and leaves behind a branch to work on — in the
+source checkout by default, in a linked worktree under `--parallel-worktree` — two integrity
+baselines, a discovered repo profile, and the artifact folder Stage 02 designs from.
 
 ## Why This Order Is Not The Obvious Order
 
 The eleven steps below run in exactly the order design spec §4 fixes, and that order looks wrong
 until the reasons are stated:
 
-- **Repo profile discovery runs first, before any worktree exists.** Step 4 (frontend source
-  init) is conditioned on `frontend_source_root` — a field discovery produces. An earlier draft of
-  this design had the two reversed, so frontend init depended on output from a step that had not
-  run yet (design spec §4, "The order matters and was wrong in the first draft (D12)"). Discovery
-  only reads, so running it against the source checkout before a worktree exists is safe — there
-  is nothing yet for a read to disturb.
+- **Repo profile discovery runs first, before the run has a branch or a workspace.** Step 4
+  (frontend source init) is conditioned on `frontend_source_root` — a field discovery produces. An
+  earlier draft of this design had the two reversed, so frontend init depended on output from a
+  step that had not run yet (design spec §4, "The order matters and was wrong in the first draft
+  (D12)"). Discovery only reads, so running it against the source checkout before the workspace
+  exists is safe — there is nothing yet for a read to disturb.
 - **`workspace_baseline` is captured second, before the run touches anything.** Capturing it later
   would bake in changes the run itself caused between "the run started" and "the baseline was
   taken," which defeats the point of a baseline (design spec §4 step 2, §7.1).
 - **`frontend_baseline` is captured immediately after frontend init, as a baseline separate from
-  `workspace_baseline` — not folded into it.** Two reasons, both required (design spec §4 step 5;
-  `workspace-guard.md`, "Why Two And Not One"): the frontend is initialized inside the *worktree*,
-  not the source checkout, so the source-checkout baseline cannot cover it even in principle; and a
-  parent repository's `git diff HEAD` sees a submodule only as a gitlink — a commit pointer — so
-  file edits inside it are invisible to a parent-repo diff no matter when that diff runs.
+  `workspace_baseline` — not folded into it.** Two reasons (design spec §4 step 5;
+  `workspace-guard.md`, "Why Two And Not One"), of which the second holds in **both** isolation
+  modes and is therefore the load-bearing one: under `--parallel-worktree` the frontend is
+  initialized inside the *worktree*, not the source checkout, so the source-checkout baseline
+  cannot cover it even in principle; and a parent repository's `git diff HEAD` sees a submodule
+  only as a gitlink — a commit pointer — so file edits inside it are invisible to a parent-repo
+  diff no matter when that diff runs, or which mode the run is in.
 
 ## Execution Order
 
 ```
-repo profile (read-only) → source baseline → worktree + branch gate → frontend init + FE baseline
+repo profile (read-only) → source baseline (+ dirty list) → branch gate (a worktree only under
+--parallel-worktree) → frontend init + FE baseline
 → Jira intake (fetch → slug → artifact folder → `ticket.md`) → design depth → discovery sweeps
 → impact sweep → bootstrap (only when no framework)
 → artifact folder init (`execution-report.md`) + resume check
@@ -48,11 +52,12 @@ repo profile (read-only) → source baseline → worktree + branch gate → fron
 
 ### 1. Repo profile
 
-Read-only, against the source checkout — no worktree exists yet. Run `repo-profile.md`'s discovery
-order and resolve the fourteen fields it lists. This is the one point in the stage that may ask the
-human a round of questions: only for a field no discovered source answers, and only once
-(`repo-profile.md`, "Discovery Order"). The `answers` cache file is *written* later, from inside
-the worktree, alongside step 6 — this step only resolves the fields, it does not persist them.
+Read-only, against the source checkout — no workspace has been chosen yet. Run `repo-profile.md`'s
+discovery order and resolve the fourteen fields it lists. This is the one point in the stage that
+may ask the human a round of questions: only for a field no discovered source answers, and only
+once (`repo-profile.md`, "Discovery Order"). The `answers` cache file is *written* later, from
+inside the workspace, alongside step 6 — this step only resolves the fields, it does not persist
+them.
 
 ### 2. Capture `workspace_baseline`
 
@@ -62,23 +67,68 @@ the source checkout root. Content-addressed, not a `git status --porcelain` stri
 `workspace-guard.md`, "Why `git status --porcelain` Is Not Sufficient," for why a status letter
 misses a path that was already dirty before the run and grows more dirty during it.
 
-### 3. Worktree gate
+**Under `isolation: branch`, capture `baselines.preexisting_dirty[]` here as well** — the per-path
+hash list `workspace-guard.md`'s "The Two Lists" specifies, over the same tree at the same moment.
+It has to be *this* moment: step 3 is about to carry the developer's in-flight edits onto a new
+branch, and once they are there nothing distinguishes a path that was already dirty from one this
+run dirtied. Under `isolation: worktree` the list stays empty — nothing the run does reaches the
+source checkout, so `workspace_baseline`'s whole-tree comparison covers it on its own.
+
+### 3. Branch gate
+
+Resolve `run.isolation` and `run.workspace_path` here, and record both:
+
+| `run.isolation` | Selected by | `run.workspace_path` |
+|---|---|---|
+| `branch` | nothing — it is the default | the source checkout root |
+| `worktree` | `--parallel-worktree` | `<repo-root>/.worktrees/<branch>` |
+
+Both modes share the base-branch resolution and both produce the same branch name:
 
 - Base branch priority `develop → main → master`, local first, then remote-tracking. Sync
   best-effort; a fetch or pull failure is a warning, never a stop.
-- Linked worktree at `<repo-root>/.worktrees/<branch>`, branch name used verbatim — a slashed
-  branch such as `test/mom-1234-agreement-reset-button` therefore nests
-  (`run-state.md` rule 1).
-- Ensure `.worktrees/` is git-ignored.
 - The final branch name — `<branch_prefix><jira-key>-<slug>` — is not yet knowable here: the
   Jira key is known from the invocation, but the slug comes from the Jira title, fetched at step 6.
-  Create the worktree against a provisional branch now; once step 6 resolves the slug, rename in
-  place with `git branch -m` (design spec §4 step 3).
+  Create against a provisional branch now; once step 6 resolves the slug, rename in place with
+  `git branch -m` (design spec §4 step 3).
+
+**`isolation: branch` — the default.** `git -C <source checkout root> checkout -b <provisional>
+<base branch>`.
+
+Branch off the **base branch, not off current HEAD.** Whatever branch the developer happens to be
+standing on may carry unrelated work, and a QA branch cut from it hands that work to Stage 04's
+push under this run's name.
+
+A checkout git **refuses** — local changes would be overwritten by the switch — stops the run, with
+the git error quoted and `--parallel-worktree` named as the way through. Do not stash, do not
+force, do not commit the developer's work to clear the way: `workspace-guard.md` forbids touching
+the developer's tree, and that prohibition does not weaken because the tree is now the one the run
+wants to stand in.
+
+A dirty tree git *does* let through is allowed and expected. Those edits ride along onto the new
+branch, and what protects them is step 2's `preexisting_dirty[]` plus the scoped staging every
+later commit is bound to — not a refusal to run.
+
+**`isolation: worktree` — `--parallel-worktree`.** Linked worktree at
+`<repo-root>/.worktrees/<branch>`, branch name used verbatim — a slashed branch such as
+`test/mom-1234-agreement-reset-button` therefore nests (`run-state.md` rule 1). Ensure
+`.worktrees/` is git-ignored.
+
+The flag exists for two situations the default cannot serve: more than one run against the same
+repository at once, and a checkout too dirty to switch branches. Both are the same underlying
+fact — the developer's working tree is already in use — which is why one flag covers both.
+
+**Why `branch` is the default.** The ordinary run is one developer, one story, one pipeline. A
+worktree costs a second checkout of the repository and its own dependency install before a single
+test can run, and it leaves the result somewhere the developer then has to go find. A branch in the
+checkout they are already standing in is where a branch is expected to be. The isolation a worktree
+buys is real, and it is what the flag is for — it is simply not what the common case needs.
 
 ### 4. Frontend source initialization (hard stop, not best-effort)
 
 When `frontend_source_root` names a submodule, run `git submodule update --init -- <path>`
-**inside the worktree**. Failure stops the run with the git error quoted — this is one of the
+**inside the workspace** — `run.workspace_path`, whichever mode resolved it. Failure stops the run
+with the git error quoted — this is one of the
 `operating-rules.md` turn-ending conditions ("Stage 01 frontend-source initialization failure").
 Not a warning: the Stage 03 entry selector gate reads frontend source, and an empty submodule
 directory makes that gate unsatisfiable before it can even start. It stops here rather than there
@@ -91,7 +141,7 @@ exists — the pipeline expects at most one submodule, the frontend (design spec
 ### 5. Capture `frontend_baseline`
 
 Immediately after step 4 succeeds. Same shape as `workspace_baseline`, scoped instead to
-`<worktree>/<frontend_source_root>` (`workspace-guard.md`, "The Two Baseline Schemas"). This is
+`<workspace_path>/<frontend_source_root>` (`workspace-guard.md`, "The Two Baseline Schemas"). This is
 the separate baseline explained above — capture it now, not folded into step 2's baseline and not
 deferred to later in the run.
 
@@ -199,12 +249,17 @@ follow it in full: one approval for the complete list of paths, nothing overwrit
 import CI job written even when its secrets are unset.
 
 Nothing earlier in this stage depended on a framework existing, which is why the step sits here
-rather than ahead of the worktree or the baselines. The first thing that needs one is Stage 03's
+rather than ahead of the branch gate or the baselines. The first thing that needs one is Stage 03's
 `generate_cmd`.
 
 On completion, `discovery.framework` becomes `playwright-bdd` and the `profile.*` path and command
 fields name directories and scripts that now exist. A run that reaches Stage 02 with
 `framework: none` still recorded has skipped an approval it should have asked for.
+
+Under `isolation: branch`, every path bootstrap created also joins `baselines.owned_paths[]` at
+step 11. Bootstrap writes config files and CI workflow files that sit outside the five
+`profile.*_path` locations, and a path the run created but does not own is one no later stage may
+stage — and one Stage 04's second baseline check then reports as a leak.
 
 ### 11. Resume
 
@@ -217,7 +272,7 @@ delay is the point.** It stopped because the code had not landed, or because the
 design first and the automation later. Either way, time passed. Two things went stale in between,
 and neither fixes itself:
 
-- **The base branch moved.** Step 3's sync is best-effort at creation time, and this worktree was
+- **The base branch moved.** Step 3's sync is best-effort at creation time, and this branch was
   created weeks ago. Re-sync it against the base branch **now**, before design or automation reads
   anything — this is the one point in the run where rebasing costs nothing, because nothing has been
   produced yet. Left to Stage 04, the same divergence stops a fast-forward-only push after every
@@ -225,6 +280,12 @@ and neither fixes itself:
 - **`run.code_state` may still be `pending`.** Re-resolve it on any `02.4` resume. It stays
   `pending` if the code still has not landed, and the run stops after design again — the resume was
   simply early. A `03` resume skips this: its code had already landed when the run stopped.
+
+**Resolve `baselines.owned_paths[]` here**, as the last thing before the run state is written —
+this is the first point where every input to it exists: `run.artifact_dir` from step 6, the five
+`profile.*_path` locations from step 1, and bootstrap's created paths from step 10 on the runs
+where it ran. Under `isolation: worktree` the list stays empty; nothing reads it in that mode
+(`run-state.md` rule 17).
 
 A folder step 6 just created has no `execution-report.md` yet. Write it here, with the run-state
 yaml block `run-state.md` specifies, carrying every field listed under "What This Stage Produces"
@@ -246,7 +307,11 @@ and silently starts a second artifact folder.
 Written into run state (`run-state.md` is the authority on shape; nothing here travels between
 stages that is not a field in that contract):
 
-- `run.jira_key`, `run.slug`, `run.artifact_dir`, `run.branch`, `run.worktree_path`
+- `run.jira_key`, `run.slug`, `run.artifact_dir`, `run.branch`, `run.isolation`,
+  `run.workspace_path` — the last two resolved at step 3. `run.isolation` is what tells Stage 03
+  and Stage 04 which staging rule and which baseline comparison apply, and an unrecorded
+  `--parallel-worktree` is a run that built in a worktree and is then verified as though it had
+  built in the checkout
 - `run.mode` (always `default`), `run.design_only` — `true | false` — and `run.full_suite` —
   `true | false`. All are parsed at entry dispatch and none reaches Stage 03 or Stage 04 unless
   this stage records them; an unrecorded `run.full_suite` is a `--full-suite` flag Stage 03 has no
@@ -257,7 +322,8 @@ stages that is not a field in that contract):
 - `profile.*` — every field step 1 resolved, recorded here rather than left in this stage's working
   memory. Stage 02 reads it and Stage 03 reads every field of it, and neither may read this file
   (`run-state.md` rule 2), so an unrecorded profile field is a field that does not exist downstream.
-- `baselines.workspace_baseline`, `baselines.frontend_baseline`
+- `baselines.workspace_baseline`, `baselines.frontend_baseline`, and — under `isolation: branch` —
+  `baselines.preexisting_dirty[]` from step 2 and `baselines.owned_paths[]` from step 11
 - `xray.query`, `xray.cucumber_tests`, `xray.manual_tests`
 - `discovery.*` — every field `discovery.md`'s "What Discovery Writes" names: `ran`, `framework`
   (updated by step 10 when it ran),

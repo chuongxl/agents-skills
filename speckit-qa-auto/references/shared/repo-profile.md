@@ -19,7 +19,7 @@ Search, stopping at the first source that answers each field:
 4. Inference — `package.json` scripts, `playwright.config.ts`, and one existing
    `.feature` / `.steps.ts` pair read as a worked example
 
-Run-only, read-only, against the source checkout, before any worktree exists — discovery is safe
+Run-only, read-only, against the source checkout, before the run has a workspace — discovery is safe
 to run this early precisely because it only reads (design spec §4 step 1). A field that no source
 answers is asked of the human, once.
 

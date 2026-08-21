@@ -17,14 +17,18 @@ printed.
 
 This is the pipeline's second and final human gate (design spec §7, marked ◀ HUMAN GATE). Stage 03
 left every scenario in run scope with a verdict — `green` or `blocked` — and this stage turns that
-into a report a human can act on, then commits and pushes only after both integrity baselines
-confirm the developer's own checkout came out of the run untouched.
+into a report a human can act on, then commits and pushes only after both integrity checks pass.
+What those checks are entitled to conclude depends on `run.isolation`: under `worktree`, that the
+developer's checkout came out of the run untouched; under `branch` — the default — that the run
+wrote only inside the paths it owns and left every already-dirty path exactly as it found it. 4.3
+is where that difference is spelled out.
 
 ## What This Stage Receives
 
 Per `run-state.md` rule 2, read only from `execution-report.md` and the artifact folder — never
-from `stage-03-automate.md`: `run.jira_key`, `run.artifact_dir`, `run.branch`,
-`run.worktree_path`, `baselines.workspace_baseline`, `baselines.frontend_baseline`,
+from `stage-03-automate.md`: `run.jira_key`, `run.artifact_dir`, `run.branch`, `run.isolation`,
+`run.workspace_path`, `baselines.workspace_baseline`, `baselines.frontend_baseline`,
+`baselines.preexisting_dirty[]`, `baselines.owned_paths[]`,
 `baselines.frontend_edits_approved`, `design.selector_evidence`, and every entry of
 `design.scenarios[]` as Stage 03 left them — each carrying `status: green | blocked`, `attempts`,
 `blocked_reason` when blocked, and `commit`. On disk, inside `run.artifact_dir`: the `.feature`
@@ -46,7 +50,7 @@ for that rule to go unenforced.
 
 Present, for approval:
 
-- Files created and changed, across the worktree and the artifact folder
+- Files created and changed, across the workspace and the artifact folder
 - Test results — pass/blocked per scenario, each naming its commit
 - Blocked scenarios with reasons
 - Proposed `data-testid` additions for the frontend, each with file and line (the report-only
@@ -78,27 +82,37 @@ Present, for approval:
 This approval always runs — no flag skips it. Neither does 4.3's baseline verification, which is
 unconditional (`operating-rules.md`, Turn-Ending Condition 8) and would remain so even if this
 review were ever made optional: the two answer different questions, and a human saying "the tests
-look right" is not a human saying "my checkout came out of this run untouched."
+look right" is not a human saying "this run stayed inside what it was entitled to touch."
 
 ### 4.3 Verify both baselines
 
-Before any commit, re-verify `baselines.workspace_baseline` against the source checkout and
-`baselines.frontend_baseline` against the frontend working tree, per `workspace-guard.md`'s capture
-commands and comparison. Both must be checked; neither substitutes for the other, and
-`workspace-guard.md`, "Why Two And Not One" is why: a parent-repo diff cannot see inside a
-submodule, and the frontend baseline cannot cover the source checkout since it is scoped to a path
-inside the worktree.
+Before any commit, re-verify the source checkout and the frontend working tree per
+`workspace-guard.md`'s capture commands and comparison. Both must be checked; neither substitutes
+for the other, and `workspace-guard.md`, "Why Two And Not One" is why: a parent-repo diff cannot
+see inside a submodule, so the checkout-level check cannot speak for the frontend in either
+isolation mode.
 
-- A `workspace_baseline` difference is always a violation. Stop the run **before any commit**,
-  report the differing paths with both the baseline and current hashes, and go no further. **Never
-  revert the source checkout** — undoing a developer's working tree without asking is worse than
-  the leak it would undo.
+**Which comparison the source checkout gets depends on `run.isolation`**, per
+`workspace-guard.md`, "What `workspace_baseline` Checks, Per Mode". Read that section rather than
+assuming the whole-tree form: applied under `isolation: branch` it flags the run's own deliverable
+as a leak, and every run in the default mode would stop here.
+
+- Under `isolation: worktree`: re-capture `workspace_baseline` over the source checkout and compare
+  whole-tree. **Any** difference is a violation.
+- Under `isolation: branch`: run the scoped pair, and **both** halves must pass — every entry of
+  `baselines.preexisting_dirty[]` still hashes to its recorded `sha256` (an entry recorded `null`
+  is still absent from disk), and every path changed since intake falls inside
+  `baselines.owned_paths[]`.
+- Either form's failure is a violation. Stop the run **before any commit**, report the differing
+  paths with both the baseline and current hashes, and go no further. **Never revert the source
+  checkout** — undoing a developer's working tree without asking is worse than the leak it would
+  undo, and in the default mode that checkout is the one the developer is standing in.
 - A `frontend_baseline` difference is a violation **unless** `baselines.frontend_edits_approved` is
   `true`, in which case it is not a stop — report the diff for review alongside the rest of 4.2's
   output instead.
 
 This is Turn-Ending Condition 8 (`operating-rules.md`). A run that stops here has produced a
-report but made no commit; the worktree and the source checkout are left exactly as they were
+report but made no commit; the workspace and the source checkout are left exactly as they were
 found.
 
 ### 4.4 Tag blocked scenarios
@@ -121,12 +135,15 @@ their one-line reason in the artifact already (`gherkin-conventions.md`'s Surfac
 
 ### 4.5 Commit and fast-forward push
 
-Follow `commit.md` in full: conditional commit on `git status --porcelain` in the worktree — an
-already-clean tree (for example, every change already committed incrementally during Stage 03) is
-a success path, report the existing commits on the branch rather than treating it as an error — then
+Follow `commit.md` in full: conditional commit on the status check its table names for this run's
+`run.isolation` — scoped to `baselines.owned_paths[]` under `branch`, whole-tree under
+`worktree` — where an already-clean tree (for example, every change already committed incrementally
+during Stage 03) is a success path, so report the existing commits on the branch rather than
+treating it as an error. Stage per the same table, and under `isolation: branch` verify the staged
+set before committing; `git add -A` is forbidden in that mode (`run-state.md` rule 17). Then
 fast-forward-only push. Fetch `origin/<branch>`; remote absent pushes with `-u`; remote an ancestor
 of local pushes plainly; **remote diverged stops and reports, and this stage does not rebase**
-(Turn-Ending Condition 9). Every command carries an explicit `-C <worktree_path>`.
+(Turn-Ending Condition 9). Every command carries an explicit `-C <workspace_path>`.
 
 Report the resulting commit(s) — hash and subject — and the branch pushed, per `commit.md`,
 "Reporting."
@@ -196,7 +213,8 @@ Writing the resulting keys back into the `.feature` files closes the loop and is
 
 | Thought | Reality |
 |---|---|
-| "The baseline diff is tiny, probably just whitespace, I'll clean it up and continue" | Any `workspace_baseline` difference stops the run before committing. Report it; do not touch the source checkout to make it go away |
+| "The baseline diff is tiny, probably just whitespace, I'll clean it up and continue" | A failed baseline check — whole-tree under `worktree`, either half of the scoped pair under `branch` — stops the run before committing. Report it; do not touch the source checkout to make it go away |
+| "This is branch mode, so the whole-tree baseline check obviously fails — I'll skip 4.3" | 4.3 is not skipped, it is the *other* comparison. Run the scoped pair; skipping it means nothing checked whether the run wrote outside `owned_paths[]` |
 | "I already reverted the stray edit, so the run can proceed clean" | Never revert the source checkout, even to fix what the run itself would report as a violation. Undoing a developer's working tree without asking is the worse outcome |
 | "The frontend diff is expected, the human will obviously approve it" | Report it and wait for `baselines.frontend_edits_approved: true`. An expected diff is still a violation until the approval is on record |
 | "Stage 03 already knows this scenario is blocked, I'll tag it during the fix loop to save a step" | Stage 03 may not edit `.feature` files, period. The tag is a human-gated edit and belongs here, after 4.2's approval, not inside the fix loop |

@@ -15,14 +15,40 @@ run before any commit step.
 
 ## Conditional Commit
 
-Check `git status --porcelain` in the worktree first. **Empty output is a success path, not a
-failure** — it means the run's changes were already committed earlier (for example, incrementally
-during Stage 03), and there is nothing left to commit here. In that case, skip the commit and
-report the existing commits on the branch instead of treating the empty status as an error.
+Check the status first, scoped the way `run.isolation` requires:
 
-Non-empty output → `git add -A` → `git commit`. `.worktrees/` is git-ignored from Stage 01
-onward, so `git add -A` inside the worktree cannot sweep the pipeline's own scratch state into the
-feature commit.
+| `run.isolation` | Status check | Staging |
+|---|---|---|
+| `branch` (default) | `git -C "$W" status --porcelain -- <owned_paths>` | `git -C "$W" add -- <owned_paths>` |
+| `worktree` | `git -C "$W" status --porcelain` | `git -C "$W" add -A` |
+
+**Empty output is a success path, not a failure** — it means the run's changes were already
+committed earlier (for example, incrementally during Stage 03), and there is nothing left to commit
+here. In that case, skip the commit and report the existing commits on the branch instead of
+treating the empty status as an error.
+
+Non-empty output → stage per the table → `git commit`.
+
+`add -A` is safe under `isolation: worktree`, and only there: the tree is the pipeline's own, and
+`.worktrees/` is git-ignored from Stage 01 onward, so it cannot sweep the pipeline's own scratch
+state into the feature commit either.
+
+**Under `isolation: branch`, `git add -A` is forbidden** (`run-state.md` rule 17). The run is
+working inside the developer's checkout, which may have carried in-flight edits onto this branch,
+and `add -A` would stage them into a commit claiming this pipeline authored them.
+`baselines.owned_paths[]` — `run.artifact_dir`, the five `profile.*_path` locations, and whatever
+bootstrap created — is the whole of what this run produced and therefore the whole of what it may
+stage.
+
+In branch mode, after staging and **before** committing, verify the staged set:
+
+```bash
+git -C "$W" diff --cached --name-only
+```
+
+Every path printed must fall inside `owned_paths[]`. One that does not means the staging reached
+further than the list allows: stop and report it, rather than committing and leaving Stage 04's
+second baseline check to find it after the fact.
 
 ## Fast-Forward-Only Push
 
@@ -35,7 +61,7 @@ git -C "$W" fetch origin "$BRANCH"
 # diverged           -> STOP and report; do not rebase
 ```
 
-`$W` is the worktree path; every command in this procedure carries an explicit `-C "$W"`. Determine
+`$W` is `run.workspace_path`; every command in this procedure carries an explicit `-C "$W"`. Determine
 which of the three cases applies by comparing `git -C "$W" rev-parse origin/"$BRANCH"` against the
 local branch tip (for example, `git -C "$W" merge-base --is-ancestor origin/"$BRANCH" HEAD`) before
 choosing which push form to run.
@@ -72,3 +98,5 @@ is a failure for the stage; a skipped commit on an already-clean tree is not.
 | "The tree is empty, so there's nothing to report" | Empty status is a success path. Report the existing commits instead of reporting nothing |
 | "Close enough, I'll push with `--force` to make it fast-forward" | Force-pushing discards commits that were not produced by this run. This procedure only ever pushes fast-forward or stops |
 | "The result was green a minute ago, the commit sha doesn't matter now" | It matters the moment anything else lands on the branch. Every result names the commit it was produced on, with no exception |
+| "The developer's edit is in the same directory as my test file, `add -A` is simpler" | `add -A` belongs to `isolation: worktree` alone. In the default branch mode it commits in-flight work the pipeline never wrote, into a commit that says the pipeline wrote it |
+| "The staged set has one path outside the list, but it's obviously harmless" | It means the staging reached outside `owned_paths[]`. Stop and report — a path outside that list is a path this run cannot vouch for |
