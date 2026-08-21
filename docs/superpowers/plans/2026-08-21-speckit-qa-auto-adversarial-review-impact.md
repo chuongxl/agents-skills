@@ -21,6 +21,14 @@ Every task's requirements implicitly include this section.
 - **Never link outside the skill folder.** `jira-to-speckit` is referred to by name only; a cross-skill link fails `validate_skills.py` and breaks the skill when installed alone.
 - **Run-state rule 3:** a field absent from `references/shared/run-state.md` does not travel between stages. Adding one means editing that file first.
 - **House style:** every rule in this repository states its reason inline. A rule with no stated reason is rewritten by the next reader who finds it inconvenient. Match the surrounding prose density — these files argue, they do not enumerate.
+- **Precondition — the tree is already red, and not from this work.** `python3 tools/validate_skills.py`
+  currently fails with `jira-to-speckit: root README declares v0.4.0 but SKILL.md declares v0.3.0`.
+  Nothing in this plan touches `jira-to-speckit`. **Resolve it before Task 1**, or every task's
+  "run the tests" step reports a failure it did not cause and the executor learns to ignore the
+  suite — which is the same failure mode this whole change exists to prevent. The evidence says
+  `0.4.0` is intended: the root README row, that skill's own README, and the commit that added the
+  Xray GraphQL integration all say `0.4.0`; only `jira-to-speckit/SKILL.md:9` was left at `0.3.0`.
+  Confirm with the skill's owner before bumping — it is a one-line fix, but it is their version.
 - **Full check suite** (the "run the tests" step of every task):
 
   ```bash
