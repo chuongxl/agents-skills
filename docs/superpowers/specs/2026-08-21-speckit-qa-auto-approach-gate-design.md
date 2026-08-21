@@ -1,4 +1,4 @@
-# speckit-qa-auto — The Test Approach Gate (Step 2.2b)
+# speckit-qa-auto — The Test Approach Gate and Test Case Descriptions
 
 Date: 2026-08-21
 Status: approved (design), not yet implemented
@@ -6,16 +6,22 @@ Extends [`2026-08-19-speckit-qa-auto-design.md`](2026-08-19-speckit-qa-auto-desi
 [`2026-08-20-speckit-qa-auto-impact-analysis-design.md`](2026-08-20-speckit-qa-auto-impact-analysis-design.md);
 decision numbering continues from that document's D46.
 
+Two changes ship together in one version because they are implemented in one pass over the same
+stage files: a human gate on the test approach (§1–§6), and reading and writing the `description`
+field that Jira and Xray test cases carry (§7).
+
 **Scope.** `speckit-qa-auto/` version `0.4.0 → 0.5.0`.
 
 | Kind | Files |
 |---|---|
 | New | none |
-| Edited | `references/pipeline/stage-02-test-design.md`; `references/shared/run-state.md`, `references/shared/operating-rules.md`; `assets/adversarial-review-prompt.md`; `SKILL.md`; the skill's own `README.md` |
-| Edited outside the skill | root `README.md` — the skills-table row's version badge, which `tools/validate_skills.py:292` compares against `SKILL.md`; `test-case/speckit-qa-auto/test-cases.md` — new rows AC37–AC49 |
+| Edited | `references/pipeline/stage-01-intake.md`, `references/pipeline/stage-02-test-design.md`; `references/shared/run-state.md`, `references/shared/operating-rules.md`, `references/shared/discovery.md`; `assets/adversarial-review-prompt.md`; `SKILL.md`; the skill's own `README.md` |
+| Edited in a second skill | `jira-to-speckit/references/XRAY_API.md` — `description` added to the Xray-path field list; `jira-to-speckit/SKILL.md` — version `0.3.0 → 0.4.0` |
+| Edited outside both skills | root `README.md` — **both** skills-table version badges, which `tools/validate_skills.py:292` compares against each `SKILL.md`; `test-case/speckit-qa-auto/test-cases.md` — new rows AC37–AC56, and **AC02 updated**, since it currently asserts `jira-to-speckit` reads `v0.3.0` |
 
-No new stage, no new reference leaf, no renumbering of any existing step. The change is one
-inserted step and the fields it writes.
+No new stage, no new reference leaf, no renumbering of any existing step. One new artifact file
+per run — `existing-tests-index.md` (§7.2). `gherkin-conventions.md` and the `.feature` files are
+**not** touched, for the reason D60 gives.
 
 ## Problem
 
@@ -69,6 +75,50 @@ same run diverge the first time a reviewer raises one and not the other, and eve
 afterwards has to know which one governs. This design adds no classifier. It scales the new gate's
 ceremony along the axis that already exists, and it moves the announcement of that axis to a point
 where disagreement is cheap.
+
+### The second problem — descriptions are neither read nor written
+
+A Jira or Xray test case carries a `description`, and teams use it as the test's own summary. A real
+example, `MOM-12628`:
+
+> **Test Objective:** Verify the Missing tab's Reason column correctly classifies each VVD's setup
+> gap into one of the three defined missing-reason messages (or "N/A") based on the terminal's
+> Agreement Item registration, status, and Default Vendor flag, applying the confirmed precedence
+> when a terminal has multiple conflicting gaps and recalculating correctly once a gap is resolved;
+> verify each Reason value's tooltip text and general tooltip display behavior; and verify a
+> fully-configured terminal's resulting candidate is placed into the "Interfaced" or "Not
+> Interfaced" tab depending on quantity.
+>
+> **Scenario:** 1: No Agreement Item registered for the terminal · 2: Agreement Item is registered
+> and WFA/Approved but no Default Vendor flag · 3: Agreement Item registered, flagged Default
+> Vendor, but status not yet Approved · … · 7: Only one tooltip visible at a time; tooltip hides on
+> mouse-out
+
+The pipeline reads neither end of this. **On the read side**, Sweep 2 fetches
+`fields=summary,labels,issuetype` (`jira-to-speckit/references/XRAY_API.md:81`) — `description` is
+not among them, so the cheapest available summary of what an existing test does is discarded, and
+Stage 02 either reads every manual test's full step table or reads none of them. **On the write
+side**, a designed test set produces a `.feature` file and a `test-design.md`, and nothing that
+reads like the block above — so the next run over the same area finds tests this pipeline created
+and has nothing to triage them by.
+
+### What the description costs to obtain, and what triage actually saves
+
+Both halves of the obvious framing are wrong in a way worth recording, because the design turns on
+it.
+
+**Fetching the description is free.** It is a field on the Jira issue, and the metadata call that
+already runs takes a field list. Adding one name to that list adds no request.
+
+**Triaging to avoid fetching steps saves almost nothing.** Steps do not come one test at a time:
+`XRAY_API.md:108-121` specifies a single `getTests(jql: …)` GraphQL call paged at 100, chosen
+precisely so keys and steps arrive together. Skipping tests would not remove a call. What triage
+actually saves is **the tokens Stage 02 spends reading `existing-tests-manual.md`** — a full step
+table across dozens of manual tests — and that saving is real.
+
+The distinction matters because it fixes what the index is allowed to do. An index that saved API
+calls would have to decide what gets fetched. An index that saves reading attention does not, and
+must not.
 
 ## Design Decisions
 
@@ -142,6 +192,52 @@ gate carries `design.approach_chosen` alongside `run.design_depth`. This is not 
 only place a *drift* between the approach a human approved at 2.2b and the scenarios that actually
 came out of 2.3–2.4b becomes visible. Without it, 2.2b's approval could be honoured in name and
 abandoned in fact, with no check anywhere that noticed.
+
+**D58 — The description is read as a triage index, never as a filter on the dedup corpus.**
+`existing-tests.feature` and `existing-tests-manual.md` are still written in full, and dedup still
+matches mechanically against all of it. The index orders attention; it does not gate input. An
+index that decided which tests entered the corpus would make dedup depend on a judgement about a
+prose summary, and two runs over an unchanged Xray could then produce different labels — which is
+the property AC07 exists to hold.
+
+**D59 — The index is its own artifact, `existing-tests-index.md`, covering both corpora.** One
+cheap file the design stage reads before descending into either export. Folding it into
+`existing-tests-manual.md` would cover only half the tests and would put the cheap read behind the
+expensive one; folding it into `test-design.md` would mix an input with an output.
+
+**D60 — The designed description lives in `test-design.md` only, never in the `.feature` file.**
+Three reasons, of which the first is decisive:
+
+- A description that reproduces the ticket's format contains a line reading `Scenario:`, and in a
+  `.feature` file **that is a keyword**. Gherkin would parse it as a scenario with an empty name and
+  `bddgen` would compile it. `Scenarios:` is no safer — it is an alias for `Examples:`. Keeping the
+  block in markdown removes the hazard rather than working around it, and lets the block match the
+  ticket's format **verbatim**, which is what makes it paste-ready.
+- Whether Xray's Cucumber import carries a Feature-level description onto the imported Test issue is
+  **not documented in `XRAY_API.md` and is not verified here**. Writing into the `.feature` file
+  would buy an unconfirmed benefit at the cost of the hazard above.
+- `gherkin-conventions.md` and the `.feature` files stay untouched, so this change cannot affect
+  what Stage 03 generates or what CI imports.
+
+**The consequence is named rather than glossed:** the round trip becomes manual. Descriptions do not
+reach Xray on their own, so tests this pipeline creates carry no description there, and a later
+run's triage reports `no description` for exactly them — unless a human pastes the block from
+`test-design.md` into the Jira field. Verifying the import mapping, and acting on it, is §11.
+
+**D61 — The numbered list is derived from `design.scenarios[]` in file order, never authored
+freehand.** It therefore cannot drift from the scenarios it claims to describe, and 2.7 can check it
+by comparison rather than by judgement. A hand-written list would be a second statement of the same
+fact, and the two would disagree the first time a scenario was renamed at the gate.
+
+**D62 — Each scenario set gets its own block.** The main `.feature` set and the impact set are
+described separately in `test-design.md`; the impact block's objective states the invariants, not
+the feature. One merged block would claim a single objective over two sets that exist for opposite
+reasons — what the story builds, and what the story must not break.
+
+**D63 — `jira-to-speckit` gains `description` on the Xray path only.** The field list at
+`XRAY_API.md:81` sits inside the Xray branch, which runs only when `xray_tests: true`. Default-mode
+output is unchanged, so AC03's backward-compatibility guarantee holds without amendment and no
+caller that omits `xray_tests` sees any difference.
 
 ## 1. Step 2.2b — Test Approach Gate
 
@@ -297,7 +393,73 @@ One clause added under **Calibration**:
 The three tasks are unchanged, and the `test`-anchor fidelity set is unchanged. Adding a fourth task
 is refused for the reason D54 gives.
 
-## 7. SKILL.md and README Changes
+## 7. Test Case Descriptions — Read and Write
+
+### 7.1 The fetch
+
+`jira-to-speckit/references/XRAY_API.md:81` gains one field name:
+
+```
+{JIRA_URL}/rest/api/2/issue/{issueKey}?fields=summary,labels,issuetype,description
+```
+
+Same call, same branch, no new endpoint (D63). `jira-to-speckit` bumps `0.3.0 → 0.4.0` and its root
+README row follows, which is what makes `tools/validate_skills.py` pass.
+
+### 7.2 `existing-tests-index.md` — the cheap read
+
+Written by Stage 01 step 8, Sweep 2, into `run.artifact_dir`. One row per test, over **both**
+corpora:
+
+| Column | Value |
+|---|---|
+| Key | the Xray test key |
+| Type | `Cucumber`, `Manual`, or `Generic` |
+| Summary | the issue summary |
+| Objective | the description's `Test Objective:` line; failing that its first non-empty line; failing that `no description` |
+
+`no description` is a recorded fact, not a blank. A blank cell reads as "not looked at," and the
+whole value of this file is that a reader can tell the two apart without opening the test.
+
+**What the index may not do (D58).** It may not shorten `existing-tests.feature`, may not shorten
+`existing-tests-manual.md`, and may not remove any test from what 2.2 matches against. Stage 02 reads
+it first and uses it to decide which manual tests' step tables are worth reading closely — an
+ordering of attention, applied to a corpus that is already complete.
+
+`discovery.xray_tests[]` gains `objective`, carrying the same value the index row carries, so a
+later stage reads it from run state rather than by re-parsing a markdown table
+(`run-state.md` rule 5).
+
+### 7.3 The written block
+
+Step 2.5 writes, into `test-design.md`, one block per scenario set (D62), in the ticket's own format
+verbatim — markdown, so `Scenario:` is inert text:
+
+```
+Test Objective: <one paragraph: what is verified, under what conditions, with which
+precedence rules, and what the expected placement or outcome is>
+
+Scenario:
+1: <scenario name, exactly as it appears in the .feature file>
+2: <…>
+```
+
+The numbered list is generated from `design.scenarios[]` in file order (D61). The objective is
+written; the list is derived.
+
+**2.7 gains two mechanical checks:** a block exists for every scenario set the run produced, and
+each block's numbered list matches that set's scenario names in count and in order. Both fail the
+way every other 2.7 check fails — fixed at source, three consecutive failures stopping the run.
+
+**2.7b** sees the blocks inside `test-design.md`, which it already receives. An objective claiming
+coverage no scenario provides is an ordinary task-1 finding; no new task is added, for the reason
+D54 gives about the fourth task.
+
+**2.8** presents the blocks for approval alongside the coverage matrix. This is human-facing prose
+intended to be pasted into a Jira field, and it is the only artifact of the run that a person may
+copy somewhere the pipeline cannot check.
+
+## 8. SKILL.md and README Changes
 
 `SKILL.md`:
 
@@ -311,17 +473,18 @@ is refused for the reason D54 gives.
   against, and this is now user-visible behaviour, not an internal step.
 - **`version`** — `0.4.0` → `0.5.0`.
 
-The skill's own `README.md` mirrors the gate count and the version. The **root `README.md`** row for
-`speckit-qa-auto` takes the version badge `v0.5.0` — `tools/validate_skills.py:292` compares that
-badge against `SKILL.md`'s front matter, so a bump in one place and not the other fails the
-validator. The row's flags column is unchanged: this design adds no flag.
+The skill's own `README.md` mirrors the gate count and the version, and gains the description block
+as a produced artifact. The **root `README.md`** takes `v0.5.0` on the `speckit-qa-auto` row and
+`v0.4.0` on the `jira-to-speckit` row — `tools/validate_skills.py:292` compares each badge against
+its skill's front matter, so a bump in one place and not the other fails the validator. Neither
+row's flags column changes: this design adds no flag.
 
-## 8. Acceptance Criteria
+## 9. Acceptance Criteria
 
 Deterministic, CI- or read-checkable, continuing `test-case/speckit-qa-auto/test-cases.md` from
 AC36.
 
-### 8.1 Deterministic
+### 9.1 Deterministic
 
 | ID | Item | Check | Expected |
 |---|---|---|---|
@@ -339,7 +502,15 @@ AC36.
 | AC48 | Version agrees in three places | `python3 tools/validate_skills.py`; `python3 tools/validate_coupling.py speckit-qa-auto` | Exit `0`, `0` errors; `SKILL.md`, the skill README, and the root README row all read `0.5.0` |
 | AC49 | The question boundary holds | A run with one ticket ambiguity and one how-to-test question | The first appears in `test-design.md` Open Questions or was asked at 2.1; the second appears in `design.approach_questions[]`; neither appears in both lists |
 
-### 8.2 Not a CI gate
+| AC50 | Description costs no extra call | Read `jira-to-speckit/references/XRAY_API.md` §4 | `description` appears in the existing `fields=` list; no new endpoint and no second request is specified |
+| AC51 | The index covers both corpora | A run whose Xray query returned Cucumber and Manual tests | `existing-tests-index.md` holds a row for every test in both exports; a test whose issue has no description reads `no description`, not an empty cell |
+| AC52 | Triage orders attention, never input | A run where several manual tests have no description | Every such test still appears in `existing-tests-manual.md` in full and still participates in 2.2's matching; no test is absent from a corpus because of its index row |
+| AC53 | The block is not in the `.feature` | `grep -n 'Test Objective' <artifact_dir>/*.feature` | No match in any `.feature` file; the block is present in `test-design.md` |
+| AC54 | The numbered list cannot drift | A run where a scenario was renamed at the 2.8 gate | The block's list matches `design.scenarios[]` in count and order after the revision; 2.7 re-ran and passed |
+| AC55 | Each scenario set has its own block | A run that designed impact scenarios, and one that did not | Two blocks in the first, one in the second; the impact block's objective names invariants, not the feature |
+| AC56 | `jira-to-speckit` version agrees | `python3 tools/validate_skills.py` | Exit `0`; `jira-to-speckit/SKILL.md` and its root README row both read `0.4.0`; AC02's assertion has been updated from `v0.3.0` |
+
+### 9.2 Not a CI gate
 
 Whether 2.2b changes outcomes is an empirical question this design does not settle by argument. It
 is answered by recording, across real runs, how often the human picks something other than the
@@ -348,7 +519,7 @@ good recommender or a rubber stamp, and the two are told apart by the rate, not 
 rate is recorded and reported; it obliges nothing on its own, and it is the input to whether the
 alternatives being generated are real alternatives.
 
-## 9. What This Does Not Do
+## 10. What This Does Not Do
 
 - It does not add a fourth classification axis. `run.design_depth` is the only classifier (D47).
 - It does not let a human author Gherkin at a gate. 2.2b decides the shape; 2.3 and 2.4b author,
@@ -359,8 +530,13 @@ alternatives being generated are real alternatives.
   run 2.2b. No flag skips a gate, and this design adds no flag.
 - It does not report the approach in Stage 04's summary. Nothing downstream reads the field, and
   adding a consumer that only displays is a coupling paid for nothing.
+- It does not write anything to Jira or Xray. `jira-to-speckit` stays read-only; `XRAY_API.md`'s
+  list of things it does not do — "creates or edits a test, or its steps" — is unchanged, and the
+  description block reaches a Jira field only if a person puts it there.
+- It does not shorten either Xray export. The index is an additional file, not a replacement for
+  one (D58).
 
-## 10. Out Of Scope (v2 Candidates)
+## 11. Out Of Scope (v2 Candidates)
 
 - **A library of named approaches.** The five axes in §1.2 are stated so a run can reason to a
   coherent position, not so it can pick from a catalogue. A catalogue is worth building once real
@@ -368,6 +544,12 @@ alternatives being generated are real alternatives.
 - **Per-behaviour approach overrides.** One approach per run today. A story wanting the API layer
   for one behaviour and the UI for another says so in the rationale; whether that deserves its own
   field is a question for evidence.
+- **Verifying the Cucumber-import description mapping.** Whether Xray's importer carries a
+  Feature-level description onto the Test issues it creates is unverified, and `XRAY_API.md` does not
+  say. It is worth one experiment against a real project. If it does carry, writing the block into
+  the `.feature` file becomes viable — but only with the `Scenario:` keyword hazard solved, which is
+  a separate problem D60 currently avoids rather than fixes. If it does not, the follow-up is a
+  paste-ready file, and nothing else in this design changes.
 - **Carrying an approved approach across resumed runs.** A `02.4` resume re-enters after the code
   lands, and the approach it was approved against may no longer fit what was built. Re-asking is the
   safe default; caching it is an optimization with a correctness cost, and it needs its own design.
