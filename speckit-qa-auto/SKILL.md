@@ -15,7 +15,7 @@ license: MIT
 allowed-tools: bash glob grep view create edit skill
 metadata:
   author: Alex Nguyen
-  version: "0.4.0"
+  version: "0.5.0"
 ---
 
 # Speckit QA Auto
@@ -88,7 +88,7 @@ not link ahead, and a stage never links back to the one before it.
 | Stage | File | Human gate |
 |---|---|---|
 | 01 — Intake | `references/pipeline/stage-01-intake.md` | none |
-| 02 — Test Design | `references/pipeline/stage-02-test-design.md` | yes |
+| 02 — Test Design | `references/pipeline/stage-02-test-design.md` | yes — **two**: 2.2b approach, 2.8 design |
 | 03 — Automate | `references/pipeline/stage-03-automate.md` | none — no-stop zone |
 | 04 — Finish | `references/pipeline/stage-04-finish.md` | yes |
 
@@ -140,16 +140,18 @@ developer's work to clear its own path.
 ## Modes
 
 Isolation above is *where* the run works; this section is *what the run skips*, and the answer is
-nothing. There is one mode. Both human gates — Stage 02 design approval and Stage 04 commit-and-push
-approval — always run, and so do the Stage 02 self-review gate and the selector gate at the head of
-Stage 03. **No flag skips a gate.** An earlier `--yolo` flag that skipped the two approvals has been
+nothing. There is one mode. All three human gates — the Stage 02 **approach** gate at 2.2b, the
+Stage 02 **design** gate at 2.8, and Stage 04's commit-and-push approval — always run, and so do the
+Stage 02 self-review gate and the selector gate at the head of Stage 03. **No flag skips a gate.** An earlier `--yolo` flag that skipped the two approvals has been
 removed: its documented effect was to skip approvals, but its actual effect was to let a run whose
 Xray dedup never ran ship every scenario as `NEW`, with no human ever seeing the `not-run` label —
 which creates a duplicate Xray test for every scenario a team already had.
 
-No flag disables the adversarial review at 2.7b or the impact section of the Stage 02 gate either.
-`run.design_depth` scales how wide the impact sweep looks and how long the design document runs; it
-never scales what the ticket read covers, and it never turns a check off. Narrowing the read is the
+No flag disables the adversarial review at 2.7b or the impact section of the Stage 02 design gate
+either. `run.design_depth` scales how wide the impact sweep looks, how long the design document
+runs, and how many alternatives the 2.2b approach gate presents; it never scales what the ticket
+read covers, it never decides whether an answer is taken at a gate, and it never turns a check off.
+A gate that "scales to nothing" at `trivial` is a gate that was removed. Narrowing the read is the
 defect the review exists to catch, and the pass that would authorize the narrowing is the pass being
 audited.
 

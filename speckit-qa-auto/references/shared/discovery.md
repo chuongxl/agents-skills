@@ -59,19 +59,46 @@ and returns noise priced as signal.
 Every test linked to the anchor, and to every issue Sweep 1 returned. Both test types are
 collected and the type is always recorded:
 
-Returns `discovery.xray_tests[]`: `{key, test_type, summary, requirement}`, where `test_type` is
-`Cucumber`, `Manual`, or `Generic`.
+Returns `discovery.xray_tests[]`: `{key, test_type, summary, requirement, objective}`, where
+`test_type` is `Cucumber`, `Manual`, or `Generic`.
 
 The type is not a detail. A Cucumber test has Gherkin, so it has a normalized key and can be
 matched mechanically. A Manual test has prose steps, so it cannot — it is advisory input to a human
 decision, and it is also the raw material a Manual-to-Gherkin conversion reads. Losing the type
 collapses two very different downstream paths into one.
 
+`objective` comes from the test issue's `description` field, which the metadata fetch now asks for
+by name — the same call, one more field, no extra request. Its value is the description's
+`Test Objective:` line; failing that the description's first non-empty line; failing that `null`.
+
 **The steps themselves go to disk, not into `discovery.xray_tests[]`.** The sweep writes them
 verbatim into `existing-tests-manual.md` in the artifact folder, and the run-state entries carry
-keys, types, summaries, and requirements only. This is what lets the bounds below hold while a
-conversion still has the full step text to work from: the content lives in a file anything can read,
-and only the index travels through run state.
+keys, types, summaries, requirements, and objectives only. This is what lets the bounds below hold
+while a conversion still has the full step text to work from: the content lives in a file anything
+can read, and only the index travels through run state.
+
+**Sweep 2 also writes `existing-tests-index.md`** into the artifact folder — one row per test across
+**both** exports:
+
+| Key | Type | Summary | Objective |
+|---|---|---|---|
+| `MOM-12628` | `Manual` | Missing tab reason classification | Verify the Missing tab's Reason column correctly classifies each VVD's setup gap… |
+| `MOM-13001` | `Cucumber` | Agreement reset | `no description` |
+
+`no description` is written out, never left blank. A blank cell reads as *not looked at*, and the
+entire value of this file is that a reader can tell those two apart without opening the test.
+
+**The index orders attention; it never filters a corpus** (`run-state.md` rule 19). It does not
+shorten `existing-tests.feature`, does not shorten `existing-tests-manual.md`, and does not remove
+any test from what dedup matches against. The design stage reads it first to decide which manual
+tests' full step tables are worth reading closely — an ordering applied to a corpus that is already
+complete.
+
+Triage cannot save API calls, and the file does not pretend to: the steps for every test arrive in
+one paginated `getTests(jql: …)` call, so skipping tests removes no request. What it saves is the
+reading attention a full step table across dozens of manual tests would otherwise consume. That
+distinction is what fixes what the index is allowed to do — an index that saved calls would have to
+decide what gets fetched; this one does not, and must not.
 
 ### Sweep 3 — Repository tests
 
@@ -135,10 +162,12 @@ an unbounded traversal:
 
 ## What Discovery Writes
 
-`discovery.ran`, `discovery.framework`, `discovery.linked_issues[]`, `discovery.xray_tests[]`,
-`discovery.repo_tests[]`, `discovery.orphan_features[]` — every one of them a field in the run-state
-contract, written to `execution-report.md` before the stage ends. A finding held only in the
-subagent's reply is a finding no later stage can read.
+`discovery.ran`, `discovery.framework`, `discovery.linked_issues[]`, `discovery.xray_tests[]`
+(each entry carrying its `objective`), `discovery.repo_tests[]`, `discovery.orphan_features[]` —
+every one of them a field in the run-state contract, written to `execution-report.md` before the
+stage ends. A finding held only in the subagent's reply is a finding no later stage can read.
+
+On disk, Sweep 2 additionally leaves `existing-tests-index.md` beside the two exports.
 
 ## Red Flags — thoughts that mean a sweep has exceeded its mandate
 

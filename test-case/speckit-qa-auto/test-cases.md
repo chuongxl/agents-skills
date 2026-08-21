@@ -1,14 +1,16 @@
 # speckit-qa-auto test cases
 
 Scope: one case per acceptance criterion in design spec §12
-(`docs/superpowers/specs/2026-08-19-speckit-qa-auto-design.md`). AC05–AC09 carry the design's real
+(`docs/superpowers/specs/2026-08-19-speckit-qa-auto-design.md`), extended by
+`2026-08-20-…-impact-analysis-design.md` (AC13–AC36) and
+`2026-08-21-…-approach-gate-design.md` §9.1 (AC37–AC56). AC05–AC09 carry the design's real
 risk and are written as executable scenarios — concrete preconditions and commands, not prose —
 because each is exactly the case a plausible-looking implementation would silently fail.
 
 | ID | Spec §12 item | Scenario | Preconditions | Steps | Expected result |
 |---|---|---|---|---|---|
 | AC01 | 1 | Validator passes | `speckit-qa-auto/` and its reference files are committed | Run `python3 tools/validate_skills.py` from repo root | Exit code `0`; `speckit-qa-auto` reported with `0` error(s) and `0` warning(s) |
-| AC02 | 2 | Version rows agree | `speckit-qa-auto/SKILL.md` and `jira-to-speckit/SKILL.md` carry front-matter `version:`; `README.md` lists both skills | Read the version field from `speckit-qa-auto/SKILL.md`; read the `speckit-qa-auto` row in `README.md`; read the version field from `jira-to-speckit/SKILL.md`; read the `jira-to-speckit` row in `README.md` | `README.md`'s `speckit-qa-auto` row version equals `speckit-qa-auto/SKILL.md`'s version; `README.md`'s `jira-to-speckit` row reads `v0.3.0` and `jira-to-speckit/SKILL.md`'s front-matter version reads `0.3.0` |
+| AC02 | 2 | Version rows agree | `speckit-qa-auto/SKILL.md` and `jira-to-speckit/SKILL.md` carry front-matter `version:`; `README.md` lists both skills | Read the version field from `speckit-qa-auto/SKILL.md`; read the `speckit-qa-auto` row in `README.md`; read the version field from `jira-to-speckit/SKILL.md`; read the `jira-to-speckit` row in `README.md` | `README.md`'s `speckit-qa-auto` row version equals `speckit-qa-auto/SKILL.md`'s version; `README.md`'s `jira-to-speckit` row reads `v0.5.0` and `jira-to-speckit/SKILL.md`'s front-matter version reads `0.5.0` |
 | AC03 | 3 | `jira-to-speckit` backward compatibility | `.env` has valid Jira credentials; a resolvable issue key | Invoke `jira-to-speckit` supplying only `issue` and `ticket_output_path`, omitting `xray_tests` entirely | Exactly one file is written (`ticket_output_path`); no `XRAY_CLIENT_ID`/`XRAY_CLIENT_SECRET` lookup occurs; no request reaches `xray.cloud.getxray.app`; the brief follows the same output template `0.2.0` produced, with no Xray section |
 | AC04 | 4 | Test-case file exists | None | Run `ls test-case/speckit-qa-auto/test-cases.md` | File exists and follows the column shape of `test-case/speckit-auto/test-cases.md` (scenario / preconditions / steps / expected result) |
 | AC05 | 5 | Workspace baseline regression | See "AC05 — Workspace baseline regression" below | See below | See below |
@@ -43,6 +45,27 @@ because each is exactly the case a plausible-looking implementation would silent
 | AC34 | §9.1.21 | Impact scenarios carry a dedup label at creation | A run where 2.7b added an impact scenario on a loop | Read `design.scenarios[]` for entries with `origin: adversarial-review` | Each carries a `dedup` value; none is unlabelled when 2.7 re-runs |
 | AC35 | §9.1.22 | The impact gate is turn-ending condition 12 | `speckit-qa-auto/` complete | Read `references/shared/operating-rules.md`'s turn-ending list | Condition 12 names the Stage 02 gate's impact section with no answer given |
 | AC36 | §9.1.23 | @IMPACT is skill-owned and out of the filter | A run that designed impact scenarios | Read `profile.existing_tags` and `scoped_run_cmd` | `@IMPACT` is absent from `existing_tags` and absent from the tag filter |
+
+| AC37 | §9.1 | The gate precedes authored Gherkin | A run stopped at step 2.2b | Read the run-state block and list `run.artifact_dir` | `design.approach_chosen` is present; no `.feature` file exists in the artifact folder yet |
+| AC38 | §9.1 | No fourth classifier | `speckit-qa-auto/` complete | `grep -nE 'engagement\|approach_path\|spike\|bounded\|architectural' speckit-qa-auto/references/shared/run-state.md` | No classifier field beyond `run.design_depth`; the three-path vocabulary appears nowhere as a field |
+| AC39 | §9.1 | Ceremony scales, approval does not | A run classified `design_depth: trivial`, taken through 2.2b | Read `design.approach_*` and `test-design.md` | `approach_alternatives[]` holds at least one rejected entry; an answer was taken; every 2.7 check still ran |
+| AC40 | §9.1 | One gate per epic | An `epic` anchor with two children | Follow the run through 2.2b | Exactly one approach presentation, carrying per-child depth; one artifact folder |
+| AC41 | §9.1 | `test` anchor takes no approach menu | A `test`-anchor conversion run at 2.2b | Read what the gate presented and `design.approach_chosen` | No alternatives menu; the third section confirms batch scope; `approach_chosen: faithful-conversion` |
+| AC42 | §9.1 | Rejected alternatives survive | A run approved at 2.2b, read after 2.8 | Read `design.approach_alternatives[]` and `test-design.md` §0 | Each rejected alternative appears in both, with its `rejected_because` |
+| AC43 | §9.1 | Unrun dedup removes an option, not the gate | A run where Stage 01 could not reach Xray | Follow the run through 2.2b | The gate runs; the coverage-leaning approach is absent; the reason Stage 01 recorded is stated |
+| AC44 | §9.1 | 2.2b is turn-ending 14, not a resume point | `speckit-qa-auto/` complete | Read `operating-rules.md`; `grep -rn '02\.2b' speckit-qa-auto/references/shared/run-state.md` | Condition 14 names 2.2b; no `resume_from` value `02.2b` exists |
+| AC45 | §9.1 | An approach-caused finding routes to 2.2b | A 2.7b finding fixable only by changing the approach | Follow the loop | The run re-enters 2.2b, re-runs 2.7, re-reviews; `design.approach_revised_in_02: true`; `design.review_rounds` never exceeds 3 |
+| AC46 | §9.1 | The reviewer keeps three tasks | Read `assets/adversarial-review-prompt.md` as dispatched | Count the tasks in the `story` set; read Calibration | Three tasks, not four; the do-not-re-litigate clause is present |
+| AC47 | §9.1 | Drift is visible at 2.8 | A run whose 2.3 output departs from the approved approach | Read the 2.8 Depth section | It shows `approach_chosen` beside the delivered surfaces, and the departure is stated |
+| AC48 | §9.1 | Version agrees in three places | `speckit-qa-auto/` complete | `python3 tools/validate_skills.py`; `python3 tools/validate_coupling.py speckit-qa-auto` | Exit `0`, `0` errors; `SKILL.md`, the skill README, and the root README row all read `0.5.0` |
+| AC49 | §9.1 | The question boundary holds | A run with one ticket ambiguity and one how-to-test question | Read `test-design.md` Open Questions and `design.approach_questions[]` | The first is in Open Questions or was asked at 2.1; the second is in `approach_questions[]`; neither is in both |
+| AC50 | §9.1 | Description costs no extra call | `jira-to-speckit/` complete | Read `references/XRAY_API.md` §4 | `description` appears in the existing `fields=` list; no new endpoint and no second request is specified |
+| AC51 | §9.1 | The index covers both corpora | A run whose Xray query returned Cucumber and Manual tests | Read `existing-tests-index.md` | A row for every test in both exports; a test whose issue has no description reads `no description`, not an empty cell |
+| AC52 | §9.1 | Triage orders attention, never input | A run where several manual tests have no description | Read `existing-tests-manual.md` and the 2.2 labels | Every such test still appears in full and still carries a dedup label; no test is absent from a corpus because of its index row |
+| AC53 | §9.1 | The block is not in the `.feature` | A run that reached 2.8 | `grep -n 'Test Objective' <artifact_dir>/*.feature` | No match in any `.feature`; the block is present in `test-design.md` §0b |
+| AC54 | §9.1 | The numbered list cannot drift | A run where a scenario was renamed at the 2.8 gate | Compare §0b's list against `design.scenarios[]` after the revision | Matching in count and order; 2.7 re-ran and passed |
+| AC55 | §9.1 | Each scenario set has its own block | One run that designed impact scenarios, one that did not | Read `test-design.md` §0b in each | Two blocks in the first, one in the second; the impact block's objective names invariants, not the feature |
+| AC56 | §9.1 | `jira-to-speckit` version agrees | Repository complete | `python3 tools/validate_skills.py` | Exit `0`; `jira-to-speckit/SKILL.md` and its root README row both read `0.5.0`; AC02 asserts `v0.5.0` |
 
 ## AC05 — Workspace baseline regression
 

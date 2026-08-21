@@ -78,9 +78,18 @@ The response is a zip of `.feature` files. Unzip it and concatenate the contents
 
 **Every other type (Manual, Generic)** — fetch through the Jira REST API for the issue metadata,
 using the same credentials and endpoints documented in [`JIRA_API.md`](JIRA_API.md) (`GET
-{JIRA_URL}/rest/api/2/issue/{issueKey}?fields=summary,labels,issuetype`), and through Xray's
-GraphQL API for the steps (§5). **`export/cucumber` returns nothing for Manual and Generic tests** —
-do not treat an empty export as "no manual tests exist."
+{JIRA_URL}/rest/api/2/issue/{issueKey}?fields=summary,labels,issuetype,description`), and through
+Xray's GraphQL API for the steps (§5). **`export/cucumber` returns nothing for Manual and Generic
+tests** — do not treat an empty export as "no manual tests exist."
+
+**`description` is in that field list deliberately, and it costs nothing.** A field list is one
+parameter of a call that already runs, so asking for the description adds no request. Teams use the
+field as the test's own summary — typically a `Test Objective:` paragraph followed by a numbered
+scenario list — which makes it the cheapest available answer to *what does this test actually
+cover?* Report it per test alongside key, summary, and labels; report `null` when the issue has
+none, never an empty string, so a caller can tell an absent description from a blank one.
+
+This is a read. Nothing here writes the field back — see §"What this skill does not do."
 
 Both files are optional and named by the caller. Whichever path is not supplied is not written.
 

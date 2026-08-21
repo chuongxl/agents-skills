@@ -16,8 +16,8 @@ field that Jira and Xray test cases carry (§7).
 |---|---|
 | New | none |
 | Edited | `references/pipeline/stage-01-intake.md`, `references/pipeline/stage-02-test-design.md`; `references/shared/run-state.md`, `references/shared/operating-rules.md`, `references/shared/discovery.md`; `assets/adversarial-review-prompt.md`; `SKILL.md`; the skill's own `README.md` |
-| Edited in a second skill | `jira-to-speckit/references/XRAY_API.md` — `description` added to the Xray-path field list; `jira-to-speckit/SKILL.md` — version `0.3.0 → 0.4.0` |
-| Edited outside both skills | root `README.md` — **both** skills-table version badges, which `tools/validate_skills.py:292` compares against each `SKILL.md`; `test-case/speckit-qa-auto/test-cases.md` — new rows AC37–AC56, and **AC02 updated**, since it currently asserts `jira-to-speckit` reads `v0.3.0` |
+| Edited in a second skill | `jira-to-speckit/references/XRAY_API.md` — `description` added to the Xray-path field list; `jira-to-speckit/SKILL.md` — version `0.4.0 → 0.5.0` |
+| Edited outside both skills | root `README.md` — **both** skills-table version badges, which `tools/validate_skills.py:292` compares against each `SKILL.md`; `test-case/speckit-qa-auto/test-cases.md` — new rows AC37–AC56, and **AC02 updated** — it asserts `jira-to-speckit` reads `v0.3.0`, which was already stale before this change: the skill stood at `0.4.0` |
 
 No new stage, no new reference leaf, no renumbering of any existing step. One new artifact file
 per run — `existing-tests-index.md` (§7.2). `gherkin-conventions.md` and the `.feature` files are
@@ -403,7 +403,7 @@ is refused for the reason D54 gives.
 {JIRA_URL}/rest/api/2/issue/{issueKey}?fields=summary,labels,issuetype,description
 ```
 
-Same call, same branch, no new endpoint (D63). `jira-to-speckit` bumps `0.3.0 → 0.4.0` and its root
+Same call, same branch, no new endpoint (D63). `jira-to-speckit` bumps `0.4.0 → 0.5.0` and its root
 README row follows, which is what makes `tools/validate_skills.py` pass.
 
 ### 7.2 `existing-tests-index.md` — the cheap read
@@ -432,7 +432,7 @@ later stage reads it from run state rather than by re-parsing a markdown table
 
 ### 7.3 The written block
 
-Step 2.5 writes, into `test-design.md`, one block per scenario set (D62), in the ticket's own format
+Step 2.6 writes, into `test-design.md`, one block per scenario set (D62), in the ticket's own format
 verbatim — markdown, so `Scenario:` is inert text:
 
 ```
@@ -475,7 +475,7 @@ copy somewhere the pipeline cannot check.
 
 The skill's own `README.md` mirrors the gate count and the version, and gains the description block
 as a produced artifact. The **root `README.md`** takes `v0.5.0` on the `speckit-qa-auto` row and
-`v0.4.0` on the `jira-to-speckit` row — `tools/validate_skills.py:292` compares each badge against
+`v0.5.0` on the `jira-to-speckit` row — `tools/validate_skills.py:292` compares each badge against
 its skill's front matter, so a bump in one place and not the other fails the validator. Neither
 row's flags column changes: this design adds no flag.
 
@@ -508,7 +508,7 @@ AC36.
 | AC53 | The block is not in the `.feature` | `grep -n 'Test Objective' <artifact_dir>/*.feature` | No match in any `.feature` file; the block is present in `test-design.md` |
 | AC54 | The numbered list cannot drift | A run where a scenario was renamed at the 2.8 gate | The block's list matches `design.scenarios[]` in count and order after the revision; 2.7 re-ran and passed |
 | AC55 | Each scenario set has its own block | A run that designed impact scenarios, and one that did not | Two blocks in the first, one in the second; the impact block's objective names invariants, not the feature |
-| AC56 | `jira-to-speckit` version agrees | `python3 tools/validate_skills.py` | Exit `0`; `jira-to-speckit/SKILL.md` and its root README row both read `0.4.0`; AC02's assertion has been updated from `v0.3.0` |
+| AC56 | `jira-to-speckit` version agrees | `python3 tools/validate_skills.py` | Exit `0`; `jira-to-speckit/SKILL.md` and its root README row both read `0.5.0`; AC02's assertion has been updated from the stale `v0.3.0` |
 
 ### 9.2 Not a CI gate
 

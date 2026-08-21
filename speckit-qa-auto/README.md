@@ -1,6 +1,6 @@
 # Speckit QA Auto — Jira-to-Tests QA Pipeline
 
-**Version**: 0.4.0
+**Version**: 0.5.0
 **Author**: Alex Nguyen
 
 ## Overview
@@ -105,7 +105,9 @@ digraph qa_pipeline {
     "Bootstrap: framework, test tree, CI import job" -> "Stage 02: test design";
     "Test framework present?" -> "Stage 02: test design" [label="yes"];
 
-    "Stage 02: test design" -> "Self-review passes?";
+    "Stage 02: test design" -> "Human approves the test approach?";
+    "Human approves the test approach?" -> "Stage 02: test design" [label="different approach"];
+    "Human approves the test approach?" -> "Self-review passes?" [label="approved"];
     "Self-review passes?" -> "Stage 02: test design" [label="no, fix at source"];
     "Self-review passes?" -> "Human approves design?" [label="yes"];
     "Human approves design?" -> "Stage 02: test design" [label="revisions"];
@@ -148,7 +150,19 @@ passed, it runs to a scenario verdict or to the circuit breaker. Every loop insi
   A story that attaches an invoice to a work order candidate creates an invariant for every flow
   that already writes candidates, and none of those flows' tickets say so. The sweep returns
   candidates with evidence paths; a human decides at the gate, and cannot decline to answer.
-- **Adversarial design review** — before the human gate, a reviewer attacks the design with three
+- **Test approach agreed before any Gherkin exists** — after dedup and before a single scenario is
+  written, the run states the depth it classified the story at and why, asks the questions whose
+  answers change the design one at a time, and puts 2-3 approaches with their trade-offs in front of
+  a human. Rejected alternatives are kept with their reasons. Disagreeing here costs a sentence;
+  disagreeing at the design gate costs a redesign and a re-review.
+- **Existing tests triaged by their description first** — every Xray test is reported with its
+  `Test Objective:` line in `existing-tests-index.md`, so the design stage knows which manual step
+  tables are worth reading closely. The index orders attention and never filters what dedup matches
+  against, so two runs over an unchanged Xray still produce identical labels.
+- **A paste-ready description for every test set** — `test-design.md` §0b carries a `Test Objective:`
+  paragraph plus a scenario list derived from the `.feature` file, in the format a Jira or Xray
+  Description field expects.
+- **Adversarial design review** — before the design gate, a reviewer attacks the design with three
   questions scoped by the **ticket** rather than by the design's own list of criteria: which
   sentences state a rule that no scenario covers, what invariants this story creates for existing
   flows, and which lines were classified by the heading above them rather than by what they say.
@@ -171,8 +185,10 @@ passed, it runs to a scenario verdict or to the circuit breaker. Every loop insi
   the discovered repo profile's conventions.
 - **Bounded fix loop** — up to 3 fix attempts per scenario and a 5-failure circuit breaker;
   environmental failures stop the run instead of burning attempts.
-- **Two human gates, and no flag skips them** — design approval (Stage 02) and commit/push approval
-  (Stage 04), plus the self-review and selector gates.
+- **Three human gates, and no flag skips them** — approach approval (Stage 02, step 2.2b), design
+  approval (Stage 02, step 2.8), and commit/push approval (Stage 04), plus the self-review and
+  selector gates. `design_depth` scales how many alternatives a gate presents; it never decides
+  whether an answer is taken.
 - **Branch by default, worktree on request** — `--parallel-worktree` opts into an isolated
   worktree; the default cuts the branch in the checkout you are already in.
 - **Content-aware workspace guard** — two integrity baselines (source checkout and frontend
@@ -203,7 +219,7 @@ one frontend submodule is assumed.
 ## Examples
 
 ```bash
-# Default: discovery, design, selector gate, automation, both human gates
+# Default: discovery, approach gate, design, selector gate, automation, all three human gates
 skill speckit-qa-auto --issue MOM-1234
 
 # Approved Gherkin now, automation later — the run stops after the design gate

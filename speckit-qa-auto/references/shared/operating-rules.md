@@ -14,8 +14,9 @@ Exhaustive. Any other reason to stop is invalid.
 
 1. A concrete tool or runtime error, with the error text quoted
 2. A genuinely missing required input, after one ask
-3. The Stage 02 human gate — including the runs that end there for good: `--design-only`, and
-   `run.code_state: pending`, both of which finish design and stop by design, not by failure
+3. The Stage 02 **design** gate at step 2.8 — including the runs that end there for good:
+   `--design-only`, and `run.code_state: pending`, both of which finish design and stop by design,
+   not by failure. Stage 02 has two gates; this condition is 2.8, and condition 14 is 2.2b
 4. Stage 02 self-review failing the same check 3 consecutive times
 5. Stage 01 frontend-source initialization failure, or the Stage 03 entry selector gate with no
    frontend source
@@ -36,6 +37,10 @@ Exhaustive. Any other reason to stop is invalid.
     overwritten by the switch onto the base branch. The error is quoted and `--parallel-worktree`
     is named as the way through; the developer's tree is never stashed, forced, or committed to
     clear the way
+14. The Stage 02 **approach** gate at step 2.2b with no answer given. As with condition 12, the run
+    cannot tell a human who has not decided from a human who agrees with the recommendation — and
+    at this gate that difference sets the shape of every scenario the run goes on to write. A nod
+    is an answer at `design_depth: trivial`; silence is not an answer at any depth
 
 ## Fix Loop Rules
 

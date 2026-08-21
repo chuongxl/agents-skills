@@ -38,7 +38,9 @@ discovery:
   ran:                 true | false
   framework:           playwright-bdd | none
   linked_issues:       [{key, issue_type, relation, status}]
-  xray_tests:          [{key, test_type, summary, requirement}]
+  xray_tests:          [{key, test_type, summary, requirement, objective}]
+                       # objective: the description's `Test Objective:` line, or its first
+                       # non-empty line, or null. See discovery.md; never a filter (rule 19)
   repo_tests:          [{feature_path, scenarios, tags}]
   orphan_features:     ["src/tests/login/login-auth.feature"]
 
@@ -87,6 +89,15 @@ impact:
       acknowledged_empty:  true
 
 design:
+  approach_chosen:     api-first-plus-ui-smoke        # for a `test` anchor: faithful-conversion
+  approach_rationale:  "the invariant is enforced server-side; one UI path covers the render"
+  approach_alternatives:                              # never empty once 2.2b has run; see rule 18
+    - name:            ui-heavy
+      rejected_because: "every criterion through the UI triples runtime for one extra render check"
+  approach_questions:
+    - question:        "Is the precedence rule regression-critical this release?"
+      answer:          "yes — it changed in 12194 and broke twice"
+  approach_revised_in_02: false                       # a 2.7b finding routed back to 2.2b
   selector_evidence:   source | live-dom | fallback | deferred   # roll-up; see rule 16
   adversarial_review:  approved | issues-fixed | issues-open     # three values; see rule 11
   review_mode:         isolated | inline
@@ -214,3 +225,19 @@ design:
 > and no later check can un-commit it. Under `isolation: worktree` neither list is populated or
 > read: the tree is the pipeline's own, `add -A` is safe, and `workspace_baseline` keeps its
 > whole-tree meaning.
+
+> **18. `design.approach_chosen` exists before step 2.3 writes its first scenario, and
+> `design.approach_alternatives[]` is never empty once 2.2b has run.** A scenario authored before
+> the field exists is a scenario whose shape nobody approved; an empty alternatives list is a
+> decision recorded as a fact. Neither is repaired by a later gate — 2.8 approves scenarios
+> *against* an approach, and it cannot approve them against one that was never written down. The
+> ceremony at 2.2b scales with `run.design_depth`; whether an answer is taken does not
+> (rule 12 draws the same line for every other check depth touches).
+
+> **19. `discovery.xray_tests[].objective` orders attention and never filters a corpus.**
+> `existing-tests.feature` and `existing-tests-manual.md` are written in full whatever the objectives
+> say, and 2.2 matches against all of it. A test whose issue carries no description records
+> `objective: null` and is still exported, still matched, still labelled. Letting the field decide
+> what enters the corpus would make dedup depend on a judgement about a prose summary, and two runs
+> over an unchanged Xray could then disagree — which is the determinism this contract exists to
+> hold.

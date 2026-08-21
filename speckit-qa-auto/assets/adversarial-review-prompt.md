@@ -54,6 +54,13 @@ Only flag issues that would cause real problems. A missing constraint, a contrad
 admitting two readings — those are issues. Wording improvements, stylistic preferences, and
 "this section is shorter than that one" are not.
 
+`test-design.md` §0 records a test approach a human approved before any scenario was written, and
+§0b records the description blocks derived from the scenarios. Treat both as **context, not as
+targets.** Do not flag "a different approach would have been better" — that decision has an owner.
+Do flag the *consequence*: a constraint or an invariant left uncovered, naming the approach as the
+cause if that is what it is. An objective in §0b that claims coverage no scenario provides is an
+ordinary task 1 finding.
+
 Be genuinely adversarial on the three tasks, but do not manufacture findings to seem thorough. If
 the design holds, say it holds. Approve unless there are serious gaps.
 

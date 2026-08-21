@@ -6,7 +6,7 @@ license: MIT
 allowed-tools: bash view create
 metadata:
   author: Alex Nguyen
-  version: "0.4.0"
+  version: "0.5.0"
 ---
 
 # Jira to Speckit

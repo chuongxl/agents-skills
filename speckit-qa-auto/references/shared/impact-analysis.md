@@ -130,7 +130,7 @@ Absent frontend source, an uninitialized submodule, or an entity that cannot be 
 ticket: the sweep records that it did not run, and **why**.
 
 Empty-because-nothing-writes-this-entity and empty-because-the-sweep-could-not-run are different
-facts, and every consumer downstream treats them differently. Neither releases the human gate, and
+facts, and every consumer downstream treats them differently. Neither releases the 2.8 design gate, and
 neither excuses the adversarial review: a reviewer with no candidate list still runs, with less
 ammunition for the invariants question, and the gate says so.
 

@@ -205,6 +205,12 @@ true`, `xray_output_path = <artifact_dir>/existing-tests.feature`, `xray_manual_
 returned, not the anchor alone. Record `xray.query` from whichever JQL ran (`testRequirement` or
 `linkedIssues`), and `xray.cucumber_tests` / `xray.manual_tests` from the counts reported back.
 
+Sweep 2 also writes **`existing-tests-index.md`** into the artifact folder and carries each test's
+`objective` into `discovery.xray_tests[]`, per `discovery.md`. The objective comes from the test
+issue's `description`, fetched by the metadata call that already runs — one more field name, no
+extra request. The index exists so Stage 02 can decide which manual step tables to read closely; it
+orders attention and never filters what dedup matches against (`run-state.md` rule 19).
+
 Unavailable Xray credentials degrade to a warning, never a stop, and the reason is recorded in
 `discovery.ran` per `discovery.md`, "When A Sweep Cannot Run". Stage 02 is the stage that then
 records every behaviour `NEW` and marks dedup `not-run`; this stage only records that the fetch did
@@ -327,12 +333,13 @@ stages that is not a field in that contract):
 - `xray.query`, `xray.cucumber_tests`, `xray.manual_tests`
 - `discovery.*` — every field `discovery.md`'s "What Discovery Writes" names: `ran`, `framework`
   (updated by step 10 when it ran),
-  `linked_issues[]`, `xray_tests[]`, `repo_tests[]`, `orphan_features[]`. A sweep result held only
-  in a subagent's reply is a result no later stage can read (`run-state.md` rule 5)
+  `linked_issues[]`, `xray_tests[]` — each entry carrying its `objective` — `repo_tests[]`,
+  `orphan_features[]`. A sweep result held only in a subagent's reply is a result no later stage can
+  read (`run-state.md` rule 5)
 
 And, on disk, the artifact folder holding `execution-report.md` — **created by this stage**, per
-step 11, carrying the run-state yaml block above — plus `ticket.md`, `existing-tests.feature`, and
-`existing-tests-manual.md`.
+step 11, carrying the run-state yaml block above — plus `ticket.md`, `existing-tests.feature`,
+`existing-tests-manual.md`, and `existing-tests-index.md`.
 
 ## Enter Stage 02
 

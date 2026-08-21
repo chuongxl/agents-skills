@@ -16,8 +16,10 @@ file that goes undeclared is read from memory instead of from the file. It links
 under `references/pipeline/` — its predecessor is not linked back to, and its successor is named,
 never linked: **enter Stage 03** at the end of this stage, same turn.
 
-This is the pipeline's main human gate (design spec §5, marked ◀ HUMAN GATE). Everything Stage 03
-automates and Stage 04 reports on treats this stage's output as settled. It turns the acceptance
+This stage carries the pipeline's two main human gates (design spec §5, marked ◀ HUMAN GATE): the
+**approach gate at 2.2b**, which settles how the story will be tested before any Gherkin exists, and
+the **design gate at 2.8**, which settles what was written. Everything Stage 03 automates and Stage
+04 reports on treats this stage's output as settled. It turns the acceptance
 criteria Stage 01 captured in `ticket.md` into approved Gherkin, deduplicated against whatever
 Xray already covers, with every UI element resolved to real evidence before approval.
 
@@ -26,9 +28,15 @@ Xray already covers, with every UI element resolved to real evidence before appr
 Per `run-state.md`, read only from `execution-report.md` and the artifact folder — never from
 `stage-01-intake.md`: `run.jira_key`, `run.artifact_dir`, `profile.*`, `xray.query`,
 `xray.cucumber_tests`, `xray.manual_tests`, and, on disk inside `run.artifact_dir`, `ticket.md`,
-`existing-tests.feature`, and `existing-tests-manual.md`. `existing-tests.feature` is empty and
-`existing-tests-manual.md` absent when Xray was unavailable at Stage 01 — that absence is itself
-an input to step 2.2.
+`existing-tests.feature`, `existing-tests-manual.md`, and `existing-tests-index.md`.
+`existing-tests.feature` is empty and `existing-tests-manual.md` absent when Xray was unavailable at
+Stage 01 — that absence is itself an input to step 2.2.
+
+`existing-tests-index.md` is the **cheap read**: one row per test across both exports, carrying each
+test's `Test Objective:` line or `no description`. Read it first and use it to decide which manual
+tests' full step tables are worth reading closely. It orders attention and nothing else — it does
+not shorten either export, and 2.2 matches against all of both whatever the index says
+(`run-state.md` rule 19).
 
 Also `run.design_depth` with the reason Stage 01 recorded for it, `impact.*`, and
 `impact-candidates.md` on disk. This stage does not run the impact sweep; it reads what Stage 01
@@ -39,8 +47,11 @@ new breadth.
 ## Execution Order
 
 The steps below run in the order design spec §5 fixes. They are numbered 2.1 through 2.8, with
-2.4b inserted between 2.4 and 2.5 and 2.7b between 2.7 and 2.8 — the numbering marks position,
-not a count.
+2.2b inserted between 2.2 and 2.3, 2.4b between 2.4 and 2.5, and 2.7b between 2.7 and 2.8 — the
+numbering marks position, not a count.
+
+Stage 02 has **two** human gates: the approach gate at 2.2b and the design gate at 2.8. Everywhere
+this file said "the human gate" before there was one of each, it now names the step.
 
 ### 2.1 Requirement analysis
 
@@ -82,6 +93,95 @@ One field carrying both directions under one name leaves the gate and the Stage 
 tell them apart. See `gherkin-conventions.md` for why the other two are refused: either would
 decide, with no human involved, that another story's Test issue now belongs to this one.
 
+### 2.2b Test approach gate ◀ HUMAN GATE
+
+The first point in the pipeline where a human is asked about the *shape* of the testing, and it is
+placed here because this is where changing the answer is still cheap. At 2.8 every scenario is
+written, self-reviewed, and adversarially reviewed; a disagreement there costs a full redesign, and
+agreement partly bought by sunk cost is the reviewer-who-is-only-noticing failure 2.8's own impact
+section exists to avoid.
+
+**Why after 2.2 and not before it.** One approach a run must be able to choose is *lean on the
+coverage that already exists*, and that cannot be stated without the dedup labels 2.2 produces.
+Placed earlier, the gate would ask a human to choose between options one of which it could not
+describe.
+
+Present three sections, then **stop**:
+
+| Section | Content |
+|---|---|
+| Depth | `run.design_depth` with the reason Stage 01 recorded — presented here so it can be disagreed with before any Gherkin exists |
+| Questions | Asked **one at a time**; only questions whose answer changes the design |
+| Approach | Alternatives with trade-offs, the recommendation first |
+
+**Ceremony scales with `run.design_depth`. Whether an answer is taken does not** (`run-state.md`
+rule 18). This is the boundary most at risk in this step: a gate that "scales to nothing" on
+`trivial` is a gate that was removed.
+
+| `design_depth` | Questions | Approaches presented | Approval |
+|---|---|---|---|
+| `trivial` | only one that genuinely blocks | 1, in 2-3 sentences, **with the obvious alternative named and rejected in writing** | a nod suffices |
+| `standard` | one at a time | 2, with trade-offs and a recommendation | an explicit yes |
+| `cross-cutting` | one at a time | 3, with trade-offs and a recommendation | an explicit yes |
+
+Even at `trivial`, one alternative is named and rejected. An approach offered with no alternative is
+a decision presented as a fact, and `trivial` is where that is most tempting. The cost is one
+sentence.
+
+**What an approach is.** A coherent position on five axes, not a slogan: the **surface mix** (which
+behaviours are `ui`, `api`, `manual`); **granularity** (one scenario per criterion, or a
+`Scenario Outline` with an examples table); **negative and boundary depth**; **what is left to
+existing coverage** (which `SKIP`-labelled behaviours are genuinely covered); and the **test data
+strategy** (fixtures, mocks, or live seeding). Shapes these combine into, as illustration and not a
+fixed menu:
+
+| | Approach | Trade-off |
+|---|---|---|
+| A | UI-heavy — every criterion a UI scenario, real data | Highest fidelity; slowest; most exposed to flake |
+| B | API-first plus a UI smoke — invariants at the API layer, one or two UI happy paths | Fast and stable; blind to rendering defects |
+| C | Thin — automate only `NEW` behaviours, leave `SKIP` rows to their existing Xray tests | Cheapest; depends entirely on dedup having run |
+
+**When `xray.dedup` is `not-run`, approach C cannot be stated.** Say so, with the reason Stage 01
+recorded for the unavailability. The gate still runs; it presents one option fewer. An unrun dedup
+and a dedup that ran and found nothing are different facts everywhere else in this pipeline, and
+they are different facts here.
+
+**The questions asked here are not 2.1's questions.** 2.1 asks *"what does this line of the ticket
+mean?"* and must stay at 2.1, because 2.2's dedup depends on the behaviour list being right. 2.2b
+asks *"how should this be tested, and what matters to you?"* — purpose, constraints, what done looks
+like. A question appearing in both lists was asked in the wrong place.
+
+| Asked at | Kind | Recorded in |
+|---|---|---|
+| 2.1 | What does this line of the ticket mean? | Open Questions in `test-design.md`, or asked once when blocking |
+| 2.2b | How should this be tested? What matters to you? | `design.approach_questions[]` and `test-design.md` §0 |
+
+**Anchor resolution.**
+
+| `run.anchor_type` | Third section becomes |
+|---|---|
+| `story` | approaches, per the depth table |
+| `epic` | approaches stated **once for the epic**, with per-child depth inside one presentation |
+| `test` | **batch scope** — which Manual tests this run converts and where the batch is cut |
+
+An `epic` presents one gate, never one per child. The bound is 2.4b's bound and it is the same
+reason: the ceiling is what one human reads at one sitting, and N gates for N children moves the
+bottleneck rather than removing it. An epic too wide for one presentation is split, and the split is
+stated, in the words `manual-conversion.md` uses for a conversion batch.
+
+A `test` anchor gets **no approach menu**. The approach is fixed by the anchor — translate
+faithfully — and offering alternatives would invite a redesign of an approved test that has been
+executing for years, which is what `manual-conversion.md` exists to prevent. `approach_chosen`
+records `faithful-conversion`. Depth is still announced and questions are still asked.
+
+**Depth raised here** re-runs the impact sweep at the new breadth by loading `impact-analysis.md`,
+and sets `run.depth_raised_in_02` — the mechanism 2.7b already uses. **Depth lowered here is
+refused:** the ratchet is one-way (`run-state.md` rule 12). Record the disagreement as an approach
+question with its answer; do not act on it.
+
+**No answer ends the turn** (`operating-rules.md`, Turn-Ending Condition 14). A nod is an answer at
+`trivial`. Silence is not an answer at any depth.
+
 ### 2.3 Scenario design
 
 **When `run.anchor_type` is `test`, or discovery returned Manual tests the human elected to
@@ -90,6 +190,11 @@ job from design: the source is an approved test that has been executing for year
 2.8 asks whether the translation is faithful, not whether the test is a good idea. Converted
 scenarios carry `design.scenarios[].source_manual_test`, carry no `@TEST_` tag, and are imported as
 new Cucumber tests linked to the manual originals — never as overwrites of them.
+
+**Design to `design.approach_chosen`.** A scenario whose surface contradicts the approved approach
+is either brought into line or carries the reason it departs — recorded, never silent, because
+2.8 compares the approved approach against what was delivered and that comparison is what makes
+drift visible.
 
 Gherkin, one behaviour per scenario (`gherkin-conventions.md`, "Scenario Granularity"). Negative
 and boundary cases are their own scenarios, not extra `And` steps folded onto the happy path. Every
@@ -181,6 +286,43 @@ Into the same artifact folder: the scenarios, the coverage matrix, the element i
 data and mock plan, the dedup decisions from 2.2 (including `dedup: not-run` when it applies), and
 Open Questions from 2.1.
 
+**§0 — Test approach**, placed first because it is the frame every later section sits inside: the
+approach chosen and why, **every alternative considered with the reason it was rejected**, the
+clarifying questions from 2.2b with their answers, and the depth at the time of approval together
+with whether the human changed it. Rejected alternatives are kept for the reason §9 keeps rejected
+review findings: a choice recorded without the options it beat leaves the next reader unable to tell
+a design that was never considered from one that was considered and held.
+
+**§0b — Test case description**, one block per scenario set (the main set, and the impact set when
+2.4b designed one). This is the block a person pastes into the Jira or Xray Description field, so it
+is written in that field's own format:
+
+```
+Test Objective: <one paragraph — what is verified, under what conditions, with which
+precedence rules, and what outcome or placement is expected>
+
+Scenario:
+1: <scenario name, exactly as it appears in the .feature file>
+2: <…>
+```
+
+**The objective is written; the numbered list is derived** — generated from `design.scenarios[]` in
+file order, never authored by hand. A hand-written list is a second statement of the same fact, and
+the two disagree the first time a scenario is renamed at 2.8. 2.7 checks the derivation by
+comparison rather than by judgement.
+
+The impact set's block states the **invariants**, not the feature. One merged block would claim a
+single objective over two sets that exist for opposite reasons — what the story builds, and what the
+story must not break.
+
+**This block is not written into the `.feature` file, and that is deliberate.** A description in the
+ticket's format contains a line reading `Scenario:`, and in a `.feature` file that is a keyword —
+Gherkin would parse it as a scenario with an empty name and `bddgen` would compile it. `Scenarios:`
+is no safer; it is an alias for `Examples:`. Markdown makes the hazard disappear instead of working
+around it, and lets the block match the field's format verbatim. Whether Xray's Cucumber import
+would carry a Feature-level description onto the imported Test issue is unverified, so the benefit
+that would justify the risk is unconfirmed.
+
 Two further sections. **§2b — impact coverage**: each candidate, the scenario or scenarios designed
 for it, its evidence path, and whether it came from the sweep, the human, or both. **§9 — review
 findings**, written at 2.7b and kept afterwards, *including findings that were rejected*. A review
@@ -191,6 +333,10 @@ challenged from one that was challenged and held.
 
 Every one of these must hold, checked mechanically, not asked about:
 
+- `design.approach_chosen` is present and `design.approach_alternatives[]` is non-empty
+  (`run-state.md` rule 18)
+- `test-design.md` §0b holds one description block per scenario set the run produced, and each
+  block's numbered list matches that set's scenario names in **count and order**
 - Every acceptance criterion from `ticket.md` is covered by at least one scenario
 - No `TODO`, `TBD`, or other placeholder anywhere in the `.feature` file or `test-design.md`
 - Every `surface: ui` scenario names every element it touches in the element intent map
@@ -227,13 +373,22 @@ by the ticket rather than by the extraction. **The difference is the question, n
 was never isolated in the way an earlier draft claimed, and that draft's exemption for this step has
 been withdrawn accordingly.
 
+**§0 and §0b travel with `test-design.md` and are context, not targets.** The reviewer is not given
+a fourth task asking whether the approach was wrong — that decision has an owner and was approved by
+a human before the scenarios existed. What the existing tasks may now do is name the approach as a
+*cause*: an invariant left uncovered *because* the approach put that surface at the API layer is an
+ordinary task-2 finding. An objective in §0b claiming coverage no scenario provides is an ordinary
+task-1 finding.
+
 **Mode.** Prefer a subagent — a fresh context is less anchored on a conclusion it did not reach,
 which is a real but unquantified benefit. Where dispatch is unavailable, run inline with the same
 prompt and the same tasks, and record `design.review_mode: inline`. It is never skipped for want of
 dispatch, which is why `design.adversarial_review` has no `not-run` value (`run-state.md` rule 11).
 
 **Loop.** `Issues Found` routes by task: findings from tasks 1 and 3 return to 2.1, findings from
-task 2 return to 2.4b. Either path re-runs 2.7 and then re-reviews. Scenarios added carry
+task 2 return to 2.4b. A finding that **can only be fixed by changing the approach** returns to
+2.2b instead — a second trip through the approach gate, setting `design.approach_revised_in_02`.
+Every path re-runs 2.7 and then re-reviews, and every path counts against the same three-round cap. Scenarios added carry
 `origin: adversarial-review`, and are labelled where they are created — dedup is a rule, not a step
 that already ran.
 
@@ -259,7 +414,8 @@ Present four sections:
 
 | Section | Content |
 |---|---|
-| Depth | `run.design_depth` with its reason, and whether a review finding raised it mid-run — stated so it can be disagreed with |
+| Depth | `run.design_depth` with its reason, and whether a review finding raised it mid-run — stated so it can be disagreed with. **Plus `design.approach_chosen` beside the surfaces actually delivered**: this is the only place a drift between the approach approved at 2.2b and the scenarios that came out of 2.3–2.4b becomes visible, and without it 2.2b's approval could be honoured in name and abandoned in fact |
+| Description | The §0b blocks, for approval. Human-facing prose intended for a Jira field — the only artifact of this run a person may copy somewhere the pipeline cannot check |
 | Coverage | The coverage matrix, the dedup labels, the element intent map, Open Questions |
 | Review | `approved`, `issues-fixed` with each finding and its disposition, or `issues-open` with the open findings verbatim — plus `design.review_mode` |
 | Impact | Every designed impact scenario with its candidate's evidence path and provenance; `impact.declared[]` alongside `impact.candidates[]`; the existing tests found per candidate |
@@ -310,7 +466,7 @@ code; the code may not match it.
 Writing test cases ahead of implementation is normal QA practice, not an edge case, and this stage
 supports it directly: `run.code_state: pending` lets the design finish, be reviewed, be approved,
 and be committed with no frontend to read. Nothing is loosened to allow it — the intent map is still
-required in full, self-review still runs every check, and the human gate still gates.
+required in full, self-review still runs every check, and both gates still gate.
 
 What a `pending` run cannot do is enter Stage 03. Selectors resolve against code, and there is no
 code; a run that automated anyway would generate against selectors nobody could verify. So the run
@@ -339,7 +495,7 @@ values do not split otherwise-identical scenarios.
 | Key matches an exported Cucumber scenario, step sequence identical | `SKIP (covered by <TEST-key>)` |
 | Key matches, step sequence differs | `UPDATE <TEST-key>` — carries `@TEST_<TEST-KEY>`, import updates in place |
 | No key match anywhere | `NEW` |
-| An existing test's key matches nothing in the new design | `REVIEW <TEST-key>` — reported at the human gate, never deleted or modified by the pipeline |
+| An existing test's key matches nothing in the new design | `REVIEW <TEST-key>` — reported at the 2.8 design gate, never deleted or modified by the pipeline |
 
 Matching runs only against `existing-tests.feature` — the Cucumber export, which is Gherkin and
 therefore has a normalized key to compare. `REVIEW` never triggers a delete or an edit of the
@@ -376,6 +532,9 @@ Written into run state:
 - `design.scenarios[]` — one entry per scenario, each carrying `name`, `surface`, `dedup`, `origin`,
   and `status: pending` (Stage 03 is what moves a scenario off `pending`); impact scenarios also
   carry `impact: true` and `impact_flow`
+- `design.approach_chosen`, `design.approach_rationale`, `design.approach_alternatives[]`, and
+  `design.approach_questions[]`, all from 2.2b — written before 2.3 authors anything
+  (`run-state.md` rule 18); `design.approach_revised_in_02` when 2.7b routed a finding back there
 - `xray.dedup` — `ran | not-run`, from step 2.2
 - `design.adversarial_review`, `design.review_mode`, and `design.review_rounds`, from 2.7b
 - `impact.approved_scenarios[]`, `impact.dropped_scenarios[]`, and `impact.acknowledged_empty`, all
@@ -388,11 +547,12 @@ second because the condition that would have written `not-run` no longer exists.
 writes is one a reader assumes means something.
 
 And, on disk inside `run.artifact_dir`: the `.feature` file(s) from 2.5, `test-design.md` from 2.6
-including its §2b and §9, and `impact-candidates.md` updated with each candidate's decision.
+including its §0, §0b, §2b and §9, and `impact-candidates.md` updated with each candidate's
+decision. No `.feature` file carries a description block — see 2.6.
 
 ## Enter Stage 03
 
-Once the human gate is passed and the design artifacts are committed, enter Stage 03 in the same
+Once the 2.8 design gate is passed and the design artifacts are committed, enter Stage 03 in the same
 turn — unless 2.8's table sent the run elsewhere. A `pending` or `--design-only` run ends here
 instead, with `resume_from` set, and that ending is a success path: the artifacts are written,
 approved, and committed, and the run has produced exactly what it was asked for.
@@ -411,4 +571,9 @@ approved, and committed, and the run has produced exactly what it was asked for.
 | "The sweep found nothing, so the impact section can be skipped at the gate" | An empty sweep is not evidence of no impact — the knowledge lives in a human's head. The section asks its question on every run, and `acknowledged_empty: true` is a person's answer, not a default |
 | "The human dropped every impact scenario, so the empty file is harmless" | Delete it. Stage 03 materializes it and CI imports it as a file containing no tests |
 | "One element is unnamed, but the rest of the map is done — good enough to pass 2.7" | Self-review checks every element of every `ui` scenario. One missing row fails the gate. Name it, or reclassify the scenario's `surface` with a reason — marking the scenario blocked is not an exit here, since this stage leaves every scenario `pending` and `blocked` is a Stage 03 verdict |
+| "Depth is `trivial`, so I'll pick the approach and mention it at 2.8" | 2.8 is after the Gherkin is written. Disagreement there costs a redesign and a re-review — which is the cost 2.2b exists to remove |
+| "There's only one sensible approach here" | Then say so, **and say why the others were rejected**. An approach presented with no alternative is a decision presented as a fact |
+| "I'll batch the questions into one message to save a round trip" | One at a time. A batch of questions gets a batch of half-answers, and the half-answer to the question that mattered is indistinguishable from the rest |
+| "The index says this manual test is unrelated, so leave it out of dedup" | The index orders attention, never input. Every exported test is matched, whatever its objective line says (`run-state.md` rule 19) |
+| "The description reads better in the `.feature` file, next to the scenarios" | A line reading `Scenario:` is a keyword there. It parses as an empty scenario and `bddgen` compiles it. The block stays in `test-design.md` §0b |
 | "This failed self-review before, I'll just approve it at 2.8 and fix it in Stage 03" | Stage 03's fix loop cannot edit `.feature` files at all (`operating-rules.md`). A design defect that reaches 2.8 unfixed stays a defect through automation |
