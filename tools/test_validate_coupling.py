@@ -89,6 +89,58 @@ def test_stage_may_link_to_a_shared_leaf(tmp: Path) -> None:
     expect("a stage may load a shared leaf", check_skill(skill) == [])
 
 
+def test_undeclared_backtick_citation_is_an_error(tmp: Path) -> None:
+    skill = build(tmp / "cited", {
+        "SKILL.md": "Router.\n",
+        "references/pipeline/stage-01.md":
+            "Loads: [run state](../shared/run-state.md).\n\n"
+            "Commit per `commit.md`.\n",
+        "references/shared/run-state.md": "Leaf.\n",
+        "references/shared/commit.md": "Leaf.\n",
+    })
+    errors = check_skill(skill)
+    expect("citing an undeclared leaf in backticks is one error", len(errors) == 1)
+    expect("error names the leaf and the Loads line",
+           errors and "commit.md" in errors[0] and "Loads:" in errors[0])
+
+
+def test_declared_backtick_citation_is_accepted(tmp: Path) -> None:
+    skill = build(tmp / "cited-ok", {
+        "SKILL.md": "Router.\n",
+        "references/pipeline/stage-01.md":
+            "Loads: [run state](../shared/run-state.md),\n"
+            "[commit](../shared/commit.md).\n\n"
+            "Commit per `commit.md`.\n",
+        "references/shared/run-state.md": "Leaf.\n",
+        "references/shared/commit.md": "Leaf.\n",
+    })
+    expect("citing a leaf declared on a wrapped Loads: line is fine",
+           check_skill(skill) == [])
+
+
+def test_artifact_and_stage_filenames_are_not_citations(tmp: Path) -> None:
+    skill = build(tmp / "artifacts", {
+        "SKILL.md": "Router.\n",
+        "references/pipeline/stage-01.md":
+            "Loads: [run state](../shared/run-state.md).\n\n"
+            "Write `ticket.md` and `execution-report.md`, then enter `stage-02.md`.\n",
+        "references/pipeline/stage-02.md": "Leaf.\n",
+        "references/shared/run-state.md": "Leaf.\n",
+    })
+    expect("artifact filenames and successor stage names are not leaf citations",
+           check_skill(skill) == [])
+
+
+def test_shared_leaf_citing_a_sibling_is_not_a_c3_error(tmp: Path) -> None:
+    skill = build(tmp / "shared-cite", {
+        "SKILL.md": "Router.\n",
+        "references/shared/discovery.md": "See `impact-analysis.md` for the fourth sweep.\n",
+        "references/shared/impact-analysis.md": "Leaf.\n",
+    })
+    expect("a leaf citing a sibling by name is how leaves refer to each other",
+           check_skill(skill) == [])
+
+
 def main() -> int:
     with tempfile.TemporaryDirectory() as raw:
         tmp = Path(raw)
@@ -97,6 +149,10 @@ def main() -> int:
         test_stage_linking_to_stage_is_an_error(tmp)
         test_links_inside_code_fences_are_ignored(tmp)
         test_stage_may_link_to_a_shared_leaf(tmp)
+        test_undeclared_backtick_citation_is_an_error(tmp)
+        test_declared_backtick_citation_is_accepted(tmp)
+        test_artifact_and_stage_filenames_are_not_citations(tmp)
+        test_shared_leaf_citing_a_sibling_is_not_a_c3_error(tmp)
     print()
     if FAILURES:
         print(f"{len(FAILURES)} check(s) failed")

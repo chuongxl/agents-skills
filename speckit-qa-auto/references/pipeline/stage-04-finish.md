@@ -1,10 +1,15 @@
 # Stage 04: Finish
 
 Loads: [run-state.md](../shared/run-state.md), [operating-rules.md](../shared/operating-rules.md),
-[workspace-guard.md](../shared/workspace-guard.md), [commit.md](../shared/commit.md). Four leaves,
+[workspace-guard.md](../shared/workspace-guard.md), [commit.md](../shared/commit.md),
+[selector-verification.md](../shared/selector-verification.md),
+[gherkin-conventions.md](../shared/gherkin-conventions.md). Six leaves,
 so the reader knows the cost before paying it (design spec §11.2 rule 1) — every leaf cited below
 by rule or turn-ending-condition number is declared here, since a cited file that goes undeclared
-is read from memory instead of from the file. It links to no other file under
+is read from memory instead of from the file. That sentence stood here while two of the leaves it
+promised went undeclared: the report quotes `selector-verification.md`'s "Semantic Fallback Is A
+Recorded Risk" requirement and classifies manual and blocked scenarios by `gherkin-conventions.md`'s
+Surface table. A claim a file makes about itself is not a check, which is why C3 now is one. It links to no other file under
 `references/pipeline/` — its predecessor is not linked back to, and it has no successor: this is
 the last stage the skill runs. After the steps below the pipeline ends — with the pull request
 opened at 4.6 when `--pr` was passed, and otherwise left for a human to open from the text 4.6

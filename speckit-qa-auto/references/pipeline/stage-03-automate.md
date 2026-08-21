@@ -2,8 +2,12 @@
 
 Loads: [run-state.md](../shared/run-state.md), [operating-rules.md](../shared/operating-rules.md),
 [gherkin-conventions.md](../shared/gherkin-conventions.md),
-[selector-verification.md](../shared/selector-verification.md). Four leaves, so the reader knows the
-cost before paying it (design spec §11.2 rule 1). `selector-verification.md` is declared because the
+[selector-verification.md](../shared/selector-verification.md),
+[repo-profile.md](../shared/repo-profile.md). Five leaves, so the reader knows the
+cost before paying it (design spec §11.2 rule 1). `repo-profile.md` is declared because this stage
+resolves `generate_cmd`, `scoped_run_cmd`, and `testdata_path` against that file's field table —
+it was cited here and left undeclared until the coupling check C3 started reading citations rather
+than links. `selector-verification.md` is declared because the
 selector gate opens this stage; it is no longer a design-stage concern, and reading it from memory
 is exactly how a moved gate goes on being applied where it used to live. `run-state.md` is declared
 because this stage reads and updates `design.scenarios[]` by field name — `attempts` above all, which is what bounds
@@ -119,7 +123,7 @@ infrastructure-failure rule, and consumes no attempt.
 
 When a scenario resolves — `green` or `blocked` — commit the worktree locally (`git add -A && git
 commit`, no push) so `design.scenarios[].commit` names a real sha. Pushing the branch is Stage 04's
-job alone (`commit.md`). A result with no sha attached is not a result (`run-state.md` rule 4).
+job alone. A result with no sha attached is not a result (`run-state.md` rule 4).
 
 ### 3.5 Coverage review loop
 
