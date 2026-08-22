@@ -1,6 +1,6 @@
 # Speckit QA Auto — Jira-to-Tests QA Pipeline
 
-**Version**: 0.5.0
+**Version**: 0.6.0
 **Author**: Alex Nguyen
 
 ## Overview
@@ -19,7 +19,8 @@ output:
    only a **derived, scenario-level subset**, materialized by Stage 03 and never edited directly.
 3. **Discovery runs before design.** Linked issues, existing Xray tests (Cucumber *and* Manual), and
    the repository's own `.feature` files are swept first, so a scenario is never designed in
-   ignorance of coverage that already exists.
+   ignorance of coverage that already exists. Related stories are found along five axes, not just
+   Jira links, because a link only finds what somebody took the trouble to create.
 4. **Design can complete before the code does.** Writing test cases ahead of implementation is
    normal practice, so it is a supported path, not a workaround: the selector gate runs at the head
    of Stage 03, and a pre-code run finishes design, gets approved, and resumes into automation once
@@ -144,7 +145,18 @@ passed, it runs to a scenario verdict or to the circuit breaker. Every loop insi
 
 - **Discovery before design** — three concurrent sweeps (Jira linkage, Xray tests, repository
   tests) gather evidence, never verdicts, so dedup stays a mechanical rule rather than a subagent's
-  opinion.
+  opinion. Related stories are swept along five axes — links, shared component, epic siblings, a
+  bounded text search, and whatever `--related` declares — each candidate recording which axis found
+  it. Stage 01 records keys and summaries only; a human picks which are worth reading at the
+  approach gate, so wider reach does not become more reading.
+- **Gates written for the reader, not the machine** — one file owns everything a person sees: one
+  question per message, as many questions as there are concerns, alternatives carried by the choices
+  offered, and no step number, field name, or internal label quoted at a reader. It degrades to
+  prose on a host with no structured question tool.
+- **Test case priority** — every scenario carries one, derived from the ticket's own Jira priority
+  and stepped down for negative, boundary, and edge cases, then settled by a human at the design
+  gate. It rides the feature file as `@Priority_<Level>`, so it reaches Xray through the import CI
+  already runs and `--tags @Priority_Highest` selects a smoke subset on day one.
 - **Impact analysis** — a fourth sweep, sequenced after those three, traces every write against the
   story's entity back to the flow that owns it, and lists the existing tests on the same surface.
   A story that attaches an invoice to a work order candidate creates an invariant for every flow
@@ -188,7 +200,8 @@ passed, it runs to a scenario verdict or to the circuit breaker. Every loop insi
 - **Three human gates, and no flag skips them** — approach approval (Stage 02, step 2.2b), design
   approval (Stage 02, step 2.8), and commit/push approval (Stage 04), plus the self-review and
   selector gates. `design_depth` scales how many alternatives a gate presents; it never decides
-  whether an answer is taken.
+  whether an answer is taken, never caps how many questions are asked, and is never shown to a
+  reader — it drives knobs nobody can see.
 - **Branch by default, worktree on request** — `--parallel-worktree` opts into an isolated
   worktree; the default cuts the branch in the checkout you are already in.
 - **Content-aware workspace guard** — two integrity baselines (source checkout and frontend
@@ -230,6 +243,9 @@ skill speckit-qa-auto --issue MOM-100
 
 # Convert an existing Manual Xray test into automation
 skill speckit-qa-auto --issue MOM-5678
+
+# Name related stories up front instead of waiting for the sweep to guess them
+skill speckit-qa-auto --issue MOM-1234 --related MOM-1200,MOM-1211
 
 # Run the full suite instead of the default affected-domain scope
 skill speckit-qa-auto --issue MOM-1234 --full-suite

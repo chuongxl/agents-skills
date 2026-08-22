@@ -43,6 +43,10 @@ discovery:
                        # non-empty line, or null. See discovery.md; never a filter (rule 19)
   repo_tests:          [{feature_path, scenarios, tags}]
   orphan_features:     ["src/tests/login/login-auth.feature"]
+  related_candidates:  [{key, summary, matched_by}]
+                       # matched_by: link | component | epic-sibling | text | declared
+                       # evidence, never a relevance verdict. See discovery.md
+  related_read:        ["MOM-12500"]   # chosen by a human; governs reading, never recording (rule 20)
 
 profile:
   # every field re-derived each run from the playbook; see repo-profile.md
@@ -105,6 +109,7 @@ design:
   scenarios:
     - name:            Verify the Reset button is renamed
       surface:         ui | api | manual
+      priority:        Highest | High | Medium | Low | Lowest   # the project's own Jira scale
       dedup:           NEW | UPDATE MOM-5678 | SKIP MOM-5678 | REVIEW MOM-5678
       source_manual_test: MOM-5678     # absent unless converted from a Manual Xray test
       origin:          extraction | adversarial-review
@@ -115,6 +120,7 @@ design:
       commit:          <sha the result was produced on>
     - name:            Refreshing candidates does not remove an invoice-attached candidate
       surface:         ui
+      priority:        High
       impact:          true
       impact_flow:     RefreshWorkOrderCandidates
       origin:          adversarial-review
@@ -181,9 +187,12 @@ design:
 > nothing writes is one a reader assumes means something. Failure to perform the review at all is an
 > infrastructure stop, not a run-state value.
 
-> **12. `run.design_depth` may scale the impact sweep's entity breadth and document verbosity. It
-> may never scale what requirement analysis reads, and never disable a gate or the adversarial
-> review.** It ratchets up only. Narrowing the read is the very defect the review exists to catch,
+> **12. `run.design_depth` may scale the impact sweep's entity breadth, document verbosity, and how
+> many approaches a gate offers. It may never scale what requirement analysis reads, never scale what
+> is asked, and never disable a gate or the adversarial review.** A question not asked is a fact not
+> obtained, and the pass that would authorize skipping it is the pass being audited — the same
+> argument that forbids narrowing the read, in the same words. A cap on questions does not remove
+> concerns; it converts them into silent assumptions (`gate-presentation.md`, rule 2). It ratchets up only. Narrowing the read is the very defect the review exists to catch,
 > and the pass that would authorize the narrowing is the pass being audited. A raise inside Stage 02
 > sets `depth_raised_in_02` and re-runs the sweep at the new breadth by loading
 > `impact-analysis.md` — a shared leaf, loadable by whichever stage needs it.
@@ -230,9 +239,10 @@ design:
 > `design.approach_alternatives[]` is never empty once 2.2b has run.** A scenario authored before
 > the field exists is a scenario whose shape nobody approved; an empty alternatives list is a
 > decision recorded as a fact. Neither is repaired by a later gate — 2.8 approves scenarios
-> *against* an approach, and it cannot approve them against one that was never written down. The
-> ceremony at 2.2b scales with `run.design_depth`; whether an answer is taken does not
-> (rule 12 draws the same line for every other check depth touches).
+> *against* an approach, and it cannot approve them against one that was never written down. **How
+> many alternatives 2.2b presents** scales with `run.design_depth`; how many questions it asks does
+> not, and whether an answer is taken does not (rule 12 draws the same line for every other check
+> depth touches).
 
 > **19. `discovery.xray_tests[].objective` orders attention and never filters a corpus.**
 > `existing-tests.feature` and `existing-tests-manual.md` are written in full whatever the objectives
@@ -241,3 +251,11 @@ design:
 > what enters the corpus would make dedup depend on a judgement about a prose summary, and two runs
 > over an unchanged Xray could then disagree — which is the determinism this contract exists to
 > hold.
+
+> **20. `discovery.related_read[]` orders attention and never filters a corpus.** Every entry of
+> `discovery.related_candidates[]` stays in `execution-report.md` whatever a human picks, and the
+> pick governs which candidates have their **content** read — never which are recorded, and never
+> what any later step can see. This is rule 19's sentence for a second index, and it is written
+> again rather than cross-referenced because the failure it prevents is the same one: a list that
+> quietly became the corpus. Nothing derives a coverage judgement from a candidate's absence from
+> this list; absence means *nobody chose to read it*, which is not a fact about coverage.

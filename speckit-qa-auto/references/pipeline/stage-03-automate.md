@@ -3,8 +3,12 @@
 Loads: [run-state.md](../shared/run-state.md), [operating-rules.md](../shared/operating-rules.md),
 [gherkin-conventions.md](../shared/gherkin-conventions.md),
 [selector-verification.md](../shared/selector-verification.md),
-[repo-profile.md](../shared/repo-profile.md), [commit.md](../shared/commit.md). Six leaves, so the
-reader knows the cost before paying it (design spec §11.2 rule 1). `commit.md` is declared because
+[repo-profile.md](../shared/repo-profile.md), [commit.md](../shared/commit.md),
+[gate-presentation.md](../shared/gate-presentation.md). Seven leaves, so the
+reader knows the cost before paying it (design spec §11.2 rule 1). `gate-presentation.md` is
+declared because the selector gate at the head of this stage asks a human to choose an evidence
+source, and everything a human reads is presented under that file — it is a leaf, so
+`selector-verification.md` cannot declare it on this stage's behalf. `commit.md` is declared because
 3.4 commits after every scenario verdict, and which paths it may stage depends on `run.isolation` —
 a staging rule read from memory is how `git add -A` reappears in the mode that forbids it. `repo-profile.md` is declared because this stage
 resolves `generate_cmd`, `scoped_run_cmd`, and `testdata_path` against that file's field table —
@@ -36,7 +40,10 @@ Runs first, before any step below, and before the no-stop zone opens. Follow
    `selector_evidence: deferred` means that exit was missed — stop and report, rather than generate
    against selectors nobody could verify.
 2. **Ask the evidence source and resolve.** Repository source, live DOM via subagent, or a recorded
-   semantic fallback, per `selector-verification.md`, "The Choice Is Asked, Never Assumed". Write
+   semantic fallback, per `selector-verification.md`, "The Choice Is Asked, Never Assumed". Asked
+   under `gate-presentation.md`: each source is one choice carrying its own trade-off, and the
+   question names no step and no field — a reader picking an evidence source does not need to know
+   which run-state value their answer lands in. Write
    `design.selector_evidence`. This is the one question this stage asks, and asking it here — rather
    than after three scenarios have been generated against the wrong source — is what keeps it
    answerable.

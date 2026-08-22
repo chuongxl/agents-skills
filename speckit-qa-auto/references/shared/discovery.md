@@ -40,7 +40,7 @@ make the description false for the whole set.
 Each of the three is a subagent that receives the
 anchor and returns one structured list.
 
-### Sweep 1 — Jira linkage
+### Sweep 1 — Jira linkage and related stories
 
 From the anchor issue, walk one hop of every link type and record what is on the other end:
 
@@ -53,6 +53,38 @@ From the anchor issue, walk one hop of every link type and record what is on the
 Returns `discovery.linked_issues[]`: `{key, issue_type, relation, status}`. Nothing else — not
 descriptions, not comments. One hop only: two hops from a mature epic reaches most of the project
 and returns noise priced as signal.
+
+**Links are one axis, and alone they find only what somebody took the trouble to link.** A story
+covering the same screen, written by another squad, linked to nothing, is invisible to the walk
+above however deep it goes — the limit is the axis, not the depth. So the sweep also looks along
+four more, and records which one found each candidate:
+
+| `matched_by` | Where it looks |
+|---|---|
+| `link` | the walk above |
+| `component` | issues sharing a `components` value with the anchor — the field `jira-to-speckit` already returns |
+| `epic-sibling` | the other children of the anchor's parent epic |
+| `text` | JQL text search on the entity or screen name the ticket names |
+| `declared` | keys a human passed to `--related` |
+
+Returns `discovery.related_candidates[]`: `{key, summary, matched_by}`.
+
+**`matched_by` records why something was found, never whether it matters.** It is the same
+distinction the whole file rests on: an axis is evidence of how a candidate surfaced, and relevance
+is decided later by a person. A sweep returning `relevant: true` has exceeded its mandate exactly as
+one returning "already covered" has.
+
+**Summaries, never content.** A candidate arrives as a key, a one-line summary, and its axis —
+nothing more, at any depth. Adding axes multiplies candidates, so a sweep that also read each one
+would spend the cost of the wider reach on material nobody asked for, which is the complaint that
+motivated the wider reach in the first place. Which candidates are worth reading is a question with
+an owner, and the owner is a human at the approach gate; `discovery.related_read[]` records the
+answer, and reads nothing until it exists (`run-state.md` rule 20).
+
+**A candidate already in `discovery.linked_issues[]` still appears here, carrying `matched_by:
+link`.** The two lists answer different questions — one is the link topology, the other is the
+attention pool — and a candidate found along two axes is a stronger signal than one found along
+either, which is why the axis is recorded per candidate rather than collapsed into a set.
 
 ### Sweep 2 — Xray tests
 
@@ -159,13 +191,22 @@ an unbounded traversal:
 - Subagents return structured lists, never full issue bodies or full DOM or full file contents
 - A sweep that would return more than a page of entries returns the entries and a count of what it
   truncated — a silent cap reads as a complete answer
+- **The `text` axis is bounded to the anchor's own project, capped, and reports its truncation.** It
+  is the one axis that can return the project, so it is the one that most needs the bound the line
+  above already sets. The other axes are bounded by their own shape: `component` and `epic-sibling`
+  are finite sets, and `declared` is whatever a human typed
 
 ## What Discovery Writes
 
-`discovery.ran`, `discovery.framework`, `discovery.linked_issues[]`, `discovery.xray_tests[]`
+`discovery.ran`, `discovery.framework`, `discovery.linked_issues[]`,
+`discovery.related_candidates[]` (each entry carrying its `matched_by`), `discovery.xray_tests[]`
 (each entry carrying its `objective`), `discovery.repo_tests[]`, `discovery.orphan_features[]` —
 every one of them a field in the run-state contract, written to `execution-report.md` before the
 stage ends. A finding held only in the subagent's reply is a finding no later stage can read.
+
+`discovery.related_read[]` is **not** written here. It records a human's choice, it is written at
+the approach gate, and Stage 01 leaves it absent — an empty list and an unwritten one would
+otherwise be indistinguishable from *a human looked and chose nothing*.
 
 On disk, Sweep 2 additionally leaves `existing-tests-index.md` beside the two exports.
 
@@ -177,4 +218,7 @@ On disk, Sweep 2 additionally leaves `existing-tests-index.md` beside the two ex
 | "The orphan feature is clearly the old version of this, I'll move it into the artifact folder" | Orphans are reported and left alone. An orphan has no Jira key, and the artifact folder name is the identity the whole pipeline indexes on |
 | "Xray credentials are missing, so record zero tests and move on" | Zero-because-empty and zero-because-unreachable are different facts. Record which one happened, every time |
 | "Walking one more hop would find the related epic" | One hop. Two hops from a mature epic returns most of the project as if it were relevant |
+| "This candidate is clearly the one that matters, I'll read it now" | Every candidate arrives as key, summary, and axis. Which are worth reading is a human's answer at the approach gate, and reading ahead of it spends the cost the axes were widened to avoid |
+| "Only three candidates came back, so I'll just read all three" | The count does not transfer the decision. Three is a short question, not a licence to skip it |
+| "The text search returns hundreds, I'll keep the most relevant twenty" | Relevance is a verdict. Apply the cap, return the entries, and report what was truncated |
 | "I'll have the subagent read the whole ticket so the design has context" | Sweeps return keys, paths, types, and tags. Ticket content comes through intake, once, where it can be read against acceptance criteria |

@@ -199,6 +199,17 @@ Run `discovery.md` in full: the three sweeps, concurrently, each in its own suba
 returning a structured list and no judgement. This step generalizes what was once a bare Xray
 read — the Xray export is one of the three sweeps, not the whole of what Stage 01 needs to look at.
 
+**Sweep 1 looks along five axes, not one.** Links, shared `components`, epic siblings, a bounded
+JQL text search on the entity or screen name the ticket names, and whatever keys `--related`
+supplied. Each candidate is recorded in `discovery.related_candidates[]` with the `matched_by` axis
+that found it. Pass the `--related` values into the sweep so they arrive as `matched_by: declared`
+rather than as a separate list — the axis is the record of provenance, and a second list would put
+the same fact in two shapes.
+
+**This stage records candidates; it does not read them.** Key, summary, axis — nothing more.
+`discovery.related_read[]` stays absent until a human answers the question at the approach gate,
+and an absent list is not an empty one (`discovery.md`, "What Discovery Writes").
+
 **Sweep 2 produces the export files dedup reads.** Invoke `jira-to-speckit` with `xray_tests:
 true`, `xray_output_path = <artifact_dir>/existing-tests.feature`, `xray_manual_output_path =
 <artifact_dir>/existing-tests-manual.md`, and extend the query to cover every issue Sweep 1

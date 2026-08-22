@@ -21,15 +21,16 @@ straight into the test tree would leave the artifact — the one thing CI import
 
 ## Tags
 
-Two tags bind the file to Xray:
+Two tags bind the file to Xray, and two more are skill-owned:
 
 | Tag | Level | Meaning |
 |---|---|---|
 | `@REQ_<STORY-KEY>` | Feature | Links every test in the file to the story as its requirement |
 | `@TEST_<TEST-KEY>` | Scenario | Applied **only** to `UPDATE` rows — binds the scenario to an existing Test issue so import updates it in place instead of creating a duplicate |
 | `@IMPACT` | Feature | Marks a file whose scenarios assert invariants this story imposes on flows other stories own. **Skill-owned**, unlike `existing_tags` below |
+| `@Priority_<Level>` | Scenario | The scenario's test priority, in the project's own Jira scale — `@Priority_Highest`, `@Priority_High`, `@Priority_Medium`, `@Priority_Low`, `@Priority_Lowest`. **Skill-owned.** Every scenario carries exactly one |
 
-Both are **additive**. The profile's `existing_tags` (`@Automation`, `@Regression_Test`, domain
+All are **additive**. The profile's `existing_tags` (`@Automation`, `@Regression_Test`, domain
 tags, etc.) stay exactly where they already are on every scenario that carries them — nothing is
 removed, renamed, or reordered. This is what keeps `--grep` filtering and the repo's current CI
 workflow working unchanged after this pipeline starts writing to the same files.
@@ -37,6 +38,18 @@ workflow working unchanged after this pipeline starts writing to the same files.
 A `@TEST_<TEST-KEY>` tag is never added to a `NEW` scenario — there is no existing Test issue yet
 to bind to. It is never added to `SKIP` or `REVIEW` scenarios either; those are dedup outcomes, not
 import targets.
+
+**`@Priority_<Level>` is prefixed, and the prefix is the point.** A bare `@High` is exactly the kind
+of word a repository may already use for something else, and `existing_tags` is repo-owned and
+open-ended by design — this skill discovers that list, it does not govern it. A collision would not
+announce itself: the repo's filter would start selecting this skill's scenarios, or the reverse, and
+both look like a working suite.
+
+The level rides the `.feature` file, which is the artifact CI already imports, so priority reaches
+Xray with **no new integration and no write path into Jira** — this skill still reads Xray and never
+writes to it. It also makes `--tags @Priority_Highest` a usable smoke selector on day one. Like
+`@IMPACT`, it does **not** appear in `scoped_run_cmd`'s filter: a tag that changed run scope would
+pull pre-existing tests into a no-stop zone that has no verdict path for them.
 
 `@IMPACT` is **skill-owned**, and that is the difference between it and everything in
 `existing_tags`. `existing_tags` records a convention this pipeline *discovered* in the repository
@@ -114,3 +127,5 @@ Stated so they are not improvised at Stage 03:
 | "I'll skip just this one Examples row instead of blocking the whole outline" | Splitting an `Examples` table changes the scenario. Block the whole outline |
 | "The file has one working scenario left, I'll materialize just that" | If every other scenario in the file is blocked and one survives, that one is materialized alone — but if all are blocked, the file is not materialized at all. Check which case actually applies before writing anything |
 | "I'll tag this NEW scenario with `@TEST_...` so Xray has something to bind to early" | There is no Test issue yet for a `NEW` scenario. Only `UPDATE` rows carry `@TEST_<TEST-KEY>` |
+| "The repo already tags severity, I'll reuse `@High` instead of adding another tag" | `existing_tags` is the repo's, and this skill neither renames nor overloads it. `@Priority_High` is this skill's, and the prefix is what keeps the two filters from silently selecting each other's scenarios |
+| "This scenario's priority is obvious, the tag is noise" | Every scenario carries exactly one. A missing tag reads as *nobody decided*, which is a different fact from *decided to be low* |

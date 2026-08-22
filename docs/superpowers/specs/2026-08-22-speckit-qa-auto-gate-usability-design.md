@@ -1,7 +1,7 @@
 # speckit-qa-auto — Gate Usability, Discovery Reach, and Test Case Priority
 
 Date: 2026-08-22
-Status: draft (design), not yet implemented
+Status: implemented in `speckit-qa-auto` 0.6.0
 Extends [`2026-08-19-speckit-qa-auto-design.md`](2026-08-19-speckit-qa-auto-design.md),
 [`2026-08-20-speckit-qa-auto-impact-analysis-design.md`](2026-08-20-speckit-qa-auto-impact-analysis-design.md),
 and [`2026-08-21-speckit-qa-auto-approach-gate-design.md`](2026-08-21-speckit-qa-auto-approach-gate-design.md);

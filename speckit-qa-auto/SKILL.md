@@ -15,7 +15,7 @@ license: MIT
 allowed-tools: bash glob grep view create edit skill
 metadata:
   author: Alex Nguyen
-  version: "0.5.0"
+  version: "0.6.0"
 ---
 
 # Speckit QA Auto
@@ -23,8 +23,14 @@ metadata:
 ## Entry Dispatch (Do This First, Every Invocation)
 
 Load `references/shared/host-adaptation.md` once and fix the host for the rest of the run. Parse
-the invocation: `--issue <jira-url-or-key>`, `--design-only`, `--full-suite`, `--parallel-worktree`,
-`--pr`.
+the invocation: `--issue <jira-url-or-key>`, `--impact "<flow>[, <flow>]"`,
+`--related <KEY>[,<KEY>]`, `--design-only`, `--full-suite`, `--parallel-worktree`, `--pr`.
+
+**Everything a human reads at any gate is presented under
+`references/shared/gate-presentation.md`.** One question per message, as many questions as there are
+concerns, alternatives carried by the choices rather than folded into the question, and no step
+number, run-state field, or rule quoted at a reader. It is the only file that governs the
+user-facing side of this pipeline; every other file governs what the pipeline decides.
 
 **`--issue` is required.** A missing `--issue` stops the run, with the reason: the Jira key is the
 artifact folder's identity, the `@REQ_` tag every scenario carries, and the dedup key against
@@ -150,7 +156,11 @@ which creates a duplicate Xray test for every scenario a team already had.
 No flag disables the adversarial review at 2.7b or the impact section of the Stage 02 design gate
 either. `run.design_depth` scales how wide the impact sweep looks, how long the design document
 runs, and how many alternatives the 2.2b approach gate presents; it never scales what the ticket
-read covers, it never decides whether an answer is taken at a gate, and it never turns a check off.
+read covers, **it never scales how many questions are asked**, it never decides whether an answer is
+taken at a gate, and it never turns a check off. It is also never shown to a human: it drives knobs
+a reader cannot see, so presenting it costs a turn and returns a guess. A cap on questions is the
+same defect in the other direction — it does not remove concerns, it converts them into silent
+assumptions, which is why the approach gate's depth table no longer has a Questions column.
 A gate that "scales to nothing" at `trivial` is a gate that was removed. Narrowing the read is the
 defect the review exists to catch, and the pass that would authorize the narrowing is the pass being
 audited.
@@ -177,6 +187,11 @@ skill is installed on its own. Refer to it by name only.
 
 - `--issue <jira-url-or-key>` — required; see Entry Dispatch.
 - `--impact "<flow>[, <flow>...]"` — optional; see Entry Dispatch.
+- `--related <KEY>[,<KEY>...]` — optional. Jira keys of stories a human already knows are related.
+  They join whatever the discovery sweep finds along its other axes, carrying `matched_by:
+  declared`, and are offered at the approach gate like any other candidate. Declared and swept are
+  kept distinct rather than merged, for the reason `--impact` keeps them distinct: a candidate both
+  a person and a sweep produced is a stronger signal than either alone.
 - `--parallel-worktree` — optional; see Isolation. Without it the run branches in the source
   checkout.
 - `.env` in the repository root: `JIRA_URL`, `JIRA_USERNAME`, `JIRA_API_TOKEN` — required for

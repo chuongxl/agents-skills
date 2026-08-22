@@ -3,7 +3,8 @@
 Loads: [run-state.md](../shared/run-state.md), [operating-rules.md](../shared/operating-rules.md),
 [workspace-guard.md](../shared/workspace-guard.md), [commit.md](../shared/commit.md),
 [selector-verification.md](../shared/selector-verification.md),
-[gherkin-conventions.md](../shared/gherkin-conventions.md). Six leaves,
+[gherkin-conventions.md](../shared/gherkin-conventions.md),
+[gate-presentation.md](../shared/gate-presentation.md). Seven leaves,
 so the reader knows the cost before paying it (design spec §11.2 rule 1) — every leaf cited below
 by rule or turn-ending-condition number is declared here, since a cited file that goes undeclared
 is read from memory instead of from the file. That sentence stood here while two of the leaves it
@@ -48,10 +49,19 @@ for that rule to go unenforced.
 
 ### 4.2 Human review
 
+Presented under `gate-presentation.md`: one question per message, alternatives carried by the
+choices offered, and no step number, field name, or rule quoted at a reader. The list below is what
+this stage has to say, not the words it says it in — several entries name run-state fields because
+that is how this file addresses the pipeline, and every one of them reaches a person rendered in
+plain words or not at all.
+
 Present, for approval:
 
 - Files created and changed, across the workspace and the artifact folder
-- Test results — pass/blocked per scenario, each naming its commit
+- Test results — pass/blocked per scenario, each naming its commit and its priority. The priority is
+  the one settled by a human at the design gate, and it is what makes a blocked list actionable:
+  three blocked scenarios at the story's own priority and three at two levels below are different
+  reports, and a list that omits it reads as though they were the same
 - Blocked scenarios with reasons
 - Proposed `data-testid` additions for the frontend, each with file and line (the report-only
   proposals `selector-verification.md`'s selector gate produced at the head of Stage 03, carried
@@ -218,6 +228,7 @@ Writing the resulting keys back into the `.feature` files closes the loop and is
 | "I already reverted the stray edit, so the run can proceed clean" | Never revert the source checkout, even to fix what the run itself would report as a violation. Undoing a developer's working tree without asking is the worse outcome |
 | "The frontend diff is expected, the human will obviously approve it" | Report it and wait for `baselines.frontend_edits_approved: true`. An expected diff is still a violation until the approval is on record |
 | "Stage 03 already knows this scenario is blocked, I'll tag it during the fix loop to save a step" | Stage 03 may not edit `.feature` files, period. The tag is a human-gated edit and belongs here, after 4.2's approval, not inside the fix loop |
+| "I'll head the report with the stage and the run-state fields so it's traceable" | Traceability lives in `execution-report.md`, which keeps every field name. What a person reads names no stage and no field (`gate-presentation.md` rule 5) |
 | "The remote only has a trivial commit ahead, I'll rebase past it" | Diverged means diverged. Stop and report regardless of how small the remote's commit looks — `commit.md` only ever pushes fast-forward or stops |
 | "`--pr` wasn't passed, but opening it saves the human a step" | Opening the PR is `--pr`'s effect alone. Print the title and body; let the flag decide whether it opens |
 | "CI can just read whichever `.feature` copy is easiest to zip" | `src/tests` omits blocked and manual scenarios by construction. CI must read `docs/qa/`, never the test tree — that is the whole reason D15 exists |

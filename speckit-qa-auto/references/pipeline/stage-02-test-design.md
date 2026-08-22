@@ -2,9 +2,10 @@
 
 Loads: [run-state.md](../shared/run-state.md), [operating-rules.md](../shared/operating-rules.md),
 [selector-verification.md](../shared/selector-verification.md),
-[gherkin-conventions.md](../shared/gherkin-conventions.md), and — only when this run converts
+[gherkin-conventions.md](../shared/gherkin-conventions.md),
+[gate-presentation.md](../shared/gate-presentation.md), and — only when this run converts
 existing Manual tests — [manual-conversion.md](../shared/manual-conversion.md), and — only when a
-review finding raises `run.design_depth` — [impact-analysis.md](../shared/impact-analysis.md). Four
+review finding raises `run.design_depth` — [impact-analysis.md](../shared/impact-analysis.md). Five
 leaves always, two more conditionally, so the reader knows the cost before paying it (design spec
 §11.2 rule 1). The conditional loads are the point: a story with no existing manual coverage never
 pays for the file that governs converting it, and a run whose depth is never raised never pays for
@@ -18,7 +19,10 @@ never linked: **enter Stage 03** at the end of this stage, same turn.
 
 This stage carries the pipeline's two main human gates (design spec §5, marked ◀ HUMAN GATE): the
 **approach gate at 2.2b**, which settles how the story will be tested before any Gherkin exists, and
-the **design gate at 2.8**, which settles what was written. Everything Stage 03 automates and Stage
+the **design gate at 2.8**, which settles what was written. **Both are presented under
+`gate-presentation.md`**, which owns everything a person reads and is why no step below specifies
+its own wording: one question per message, alternatives carried by the choices, and no step number,
+field name, or rule quoted at a reader. Everything Stage 03 automates and Stage
 04 reports on treats this stage's output as settled. It turns the acceptance
 criteria Stage 01 captured in `ticket.md` into approved Gherkin, deduplicated against whatever
 Xray already covers, with every UI element resolved to real evidence before approval.
@@ -37,6 +41,10 @@ test's `Test Objective:` line or `no description`. Read it first and use it to d
 tests' full step tables are worth reading closely. It orders attention and nothing else — it does
 not shorten either export, and 2.2 matches against all of both whatever the index says
 (`run-state.md` rule 19).
+
+Also `discovery.related_candidates[]` — the stories Sweep 1 found along its five axes, each with
+its `matched_by` — which this stage offers at the approach gate and reads the content of only after
+a human has picked. `discovery.related_read[]` arrives absent, and absent is not empty.
 
 Also `run.design_depth` with the reason Stage 01 recorded for it, `impact.*`, and
 `impact-candidates.md` on disk. This stage does not run the impact sweep; it reads what Stage 01
@@ -59,6 +67,17 @@ Turn the **whole ticket** into a list of testable behaviours — every section, 
 the acceptance-criteria table alone. A blocking ambiguity — one that would make a behaviour
 impossible to write correctly either way — is asked **once**. A non-blocking one is recorded under
 Open Questions in `test-design.md` and the run continues; not every open question earns a stop.
+
+**Asked under `gate-presentation.md`**: one question per message, and the question carries the
+question — the reading being assumed goes beneath it or into the choices, not in front of it. A run
+that asks *"this story's depth resolves to cross-cutting (new state, a migration write, an explicit
+prohibition); before I go further, the ticket says X, I read this as Y, is that right?"* has put
+three things a reader cannot act on ahead of the one they can, and that shape was reported as
+unreadable by the QA team this step serves.
+
+**How many blocking ambiguities there are is what bounds how many questions are asked.** Nothing
+else does — not the depth, not the anchor type. Every ambiguity resolved by assumption rather than
+by asking goes to Open Questions, named as an assumption (`gate-presentation.md` rule 2).
 
 **No rule attaches to any heading name.** Headings are how a writer organized their thoughts, not a
 schema. A rule keyed to `Out-Scope` patches one ticket layout and misses the next one that files its
@@ -110,23 +129,47 @@ Present three sections, then **stop**:
 
 | Section | Content |
 |---|---|
-| Depth | `run.design_depth` with the reason Stage 01 recorded — presented here so it can be disagreed with before any Gherkin exists |
-| Questions | Asked **one at a time**; only questions whose answer changes the design |
+| Related stories | The candidates Sweep 1 found, for a human to pick which are worth reading |
+| Questions | Only questions whose answer changes the design |
 | Approach | Alternatives with trade-offs, the recommendation first |
+
+**`run.design_depth` is not one of them, and is not presented anywhere.** It scales the sweep's
+breadth, the document's verbosity, and how many alternatives the third section offers — none of
+which a reader can see or act on, which is what makes presenting it cost a turn and return a guess
+(`gate-presentation.md`, rule 6). It is resolved at Stage 01 and stays internal. An earlier draft
+opened this gate with it "so it can be disagreed with"; the disagreement it invited was about a
+label, and the users who received it asked what the label meant.
+
+**Related stories.** `discovery.related_candidates[]` is presented as one multi-select question,
+each candidate an option carrying its summary and the axis that found it — *linked to this story*,
+*same component*, *sibling under the same epic*, *matched the screen name*, *you named it*. The
+answer is written to `discovery.related_read[]`, and **only those candidates have their content
+read**, before the scenarios are designed.
+
+Stage 01 deliberately stopped at keys and summaries, so this is the first point where reading is
+possible at all, and it is placed at a gate that already stops rather than at one of its own. What
+a person picks governs reading and nothing else: every candidate stays in `execution-report.md`, and
+nothing derives a coverage judgement from a candidate nobody chose (`run-state.md` rule 20).
 
 **Ceremony scales with `run.design_depth`. Whether an answer is taken does not** (`run-state.md`
 rule 18). This is the boundary most at risk in this step: a gate that "scales to nothing" on
 `trivial` is a gate that was removed.
 
-| `design_depth` | Questions | Approaches presented | Approval |
-|---|---|---|---|
-| `trivial` | only one that genuinely blocks | 1, in 2-3 sentences, **with the obvious alternative named and rejected in writing** | a nod suffices |
-| `standard` | one at a time | 2, with trade-offs and a recommendation | an explicit yes |
-| `cross-cutting` | one at a time | 3, with trade-offs and a recommendation | an explicit yes |
+| `design_depth` | Approaches presented | Approval |
+|---|---|---|
+| `trivial` | 1, in 2-3 sentences, **with the obvious alternative named and rejected in writing** | a nod suffices |
+| `standard` | 2, with trade-offs and a recommendation | an explicit yes |
+| `cross-cutting` | 3, with trade-offs and a recommendation | an explicit yes |
 
 Even at `trivial`, one alternative is named and rejected. An approach offered with no alternative is
 a decision presented as a fact, and `trivial` is where that is most tempting. The cost is one
 sentence.
+
+**Depth does not bound how many questions are asked, and the table no longer has a column for it.**
+It carried one — `trivial` permitted *"only one that genuinely blocks"* — and that cap did not
+reduce concerns, it converted them into silent assumptions, because the run must continue and the
+ticket does not answer them. Ask what there is to ask; a concern left unasked is written into Open
+Questions instead (`run-state.md` rule 12, `gate-presentation.md` rule 2).
 
 **What an approach is.** A coherent position on five axes, not a slogan: the **surface mix** (which
 behaviours are `ui`, `api`, `manual`); **granularity** (one scenario per criterion, or a
@@ -160,8 +203,8 @@ like. A question appearing in both lists was asked in the wrong place.
 
 | `run.anchor_type` | Third section becomes |
 |---|---|
-| `story` | approaches, per the depth table |
-| `epic` | approaches stated **once for the epic**, with per-child depth inside one presentation |
+| `story` | approaches, per the table above |
+| `epic` | approaches stated **once for the epic**, covering every child in one presentation |
 | `test` | **batch scope** — which Manual tests this run converts and where the batch is cut |
 
 An `epic` presents one gate, never one per child. The bound is 2.4b's bound and it is the same
@@ -172,12 +215,16 @@ stated, in the words `manual-conversion.md` uses for a conversion batch.
 A `test` anchor gets **no approach menu**. The approach is fixed by the anchor — translate
 faithfully — and offering alternatives would invite a redesign of an approved test that has been
 executing for years, which is what `manual-conversion.md` exists to prevent. `approach_chosen`
-records `faithful-conversion`. Depth is still announced and questions are still asked.
+records `faithful-conversion`. The other two sections still run: related stories are still offered,
+and questions are still asked.
 
-**Depth raised here** re-runs the impact sweep at the new breadth by loading `impact-analysis.md`,
-and sets `run.depth_raised_in_02` — the mechanism 2.7b already uses. **Depth lowered here is
-refused:** the ratchet is one-way (`run-state.md` rule 12). Record the disagreement as an approach
-question with its answer; do not act on it.
+**An answer here may raise the depth, though nobody was asked about depth.** A human who names a
+surface nobody swept, or picks a related story that widens the entity set, has changed what the
+sweep should have covered — so the run raises `run.design_depth`, re-runs the impact sweep at the
+new breadth by loading `impact-analysis.md`, and sets `run.depth_raised_in_02`, which is the
+mechanism 2.7b already uses. The raise is a **consequence** of an answer about testing, never an
+answer to a question about depth. **Lowering is refused:** the ratchet is one-way (`run-state.md`
+rule 12).
 
 **No answer ends the turn** (`operating-rules.md`, Turn-Ending Condition 14). A nod is an answer at
 `trivial`. Silence is not an answer at any depth.
@@ -201,6 +248,31 @@ and boundary cases are their own scenarios, not extra `And` steps folded onto th
 scenario is assigned a `surface` — `ui`, `api`, or `manual` — matching `design.scenarios[].surface`
 in the run-state contract. Build the coverage matrix: acceptance criterion → the scenario(s) that
 cover it. A criterion with no row is not yet designed.
+
+**Every scenario is also assigned a `priority`, derived from the ticket's own.** `ticket.md` carries
+the story's Jira `priority` in its front matter; that value is the anchor, and the scale is whatever
+the project's Jira uses — never one this skill invents:
+
+| Scenario | `design.scenarios[].priority` |
+|---|---|
+| Happy path of a main acceptance criterion | the ticket's priority |
+| Negative or boundary case | one level below |
+| Rare edge case | two levels below |
+
+Floored at the project's lowest level. Anchoring to the ticket avoids asking this skill for a
+judgement it has no standing to make — *how important is this feature in absolute terms* — while
+still separating the happy path from the edge case inside one ticket, which inheriting the ticket's
+priority flat would lose. The value is proposed, not settled: a human adjusts it at 2.8.
+
+**A scenario converted from a Manual test takes that test's priority and does not re-derive it.**
+The source is an approved test that has been executing for years, so the gate asks whether the
+translation is faithful, not whether the test is a good idea (`manual-conversion.md`). Re-deriving
+its priority would re-decide something already decided, through a door the conversion path exists to
+keep shut.
+
+The level is written into the `.feature` file as `@Priority_<Level>` on the scenario, per
+`gherkin-conventions.md`. That is what carries it to Xray through the import CI already runs — this
+skill writes nothing to Xray directly.
 
 ### 2.4 Element intent map
 
@@ -288,8 +360,10 @@ Open Questions from 2.1.
 
 **§0 — Test approach**, placed first because it is the frame every later section sits inside: the
 approach chosen and why, **every alternative considered with the reason it was rejected**, the
-clarifying questions from 2.2b with their answers, and the depth at the time of approval together
-with whether the human changed it. Rejected alternatives are kept for the reason §9 keeps rejected
+clarifying questions from 2.2b with their answers, which related stories the human chose to have
+read, and the depth at the time of approval together with whether an answer at the gate raised it.
+Depth appears in this document and never at the gate: `test-design.md` is a committed artifact whose
+readers are auditing the run, which is exactly the reader a machine-facing field serves. Rejected alternatives are kept for the reason §9 keeps rejected
 review findings: a choice recorded without the options it beat leaves the next reader unable to tell
 a design that was never considered from one that was considered and held.
 
@@ -343,6 +417,13 @@ Every one of these must hold, checked mechanically, not asked about:
 - Every `surface: api` scenario names its endpoint and its request/response fixture
 - Every `surface: manual` scenario carries its one-line reason
 - Every behaviour carries a dedup label from step 2.2
+- Every scenario carries a `priority`, and every scenario in the `.feature` file carries exactly one
+  `@Priority_<Level>` tag matching it
+- **Nothing presented to a human at either gate names a step, a run-state field, or a rule**, and no
+  gate folds its alternatives into the question text (`gate-presentation.md`). This check reads what
+  the gate is about to say, not what the stage file contains: the stage files are written in the
+  contract's own vocabulary by design, and it is the crossing into user-facing text that this
+  catches
 - **No line of the ticket admitted into scope is left with two readings.** Each such line is
   resolved to one reading, and the resolution is written in `test-design.md` with **both** readings
   named. A line reading either as *this release does not build it* or as *the system must prevent
@@ -410,15 +491,32 @@ Findings and their dispositions are written to `test-design.md` §9, **including
 
 ### 2.8 Human gate
 
-Present four sections:
+Present five sections, **one at a time**, per `gate-presentation.md` rule 4 — a section carrying a
+decision stands alone, and reporting sections may be grouped:
 
-| Section | Content |
-|---|---|
-| Depth | `run.design_depth` with its reason, and whether a review finding raised it mid-run — stated so it can be disagreed with. **Plus `design.approach_chosen` beside the surfaces actually delivered**: this is the only place a drift between the approach approved at 2.2b and the scenarios that came out of 2.3–2.4b becomes visible, and without it 2.2b's approval could be honoured in name and abandoned in fact |
-| Description | The §0b blocks, for approval. Human-facing prose intended for a Jira field — the only artifact of this run a person may copy somewhere the pipeline cannot check |
-| Coverage | The coverage matrix, the dedup labels, the element intent map, Open Questions |
-| Review | `approved`, `issues-fixed` with each finding and its disposition, or `issues-open` with the open findings verbatim — plus `design.review_mode` |
-| Impact | Every designed impact scenario with its candidate's evidence path and provenance; `impact.declared[]` alongside `impact.candidates[]`; the existing tests found per candidate |
+| # | Section | Content | Carries a decision |
+|---|---|---|---|
+| 1 | What was agreed, and what was written | The approach approved earlier beside the surfaces actually delivered | no — unless they differ |
+| 2 | Description | The §0b blocks, for approval. Human-facing prose intended for a Jira field — the only artifact of this run a person may copy somewhere the pipeline cannot check | **yes** |
+| 3 | Coverage and priority | The coverage matrix, the dedup labels rendered in plain words, the priority proposed per scenario, the element intent map, Open Questions | **yes** — priority |
+| 4 | Review | `approved`, `issues-fixed` with each finding and its disposition, or `issues-open` with the open findings verbatim | no |
+| 5 | Impact | Every designed impact scenario with its candidate's evidence path and provenance; `impact.declared[]` alongside `impact.candidates[]`; the existing tests found per candidate | **yes** |
+
+**Section 1 replaces what was once a Depth section, and keeps the half that was load-bearing.** That
+section carried two things: `run.design_depth`, which is no longer presented anywhere, and the
+approved approach beside what was delivered — **the only place a drift between the approach agreed
+before any Gherkin existed and the scenarios that came out of 2.3–2.4b becomes visible.** Deleting
+the section wholesale would have removed a check while appearing to remove a label. Without it, the
+earlier approval could be honoured in name and abandoned in fact, with nothing noticing.
+
+`design.review_mode` is recorded on the run and is not presented: it names which context the review
+ran in, which is a fact about this skill's machinery and not one a reader can act on
+(`gate-presentation.md` rule 6).
+
+**Section 3 proposes priority; a human settles it.** The values 2.3 derived are shown per scenario,
+with one question asking which need changing. Unlike the impact section below, silence here is not a
+stop — the proposed values stand, because a derived priority is a defensible default while an
+unanswered impact question is not (see below).
 
 Take approval or revisions — a revision returns to whichever of 2.1–2.7b it affects and re-runs
 self-review before returning here. On approval, commit the design artifacts.
