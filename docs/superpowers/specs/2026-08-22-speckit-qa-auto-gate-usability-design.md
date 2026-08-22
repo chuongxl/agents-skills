@@ -19,7 +19,7 @@ decides. It changes what the pipeline says, what it looks at, and one thing it r
 |---|---|
 | New | `references/shared/gate-presentation.md` |
 | Edited | `references/pipeline/stage-01-intake.md`, `references/pipeline/stage-02-test-design.md`, `references/pipeline/stage-04-finish.md`; `references/shared/run-state.md`, `references/shared/discovery.md`, `references/shared/gherkin-conventions.md`; `SKILL.md`; the skill's own `README.md` |
-| Edited outside the skill | root `README.md` — the `speckit-qa-auto` version badge, which `tools/validate_skills.py` compares against `SKILL.md`; `test-case/speckit-qa-auto/test-cases.md` — new rows AC57–AC74 |
+| Edited outside the skill | root `README.md` — the `speckit-qa-auto` version badge, which `tools/validate_skills.py` compares against `SKILL.md`; `test-case/speckit-qa-auto/test-cases.md` — new rows AC57–AC76 |
 
 No new stage. No new human gate. No renumbering of any existing step. One new reference leaf, and
 it is a leaf in the strict sense the skill uses: it links to no file and reads none.
@@ -82,28 +82,59 @@ reciting the contract because the contract is what the stage file is made of. A 
 means the next gate added inherits the rules instead of re-deriving them — the failure S1167
 records.
 
-**D65 — The leaf is short and mostly cites rules that already exist elsewhere.** It is not a style
+**D65 — The leaf is short, and most of its rules originate outside this design.** It is not a style
 guide, not a vocabulary table, and not a set of numeric thresholds. An earlier draft of this design
 carried a 25-word question cap and a grep list of banned tokens; both were cut. A presentation rule
 the team must maintain is a presentation rule that goes stale, and the skill already has more
 surface than one person can hold. What the leaf contains:
 
-| Rule | Source |
+| Rule | Provenance — recorded here, not in the leaf |
 |---|---|
 | One question per message. A topic needing more exploration becomes more messages | `brainstorming`, verbatim: *"Only one question per message"* |
 | The count of questions is never capped. A concern not asked is written into Open Questions, never assumed silently | this design — D66 |
-| Prefer multiple choice; use the host's question tool as its own contract specifies — the option label names the choice, the option description carries the trade-off, the recommendation is the first option | the question tool's own schema |
+| Alternatives are carried by the choices, never folded into the question, and the recommendation comes first | this design — D80 |
 | Sections are presented one at a time, and each asks whether it looks right before the next | `brainstorming`, verbatim: *"Ask after each section whether it looks right so far"* |
 | Nothing a user reads names a stage, a run-state field, or a rule number | this design — D68 |
 | An internal label with no consequence a user can act on is not presented at all | `brainstorming`'s classification-with-consequence, applied in the negative — D69 |
 
 Plus one Red Flags table, per the skill's own convention.
 
-**Provenance is recorded per rule, and three rules are this design's own.** The habit of attributing
-a whole cluster to `brainstorming` because part of it came from there is how a rule nobody can
-source ends up unfalsifiable — and the reviewer who wants to change it later has no way to tell
-whether they are contradicting an external skill or an internal preference. Rows 2, 5, and 6 are
-this document's, and are argued below on their own merits.
+**D79 — The leaf states every rule in full and names no skill outside its own folder. Provenance
+lives in this spec.** The right-hand column above is design history for whoever maintains this
+repository; it is not content of the shipped file. `speckit-qa-auto` installs into a QA team's
+`.github/skills/` with no expectation that `superpowers` is installed beside it, so a leaf whose
+rule reads *follow `brainstorming`'s question discipline* states nothing on the machine that
+matters. `SKILL.md` already fixes this for the one skill this pipeline genuinely depends on —
+*"Never linked to — a link outside this skill folder fails the validator and breaks the moment this
+skill is installed on its own. Refer to it by name only"* — and `tools/validate_skills.py:309`
+enforces it as `link escapes the skill folder`. A skill this pipeline does **not** depend on gets
+less latitude than one it does, not more: `brainstorming` is not named in the leaf at all.
+
+**Three rules are this design's own, and the spec says which.** Attributing a whole cluster to
+`brainstorming` because part of it came from there is how a rule nobody can source becomes
+unfalsifiable — the reviewer who wants to change it later cannot tell whether they are contradicting
+an external skill or an internal preference. Rows 2, 3, and 5 are this document's; row 6 is a
+derivation from `brainstorming`'s mechanism rather than a quotation of it.
+
+**D80 — The leaf's rules are stated as capabilities, not as one host's tool schema.** An earlier
+draft expressed the third rule as *use the host's question tool as its own contract specifies*,
+naming the option label and description fields. Those fields are not universal: GitHub Copilot's
+`ask_user`, Claude Code's `AskUserQuestion`, and OpenCode's surface differ, and a tool surface with
+no structured question widget at all is possible — there the question is prose. A rule shaped like a
+schema breaks exactly where there is no schema.
+
+So the rule is stated once, at the capability level, with its degradation named:
+
+> Alternatives are carried by the choices, never folded into the question, and the recommendation
+> comes first. Where the host offers structured options, each option is one alternative — its label
+> naming the choice, its description carrying the trade-off. Where it offers none, the alternatives
+> are a labelled list beneath a one-sentence question. The shape degrades; the contract does not.
+
+`host-adaptation.md` established both the pattern and the argument for subagent dispatch: the work
+still happens inline when no dispatcher exists, and *"a contract that only works when a subagent is
+available is a contract that breaks on the hosts that need it most."* The same sentence holds with
+*question widget* substituted for *subagent*, and the QA team that reported these findings runs the
+host with the least uniform tool surface of the three.
 
 ### §2 Questions are bounded by concerns, not by a budget
 
@@ -272,7 +303,7 @@ Rule edits:
 |---|---|
 | AC57 | `gate-presentation.md` exists, links to no file, reads none, and states its "needs at load time: nothing" header per the leaf convention |
 | AC58 | Every step that asks a human a question — 2.1, 2.2b, 2.8, Stage 04, the selector gate — names `gate-presentation.md` in what it loads. A step that only stops with a quoted error, such as the Stage 01 branch gate, does not |
-| AC59 | The leaf records a source for each rule, and marks rows 2, 5 and 6 as this design's own rather than attributing them to `brainstorming` |
+| AC59 | The leaf states every rule in full and names no skill outside `speckit-qa-auto/`; `brainstorming` and `superpowers` appear nowhere in the shipped skill |
 | AC60 | The depth table at 2.2b has no Questions column |
 | AC61 | No stage file caps the number of questions by `design_depth` |
 | AC62 | `run-state.md` rule 12 names both reading and asking |
@@ -280,7 +311,7 @@ Rule edits:
 | AC64 | No gate presents `run.design_depth`; the Depth section is absent from 2.2b and 2.8 |
 | AC65 | The 2.8 section carrying `design.approach_chosen` beside delivered surfaces still exists, under a name naming no field |
 | AC66 | The 2.8 section count matches the number of sections listed |
-| AC67 | Alternatives at 2.2b are carried by option labels and descriptions, never serialised into the question text |
+| AC67 | Alternatives at 2.2b are carried by the choices offered, never serialised into the question text, in whatever form the host makes available |
 | AC68 | `discovery.related_candidates[]` records `matched_by` for every entry, with no coverage judgement |
 | AC69 | Stage 01 records key, summary and `matched_by` only — no candidate content |
 | AC70 | 2.2b asks which candidates to read, and only `discovery.related_read[]` entries have content read |
@@ -288,6 +319,8 @@ Rule edits:
 | AC72 | The text axis is bounded to the project, capped, and returns a truncation count |
 | AC73 | `design.scenarios[].priority` is set for every scenario, and a converted scenario carries its Manual source's priority |
 | AC74 | `@Priority_<Level>` appears in `gherkin-conventions.md` as skill-owned at scenario level, and on every scenario in every generated `.feature` |
+| AC75 | The leaf's alternatives rule names its degradation for a host with no structured question tool, and every gate is presentable as prose |
+| AC76 | `tools/validate_skills.py` passes; no reference file links outside the skill folder |
 
 ## What This Design Does Not Do
 
@@ -300,5 +333,7 @@ Rule edits:
 - It does not add a human gate, a stage, or a turn-ending condition.
 - It does not change any dedup label, stored field value, or the determinism guarantee over them.
   D68 is a rendering rule.
+- It does not make the shipped skill depend on `superpowers`. `brainstorming` shaped three of the
+  leaf's six rules and is named nowhere inside `speckit-qa-auto/` (D79).
 - It does not write priority to Xray directly. The tag rides the `.feature` file through the import
   CI already runs.
