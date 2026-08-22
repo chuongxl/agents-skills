@@ -53,9 +53,12 @@ repo profile (read-only) → source baseline (+ dirty list) → branch gate (a w
 ### 1. Repo profile
 
 Read-only, against the source checkout — no workspace has been chosen yet. Run `repo-profile.md`'s
-discovery order and resolve the fourteen fields it lists. This is the one point in the stage that
+discovery order and resolve the seventeen fields it lists. This is the one point in the stage that
 may ask the human a round of questions: only for a field no discovered source answers, and only
-once (`repo-profile.md`, "Discovery Order"). The `answers` cache file is *written* later, from
+once (`repo-profile.md`, "Discovery Order") — with the three Gherkin-shape fields excluded from
+that round, because a repository with no `.feature` file to learn from takes their documented
+defaults instead of being asked (`repo-profile.md`, "Gherkin Shape Is Discovered, Not Assumed").
+Record `profile.gherkin_shape` as `discovered` or `default` accordingly. The `answers` cache file is *written* later, from
 inside the workspace, alongside step 6 — this step only resolves the fields, it does not persist
 them.
 
@@ -210,8 +213,9 @@ the same fact in two shapes.
 `discovery.related_read[]` stays absent until a human answers the question at the approach gate,
 and an absent list is not an empty one (`discovery.md`, "What Discovery Writes").
 
-**Sweep 2 produces the export files dedup reads.** Invoke `jira-to-speckit` with `xray_tests:
-true`, `xray_output_path = <artifact_dir>/existing-tests.feature`, `xray_manual_output_path =
+**Sweep 2 produces the export files dedup reads.** Invoke `xray-to-speckit` — not
+`jira-to-speckit`, which reads the ticket and nothing else — with `xray_output_path =
+<artifact_dir>/existing-tests.feature`, `xray_manual_output_path =
 <artifact_dir>/existing-tests-manual.md`, and extend the query to cover every issue Sweep 1
 returned, not the anchor alone. Record `xray.query` from whichever JQL ran (`testRequirement` or
 `linkedIssues`), and `xray.cucumber_tests` / `xray.manual_tests` from the counts reported back.

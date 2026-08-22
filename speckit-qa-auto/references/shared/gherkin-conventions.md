@@ -89,6 +89,42 @@ needs an explicit one-line reason recorded beside it; without the reason, self-r
 because `manual` is otherwise the easiest way to make the selector gate disappear without actually
 earning that exemption.
 
+## Anchor
+
+A `.feature` file is read by a manual tester who has never seen the ticket and by whoever writes the
+automation. Both need one thing before any step makes sense: **where the scenario starts.** That
+fact lives **in the `.feature` file**, never only in `test-design.md`. `test-design.md` stays in the
+artifact folder; the `.feature` is what Stage 03 materializes into the test tree and what CI imports
+into Xray, so a starting point recorded only in the design document does not reach either reader.
+
+Each surface states it in its own terms:
+
+| `surface` | Anchor | Where it is written |
+|---|---|---|
+| `ui` | The entry point — the page, route, or tab the scenario opens on, named as the product names it | `Background:`, or the scenario's opening `Given` — see the rule below |
+| `api` | The endpoint (query, mutation, or route) and the request/response fixture | `# endpoint:` and `# fixture:` comment lines directly above the scenario |
+| `manual` | None. The one-line reason the Surface table already requires is what this scenario owes | Comment line above the scenario |
+
+**`Background:` is authored only when every scenario in the file is `surface: ui` and they share
+one entry point.** Gherkin runs a `Background:` before *every* scenario in the file, including the
+`api` and `manual` ones — so `Given the user is on the Agreement Approval page` in a mixed file
+puts a navigation in front of a scenario that has no interface, and `bddgen` compiles it. In every
+other case the entry point rides each `ui` scenario as its own opening `Given`. A file that is all
+`ui` but spans two entry points takes the second form too: a `Background:` holding what only some
+scenarios need is the same defect written once instead of twice.
+
+The `api` form follows the comment convention an impact file already uses for `# impact_flow:` and
+`# evidence:` — metadata a scenario carries that is not a step. It is written once, on the scenario;
+`test-design.md` §2.4 records the *design* reasoning for the choice of endpoint and cites the file
+rather than restating the values, because two copies of an endpoint disagree the first time one
+moves.
+
+**The shape of all this is the repo's, not this skill's.** Whether existing features open with a
+`Background:`, how their scenarios are named, and whether `existing_tags` sit at Feature or Scenario
+level are discovered per `repo-profile.md`'s `background_style`, `scenario_name_style`, and
+`tag_placement` — the same way `existing_tags` itself is discovered. A generated file that anchors
+correctly but in a shape the repository does not use is still a file a reviewer has to rewrite.
+
 ## Scenario Granularity
 
 One behaviour per scenario. Negative and boundary cases are included as their own scenarios, not
@@ -129,3 +165,6 @@ Stated so they are not improvised at Stage 03:
 | "I'll tag this NEW scenario with `@TEST_...` so Xray has something to bind to early" | There is no Test issue yet for a `NEW` scenario. Only `UPDATE` rows carry `@TEST_<TEST-KEY>` |
 | "The repo already tags severity, I'll reuse `@High` instead of adding another tag" | `existing_tags` is the repo's, and this skill neither renames nor overloads it. `@Priority_High` is this skill's, and the prefix is what keeps the two filters from silently selecting each other's scenarios |
 | "This scenario's priority is obvious, the tag is noise" | Every scenario carries exactly one. A missing tag reads as *nobody decided*, which is a different fact from *decided to be low* |
+| "The starting page is obvious from the scenario name" | Obvious to whoever designed it. The `.feature` is read by a manual tester who was not in the room and by whoever writes the steps months later — neither can infer a route |
+| "I'll put the endpoint in `test-design.md`, it's design information" | `test-design.md` never leaves the artifact folder. The `.feature` is what reaches the test tree and Xray. An anchor that does not travel with the file is not an anchor |
+| "One `Background:` for the whole file is tidier" | A `Background:` runs before every scenario in the file. Tidy it into a mixed file and `bddgen` navigates a page in front of an `api` scenario |

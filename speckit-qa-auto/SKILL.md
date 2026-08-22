@@ -15,7 +15,7 @@ license: MIT
 allowed-tools: bash glob grep view create edit skill
 metadata:
   author: Alex Nguyen
-  version: "0.6.0"
+  version: "0.8.0"
 ---
 
 # Speckit QA Auto
@@ -178,10 +178,12 @@ to run against.
 
 | Skill | Invoked | For |
 |---|---|---|
-| `jira-to-speckit` | By name, through the `skill` tool | Jira ticket intake and Xray existing-test reads (Stage 01) |
+| `jira-to-speckit` | By name, through the `skill` tool | Jira ticket intake (Stage 01, step 7) |
+| `xray-to-speckit` | By name, through the `skill` tool | Existing Xray test export — Cucumber and Manual, steps verbatim (Stage 01, Sweep 2) |
 
 Never linked to — a link outside this skill folder fails the validator and breaks the moment this
-skill is installed on its own. Refer to it by name only.
+skill is installed on its own. Refer to them by name only. Both must be installed: neither depends
+on the other, and this pipeline calls each at a different point.
 
 ## Required Inputs
 

@@ -279,6 +279,13 @@ skill writes nothing to Xray directly.
 Applies to `surface: ui` scenarios only — an `api` scenario names its endpoint and fixture instead,
 and a `manual` scenario carries its one-line reason; neither has elements to name.
 
+Both of those are **anchors, and an anchor is written on the scenario in the `.feature` file**, per
+`gherkin-conventions.md`'s Anchor section — `# endpoint:` / `# fixture:` comment lines for `api`, the
+reason comment for `manual`. `test-design.md` records why that endpoint is the right vantage point
+and cites the file; it does not restate the values. Only `ui` scenarios put a map in
+`test-design.md`, because a selector map is what the Stage 03 entry gate consumes and a `.feature`
+file has no place to carry one.
+
 Per `selector-verification.md`, "Two Artifacts, Two Stages", this stage writes the **element intent
 map**: every element each `ui` scenario touches, named in the language of the product, together with
 where it appears and what the scenario does with it. It does **not** resolve those elements to
@@ -349,7 +356,15 @@ Into `<artifact_dir>/<domain>-<aspect>.feature`, and — when 2.4b designed any 
 behind, never the repo's test tree. Materializing into the test tree is Stage 03's job, and only for scenarios
 that survive design here. Tag per `gherkin-conventions.md`: `@REQ_<STORY-KEY>` at Feature level,
 `@TEST_<TEST-KEY>` at Scenario level only on `UPDATE` rows, plus the profile's `existing_tags`
-carried through unchanged.
+carried through unchanged, placed at the level `profile.tag_placement` records.
+
+**Anchor every scenario** per `gherkin-conventions.md`'s Anchor section. A `Background:` naming the
+entry point when — and only when — every scenario in the file is `surface: ui` and shares one, and
+`profile.background_style` is `entry-point`; otherwise each `ui` scenario opens with its own `Given`.
+`api` scenarios carry `# endpoint:` and `# fixture:`; `manual` scenarios carry their reason. Scenario
+names follow `profile.scenario_name_style`. These three profile fields are the repository's
+convention, not this skill's preference: a file that anchors correctly in a shape the repo does not
+use is still a file a reviewer rewrites by hand.
 
 ### 2.6 Write `test-design.md`
 
@@ -414,8 +429,16 @@ Every one of these must hold, checked mechanically, not asked about:
 - Every acceptance criterion from `ticket.md` is covered by at least one scenario
 - No `TODO`, `TBD`, or other placeholder anywhere in the `.feature` file or `test-design.md`
 - Every `surface: ui` scenario names every element it touches in the element intent map
-- Every `surface: api` scenario names its endpoint and its request/response fixture
+- Every `surface: api` scenario names its endpoint and its request/response fixture **on the scenario
+  in the `.feature` file**, not only in `test-design.md`
 - Every `surface: manual` scenario carries its one-line reason
+- **Every `surface: ui` scenario has an anchor** — a `Background:` covering it, or its own opening
+  `Given` naming the entry point
+- **No `.feature` file holding a non-`ui` scenario carries a `Background:`.** Checked over the file,
+  not the scenario: a `Background:` runs before every scenario in its file, and this is the one
+  anchor defect that reads as correct in the file it was written into
+- The `existing_tags` on generated scenarios sit at the level `profile.tag_placement` records, and
+  scenario names follow `profile.scenario_name_style`
 - Every behaviour carries a dedup label from step 2.2
 - Every scenario carries a `priority`, and every scenario in the `.feature` file carries exactly one
   `@Priority_<Level>` tag matching it

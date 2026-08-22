@@ -25,7 +25,7 @@ answers is asked of the human, once.
 
 ## Field Reference
 
-Fourteen fields, resolved by discovery. These names are a public interface consumed verbatim by
+Seventeen fields, resolved by discovery. These names are a public interface consumed verbatim by
 the pipeline stages — never rename, re-case, or reshape one.
 
 | Field | Example (reference repo) |
@@ -44,6 +44,9 @@ the pipeline stages — never rename, re-case, or reshape one.
 | `xray_project_key` | `MOM` |
 | `branch_prefix` | `test/` |
 | `artifact_root` | `docs/qa` |
+| `background_style` | `entry-point` — existing features open with a `Background:` naming the page and tab |
+| `scenario_name_style` | `[Agmt Approval] <behaviour>` |
+| `tag_placement` | `scenario` |
 
 Any example path built from a Jira key follows this rule (design spec §4 step 8): the key is
 uppercase where it names the issue — `run.jira_key`, the `@REQ_` / `@TEST_` tags, every Jira or
@@ -54,6 +57,37 @@ checkout forgives them, so a run that creates `docs/qa/mom-1234-…` and later r
 therefore resolves its `artifact_dir` to `docs/qa/mom-1234-<slug>`, never `docs/qa/MOM-1234-<slug>`.
 `artifact_root` itself stays `docs/qa` — the shared root every ticket folder hangs under, and the
 one place the `.repo-profile.json` cache below lives.
+
+## Gherkin Shape Is Discovered, Not Assumed
+
+The last three fields are what discovery source 4 — "one existing `.feature` / `.steps.ts` pair read
+as a worked example" — is *for*. Before them that read informed path inference and threw the rest
+away, so every generated file was structurally the skill's guess: no `Background:` at all, tags at
+whatever level the generator chose, scenario names in whatever shape came out. A file can be correct
+in every scenario it contains and still be one a reviewer rewrites by hand, because it does not look
+like the files beside it.
+
+| Field | Values | Read from |
+|---|---|---|
+| `background_style` | `entry-point` — existing `ui` features open with a `Background:` naming where the user starts; `none` — they do not, and each scenario opens with its own `Given` | The `Background:` block, or its absence, in existing `ui` feature files |
+| `scenario_name_style` | The repo's scenario-name shape, recorded as a pattern with the varying part marked — `[Agmt Approval] <behaviour>`, or plain `<behaviour>` | The `Scenario:` lines of existing features |
+| `tag_placement` | `feature` \| `scenario` \| `both` — where the repo's own `existing_tags` sit | Where `existing_tags` were found when they were discovered |
+
+`tag_placement` is the field that makes `existing_tags` usable on a **new** file. The rule that
+existing tags "stay exactly where they already are" answers the question for a file that already
+exists and answers nothing for one being written for the first time; without this field the
+placement is invented per run, and a `--grep` filter the repo runs at scenario level silently
+selects nothing from a file that tagged at Feature level.
+
+**A repository with no existing `.feature` file does not get asked.** These three take the skill's
+documented defaults — `background_style: entry-point`, `scenario_name_style: <behaviour>`,
+`tag_placement: scenario` — and the run records `profile.gherkin_shape: default` rather than
+`discovered`. Two reasons. Asking a human to state a Gherkin convention before the repository has a
+single feature file asks them to invent one with nothing to invent it from; that is bootstrap's job,
+and bootstrap is *establishing* the convention, not discovering it. And a defaulted value must never
+reach the `answers` cache: an answer cached at bootstrap would keep overriding the real convention
+once the repo grows the feature files that could have taught it, which is exactly the staleness the
+next section refuses. A default is re-derived every run like every other field in the table.
 
 ## What Is Cached, And What Is Not
 

@@ -46,12 +46,15 @@ mid-run.
 | Skill | Requires |
 |-------|----------|
 | `speckit-auto` | `jira-to-speckit`, `speckit-code-review` |
+| `speckit-qa-auto` | `jira-to-speckit`, `xray-to-speckit` |
 | `speckit-code-review` | — |
 | `jira-to-speckit` | — |
+| `xray-to-speckit` | — |
 | `job-security-scan` | — |
 
 For `speckit-auto` you effectively want all three speckit skills installed
-together.
+together. `speckit-qa-auto` needs both readers: `jira-to-speckit` for the ticket
+and `xray-to-speckit` for the existing test coverage it dedups against.
 
 ## Per-Skill Prerequisites
 
@@ -65,6 +68,18 @@ JIRA_URL=https://your-org.atlassian.net
 JIRA_USERNAME=you@example.com
 JIRA_API_TOKEN=...
 ```
+
+### `xray-to-speckit`
+
+Needs the Jira trio above **plus** Xray Cloud credentials in the same `.env`:
+
+```dotenv
+XRAY_CLIENT_ID=...
+XRAY_CLIENT_SECRET=...
+```
+
+Missing Xray credentials are a warning, not a failure — the skill reports
+`xray: unavailable` and returns.
 
 ### `job-security-scan`
 

@@ -1,8 +1,8 @@
 # Xray API Reference
 
-This reference supports the `jira-to-speckit` skill's optional Xray read mode (`xray_tests: true`).
-It covers reading the Xray tests that cover a story. It does not cover importing, creating test
-executions, or uploading results — see "Not This Skill's Job" below.
+This reference is the specification the `xray-to-speckit` skill follows. It covers reading the Xray
+tests that cover a story. It does not cover importing, creating test executions, or uploading
+results — see "Not This Skill's Job" below.
 
 ## 1. Credentials
 
@@ -14,10 +14,12 @@ Read these from the repository `.env` file:
 Never print these values, or the bearer token derived from them, in logs or chat output.
 
 If either variable is absent, do not stop the skill. Report `xray: unavailable` in the output and
-continue — the compact brief is still valid without Xray data. This is a warning, never a stop.
+continue. This is a warning, never a stop: a caller that asked for existing-test coverage and got
+`unavailable` knows it has none, which is a usable fact; a caller whose run was aborted has nothing.
 
 **Two different credentials are in play, and mixing them is the most common failure here.** Jira
-REST calls use basic auth with `JIRA_USERNAME` / `JIRA_API_TOKEN` (see `JIRA_API.md`). Xray's own
+REST calls (§4, for non-Cucumber test metadata) use basic auth with `JIRA_USERNAME` /
+`JIRA_API_TOKEN` against `{JIRA_URL}`. Xray's own
 APIs — the Cucumber export and GraphQL — use a bearer token minted from `XRAY_CLIENT_ID` /
 `XRAY_CLIENT_SECRET`. A Jira token will not authenticate against `xray.cloud.getxray.app`, and an
 Xray token will not authenticate against the Jira REST API.
@@ -77,7 +79,7 @@ The response is a zip of `.feature` files. Unzip it and concatenate the contents
 `xray_output_path`.
 
 **Every other type (Manual, Generic)** — fetch through the Jira REST API for the issue metadata,
-using the same credentials and endpoints documented in [`JIRA_API.md`](JIRA_API.md) (`GET
+using basic auth with `JIRA_USERNAME` / `JIRA_API_TOKEN` (`GET
 {JIRA_URL}/rest/api/2/issue/{issueKey}?fields=summary,labels,issuetype,description`), and through
 Xray's GraphQL API for the steps (§5). **`export/cucumber` returns nothing for Manual and Generic
 tests** — do not treat an empty export as "no manual tests exist."

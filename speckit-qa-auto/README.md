@@ -1,6 +1,6 @@
 # Speckit QA Auto — Jira-to-Tests QA Pipeline
 
-**Version**: 0.6.0
+**Version**: 0.8.0
 **Author**: Alex Nguyen
 
 ## Overview
@@ -13,7 +13,10 @@ output:
 
 1. **The Gherkin `.feature` file is the single artifact.** It is the manual tester's test case,
    the spec `playwright-bdd` compiles into automation, and the Cucumber Test Xray imports on
-   merge — nothing is authored twice.
+   merge — nothing is authored twice. Every scenario states **where it starts** inside that file:
+   a `Background:` or opening `Given` naming the entry point for `ui`, an `# endpoint:` /
+   `# fixture:` pair for `api`. A starting point recorded only in `test-design.md` never reaches
+   the test tree or Xray.
 2. **`docs/qa/<jira-key>-<slug>/` is the source of truth.** The `.feature` file(s) there are
    authored and approved at Stage 02. The project's test tree (for example `src/tests/…`) holds
    only a **derived, scenario-level subset**, materialized by Stage 03 and never edited directly.
@@ -195,6 +198,11 @@ passed, it runs to a scenario verdict or to the circuit breaker. Every loop insi
   a worked example, the conventions playbook, and the Xray import CI workflow.
 - **Playwright-BDD generation** — step definitions, page objects, selectors, and test data, per
   the discovered repo profile's conventions.
+- **Generated Gherkin matches the repository's own shape** — whether features open with a
+  `Background:`, how scenarios are named, and whether the repo's tags sit at Feature or Scenario
+  level are read off an existing `.feature` file (`background_style`, `scenario_name_style`,
+  `tag_placement`), not guessed. A repo with no feature file yet takes documented defaults and is
+  not asked.
 - **Bounded fix loop** — up to 3 fix attempts per scenario and a 5-failure circuit breaker;
   environmental failures stop the run instead of burning attempts.
 - **Three human gates, and no flag skips them** — approach approval (Stage 02, step 2.2b), design
@@ -214,8 +222,10 @@ passed, it runs to a scenario verdict or to the circuit breaker. Every loop insi
 
 ## Installation
 
-Copy the `speckit-qa-auto` folder — together with `jira-to-speckit`, its only sub-skill
-dependency — into the host's skill directory. The skill is auto-discovered from that location.
+Copy the `speckit-qa-auto` folder — together with `jira-to-speckit` and `xray-to-speckit`, its two
+sub-skill dependencies — into the host's skill directory. The skill is auto-discovered from that
+location. `jira-to-speckit` supplies the ticket; `xray-to-speckit` supplies the existing test
+coverage Stage 02 dedups against. Neither depends on the other, and both are required.
 
 ## Compatibility
 
@@ -269,7 +279,8 @@ skill speckit-qa-auto --issue MOM-1234 --parallel-worktree
 | `XRAY_CLIENT_ID`, `XRAY_CLIENT_SECRET` | no | Existing-test sweep at Stage 01; absence degrades to a warning |
 
 None of these are ever printed. Repo-specific conventions (test paths, run commands, the
-selector attribute, the Xray project key) are discovered, not configured — see
+selector attribute, the Xray project key, and the repository's Gherkin shape) are discovered, not
+configured — see
 `references/shared/repo-profile.md`. Only answers no discovered source can supply are cached, in
 `docs/qa/.repo-profile.json`, alongside a provenance hash per source so a changed playbook is
 never applied silently.

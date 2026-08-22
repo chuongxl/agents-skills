@@ -71,7 +71,7 @@ map or carries a `blocked` verdict.
 
 Per `run-state.md` rule 2, read only from `execution-report.md` and the artifact folder — never
 from `stage-02-test-design.md`: `run.artifact_dir`, `run.branch`, `run.isolation`,
-`run.workspace_path`, `baselines.owned_paths[]`, `run.full_suite`, every field of `profile.*` (`repo-profile.md`'s fourteen-field
+`run.workspace_path`, `baselines.owned_paths[]`, `run.full_suite`, every field of `profile.*` (`repo-profile.md`'s seventeen-field
 table — `feature_path`, `steps_path`, `page_path`, `selectors_path`, `testdata_path`,
 `generate_cmd`, `scoped_run_cmd`, `selector_attribute`, `existing_tags`, and the rest), and
 `design.scenarios[]` as Stage 02 left them — every scenario at `status: pending` — and

@@ -14,7 +14,8 @@ CI (`.github/workflows/validate-skills.yml`) runs both, plus `bash -n` on `*.sh`
 ## Skills
 
 - `speckit-auto` — orchestrator; depends on `jira-to-speckit` + `speckit-code-review` being installed
-- `speckit-code-review`, `jira-to-speckit`, `job-security-scan`
+- `speckit-qa-auto` — QA pipeline; depends on `jira-to-speckit` + `xray-to-speckit` being installed
+- `speckit-code-review`, `jira-to-speckit`, `xray-to-speckit`, `job-security-scan`
 
 Not skills: `tools/`, `docs/`, `test-case/`, `speckit-companion-extension/`. Do not add a `SKILL.md` to `speckit-companion-extension/` — the validator would then treat it as a skill.
 
@@ -32,6 +33,7 @@ Every relative markdown link in `SKILL.md`, `README.md`, and `references/**` mus
 ## Gotchas
 
 - `jira-to-speckit` reads Jira credentials from the project root `.env` (gitignored): `JIRA_URL`, `JIRA_USERNAME`, `JIRA_API_TOKEN`. Never print them; stop and ask the user if missing.
+- `xray-to-speckit` reads the same `JIRA_*` trio plus `XRAY_CLIENT_ID` / `XRAY_CLIENT_SECRET`. Missing Xray credentials are a warning (`xray: unavailable`), never a stop — unlike the Jira trio, which stops `jira-to-speckit`.
 - `speckit-code-review` is invoked as a **skill** (its strict JSON verdict must come back in-band), never as a background task agent.
 - `speckit-auto` resolves its provider only from repo-local `.speckit/integration.json` (no global state, no first-run prompt; missing file → stop and direct the user to `/speckit-auto --integration <provider>`). Provider is fixed for the whole run — never infer it from repo contents.
 - Gitignored runtime state/scratch: `speckit-auto/.state/`, `.superpowers/`, `.speckit/`, `.security-scan-results/`.

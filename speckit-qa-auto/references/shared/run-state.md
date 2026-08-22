@@ -51,6 +51,9 @@ discovery:
 profile:
   # every field re-derived each run from the playbook; see repo-profile.md
   source_paths:        [".github/skills/mom-auto-testing/SKILL.md", "package.json"]
+  gherkin_shape:       discovered | default
+                       # default: the repo had no .feature file to learn background_style,
+                       # scenario_name_style, or tag_placement from. Never cached in `answers`
 
 baselines:
   workspace_baseline:  {path, head_sha, worktree_diff_sha256, index_diff_sha256, untracked}
