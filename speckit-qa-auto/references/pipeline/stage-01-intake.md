@@ -290,8 +290,8 @@ folder names the stage to resume from, in `run.stage` / `run.resume_from`.
 
 **A run that ended after design — `resume_from: 02.4` or `03` — is resumed after a delay, and the
 delay is the point.** It stopped because the code had not landed, or because the team wanted the
-design first and the automation later. Either way, time passed. Two things went stale in between,
-and neither fixes itself:
+design first and the automation later. Either way, time passed. Three things went stale in between,
+and none of them fixes itself:
 
 - **The base branch moved.** Step 3's sync is best-effort at creation time, and this branch was
   created weeks ago. Re-sync it against the base branch **now**, before design or automation reads
@@ -301,6 +301,15 @@ and neither fixes itself:
 - **`run.code_state` may still be `pending`.** Re-resolve it on any `02.4` resume. It stays
   `pending` if the code still has not landed, and the run stops after design again — the resume was
   simply early. A `03` resume skips this: its code had already landed when the run stopped.
+- **The ticket moved.** `ticket.md`'s frontmatter records `fetched_at`; the issue itself records
+  `updated`. Compare the two before design or automation reads anything — it is one Jira call, and
+  it is the only thing standing between a resumed run and a design written against acceptance
+  criteria the reporter has since rewritten. If `updated` is the later of the two, re-fetch the
+  ticket and reconcile the difference as a delta: the scenarios, the coverage matrix, and the
+  execution report that already exist were all written against the old copy, and each one that the
+  changed text touches is now wrong. Nothing downstream detects this — a stale `ticket.md` reads
+  exactly like a fresh one — so a run that skips the comparison finds out only when a human happens
+  to notice copy that no longer exists in Jira.
 
 **Resolve `baselines.owned_paths[]` here**, as the last thing before the run state is written —
 this is the first point where every input to it exists: `run.artifact_dir` from step 6, the five

@@ -151,6 +151,20 @@ possible at all, and it is placed at a gate that already stops rather than at on
 a person picks governs reading and nothing else: every candidate stays in `execution-report.md`, and
 nothing derives a coverage judgement from a candidate nobody chose (`run-state.md` rule 20).
 
+**What a related story teaches is a hypothesis about this one, never a fact about it.** A rule
+observed in a story that was read — which statuses it applies to, what it preserves, what it
+forbids — is evidence about *that* story. It becomes an assertion about this one only when this
+ticket says the same thing, or when the human confirms it at this gate. Failing both, it goes to
+Open Questions named as an assumption (`gate-presentation.md` rule 2), and any scenario resting on
+it names the story it came from **and** that it is unconfirmed.
+
+A borrowed rule asserted as a hard `Then` is the specific failure this exists to prevent, and it is
+durable: it reads as ticket-derived to every later reader, it survives the adversarial review —
+which attacks whether the design covers the ticket, not where each claim came from — and it
+propagates, because the same borrowed premise usually reaches the coverage matrix and the execution
+report too. The one reader who can catch it is a human who knows both stories, and by then the
+design has been approved.
+
 **Ceremony scales with `run.design_depth`. Whether an answer is taken does not** (`run-state.md`
 rule 18). This is the boundary most at risk in this step: a gate that "scales to nothing" on
 `trivial` is a gate that was removed.

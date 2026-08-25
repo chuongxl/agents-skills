@@ -1,6 +1,7 @@
 # Speckit QA Auto — Jira-to-Tests QA Pipeline
 
-**Version**: 0.8.0
+**Version**: 0.4.0 — unreleased. Behaviour changes land here without a version bump; the number
+moves on the first release, not before.
 **Author**: Alex Nguyen
 
 ## Overview
@@ -152,6 +153,13 @@ passed, it runs to a scenario verdict or to the circuit breaker. Every loop insi
   bounded text search, and whatever `--related` declares — each candidate recording which axis found
   it. Stage 01 records keys and summaries only; a human picks which are worth reading at the
   approach gate, so wider reach does not become more reading.
+- **A related story is evidence about itself, not about this one** — a rule read out of a story
+  someone picked (which statuses it applies to, what it preserves, what it forbids) may only become
+  an assertion here if this ticket says the same thing or a human confirms it at the gate.
+  Otherwise it lands in Open Questions as a named assumption, and any scenario resting on it says
+  which story it came from and that it is unconfirmed. A borrowed rule written as a plain `Then`
+  reads as ticket-derived to everyone downstream and survives the adversarial review, which attacks
+  coverage rather than provenance.
 - **Gates written for the reader, not the machine** — one file owns everything a person sees: one
   question per message, as many questions as there are concerns, alternatives carried by the choices
   offered, and no step number, field name, or internal label quoted at a reader. It degrades to
@@ -165,6 +173,12 @@ passed, it runs to a scenario verdict or to the circuit breaker. Every loop insi
   A story that attaches an invoice to a work order candidate creates an invariant for every flow
   that already writes candidates, and none of those flows' tickets say so. The sweep returns
   candidates with evidence paths; a human decides at the gate, and cannot decline to answer.
+- **A resumed run re-checks what time changed** — the delay between a design that stopped and the
+  automation that continues it is the point of the pause, so the resume re-syncs the base branch,
+  re-resolves `code_state`, and compares the issue's `updated` against the `fetched_at` recorded in
+  `ticket.md`. A ticket the reporter rewrote in between is the one staleness nothing downstream can
+  detect — a stale `ticket.md` reads exactly like a fresh one — so the run re-fetches it and
+  reconciles the difference as a delta instead of designing against copy that no longer exists.
 - **Test approach agreed before any Gherkin exists** — after dedup and before a single scenario is
   written, the run states the depth it classified the story at and why, asks the questions whose
   answers change the design one at a time, and puts 2-3 approaches with their trade-offs in front of
@@ -295,6 +309,7 @@ repository secrets. Bootstrap writes the workflow but cannot set them, and says 
 | Run stops asking for `--issue` | Required on every invocation; pass a story, epic, or Xray test key |
 | Xray sweep reports unavailable | Add `XRAY_CLIENT_ID` / `XRAY_CLIENT_SECRET`; the run continues with dedup `not-run` |
 | Run ends after Stage 02 with `resume_from: 02.4` | The feature's code has not landed. Design is approved and committed; re-run once it has |
+| Resumed run re-fetches the ticket and edits artifacts you already reviewed | Expected: the issue's `updated` is newer than `ticket.md`'s `fetched_at`. The run reconciles the changed copy as a delta and says which scenarios it touched |
 | Bootstrap asks to create files | The repository has no Playwright-BDD test tree. Approve the listed paths, or stop and point the run at a repository that has one |
 | Xray import CI job fails | Its three secrets are not set by bootstrap; set them in repository settings |
 | Selector gate has no evidence source to offer | Frontend source unreadable and no reachable app/browser automation; accept the fallback risk or fix the checkout |
