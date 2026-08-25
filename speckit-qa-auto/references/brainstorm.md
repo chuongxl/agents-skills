@@ -11,9 +11,10 @@ Read the framework-neutral evidence from the active artifact folder and reposito
 - `existing-tests.feature` and `existing-tests-manual.md`, when present;
 - repository `.feature` files found during intake;
 - declared `--related` and `--impact` hints;
-- detected adapter id, if any, as execution context only.
+- whether automation was requested, as execution context only.
 
-Do not read adapter files here. Adapter availability can shape trade-offs, but it must not make core
+Do not read framework-specific automation rules here unless they are already injected as project
+skills in the session. Automation availability can shape trade-offs, but it must not make core
 design framework-specific.
 
 ## Conversation

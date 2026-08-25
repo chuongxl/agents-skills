@@ -11,7 +11,6 @@ from pathlib import Path
 from typing import Any
 
 ISSUE_RE = re.compile(r"^[A-Z][A-Z0-9]+-\d+$")
-SLUG_RE = re.compile(r"^[a-z0-9][a-z0-9-]*$")
 
 STAGES = {
     "intake",
@@ -23,20 +22,41 @@ STAGES = {
     "reviewing",
     "review-passed",
     "automation",
+    "automation-reviewing",
     "automation-complete",
     "finished",
     "blocked",
 }
-RESUME_TARGETS = {None, "intake", "brainstorm", "design", "review", "automation", "finish", "done"}
+RESUME_TARGETS = {
+    None,
+    "intake",
+    "brainstorm",
+    "design",
+    "review",
+    "automation",
+    "automation-review",
+    "finish",
+    "done",
+}
 COVERAGE_VALUES = {
     "dedup": {"not-run", "ran", "skipped"},
     "xray": {"available", "unavailable", "not-configured"},
 }
+AUTOMATION_STATUSES = {
+    "not-requested",
+    "pending",
+    "implemented",
+    "review-passed",
+    "blocked",
+    "not-run",
+}
+AUTOMATION_REVIEW_STATUSES = {"not-run", "pending", "passed", "changes-requested"}
 DESIGN_REQUIRED_STAGES = {
     "design-approved",
     "reviewing",
     "review-passed",
     "automation",
+    "automation-reviewing",
     "automation-complete",
     "finished",
 }
@@ -47,6 +67,7 @@ BRAINSTORM_REQUIRED_STAGES = {
     "reviewing",
     "review-passed",
     "automation",
+    "automation-reviewing",
     "automation-complete",
     "finished",
 }
@@ -54,6 +75,7 @@ BRAINSTORM_STATUSES = {"pending", "approved"}
 REVIEW_REQUIRED_STAGES = {
     "review-passed",
     "automation",
+    "automation-reviewing",
     "automation-complete",
     "finished",
 }
@@ -104,11 +126,40 @@ def validate(path: Path) -> list[str]:
 
     resume_target = data.get("resume_target")
     if resume_target not in RESUME_TARGETS:
-        errors.append("resume_target must be intake, brainstorm, design, review, automation, finish, done, or null")
+        errors.append(
+            "resume_target must be intake, brainstorm, design, review, automation, automation-review, finish, done, or null"
+        )
 
-    adapter = data.get("adapter")
-    if adapter is not None and (not isinstance(adapter, str) or not SLUG_RE.match(adapter)):
-        errors.append("adapter must be null or a lowercase kebab-case adapter id")
+    if "adapter" in data:
+        errors.append("adapter is not part of run.json; use automation.tool or automation.skill")
+
+    automation = _require_object(data.get("automation"), "automation", errors)
+    automation_status = automation.get("status")
+    if automation_status not in AUTOMATION_STATUSES:
+        errors.append(
+            "automation.status must be not-requested, pending, implemented, review-passed, blocked, or not-run"
+        )
+    if not isinstance(automation.get("requested"), bool):
+        errors.append("automation.requested must be a boolean")
+    for field in ("tool", "skill", "result"):
+        value = automation.get(field)
+        if value is not None and not isinstance(value, str):
+            errors.append(f"automation.{field} must be null or a string")
+    automation_review = _require_object(automation.get("review"), "automation.review", errors)
+    automation_review_status = automation_review.get("status")
+    if automation_review_status not in AUTOMATION_REVIEW_STATUSES:
+        errors.append("automation.review.status must be not-run, pending, passed, or changes-requested")
+    if not isinstance(automation_review.get("findings"), list):
+        errors.append("automation.review.findings must be a list")
+    automation_finish_required = (
+        stage in {"automation-complete", "finished"} or resume_target in {"finish", "done"}
+    )
+    if automation_status == "review-passed" and automation_review_status != "passed":
+        errors.append("automation.review.status must be passed when automation status is review-passed")
+    if automation_finish_required and automation_status == "implemented" and automation_review_status != "passed":
+        errors.append("automation.review.status must be passed before finish when automation code is implemented")
+    if automation_status == "review-passed" and not automation.get("result"):
+        errors.append("automation.result must point to automation-result.json when automation is review-passed")
 
     brainstorm = _require_object(data.get("brainstorm"), "brainstorm", errors)
     brainstorm_status = brainstorm.get("status")
@@ -116,7 +167,7 @@ def validate(path: Path) -> list[str]:
         errors.append("brainstorm.status must be pending or approved")
     brainstorm_required = (
         stage in BRAINSTORM_REQUIRED_STAGES
-        or resume_target in {"design", "review", "automation", "finish", "done"}
+        or resume_target in {"design", "review", "automation", "automation-review", "finish", "done"}
     )
     if brainstorm_required and brainstorm_status != "approved":
         errors.append("brainstorm.status must be approved before design, review, automation, finish, or done")
@@ -134,7 +185,7 @@ def validate(path: Path) -> list[str]:
         errors.append("review.status must be pending, passed, or changes-requested")
     review_required = (
         stage in REVIEW_REQUIRED_STAGES
-        or resume_target in {"automation", "finish", "done"}
+        or resume_target in {"automation", "automation-review", "finish", "done"}
     )
     if review_required and review_status != "passed":
         errors.append("review.status must be passed before automation, finish, or done")
@@ -149,7 +200,7 @@ def validate(path: Path) -> list[str]:
     artifacts = _require_object(data.get("artifacts"), "artifacts", errors)
     design_required = (
         stage in DESIGN_REQUIRED_STAGES
-        or resume_target in {"review", "automation", "finish", "done"}
+        or resume_target in {"review", "automation", "automation-review", "finish", "done"}
     )
 
     feature_files = artifacts.get("feature_files")

@@ -60,7 +60,17 @@ def test_validate_run_state(tmp: Path) -> None:
                 "issue": "MOM-1234",
                 "stage": "review-passed",
                 "resume_target": "automation",
-                "adapter": "playwright-bdd",
+                "automation": {
+                    "status": "pending",
+                    "requested": True,
+                    "tool": None,
+                    "skill": None,
+                    "result": None,
+                    "review": {
+                        "status": "pending",
+                        "findings": [],
+                    },
+                },
                 "brainstorm": {
                     "status": "approved",
                     "approach": "api-first-plus-ui-smoke",
@@ -105,7 +115,17 @@ def test_validate_pre_design_state(tmp: Path) -> None:
                 "issue": "MOM-1234",
                 "stage": "discovered",
                 "resume_target": "brainstorm",
-                "adapter": None,
+                "automation": {
+                    "status": "not-requested",
+                    "requested": False,
+                    "tool": None,
+                    "skill": None,
+                    "result": None,
+                    "review": {
+                        "status": "not-run",
+                        "findings": [],
+                    },
+                },
                 "brainstorm": {
                     "status": "pending",
                     "approach": None,
@@ -145,7 +165,17 @@ def test_design_requires_brainstorm(tmp: Path) -> None:
                 "issue": "MOM-1234",
                 "stage": "design-approved",
                 "resume_target": "automation",
-                "adapter": None,
+                "automation": {
+                    "status": "pending",
+                    "requested": True,
+                    "tool": None,
+                    "skill": None,
+                    "result": None,
+                    "review": {
+                        "status": "pending",
+                        "findings": [],
+                    },
+                },
                 "brainstorm": {
                     "status": "pending",
                     "approach": None,
@@ -183,7 +213,17 @@ def test_brainstorm_approved_stage_requires_approved_status(tmp: Path) -> None:
                 "issue": "MOM-1234",
                 "stage": "brainstorm-approved",
                 "resume_target": "design",
-                "adapter": None,
+                "automation": {
+                    "status": "not-requested",
+                    "requested": False,
+                    "tool": None,
+                    "skill": None,
+                    "result": None,
+                    "review": {
+                        "status": "not-run",
+                        "findings": [],
+                    },
+                },
                 "brainstorm": {
                     "status": "pending",
                     "approach": None,
@@ -223,7 +263,17 @@ def test_automation_requires_review_passed(tmp: Path) -> None:
                 "issue": "MOM-1234",
                 "stage": "design-approved",
                 "resume_target": "automation",
-                "adapter": None,
+                "automation": {
+                    "status": "pending",
+                    "requested": True,
+                    "tool": None,
+                    "skill": None,
+                    "result": None,
+                    "review": {
+                        "status": "pending",
+                        "findings": [],
+                    },
+                },
                 "brainstorm": {
                     "status": "approved",
                     "approach": "api-first-plus-ui-smoke",
@@ -261,7 +311,17 @@ def test_review_route_requires_design_artifacts(tmp: Path) -> None:
                 "issue": "MOM-1234",
                 "stage": "brainstorm-approved",
                 "resume_target": "review",
-                "adapter": None,
+                "automation": {
+                    "status": "not-requested",
+                    "requested": False,
+                    "tool": None,
+                    "skill": None,
+                    "result": None,
+                    "review": {
+                        "status": "not-run",
+                        "findings": [],
+                    },
+                },
                 "brainstorm": {
                     "status": "approved",
                     "approach": "api-first-plus-ui-smoke",
@@ -286,29 +346,102 @@ def test_review_route_requires_design_artifacts(tmp: Path) -> None:
     expect("review route without design artifacts is explained", "artifacts" in result.stderr)
 
 
-def test_detect_adapter(tmp: Path) -> None:
-    print("detect-adapter")
-    write(
-        tmp / "package.json",
+def test_implemented_automation_can_resume_to_review(tmp: Path) -> None:
+    print("implemented-automation-can-resume-to-review")
+    run_dir = tmp / "docs" / "qa" / "mom-1234"
+    feature = write(
+        run_dir / "invoice.feature",
+        "Feature: Invoice\n\n  Scenario: show invoice\n    Given an invoice exists\n",
+    )
+    design = write(run_dir / "test-design.md", "# Test Design\n")
+    run_json = write(
+        run_dir / "run.json",
         json.dumps(
             {
-                "devDependencies": {
-                    "playwright-bdd": "^8.0.0",
-                    "@playwright/test": "^1.45.0",
+                "issue": "MOM-1234",
+                "stage": "automation-reviewing",
+                "resume_target": "automation-review",
+                "automation": {
+                    "status": "implemented",
+                    "requested": True,
+                    "tool": "repo-test-runner",
+                    "skill": None,
+                    "result": "docs/qa/MOM-1234/automation-result.json",
+                    "review": {
+                        "status": "pending",
+                        "findings": [],
+                    },
                 },
-                "scripts": {"bddgen": "bddgen"},
-            }
+                "brainstorm": {
+                    "status": "approved",
+                    "approach": "api-first-plus-ui-smoke",
+                    "questions": [],
+                    "confirmed_assumptions": [],
+                    "rejected_approaches": [],
+                },
+                "review": {
+                    "status": "passed",
+                    "findings": [],
+                    "decisions": [],
+                },
+                "artifacts": {
+                    "feature_files": [str(feature.relative_to(tmp))],
+                    "test_design": str(design.relative_to(tmp)),
+                },
+                "coverage": {"dedup": "ran", "xray": "available"},
+            },
+            indent=2,
         ),
     )
-    result = run_script("detect-adapter.py", tmp)
-    expect("detects playwright-bdd", result.returncode == 0)
-    expect("prints selected adapter", '"adapter": "playwright-bdd"' in result.stdout)
 
-    empty = tmp / "empty"
-    empty.mkdir()
-    result = run_script("detect-adapter.py", empty)
-    expect("no adapter is not a hard failure", result.returncode == 0)
-    expect("no adapter prints null", '"adapter": null' in result.stdout)
+    result = run_script("validate-run-state.py", run_json)
+    expect("implemented automation can route to review", result.returncode == 0)
+
+
+def test_adapter_field_is_rejected(tmp: Path) -> None:
+    print("adapter-field-is-rejected")
+    run_dir = tmp / "docs" / "qa" / "mom-1234"
+    run_json = write(
+        run_dir / "run.json",
+        json.dumps(
+            {
+                "issue": "MOM-1234",
+                "stage": "discovered",
+                "resume_target": "brainstorm",
+                "adapter": "playwright-bdd",
+                "automation": {
+                    "status": "not-requested",
+                    "requested": False,
+                    "tool": None,
+                    "skill": None,
+                    "result": None,
+                    "review": {
+                        "status": "not-run",
+                        "findings": [],
+                    },
+                },
+                "brainstorm": {
+                    "status": "pending",
+                    "approach": None,
+                    "questions": [],
+                    "confirmed_assumptions": [],
+                    "rejected_approaches": [],
+                },
+                "review": {
+                    "status": "pending",
+                    "findings": [],
+                    "decisions": [],
+                },
+                "artifacts": {"feature_files": [], "test_design": None},
+                "coverage": {"dedup": "not-run", "xray": "unavailable"},
+            },
+            indent=2,
+        ),
+    )
+
+    result = run_script("validate-run-state.py", run_json)
+    expect("adapter field exits nonzero", result.returncode == 1)
+    expect("adapter field is explained", "adapter" in result.stderr)
 
 
 def test_dedup_gherkin(tmp: Path) -> None:
@@ -361,7 +494,8 @@ def main() -> int:
         test_brainstorm_approved_stage_requires_approved_status(tmp / "brainstorm-approved-stage")
         test_automation_requires_review_passed(tmp / "review-required")
         test_review_route_requires_design_artifacts(tmp / "review-artifacts-required")
-        test_detect_adapter(tmp / "repo")
+        test_implemented_automation_can_resume_to_review(tmp / "automation-review")
+        test_adapter_field_is_rejected(tmp / "adapter-field")
         test_dedup_gherkin(tmp / "gherkin")
     print()
     if FAILURES:

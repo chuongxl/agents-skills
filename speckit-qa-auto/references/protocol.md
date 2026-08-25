@@ -1,7 +1,7 @@
 # QA Artifact Protocol
 
 This is the core contract for `speckit-qa-auto`. It is framework-neutral: it defines what artifacts
-exist and how adapters consume them, not how a browser or test runner is driven.
+exist and how automation consumes them, not how a browser, API client, or test runner is driven.
 
 ## Artifact Folder
 
@@ -22,7 +22,7 @@ docs/qa/<issue>/
 
 `existing-tests.feature`, `existing-tests-manual.md`, `brainstorm-notes.md`, `review-notes.md`,
 and `automation-result.json` may be absent when the source data, approval notes, review notes, or
-automation adapter is unavailable. `run.json`, `ticket.md`, `test-design.md`, and at least one
+automation result is unavailable. `run.json`, `ticket.md`, `test-design.md`, and at least one
 authored `.feature` file are required before finish.
 
 ## run.json
@@ -34,7 +34,17 @@ Minimum shape:
   "issue": "MOM-1234",
   "stage": "review-passed",
   "resume_target": "automation",
-  "adapter": "playwright-bdd",
+  "automation": {
+    "status": "pending",
+    "requested": true,
+    "tool": null,
+    "skill": null,
+    "result": null,
+    "review": {
+      "status": "pending",
+      "findings": []
+    }
+  },
   "brainstorm": {
     "status": "approved",
     "approach": "api-first-plus-ui-smoke",
@@ -60,10 +70,10 @@ Minimum shape:
 
 Allowed `stage` values are `intake`, `discovered`, `brainstorming`, `brainstorm-approved`,
 `design-drafting`, `design-approved`, `reviewing`, `review-passed`, `automation`,
-`automation-complete`, `finished`, and `blocked`.
+`automation-reviewing`, `automation-complete`, `finished`, and `blocked`.
 
 Allowed `resume_target` values are `intake`, `brainstorm`, `design`, `review`, `automation`,
-`finish`, `done`, or `null`.
+`automation-review`, `finish`, `done`, or `null`.
 
 Allowed coverage values:
 
@@ -73,6 +83,17 @@ Allowed coverage values:
 | `coverage.xray` | `available`, `unavailable`, `not-configured` |
 
 Run `scripts/validate-run-state.py docs/qa/<issue>/run.json` after creating or changing state.
+
+Allowed automation values:
+
+| Field | Values |
+|---|---|
+| `automation.status` | `not-requested`, `pending`, `implemented`, `review-passed`, `blocked`, `not-run` |
+| `automation.review.status` | `not-run`, `pending`, `passed`, `changes-requested` |
+
+Use `automation.tool` for the repository tool/framework actually used, and `automation.skill` for
+an injected project/domain/framework skill when one materially shaped the implementation. Both may
+be `null`. Do not write a top-level `adapter` field.
 
 Before design artifacts exist, keep the same keys with empty values:
 
@@ -95,6 +116,12 @@ Before QA review passes, `review.status` may be `pending` or `changes-requested`
 `changes-requested` review routes back to `design` or stays at `review` while the finding is being
 clarified.
 
+When automation code is created or changed, route to `automation-review` with `automation.status:
+implemented` and `automation.review.status: pending`. `automation.review.status` must become
+`passed` before claiming automation is complete. If automation is `blocked`, `not-run`, or
+`not-requested`, record the reason in `automation-result.json` when useful and finish without
+claiming automated coverage.
+
 ## Gherkin Contract
 
 Feature files under `docs/qa/<issue>/` are source artifacts for manual and automated QA. They should:
@@ -108,20 +135,22 @@ Feature files under `docs/qa/<issue>/` are source artifacts for manual and autom
 Adapters may copy or split these files into a test tree, but the reviewed source feature files stay
 in `docs/qa/<issue>/`.
 
-## Adapter Handoff
+## Automation Handoff
 
-An adapter consumes reviewed artifacts:
+Automation consumes reviewed artifacts:
 
 - `run.json`;
 - all paths in `artifacts.feature_files`;
 - `test-design.md`;
-- the repository's existing test conventions.
+- the repository's existing test conventions;
+- any project/domain/framework skills already injected into the session.
 
-An adapter produces `automation-result.json` with this minimum shape:
+Automation produces `automation-result.json` with this minimum shape:
 
 ```json
 {
-  "adapter": "playwright-bdd",
+  "tool": "repo-specific-test-runner",
+  "skill": null,
   "status": "passed",
   "generated": ["tests/bdd/candidate-invoice.feature"],
   "results": [

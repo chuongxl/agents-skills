@@ -33,7 +33,8 @@ Use `resume_target` first:
 | `brainstorm` | read `brainstorm.md` |
 | `design` | read `design.md` |
 | `review` | read `review.md` |
-| `automation` | detect/read adapter, or finish without automation |
+| `automation` | read `automation.md`, or finish if automation is not requested or cannot run |
+| `automation-review` | read `automation-review.md` |
 | `finish` | read `finish.md` |
 | `done` or `null` | report current artifacts and stop unless the user asks for a new action |
 

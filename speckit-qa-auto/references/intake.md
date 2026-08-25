@@ -24,11 +24,14 @@ Invoke `xray-to-speckit` by name when Xray credentials are available. Write:
 Search the repository for existing `.feature` files outside `docs/qa/<issue>/` and keep their paths
 as dedup inputs. Record explicit `--related` and `--impact` hints as evidence, not verdicts.
 
-Run `scripts/detect-adapter.py <repo-root>` and record the result in `run.json`. A detected adapter
-does not change intake behavior.
+Record whether the user requested automation and whether the repository appears to have an existing
+test stack. Do not select a framework here, and do not encode Playwright, Cypress, Cucumber, or any
+other runner in core state. Project/domain/framework skills may be used later if they are already
+available in the session.
 
 ## State
 
 Create `docs/qa/<issue>/run.json` with `stage: discovered`, `resume_target: brainstorm`,
-`brainstorm.status: pending`, `review.status: pending`, and pre-design artifacts set to
+`brainstorm.status: pending`, `review.status: pending`, `automation.status: pending` when
+automation was requested or `not-requested` otherwise, and pre-design artifacts set to
 `{"feature_files": [], "test_design": null}`. Validate it before leaving intake.

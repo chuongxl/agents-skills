@@ -1,7 +1,7 @@
 # QA Review
 
 QA review is a required core gate after design and dedup, before automation or finish. It reviews
-the QA work product, not adapter implementation. The review is read-only.
+the QA work product, not automation implementation. The review is read-only.
 
 ## Inputs
 
@@ -13,10 +13,10 @@ Package only the evidence needed for review:
 - every source `.feature` path in `artifacts.feature_files`;
 - `existing-tests.feature` and `existing-tests-manual.md`, when present;
 - repository feature paths used for dedup;
-- adapter id only as handoff context.
+- automation request and likely handoff risks only as context.
 
-Do not rely on session history. Do not read adapter files unless the current route is already
-automation. Do not mutate source artifacts while reviewing.
+Do not rely on session history. Do not read framework-specific automation instructions unless they
+are already injected as project skills. Do not mutate source artifacts while reviewing.
 
 ## Execution Model
 

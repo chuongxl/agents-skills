@@ -29,7 +29,8 @@ Use these labels in `test-design.md`:
 | `SKIP` | same normalized scenario and steps already exist |
 | `REVIEW` | similar title exists, but steps differ or manual coverage needs judgement |
 
-Dedup does not decide automation scope. It tells the human and adapter what already exists.
+Dedup does not decide automation scope. It tells the human and any automation workflow what already
+exists.
 
 After labels are recorded in `test-design.md`, keep `review.status: pending` and route to
 `resume_target: review`.

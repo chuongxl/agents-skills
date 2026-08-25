@@ -1,8 +1,8 @@
 ---
 name: speckit-qa-auto
 description: |
-  Use when a Jira story, epic, or Xray test key needs framework-neutral QA test design, reviewed deduped BDD scenarios, resumable run state, and optional automation handoff without making Playwright, Cypress, or Cucumber.js part of the core workflow.
-compatibility: "Runs on GitHub Copilot, Claude Code, and OpenCode. Discovered from ~/.agents/skills/, ~/.claude/skills/, or ~/.config/opencode/skills/. Requires git, bash, Python 3, Jira credentials, and optional Xray credentials. Automation adapters require their own repository test framework."
+  Use when a Jira story, epic, or Xray test key needs framework-neutral QA test design, reviewed deduped BDD scenarios, resumable run state, and optional automation through repository conventions or injected project skills.
+compatibility: "Runs on GitHub Copilot, Claude Code, and OpenCode. Discovered from ~/.agents/skills/, ~/.claude/skills/, or ~/.config/opencode/skills/. Requires git, bash, Python 3, Jira credentials, and optional Xray credentials. Automation uses the target repository's existing test stack and any injected project skills."
 license: MIT
 allowed-tools: bash glob grep view create edit skill
 metadata:
@@ -19,8 +19,8 @@ intake or design, even when the user supplies a fresh `--issue`. A run that alre
 `docs/qa/<issue>/run.json` continues from `resume_target`; it is not restarted from Jira prose.
 
 After resume routing, read [references/protocol.md](references/protocol.md) once. The protocol is
-the core contract for artifact folders, `run.json`, feature files, coverage labels, and adapter
-handoff. Keep core outputs framework-neutral.
+the core contract for artifact folders, `run.json`, feature files, coverage labels, automation
+state, and result handoff. Keep core outputs framework-neutral.
 
 ## Router
 
@@ -33,24 +33,26 @@ Load only the reference needed for the current route:
 | Design or revise QA coverage | [references/design.md](references/design.md) | `test-design.md` and source `.feature` files under `docs/qa/<issue>/` |
 | Dedup existing coverage | [references/dedup.md](references/dedup.md) | stable `NEW` / `SKIP` / `REVIEW` labels |
 | QA review | [references/review.md](references/review.md) | reviewed artifacts and pass/change decisions |
-| Automation requested and adapter detected | one file under `adapters/` | `automation-result.json` and materialized test-tree files |
+| Automation requested | [references/automation.md](references/automation.md) | `automation-result.json` and materialized test-tree files when possible |
+| Automation code changed | [references/automation-review.md](references/automation-review.md) | reviewed automation output |
 | Final report, commit, or PR | [references/finish.md](references/finish.md) | final run report, validated state, optional branch/PR |
 
-Use `scripts/detect-adapter.py` to select an adapter. If it returns `null`, finish the core QA
-artifact workflow without automation. Do not bootstrap a framework from core; adapter setup is a
-project decision.
+When automation is requested, discover the repository's existing test stack and conventions. Use
+project, domain, or framework skills already available in the session as additional context. Do not
+bootstrap a framework from core and do not add framework-specific rules to this skill.
 
 ## Core Invariants
 
-- `docs/qa/<issue>/` is the source of truth. Test-tree files are derived adapter output.
+- `docs/qa/<issue>/` is the source of truth. Test-tree files are derived automation output.
 - `run.json` is the resume authority. Validate it with `scripts/validate-run-state.py` whenever it
   is created or updated.
 - Core references do not know about framework-specific selectors, helper objects, generation
   commands, or step wiring.
-- Adapters read reviewed artifacts and write automation results. They may not change the test
+- Automation reads reviewed artifacts and writes automation results. It may not change the test
   design to make automation pass.
 - QA review is required before automation or finish. Critical and Important findings route back to
-  design; they are not patched inside an adapter.
+  design; they are not patched inside automation code.
+- Automation review is required when automation code is created or changed.
 - Xray is read-only here. Imports or result uploads belong to the repository's CI, not this skill.
 - Missing Xray credentials warn and continue as `coverage.xray: unavailable`; missing Jira
   credentials stop intake.
@@ -62,8 +64,7 @@ project decision.
 - `--related <KEY>[,<KEY>...]` — optional evidence hints for intake/design.
 - `--impact "<flow>[, <flow>...]"` — optional impact hints kept separate from discovered coverage.
 - `--design-only` — stop after reviewed core artifacts and set `resume_target: automation`.
-- `--adapter <id>` — optional override when `scripts/detect-adapter.py` returns multiple plausible
-  adapters or the team has a custom adapter.
+- `--automation` — request repository-specific automation after reviewed QA artifacts exist.
 - `--pr` — request finish to prepare or open a PR after artifacts are validated and committed.
 
 ## Sub-Skill Dependencies
@@ -71,11 +72,8 @@ project decision.
 Invoke `jira-to-speckit` by name for ticket intake. Invoke `xray-to-speckit` by name for existing
 Xray coverage export. Refer to these skills by name only; never link outside this folder.
 
-## Adapter Files
+## Automation Extension
 
-- [adapters/playwright-bdd.md](adapters/playwright-bdd.md)
-- [adapters/cypress-cucumber.md](adapters/cypress-cucumber.md)
-- [adapters/cucumber-js.md](adapters/cucumber-js.md)
-
-Custom adapters are allowed when they follow [references/protocol.md](references/protocol.md)'s
-handoff contract and write `automation-result.json`.
+Framework or project-specific automation rules belong in injected repository skills, not in
+`speckit-qa-auto`. Those skills can combine with this one by reading the same artifact contract and
+writing `automation-result.json`.
