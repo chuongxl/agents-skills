@@ -37,6 +37,7 @@ Full instructions, dependency graph, prerequisites, and troubleshooting:
 - **speckit-code-review** — Deep code review comparing implementation against specifications
 - **jira-to-speckit** — Convert Jira tickets into Speckit-ready feature specifications
 - **xray-to-speckit** — Export the Xray tests that already cover a story, steps verbatim
+- **playwright-bdd-automation** — Implement and review Playwright-BDD automation from reviewed QA artifacts
 
 ## Comprehensive Skills Table
 
@@ -48,6 +49,7 @@ Full instructions, dependency graph, prerequisites, and troubleshooting:
 | [jira-to-speckit](./jira-to-speckit/README.md) | Jira-to-spec reader. Fetches a Jira issue, compacts it into a size-bounded Speckit-ready brief, and optionally writes a full-fidelity ticket snapshot for traceability. Does not read Xray (see `xray-to-speckit`) and does not run Speckit stages itself. | `.github/skills/` or `~/.agents/skills/` | GitHub Copilot, Claude, Local | Jira key (e.g., `DDM-1234`), Jira URL, `--issue <url>` | v0.6.0 / Alex Nguyen |
 | [xray-to-speckit](./xray-to-speckit/README.md) | Xray coverage reader. Discovers the Xray tests covering a story with one fixed JQL query, splits them by test type, and writes Cucumber tests as a concatenated `.feature` plus a Manual/Generic table carrying each test's steps verbatim from Xray's GraphQL API, each reported with its `description` so a caller can triage before reading steps. Read-only: no import, no test execution, no result upload. | `.github/skills/` or `~/.agents/skills/` | GitHub Copilot, Claude, Local | Jira story key (e.g., `MOM-1234`), Jira URL, `xray_output_path`, `xray_manual_output_path` | v0.1.0 / Alex Nguyen |
 | [speckit-qa-auto](./speckit-qa-auto/README.md) | Framework-neutral Jira-to-tests QA workflow. Resumes from `run.json`, fetches Jira and Xray evidence, requires QA brainstorming before design, requires QA review before automation or finish, writes `docs/qa/<issue>/` artifacts, designs deduped BDD scenarios, and can automate through repository conventions or injected project skills. Core still works without automation. | `.github/skills/` or `~/.agents/skills/` | GitHub Copilot, Claude, Local | `--issue <story\|epic\|test-key>`, `--impact "<flow>[, <flow>]"`, `--related <KEY>[,<KEY>]`, `--design-only`, `--automation`, `--pr` | v0.4.0 / Alex Nguyen |
+| [playwright-bdd-automation](./playwright-bdd-automation/README.md) | Playwright-BDD automation extension. Discovers, implements, runs, and reviews automation from reviewed Gherkin or `speckit-qa-auto` artifacts in repositories that already use `playwright-bdd`, with built-in default conventions that do not require a project-specific automation skill. | `.github/skills/` or `~/.agents/skills/` | GitHub Copilot, Claude, Local | Playwright-BDD repo, reviewed `.feature`, `automation-result.json`, `speckit-qa-auto --automation` | v0.1.0 / Alex Nguyen |
 
 ### Companion configuration
 
