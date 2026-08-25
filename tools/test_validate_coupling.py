@@ -141,6 +141,46 @@ def test_shared_leaf_citing_a_sibling_is_not_a_c3_error(tmp: Path) -> None:
            check_skill(skill) == [])
 
 
+def test_modular_layout_is_accepted(tmp: Path) -> None:
+    skill = build(tmp / "modular-clean", {
+        "SKILL.md":
+            "Read [protocol](references/protocol.md), [resume](references/resume.md), "
+            "and [adapter](adapters/playwright-bdd.md).\n",
+        "references/protocol.md": "Artifact contract.\n",
+        "references/resume.md": "Resume first.\n",
+        "adapters/playwright-bdd.md": "Adapter contract.\n",
+    })
+    expect("modular references and adapters are accepted", check_skill(skill) == [])
+
+
+def test_modular_reference_linking_to_adapter_is_an_error(tmp: Path) -> None:
+    skill = build(tmp / "modular-ref-link", {
+        "SKILL.md":
+            "Read [protocol](references/protocol.md) and "
+            "[adapter](adapters/playwright-bdd.md).\n",
+        "references/protocol.md": "See [Playwright](../adapters/playwright-bdd.md).\n",
+        "adapters/playwright-bdd.md": "Adapter contract.\n",
+    })
+    errors = check_skill(skill)
+    expect("core references may not route to adapters", len(errors) == 1)
+    expect("error names the reference and adapter",
+           bool(errors)
+           and "references/protocol.md" in errors[0]
+           and "adapters/playwright-bdd.md" in errors[0])
+
+
+def test_modular_unrouted_adapter_is_an_error(tmp: Path) -> None:
+    skill = build(tmp / "modular-missing-route", {
+        "SKILL.md": "Read [protocol](references/protocol.md).\n",
+        "references/protocol.md": "Artifact contract.\n",
+        "adapters/playwright-bdd.md": "Adapter contract.\n",
+    })
+    errors = check_skill(skill)
+    expect("adapter files must be routed from SKILL.md", len(errors) == 1)
+    expect("error names the unrouted adapter",
+           bool(errors) and "adapters/playwright-bdd.md" in errors[0])
+
+
 def main() -> int:
     with tempfile.TemporaryDirectory() as raw:
         tmp = Path(raw)
@@ -153,6 +193,9 @@ def main() -> int:
         test_declared_backtick_citation_is_accepted(tmp)
         test_artifact_and_stage_filenames_are_not_citations(tmp)
         test_shared_leaf_citing_a_sibling_is_not_a_c3_error(tmp)
+        test_modular_layout_is_accepted(tmp)
+        test_modular_reference_linking_to_adapter_is_an_error(tmp)
+        test_modular_unrouted_adapter_is_an_error(tmp)
     print()
     if FAILURES:
         print(f"{len(FAILURES)} check(s) failed")

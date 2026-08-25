@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Enforce the reference-file coupling rules from the speckit-qa-auto design.
 
-Two rules, both from spec section 11.2:
+Legacy pipeline rules, from the original stage design:
 
   C1  A file under references/shared/ links to no other file in the skill.
       Shared files are leaves: they may be loaded, they load nothing.
@@ -17,6 +17,16 @@ Two rules, both from spec section 11.2:
       C3 reads citations, not links, because every link in a stage file already
       sits on that file's own Loads: line — a link-based check would be
       tautologically satisfied while real violations stood.
+
+Modular protocol rules, from the thin-orchestrator redesign:
+
+  C4  A direct file under references/ links to no other reference or adapter.
+      Core references are independent protocol pages; they are loaded by the
+      orchestrator, not by each other.
+  C5  A file under adapters/ does not link to another adapter. Adapter choice is
+      owned by the router.
+  C6  Every direct references/*.md and adapters/*.md file is linked from
+      SKILL.md. Progressive disclosure only works if entry routing is visible.
 
 Opt-in per skill by explicit argument, so skills that were never designed
 against these rules are left alone. Stdlib only; run with:
@@ -38,6 +48,8 @@ from validate_skills import relative_links  # noqa: E402
 
 SHARED = "references/shared"
 PIPELINE = "references/pipeline"
+REFERENCES = "references"
+ADAPTERS = "adapters"
 
 LOADS_RE = re.compile(r"^Loads:(.*?)(?:\n\n|\Z)", re.S | re.M)
 CITATION_RE = re.compile(r"`([a-z0-9][a-z0-9-]*\.md)`")
@@ -58,9 +70,32 @@ def _markdown_files(skill_dir: Path) -> list[Path]:
     return sorted(p for p in skill_dir.rglob("*.md") if p.is_file())
 
 
+def _is_direct_child(rel: str, parent: str) -> bool:
+    prefix = parent + "/"
+    return rel.startswith(prefix) and rel[len(prefix):].count("/") == 0
+
+
+def _skill_routes(skill_dir: Path) -> set[str]:
+    skill_md = skill_dir / "SKILL.md"
+    if not skill_md.is_file():
+        return set()
+    routes: set[str] = set()
+    for link in relative_links(skill_md.read_text(encoding="utf-8")):
+        target = link.split("#", 1)[0].strip()
+        if not target or not target.endswith(".md"):
+            continue
+        resolved = (skill_md.parent / target).resolve()
+        try:
+            routes.add(resolved.relative_to(skill_dir.resolve()).as_posix())
+        except ValueError:
+            continue
+    return routes
+
+
 def check_skill(skill_dir: Path) -> list[str]:
     """Return a list of coupling errors; empty means the skill is clean."""
     errors: list[str] = []
+    routes = _skill_routes(skill_dir)
     for path in _markdown_files(skill_dir):
         rel = path.relative_to(skill_dir).as_posix()
         try:
@@ -89,6 +124,19 @@ def check_skill(skill_dir: Path) -> list[str]:
                     f"{rel}: stage files must not reference each other, "
                     f"but links to {target_rel}"
                 )
+            elif _is_direct_child(rel, REFERENCES) and (
+                target_rel.startswith(REFERENCES + "/")
+                or target_rel.startswith(ADAPTERS + "/")
+            ):
+                errors.append(
+                    f"{rel}: core references are leaves and must be routed by "
+                    f"SKILL.md, but links to {target_rel}"
+                )
+            elif rel.startswith(ADAPTERS + "/") and target_rel.startswith(ADAPTERS + "/"):
+                errors.append(
+                    f"{rel}: adapter files must not route to other adapters, "
+                    f"but links to {target_rel}"
+                )
 
         if not rel.startswith(PIPELINE + "/"):
             continue
@@ -105,6 +153,14 @@ def check_skill(skill_dir: Path) -> list[str]:
                     f"`Loads:` line — a cited leaf that goes undeclared is read "
                     f"from memory instead of from the file"
                 )
+
+    for path in _markdown_files(skill_dir):
+        rel = path.relative_to(skill_dir).as_posix()
+        if (
+            _is_direct_child(rel, REFERENCES)
+            or rel.startswith(ADAPTERS + "/") and rel.endswith(".md")
+        ) and rel not in routes:
+            errors.append(f"{rel}: not routed from SKILL.md")
     return errors
 
 

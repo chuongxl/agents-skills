@@ -1,338 +1,147 @@
 # speckit-qa-auto test cases
 
-Scope: one case per acceptance criterion in design spec §12
-(`docs/superpowers/specs/2026-08-19-speckit-qa-auto-design.md`), extended by
-`2026-08-20-…-impact-analysis-design.md` (AC13–AC36) and
-`2026-08-21-…-approach-gate-design.md` §9.1 (AC37–AC56) and
-`2026-08-22-…-gate-usability-design.md` (AC57–AC76). AC05–AC09 carry the design's real
-risk and are written as executable scenarios — concrete preconditions and commands, not prose —
-because each is exactly the case a plausible-looking implementation would silently fail.
+Scope: regression contract for the modular `speckit-qa-auto` architecture introduced in version
+`0.4.0`. The suite tests the installed skill as one entrypoint with a framework-neutral core,
+required QA brainstorming, required QA review, machine-readable `run.json` state, resume-first
+routing, and optional automation adapters.
 
-| ID | Spec §12 item | Scenario | Preconditions | Steps | Expected result |
-|---|---|---|---|---|---|
-| AC01 | 1 | Validator passes | `speckit-qa-auto/` and its reference files are committed | Run `python3 tools/validate_skills.py` from repo root | Exit code `0`; `speckit-qa-auto` reported with `0` error(s) and `0` warning(s) |
-| AC02 | 2 | Version rows agree | `speckit-qa-auto/SKILL.md` and `jira-to-speckit/SKILL.md` carry front-matter `version:`; `README.md` lists both skills | Read the version field from `speckit-qa-auto/SKILL.md`; read the `speckit-qa-auto` row in `README.md`; read the version field from `jira-to-speckit/SKILL.md`; read the `jira-to-speckit` row in `README.md` | `README.md`'s `speckit-qa-auto` row version equals `speckit-qa-auto/SKILL.md`'s version; `README.md`'s `jira-to-speckit` row reads `v0.5.0` and `jira-to-speckit/SKILL.md`'s front-matter version reads `0.5.0` |
-| AC03 | 3 | `jira-to-speckit` backward compatibility | `.env` has valid Jira credentials; a resolvable issue key | Invoke `jira-to-speckit` supplying only `issue` and `ticket_output_path`, omitting `xray_tests` entirely | Exactly one file is written (`ticket_output_path`); no `XRAY_CLIENT_ID`/`XRAY_CLIENT_SECRET` lookup occurs; no request reaches `xray.cloud.getxray.app`; the brief follows the same output template `0.2.0` produced, with no Xray section |
-| AC04 | 4 | Test-case file exists | None | Run `ls test-case/speckit-qa-auto/test-cases.md` | File exists and follows the column shape of `test-case/speckit-auto/test-cases.md` (scenario / preconditions / steps / expected result) |
-| AC05 | 5 | Workspace baseline regression | See "AC05 — Workspace baseline regression" below | See below | See below |
-| AC06 | 6 | Frontend baseline regression | See "AC06 — Frontend baseline regression" below | See below | See below |
-| AC07 | 7 | Dedup determinism | See "AC07 — Dedup determinism" below | See below | See below |
-| AC08 | 8 | Blocked-scenario round trip | See "AC08 — Blocked-scenario round trip" below | See below | See below |
-| AC09 | 9 | Selector evidence branch | See "AC09 — Selector evidence branch" below | See below | See below |
-| AC10 | 10 | Coupling check | `speckit-qa-auto/` complete | Run `python3 tools/validate_coupling.py speckit-qa-auto` | Output `speckit-qa-auto: ok` — no file under `references/shared/` links to another reference file, and no file under `references/pipeline/` links to another stage file |
-| AC11 | 11 | Dry run reaches Stage 02 human gate | Reference repository (`om-mom-e2e-playwright`) checked out; Jira and Xray credentials configured in `.env`; a real story key in that project | Run `/speckit-qa-auto --issue <real-story-key>` in default mode against the reference repo checkout, through Stage 01 and Stage 02 up to (not past) step 2.8 | The run reaches the Stage 02 human gate presenting a coverage matrix covering every acceptance criterion in the story, a selector map with every element resolved (no unresolved rows), and dedup labels (`NEW`/`UPDATE`/`SKIP`/`REVIEW`) against the story's existing Xray tests |
-| AC12 | C3 | Cited leaves are declared | `speckit-qa-auto/` complete | Run `python3 tools/validate_coupling.py speckit-qa-auto` | Output `speckit-qa-auto: ok` — every shared leaf a stage file cites in backticks is named on that stage's `Loads:` line. Run against the tree as it stood before this change's stage-file edits, the same command reports four errors: `stage-03` citing `repo-profile.md` and `commit.md`, `stage-04` citing `gherkin-conventions.md` and `selector-verification.md`. That the check was demonstrated to fail is what distinguishes a passing run from an unexercised one |
-| AC13 | §9.1.1 | Depth resolved before the sweep | A run has reached the end of Stage 01 | Read `execution-report.md`'s run-state block | `run.design_depth` is present and is written before `impact.*`, with the reason recorded |
-| AC14 | §9.1.2 | Impact sweep is sequenced, not concurrent | `speckit-qa-auto/` complete | Read `references/shared/discovery.md`'s sweep section and `references/pipeline/stage-01-intake.md` step 9 | `discovery.md`'s no-ordering claim is scoped to the three sweeps; step 9 states it runs after step 8 and why |
-| AC15 | §9.1.3 | Unrun sweep is distinguishable from an empty one | A run where the frontend source is absent | Read `impact.ran` and `impact.reason` in `execution-report.md` | `ran: false` with a reason, distinct from `ran: true` with `candidates: []` |
-| AC16 | §9.1.4 | Declarations and findings stay separate | A run invoked with `--impact "Change Setting"` where the sweep also finds that flow | Read `impact.declared[]` and `impact.candidates[]` | Both fields are present; the flow appears in `candidates[]` with `source: both`; `declared[]` is not merged away |
-| AC17 | §9.1.5 | A candidate is satisfied by a scenario or a drop | A gate revision drops a candidate's only scenario, then self-review re-runs | Re-run Stage 02 step 2.7 | The check passes, satisfied by the `impact.dropped_scenarios[]` entry; the run does not reach three consecutive failures |
-| AC18 | §9.1.6 | Impact file forbids UPDATE and SKIP | An impact scenario whose normalized key matches an existing Cucumber test | Read the impact `.feature` and `design.scenarios[]` | The label is `REVIEW-OVERLAP <TEST-key>`; no `UPDATE` or `SKIP` appears in the impact file |
-| AC19 | §9.1.7 | @REQ_ sits at Feature level in both files | A run that designed impact scenarios | Read both `.feature` files in `run.artifact_dir` | `@REQ_<STORY-KEY>` appears at Feature level in each; not at Scenario level |
-| AC20 | §9.1.8 | adversarial_review has three values | `speckit-qa-auto/` complete | `grep -rn "not-run" speckit-qa-auto/references/shared/run-state.md` | The only occurrence is rule 11's explanation of why the value was removed; the enum lists three values |
-| AC21 | §9.1.9 | Review rounds are bounded at three | A run whose reviewer returns findings on every round | Read `design.review_rounds` and `design.adversarial_review` | `review_rounds` never exceeds 3; leaving round 3 with findings open writes `issues-open` |
-| AC22 | §9.1.10 | A depth raise re-runs the sweep | A 2.7b finding raises `run.design_depth` | Read `run.depth_raised_in_02` and `impact.entities` | `depth_raised_in_02: true`; the sweep re-ran at the wider breadth; no `sweep_breadth_stale` field exists anywhere |
-| AC23 | §9.1.11 | Nothing authors Gherkin at the gate | A human names a flow nobody found, at 2.8 | Follow the run | The addition returns to 2.4b, passes 2.7 and 2.7b, and comes back to the gate; the 2.8 next-hop table is unchanged |
-| AC24 | §9.1.12 | trivial depth still runs every check | A run classified `design_depth: trivial` | Read `test-design.md` and `execution-report.md` | Step 2.1 read the whole ticket; 2.7b ran; the 2.8 gate ran with its impact section |
-| AC25 | §9.1.13 | The review degrades to inline | A host with no subagent-dispatch capability | Run Stage 02 through 2.7b | The review runs with the same prompt and tasks; `design.review_mode: inline` is recorded and shown at the gate |
-| AC26 | §9.1.14 | A pending run writes both files and stops | A story whose code has not landed, with impact candidates found | Run Stage 01–02 | Both `.feature` files are written; the run ends after Stage 02 with `run.resume_from: 02.4` |
-| AC27 | §9.1.15 | selector_evidence roll-up excludes api and manual | A landed run whose scope holds only `surface: api` scenarios | Read `design.selector_evidence` and each `design.scenarios[].selector_evidence` | Each scenario carries `n/a`; the roll-up is `n/a`, never `deferred`; Turn-Ending Condition 11 does not fire |
-| AC28 | §9.1.16 | Stage 03 does not widen the run command | A run with approved impact scenarios | Read `scoped_run_cmd` as executed at 3.3 | It covers only scenarios holding `design.scenarios[]` entries; no pre-existing test of an impact flow is pulled in |
-| AC29 | §9.1.17 | Findings and drops survive | A run where the reviewer raised findings and the human dropped a scenario | Read `test-design.md` §9 and `impact-candidates.md` | Every finding appears with its disposition, rejected ones included; every dropped scenario appears with its reason |
-| AC30 | §9.1.18 | epic fans out fields, not folders | An `epic` anchor with two children | Read `run.artifact_dir` and `impact.by_child` | One artifact folder, named for the epic; one impact file per child inside it; per-child values under `impact.by_child` |
-| AC31 | §9.1.18b | test anchor runs the fidelity set | A `test` anchor conversion run | Read the reviewer prompt as dispatched | Attack tasks 1 and 3 are replaced by the bidirectional fidelity task; an `epic` of conversions receives the same |
-| AC32 | §9.1.19 | Version agrees in three places | `speckit-qa-auto/` complete | Run `python3 tools/validate_skills.py` | Exit `0`; `speckit-qa-auto` reports `0` errors; `SKILL.md`, the skill README, and the root README row all read `0.3.0` |
-| AC33 | §9.1.20 | C3 was demonstrated to fail | `speckit-qa-auto/` complete | Run `python3 tools/validate_coupling.py speckit-qa-auto`; then run it against the tree before this change's stage-file edits | `ok` now; four errors before — `stage-03` citing `repo-profile.md` and `commit.md`, `stage-04` citing `gherkin-conventions.md` and `selector-verification.md` |
-| AC34 | §9.1.21 | Impact scenarios carry a dedup label at creation | A run where 2.7b added an impact scenario on a loop | Read `design.scenarios[]` for entries with `origin: adversarial-review` | Each carries a `dedup` value; none is unlabelled when 2.7 re-runs |
-| AC35 | §9.1.22 | The impact gate is turn-ending condition 12 | `speckit-qa-auto/` complete | Read `references/shared/operating-rules.md`'s turn-ending list | Condition 12 names the Stage 02 gate's impact section with no answer given |
-| AC36 | §9.1.23 | @IMPACT is skill-owned and out of the filter | A run that designed impact scenarios | Read `profile.existing_tags` and `scoped_run_cmd` | `@IMPACT` is absent from `existing_tags` and absent from the tag filter |
+These cases supersede the Stage 01-04 cases from the former prose pipeline. No case may depend on
+`references/pipeline/`, `references/shared/`, `execution-report.md`, selector maps, page objects, or
+Playwright-BDD unless the Playwright adapter is the explicit subject of the case.
 
-| AC37 | §9.1 | The gate precedes authored Gherkin | A run stopped at step 2.2b | Read the run-state block and list `run.artifact_dir` | `design.approach_chosen` is present; no `.feature` file exists in the artifact folder yet |
-| AC38 | §9.1 | No fourth classifier | `speckit-qa-auto/` complete | `grep -nE 'engagement\|approach_path\|spike\|bounded\|architectural' speckit-qa-auto/references/shared/run-state.md` | No classifier field beyond `run.design_depth`; the three-path vocabulary appears nowhere as a field |
-| AC39 | §9.1 | Ceremony scales, approval does not | A run classified `design_depth: trivial`, taken through 2.2b | Read `design.approach_*` and `test-design.md` | `approach_alternatives[]` holds at least one rejected entry; an answer was taken; every 2.7 check still ran |
-| AC40 | §9.1 | One gate per epic | An `epic` anchor with two children | Follow the run through 2.2b | Exactly one approach presentation, carrying per-child depth; one artifact folder |
-| AC41 | §9.1 | `test` anchor takes no approach menu | A `test`-anchor conversion run at 2.2b | Read what the gate presented and `design.approach_chosen` | No alternatives menu; the third section confirms batch scope; `approach_chosen: faithful-conversion` |
-| AC42 | §9.1 | Rejected alternatives survive | A run approved at 2.2b, read after 2.8 | Read `design.approach_alternatives[]` and `test-design.md` §0 | Each rejected alternative appears in both, with its `rejected_because` |
-| AC43 | §9.1 | Unrun dedup removes an option, not the gate | A run where Stage 01 could not reach Xray | Follow the run through 2.2b | The gate runs; the coverage-leaning approach is absent; the reason Stage 01 recorded is stated |
-| AC44 | §9.1 | 2.2b is turn-ending 14, not a resume point | `speckit-qa-auto/` complete | Read `operating-rules.md`; `grep -rn '02\.2b' speckit-qa-auto/references/shared/run-state.md` | Condition 14 names 2.2b; no `resume_from` value `02.2b` exists |
-| AC45 | §9.1 | An approach-caused finding routes to 2.2b | A 2.7b finding fixable only by changing the approach | Follow the loop | The run re-enters 2.2b, re-runs 2.7, re-reviews; `design.approach_revised_in_02: true`; `design.review_rounds` never exceeds 3 |
-| AC46 | §9.1 | The reviewer keeps three tasks | Read `assets/adversarial-review-prompt.md` as dispatched | Count the tasks in the `story` set; read Calibration | Three tasks, not four; the do-not-re-litigate clause is present |
-| AC47 | §9.1 | Drift is visible at 2.8 | A run whose 2.3 output departs from the approved approach | Read the 2.8 Depth section | It shows `approach_chosen` beside the delivered surfaces, and the departure is stated |
-| AC48 | §9.1 | Version agrees in three places | `speckit-qa-auto/` complete | `python3 tools/validate_skills.py`; `python3 tools/validate_coupling.py speckit-qa-auto` | Exit `0`, `0` errors; `SKILL.md`, the skill README, and the root README row all read `0.5.0` |
-| AC49 | §9.1 | The question boundary holds | A run with one ticket ambiguity and one how-to-test question | Read `test-design.md` Open Questions and `design.approach_questions[]` | The first is in Open Questions or was asked at 2.1; the second is in `approach_questions[]`; neither is in both |
-| AC50 | §9.1 | Description costs no extra call | `jira-to-speckit/` complete | Read `references/XRAY_API.md` §4 | `description` appears in the existing `fields=` list; no new endpoint and no second request is specified |
-| AC51 | §9.1 | The index covers both corpora | A run whose Xray query returned Cucumber and Manual tests | Read `existing-tests-index.md` | A row for every test in both exports; a test whose issue has no description reads `no description`, not an empty cell |
-| AC52 | §9.1 | Triage orders attention, never input | A run where several manual tests have no description | Read `existing-tests-manual.md` and the 2.2 labels | Every such test still appears in full and still carries a dedup label; no test is absent from a corpus because of its index row |
-| AC53 | §9.1 | The block is not in the `.feature` | A run that reached 2.8 | `grep -n 'Test Objective' <artifact_dir>/*.feature` | No match in any `.feature`; the block is present in `test-design.md` §0b |
-| AC54 | §9.1 | The numbered list cannot drift | A run where a scenario was renamed at the 2.8 gate | Compare §0b's list against `design.scenarios[]` after the revision | Matching in count and order; 2.7 re-ran and passed |
-| AC55 | §9.1 | Each scenario set has its own block | One run that designed impact scenarios, one that did not | Read `test-design.md` §0b in each | Two blocks in the first, one in the second; the impact block's objective names invariants, not the feature |
-| AC56 | §9.1 | `jira-to-speckit` version agrees | Repository complete | `python3 tools/validate_skills.py` | Exit `0`; `jira-to-speckit/SKILL.md` and its root README row both read `0.5.0`; AC02 asserts `v0.5.0` |
-| AC57 | GU | Presentation leaf is a leaf | `speckit-qa-auto/` complete | Read `references/shared/gate-presentation.md`; run `python3 tools/validate_coupling.py speckit-qa-auto` | The file opens with the leaf header ("links to no other file, and reads none"); coupling check reports `speckit-qa-auto: ok` |
-| AC58 | GU | Every asking step declares the leaf | `speckit-qa-auto/` complete | Read the `Loads:` line of `stage-02-test-design.md`, `stage-03-automate.md`, `stage-04-finish.md` | All three name `gate-presentation.md`. `stage-03` declares it for the selector gate, since `selector-verification.md` is a leaf and cannot |
-| AC59 | GU | Shipped skill names no external skill | `speckit-qa-auto/` complete | Run `grep -rniE 'brainstorming\|superpowers' speckit-qa-auto/` | No match. Provenance for the leaf's rules lives only in `docs/superpowers/specs/2026-08-22-…-design.md` |
-| AC60 | GU | Depth table has no Questions column | `speckit-qa-auto/` complete | Read the `design_depth` table at step 2.2b in `stage-02-test-design.md` | Columns are `design_depth`, `Approaches presented`, `Approval` — no Questions column |
-| AC61 | GU | No file caps questions by depth | `speckit-qa-auto/` complete | Grep the reference tree for a question count bounded by `design_depth` | No stage or leaf bounds the number of questions by depth; `SKILL.md` states depth never scales how many questions are asked |
-| AC62 | GU | Rule 12 names reading and asking | `speckit-qa-auto/` complete | Read `run-state.md` rule 12 | It forbids depth scaling both what requirement analysis reads and what is asked |
-| AC63 | GU | Assumptions are written down | A run has passed step 2.1 with at least one ambiguity resolved by assumption rather than by asking | Read Open Questions in `test-design.md` | The assumption appears, named as an assumption, with the reading that was taken |
-| AC64 | GU | Depth is never presented | A run has reached both Stage 02 gates | Read everything the run presented to the human at 2.2b and 2.8 | `design_depth` and its values (`trivial`, `standard`, `cross-cutting`) appear nowhere in it; `run-state.md` still records the field with its reason |
-| AC65 | GU | Drift check survives | `speckit-qa-auto/` complete | Read the 2.8 gate section list in `stage-02-test-design.md` | A section presents the agreed approach beside the surfaces actually delivered, and its name contains no field name |
-| AC66 | GU | Section count matches the list | `speckit-qa-auto/` complete | Count the rows of the 2.8 gate section table and compare to the sentence introducing it | Both read five |
-| AC67 | GU | Alternatives ride the choices | A run has reached the approach gate | Read the question text the gate emitted | It contains one question and no serialized list of approaches; each alternative is a separate choice carrying its own trade-off, recommendation first. On a host with no structured question tool, the alternatives are a labelled list beneath a one-sentence question |
-| AC68 | GU | Candidates carry an axis, not a verdict | A run has completed Stage 01 | Read `discovery.related_candidates[]` in `execution-report.md` | Every entry carries `matched_by` from the five-value set; no entry carries a relevance or coverage judgement |
-| AC69 | GU | Stage 01 records, never reads | A run has completed Stage 01 | Read `discovery.related_candidates[]` and check `discovery.related_read[]` | Entries hold key, summary and `matched_by` only — no descriptions or comments; `related_read` is absent, not an empty list |
-| AC70 | GU | The human picks what is read | A run has passed the approach gate having chosen a subset of candidates | Read `discovery.related_read[]`, then the design inputs | Only chosen candidates had content read; every candidate still appears in `discovery.related_candidates[]`; no dedup or coverage label is derived from a candidate's absence from `related_read` |
-| AC71 | GU | `--related` is documented and reaches the axis | `.env` configured; a resolvable story key and one related key | Run the pipeline with `--related <KEY>` through Stage 01; read `SKILL.md`, the skill `README.md`, and root `README.md` | The flag is documented in all three; `<KEY>` appears in `discovery.related_candidates[]` with `matched_by: declared` |
-| AC72 | GU | Text axis is bounded | A run on a project with many issues matching the ticket's screen name | Read the sweep's returned entries and `discovery.ran` | Results are confined to the anchor's project, capped, and accompanied by a count of what was truncated |
-| AC73 | GU | Every scenario carries a priority | A run has completed step 2.3, including at least one scenario converted from a Manual test | Read `design.scenarios[].priority` for every scenario | Every scenario has a value on the project's Jira scale; the happy path matches `ticket.md`'s priority; negative and edge cases sit one and two levels below, floored at the lowest; the converted scenario carries its Manual source's priority rather than a derived one |
-| AC74 | GU | Priority tag is present and owned | A run has written its `.feature` file | Read the tag table in `gherkin-conventions.md` and every scenario in the generated `.feature` | `@Priority_<Level>` is listed as skill-owned at scenario level; every scenario carries exactly one, matching `design.scenarios[].priority`; no `existing_tags` entry was renamed or removed |
-| AC75 | GU | Gates degrade to prose | A host with no structured question tool | Run through the approach gate | Every gate is presented as prose keeping the contract: one sentence asking, a labelled list of alternatives, recommendation first. The leaf states this degradation explicitly |
-| AC76 | GU | Validator passes, no escaping link | `speckit-qa-auto/` complete | Run `python3 tools/validate_skills.py` from repo root | Exit code `0`; `speckit-qa-auto` reports `0` error(s) and `0` warning(s); no reference file links outside the skill folder |
+Status values used while recording a run: `PASS`, `FAIL`, `BLOCKED`, `NOT RUN`.
 
-## AC05 — Workspace baseline regression
+## Repository and packaging
 
-Proves what a `git status --porcelain` string comparison misses: an already-dirty path keeps the
-same status letter through any further edit, so a status-string check cannot see the second edit.
+| ID | Scenario | Preconditions | Steps | Expected result |
+|---|---|---|---|---|
+| PKG-01 | Skill validation passes | Repository checkout contains the complete change | Run `python3 tools/validate_skills.py` | Exit `0`; every skill reports `PASS`; `speckit-qa-auto` has 0 errors and 0 warnings |
+| PKG-02 | Validator self-tests pass | None | Run `python3 tools/test_validate_skills.py` | Exit `0`; output ends with `all self-tests passed` |
+| PKG-03 | Modular coupling passes | `speckit-qa-auto/SKILL.md` routes every direct reference and adapter | Run `python3 tools/validate_coupling.py speckit-qa-auto`, then `python3 tools/test_validate_coupling.py` | Both exit `0`; the first prints `speckit-qa-auto: ok`; the self-test proves an unrouted module and a core-to-adapter link are rejected |
+| PKG-04 | Helper-script regression passes | Python 3 available | Run `python3 tools/test_speckit_qa_auto_scripts.py` | Exit `0`; state validation, adapter detection, and Gherkin dedup checks pass |
+| PKG-05 | Version is consistent | None | Compare `metadata.version` in `speckit-qa-auto/SKILL.md`, `**Version**` in its README, and the root README badge | All three are `0.4.0` |
+| PKG-06 | Skill installs as one self-contained folder | Empty temporary agent skill directory | Copy only `speckit-qa-auto/` into the directory; inspect all relative links; invoke it with a prepared resumable artifact folder | Every relative link resolves inside the copied folder; the entrypoint loads core references and adapters from that folder; no deleted pipeline/shared file is requested |
 
-**Preconditions**
+## Resume-first routing
 
-- The source checkout (not the pipeline's worktree) already has, before Stage 01 runs:
-  - one tracked file with an uncommitted local edit — e.g. `README.md` has an unstaged one-line
-    change
-  - one untracked file already present and not gitignored — e.g. `scratch-notes.txt` at the repo
-    root, containing one line of text
-- Stage 01 step 2 has captured `workspace_baseline` (`workspace-guard.md`, "The Two Baseline
-  Schemas") against the checkout in exactly this dirty state: `head_sha`, `worktree_diff_sha256`
-  ( `git diff --binary HEAD` ), `index_diff_sha256` ( `git diff --cached --binary HEAD` ), and the
-  `untracked` list including `scratch-notes.txt` with its size and sha256.
+| ID | Scenario | Preconditions | Steps | Expected result |
+|---|---|---|---|---|
+| RES-01 | Existing issue resumes instead of restarting | Valid `docs/qa/MOM-1234/run.json` with `resume_target: automation`; invoke with `--issue MOM-1234` | Start `speckit-qa-auto` and record the first route after state validation | The existing state is selected and automation routing starts; Jira intake is not rerun merely because the issue was supplied |
+| RES-02 | One implicit run resumes without an issue argument | Exactly one valid `docs/qa/**/run.json` has a resumable target | Invoke `speckit-qa-auto` without `--issue` | The run is validated and routed from `resume_target`; no issue-key question is asked |
+| RES-03 | Multiple implicit runs require a choice | Two valid resumable `run.json` files exist; no `--issue` | Invoke the skill | It lists or identifies the candidate runs and asks which one to resume; it does not choose by modification time |
+| RES-04 | Broken state blocks restart | A matching `run.json` has invalid JSON, an invalid enum, or an artifact path outside its run folder | Invoke with the matching issue | The skill stops with the validator error and names the invalid field/path; it does not restart intake or overwrite state |
+| RES-05 | `resume_target` controls routing | Valid state has `stage: automation-complete` and `resume_target: finish` | Invoke the skill | It reads the finish route; `stage` is reported only as audit context |
+| RES-06 | Completed run is read-only by default | Valid state has `resume_target: done` or `null` | Invoke without requesting a new action | Current artifacts are reported and no artifact is rewritten |
+| RES-07 | New issue routes to intake | No matching run exists; invoke with `--issue MOM-1234` | Start the skill | It enters intake after the resume search; no design or adapter reference is loaded first |
+| RES-08 | No issue and no run stops cleanly | No `docs/qa/**/run.json`; invoke without `--issue` | Start the skill | It asks for an issue key and creates no artifact folder |
+| RES-09 | Changed Jira ticket routes back to design | Valid run and `ticket.md` snapshot exist; Jira `updated` is later than the snapshot | Resume the run through its next Jira read | `ticket.md` is refreshed, the delta is recorded in `test-design.md`, and `resume_target` routes to design review before automation |
+| RES-10 | Unchanged Jira ticket causes no artifact churn | Same setup as RES-09, but Jira `updated` is not later | Resume and compare artifact hashes before/after freshness checking | Existing artifacts are unchanged solely because resume ran; routing continues from stored `resume_target` |
+| RES-11 | Brainstorm route is first-class | Valid state has `stage: discovered`, `resume_target: brainstorm`, and `brainstorm.status: pending` | Invoke the skill | It reads the brainstorm route; no design artifact is written before the approach is approved |
+| RES-12 | Review route is first-class | Valid state has `stage: design-approved`, `resume_target: review`, approved brainstorm, and `review.status: pending` | Invoke the skill | It reads the review route; no adapter is loaded before review passes |
 
-**Steps**
+## Intake and evidence
 
-1. Run `git status --porcelain` against the source checkout. Record the two lines, e.g.
-   ` M README.md` and `?? scratch-notes.txt`.
-2. Without going through the pipeline, append a further line directly to `README.md` (the already-
-   modified tracked file) and append a further line directly to `scratch-notes.txt` (the already-
-   untracked file).
-3. Run `git status --porcelain` again. Compare to step 1.
-4. Run Stage 04's baseline verification (`workspace-guard.md`, "Capture Commands" + "On
-   Violation"): recompute `worktree_diff_sha256` and the `untracked` fingerprint for
-   `scratch-notes.txt`, and compare each to the values captured in the precondition.
+| ID | Scenario | Preconditions | Steps | Expected result |
+|---|---|---|---|---|
+| INT-01 | Missing Jira credentials stop intake safely | Remove one of `JIRA_URL`, `JIRA_USERNAME`, or `JIRA_API_TOKEN` from a temporary `.env` | Start a new run | Intake stops before calling Jira; output names the missing variable but prints no credential value; no valid run is claimed |
+| INT-02 | Missing Xray credentials degrade to unavailable | Valid Jira credentials; omit `XRAY_CLIENT_ID` and `XRAY_CLIENT_SECRET` | Start a new run through intake | `ticket.md` is written; the run continues with `coverage.xray: unavailable`; absence of Xray is reported as a warning, not a blocker |
+| INT-03 | Available Xray coverage is exported read-only | Valid Jira and Xray credentials; issue has Cucumber and Manual/Generic tests | Run intake | `xray-to-speckit` writes `existing-tests.feature` and `existing-tests-manual.md`; `coverage.xray: available`; no Xray import, mutation, or result upload occurs |
+| INT-04 | Repository features join dedup inputs | Repository contains `.feature` files outside the active `docs/qa/<issue>/` folder | Run intake and inspect recorded evidence | Existing repository feature paths are retained as dedup inputs; generated files in the active run folder are excluded from the existing corpus |
+| INT-05 | Declared related and impact values remain evidence | Invoke with `--related MOM-1200 --impact "invoice refresh"` | Run intake and continue to the brainstorm gate | Both hints are visible as declared evidence/assumptions; neither is silently promoted to a requirement or dedup verdict |
+| INT-06 | Adapter detection does not change core intake | Repository detects `playwright-bdd` | Run intake only | `run.json.adapter` records `playwright-bdd`; intake still produces only framework-neutral evidence and state; no test-tree file, selector, page object, or runner command is created/run |
+| INT-07 | Pre-design state is valid | Intake has written `ticket.md`, but no `test-design.md` or authored `.feature` exists yet | Validate the newly created `run.json` with `validate-run-state.py` | Exit `0` for `stage: discovered`, `resume_target: brainstorm`, and `brainstorm.status: pending`; design artifacts are required only once the run reaches a stage that claims they exist |
 
-**Expected result**
+## QA brainstorming
 
-- Step 3's `git status --porcelain` output is byte-identical to step 1's — ` M README.md` and
-  `?? scratch-notes.txt`, unchanged — proving a status-letter comparison alone would report no
-  violation for either path.
-- Step 4's content-addressed comparison shows `worktree_diff_sha256` differs from the captured
-  baseline (the `README.md` append is caught) **and** the untracked-file entry's sha256 for
-  `scratch-notes.txt` differs from the captured baseline (the untracked-file append is caught).
-- Both paths are reported as violations, with baseline and current hashes named. The run stops
-  before any commit. The source checkout is not reverted.
+| ID | Scenario | Preconditions | Steps | Expected result |
+|---|---|---|---|---|
+| BRN-01 | Brainstorming is mandatory after intake | Intake has produced `ticket.md`, existing coverage exports when available, and valid pending state | Continue the run | The skill loads `references/brainstorm.md`, summarizes evidence, and asks for or obtains approval before routing to design |
+| BRN-02 | Simple ticket still needs approach approval | Ticket has one clear acceptance criterion and no meaningful ambiguity | Continue through brainstorming | The skill presents a short recommended approach and records approval; it does not skip brainstorming because the ticket is small |
+| BRN-03 | Meaningful choices are proposed explicitly | Ticket has UI, API, regression, or manual trade-offs | Run brainstorming | The skill proposes 2-3 approaches with recommendation and trade-offs, then waits for human approval before design |
+| BRN-04 | Only design-changing questions are asked | Evidence has missing facts that do not affect scenario design | Run brainstorming | The skill does not ask irrelevant questions; when a question is needed, it asks one at a time |
+| BRN-05 | Related issue rules remain hypotheses | `--related` issue contains a rule absent from the anchor ticket | Run brainstorming | The rule is listed as a hypothesis and becomes a confirmed assumption only if the human confirms it |
+| BRN-06 | Adapter context stays framework-neutral | Repository detects `cypress-cucumber` or `playwright-bdd` | Run brainstorming | Adapter availability appears only as an execution trade-off; no adapter file is loaded and no selectors, glue, waits, or framework commands enter the core design |
+| BRN-07 | Approved brainstorm unlocks design | Human approves an approach | Inspect `run.json` | `brainstorm.status: approved`, non-empty `brainstorm.approach`, list fields are present, and `resume_target: design`; validator exits `0` |
 
-## AC06 — Frontend baseline regression
+## State and artifact protocol
 
-Proves that a parent repository's `git diff HEAD` sees a submodule only as a gitlink — a commit
-pointer — so it cannot catch an uncommitted edit to a file inside it, which is why the frontend
-gets its own baseline (§4 step 5, D12).
+| ID | Scenario | Preconditions | Steps | Expected result |
+|---|---|---|---|---|
+| STA-01 | Approved state validates | Create `docs/qa/MOM-1234/` with valid `run.json`, approved `brainstorm`, passed `review`, `ticket.md`, `test-design.md`, and one referenced `.feature` | Run `python3 speckit-qa-auto/scripts/validate-run-state.py docs/qa/MOM-1234/run.json` | Exit `0`; stdout is JSON with `"ok": true` |
+| STA-02 | Invalid enum is rejected | Copy STA-01 and set `stage: stage-02`, invalid `resume_target`, or invalid coverage value | Run the validator for each mutation | Each exits `1` and stderr names the invalid field and allowed contract |
+| STA-03 | Artifact path cannot escape the run folder | Copy STA-01 and point `test_design` or a feature path to another issue folder or `../` target | Run the validator | Exit `1`; stderr reports that the artifact escapes the run folder |
+| STA-04 | Claimed design artifact must exist | Approved state references a missing design or feature file | Run the validator | Exit `1`; stderr names the missing path |
+| STA-05 | Finish requires the core artifact set | A run reaches finish without `ticket.md`, `test-design.md`, any authored feature, or passed QA review | Run finish validation | Finish stops and reports each missing required artifact/state; it does not mark the run `finished` |
 
-**Preconditions**
+## Framework-neutral design
 
-- The repo profile resolves `frontend_source_root` to a submodule. Stage 01 step 4
-  (`git submodule update --init -- <path>` inside the worktree) succeeded, and step 5 captured
-  `frontend_baseline` over `<worktree>/<frontend_source_root>`.
-- `baselines.frontend_edits_approved` is `false` — no frontend edit was approved at Stage 02 step
-  2.4.
+| ID | Scenario | Preconditions | Steps | Expected result |
+|---|---|---|---|---|
+| DES-01 | Design covers Jira acceptance criteria | Intake and approved brainstorm artifacts contain a story with multiple acceptance criteria and existing coverage | Run design to its human gate | `test-design.md` maps each criterion to one or more scenarios or an explicit open gap; approved approach, existing coverage, and dedup rationale are visible |
+| DES-02 | Source Gherkin contains business behavior only | Design includes UI and API scenarios; an adapter was detected | Inspect every `.feature` under the active run folder | Files contain requirement tags, stable scenario names, context, and business outcomes; they contain no selectors, locator syntax, page/helper names, waits, Cypress commands, Playwright APIs, or Cucumber.js glue |
+| DES-03 | Borrowed rules stay assumptions until confirmed | Related issue states a rule absent from the anchor ticket and brainstorming did not confirm it | Run design | The rule remains in Open Questions and any dependent scenario is marked unconfirmed with its source; no plain `Then` presents it as established fact |
+| DES-04 | Human approval is required before automation | Draft design artifacts exist but no approval was given | Attempt to continue to an adapter | The skill presents coverage, NEW/SKIP/REVIEW decisions, risks, and adapter availability; adapter execution does not start until approval |
+| DES-05 | Approval establishes review handoff state | Human approves a complete design | Inspect state after the gate | `stage: design-approved`, `resume_target: review`, `review.status: pending`, and `artifacts.feature_files`/`test_design` point to approved source artifacts |
+| DES-06 | Design-only stops with a reviewed resumable handoff | Invoke a new run with `--design-only`; approve the design and pass QA review | Observe the next action and state | No adapter runs in this invocation; reviewed artifacts remain in place and `resume_target: automation` allows a later resume |
+| DES-07 | Core completes without an adapter | No supported framework is detected and no override is supplied | Approve design, pass QA review, and continue | Core artifacts and report are completed; automation is recorded as skipped/not run with a reason; no framework is installed or bootstrapped |
 
-**Steps**
+## QA review
 
-1. Inside the frontend working tree at `<worktree>/<frontend_source_root>`, edit one existing
-   tracked file — e.g. append a line to a component file — without running `git add` or `git
-   commit` inside the submodule.
-2. From the parent worktree, run `git -C <worktree> diff HEAD -- <frontend_source_root>` (the
-   parent repo's own view of the submodule). Record the output.
-3. Run Stage 04's `frontend_baseline` verification: recompute `worktree_diff_sha256` via
-   `git -C <worktree>/<frontend_source_root> diff --binary HEAD`, hashed, and compare to the value
-   captured at Stage 01 step 5.
+| ID | Scenario | Preconditions | Steps | Expected result |
+|---|---|---|---|---|
+| REV-01 | Review is mandatory before automation | Approved design artifacts exist with dedup labels, but `review.status: pending` | Attempt to continue to an adapter | Validator rejects or routing stops; `review.md` is loaded before any adapter file |
+| REV-02 | Review receives packaged context only | Review starts after design/dedup | Inspect review prompt or transcript | It uses `ticket.md`, `run.json.brainstorm`, `test-design.md`, source `.feature` files, existing coverage, and dedup inputs; it does not rely on session history |
+| REV-03 | Review is read-only | Source artifacts exist before review | Run review and compare artifact hashes before/after | Review does not mutate `test-design.md` or source `.feature` files while collecting findings |
+| REV-04 | Critical and Important findings route back to design | Review finds a missing AC, unconfirmed related-story rule, or framework-specific Gherkin | Complete receiving-review handling | `review.status: changes-requested`, finding is recorded, and `resume_target: design`; adapter does not run |
+| REV-05 | Findings are verified before changes | Review returns a questionable finding | Handle the finding | The skill checks artifact/codebase reality, records accepted or rejected decision with evidence, and does not blindly edit |
+| REV-06 | Passed review unlocks next route | Review has no blocking findings or only accepted Minor notes | Inspect `run.json` | `review.status: passed`; `resume_target: automation` when an adapter can run or was requested, otherwise `finish`; validator exits `0` |
+| REV-07 | Minor findings do not block finish | Review finds only wording/reporting polish | Complete review | Minor notes are recorded in `review.findings` or `review.decisions`; automation/finish can proceed if coverage correctness is intact |
+| REV-08 | Review prefers isolation with inline fallback | Host supports subagents in one run and lacks them in another | Run QA review in both hosts | Capable host delegates a read-only reviewer with packaged context; fallback host runs the same checklist inline; both record the review mode and main agent handles receiving findings |
 
-**Expected result**
+## Mechanical dedup and adapter detection
 
-- Step 2's parent-repo diff shows no change to the submodule's gitlink — the pointer is unchanged
-  because nothing was committed inside the submodule — demonstrating that a single, parent-scoped
-  baseline would not catch this edit.
-- Step 3's independent `frontend_baseline` comparison shows `worktree_diff_sha256` differs from the
-  captured baseline.
-- Because `baselines.frontend_edits_approved` is `false`, this difference is reported as a
-  violation and stops the run before any commit — not merely surfaced for review. (Had
-  `frontend_edits_approved` been `true`, the same diff would instead be reported at step 4.2 for
-  human review, per `workspace-guard.md`, "On Violation".)
+| ID | Scenario | Preconditions | Steps | Expected result |
+|---|---|---|---|---|
+| MEC-01 | Exact normalized scenario is `SKIP` | Existing and candidate scenarios differ only in case/punctuation and have the same normalized steps | Run `dedup-gherkin.py` | Candidate label is `SKIP`; result names the matched existing source |
+| MEC-02 | Same title with changed steps is `REVIEW` | Existing and candidate titles normalize equally; one or more normalized steps differ | Run `dedup-gherkin.py` | Candidate label is `REVIEW`, not `SKIP` |
+| MEC-03 | Unmatched scenario is `NEW` | Candidate title has no normalized title match across existing files | Run `dedup-gherkin.py` | Candidate label is `NEW` and `matched_existing` is empty |
+| MEC-04 | Dedup is deterministic across multiple inputs | Two existing feature files and one candidate file are fixed | Run the same command twice with the same ordered inputs and compare JSON | Outputs are byte-identical; counts and labels do not depend on repository scan timing |
+| MEC-05 | Supported adapters are detected from package metadata | Prepare four temporary repos: Playwright-BDD, Cypress Cucumber, Cucumber.js, and no marker | Run `detect-adapter.py` in each | JSON adapter values are respectively `playwright-bdd`, `cypress-cucumber`, `cucumber-js`, and `null`; no-marker exits `0` with confidence `none` |
+| MEC-06 | Invalid package metadata is an explicit error | Temporary repo has malformed `package.json` | Run `detect-adapter.py` | Non-zero exit; error identifies invalid `package.json`; no adapter is guessed |
 
-## AC07 — Dedup determinism
+## Optional automation adapters
 
-Proves the dedup rule (design spec §5.1, D13; `stage-02-test-design.md`, "Dedup Is A Rule, Not A
-Judgement") is a mechanical string transform, not a per-run judgement call.
+| ID | Scenario | Preconditions | Steps | Expected result |
+|---|---|---|---|---|
+| ADP-01 | Playwright-BDD adapter materializes approved design | Approved state selects `playwright-bdd`; repository has local BDD conventions | Run automation | Derived features/steps/page helpers follow repository layout; BDD generation and the narrow Playwright scope run; `automation-result.json` records generated paths and each scenario status |
+| ADP-02 | Cypress adapter is framework-specific only at handoff | Approved state selects `cypress-cucumber`; repository has a configured preprocessor | Run automation | Derived Cypress feature/steps/support files follow local layout; the narrow Cypress scope runs; selectors stay outside source artifacts; result uses adapter id `cypress-cucumber` |
+| ADP-03 | Cucumber.js adapter owns glue, not design | Approved state selects `cucumber-js` | Run automation | Cucumber.js step definitions/world/hooks are generated under local conventions; the smallest relevant command runs; source scenario wording is unchanged |
+| ADP-04 | Adapter cannot rewrite approved source | Hash source `test-design.md` and `.feature` files before an adapter run that encounters a selector/fixture failure | Run the adapter and compare hashes | Source hashes are unchanged; the failure is represented in adapter output rather than hidden by editing QA design |
+| ADP-05 | Blocked scenario survives handoff | One approved scenario cannot run because product code or test data is absent | Run the selected adapter | Scenario remains in the source feature; `automation-result.json` lists it under `blocked` and gives a reason |
+| ADP-06 | Genuine design defect routes back to design | Adapter proves reviewed Gherkin itself must change, rather than adapter code | Stop the fix loop and inspect state | The issue is reported and `resume_target` becomes `design`; adapter does not silently change the source feature |
+| ADP-07 | Custom adapter follows the same protocol | Invoke with `--adapter team-runner`; custom adapter can read the artifact contract | Run handoff | It consumes only approved inputs, writes protocol-shaped `automation-result.json`, preserves source design, and is reported by id `team-runner` |
 
-**Preconditions**
+## Finish, git, and reporting
 
-- A Jira story with a fixed list of acceptance criteria in `ticket.md`.
-- `existing-tests.feature`, the Cucumber export from Xray, is identical across both runs — same
-  Xray state, same file content.
-
-**Steps**
-
-1. Run Stage 02 steps 2.1 (requirement analysis) through 2.2 (dedup) once over the story. Record
-   the ordered list of behaviour → label pairs from the resulting `test-design.md` (each label one
-   of `NEW`, `UPDATE <TEST-key>`, `SKIP (covered by <TEST-key>)`, `REVIEW <TEST-key>`).
-2. Discard the run's design output (do not persist it as the approved artifact).
-3. Re-run Stage 02 steps 2.1–2.2 a second time, from the same `ticket.md` and the same unchanged
-   `existing-tests.feature`.
-4. Record the second run's ordered list of behaviour → label pairs.
-
-**Expected result**
-
-**Each behaviour present in both runs carries the same label**, referencing the same `TEST-key`
-where applicable. This follows because the normalized scenario key (lowercase; tags, the
-`Scenario:`/`Scenario Outline:` prefix, punctuation, and whitespace stripped; quoted literals and
-numbers stripped) is a pure function of the scenario text and the fixed export — nothing in the
-matching rule depends on model judgement or run order.
-
-**The scenario *set* is not part of this guarantee, and an earlier version of this case wrongly
-required it to be** ("the same behaviours, in the same order"). Step 2.1 is a model pass, and step
-2.7b can add scenarios the first run did not produce. What rule 5 guarantees is that the labelling
-of a given scenario is identical across runs, not that two runs enumerate the same scenarios. A run
-that legitimately finds one more behaviour would have failed this case as written, which would have
-made the first honest improvement look like a regression.
-
-Compare labels behaviour-by-behaviour on the intersection, and record any behaviour present in only
-one run rather than failing on it.
-
-## AC08 — Blocked-scenario round trip
-
-Proves that CI importing from `docs/qa/` (D15, §10) — rather than from the materialized test tree —
-is what keeps an approved-but-unautomated scenario from being silently dropped.
-
-**Preconditions**
-
-- A designed `.feature` file exists in `docs/qa/<jira-key>-<slug>/`, approved at Stage 02, with at
-  least two scenarios.
-- Stage 03 ran to completion: one scenario is `blocked: needs-design-change` (fix attempts
-  exhausted, or the only fix available would edit Gherkin), the rest are `green`.
-- Stage 04 step 4.2's human review approved the blocked list, and step 4.4 wrote `@not-automated`
-  into the blocked scenario in the **artifact** version of the `.feature` file.
-
-**Steps**
-
-1. Inspect the materialized copy at `feature_path` (the test tree, e.g. `src/tests/...`). Confirm
-   which scenarios are present.
-2. Inspect the artifact version at `docs/qa/<jira-key>-<slug>/<domain>-<aspect>.feature`. Confirm
-   which scenarios are present and check the blocked scenario's tags.
-3. Run the §10 CI import command's archive step against `docs/qa/`:
-   `zip -r features.zip docs/qa -i \*.feature -x \*existing-tests.feature`, then list the zip's
-   contents (`unzip -l features.zip`) instead of actually posting to Xray.
-4. For contrast, build a second archive the same way but rooted at the test tree instead of
-   `docs/qa/` (i.e. `zip -r features-wrong.zip <feature_path parent> -i \*.feature`), and list its
-   contents.
-
-**Expected result**
-
-- Step 1: the test tree never contained the blocked scenario — it was omitted from the
-  materialized copy at Stage 03 (§6.3) and stays omitted.
-- Step 2: the artifact version still contains the blocked scenario, now tagged `@not-automated`,
-  alongside the green scenarios.
-- Step 3: `features.zip` (built from `docs/qa/`) contains the blocked scenario, tagged
-  `@not-automated`, in the same file as the green scenarios — the CI import command in spec §10
-  picks it up.
-- Step 4: the contrasting archive built from the test tree does **not** contain the blocked
-  scenario — demonstrating that zipping the test tree instead of `docs/qa/` would silently drop an
-  approved test case from the Xray import, which is exactly what D15 exists to prevent.
-
-## AC09 — Selector evidence branch
-
-Proves the selector gate offers live DOM inspection rather than stopping when no frontend source is
-available (Constraint 3, `selector-verification.md`'s `selector_resolution` diagram), and that
-declining every evidence source is what actually stops the run — not the mere absence of frontend
-source.
-
-**Preconditions**
-
-- Repo profile discovery ran and did **not** resolve `frontend_source_root` — no submodule, no
-  repo-local frontend checkout found; the field is absent from the profile.
-- Stage 02 reaches step 2.4 (the selector gate) for a scenario with `surface: ui`.
-- The host exposes browser automation and the application under test is reachable (base URL, and
-  credentials if required, are available), so the live-DOM branch of the gate is reachable.
-
-**Steps — three sub-cases from the same starting point**
-
-1. **Sub-case A (offer accepted).** With `frontend_source_root` absent, reach the gate. Per the
-   `selector_resolution` diagram, "Frontend source in repo?" is "no", which routes to "Browser
-   automation and app reachable?" — "yes" — which routes to "Offer live DOM inspection?". Confirm
-   the run **asks** this question rather than stopping. Accept it. Confirm a subagent is dispatched
-   (D20) and that only a selector map — not a full DOM dump — returns to the main run.
-2. **Sub-case B (offer declined, fallback accepted).** From the same gate, decline the live-DOM
-   offer but accept the semantic fallback. Inspect the resulting `test-design.md`.
-3. **Sub-case C (offer declined, fallback declined).** From the same gate, decline both the
-   live-DOM offer and the semantic fallback.
-
-**Expected result**
-
-- Sub-case A: the run never stops merely because `frontend_source_root` is absent — it reaches and
-  presents the live-DOM offer. Accepting it produces a selector map for the scenario's elements;
-  the main run's context does not receive a raw DOM dump.
-- Sub-case B: `test-design.md` records `design.selector_evidence: fallback` (run-state field
-  `design.selector_evidence`) together with the user's acknowledgement of the accepted risk; the
-  selector map's rows carry a `role`/label/text strategy for each element. Stage 04's step 4.2
-  report later repeats this evidence source.
-- Sub-case C: the run stops — Turn-Ending Condition 7 (`operating-rules.md`) / the
-  `selector_resolution` diagram's "STOP: no evidence and fallback declined" node — before Gherkin
-  is approved. No selector map is fabricated to route around the stop.
+| ID | Scenario | Preconditions | Steps | Expected result |
+|---|---|---|---|---|
+| FIN-01 | Finish summarizes the whole run | Valid core artifacts; dedup ran; adapter passed, failed, blocked, or was skipped | Run finish | Report names artifact folder, changed feature files, dedup and Xray status, adapter/reason skipped, and blocked scenarios retained in source |
+| FIN-02 | Automation claim requires a result artifact | State claims automation completed but `automation-result.json` is absent | Run finish | Finish stops or downgrades the claim and reports the missing result; it does not report automation as passed |
+| FIN-03 | Commit scope excludes unrelated work | Working tree contains reviewed QA outputs plus unrelated user edits | Request commit/finish | Only reviewed artifact and adapter-output paths are staged; unrelated edits remain untouched; `git add -A` is not used |
+| FIN-04 | PR describes the read-only Xray boundary | Validated and committed run; invoke with `--pr`; host can create a PR | Complete finish | PR summary describes generated QA/automation artifacts and states that the skill performs no Xray write/import/result upload |
+| FIN-05 | Final state is resumable and valid | Finish succeeds | Inspect and validate `run.json` | State is `finished` with `resume_target: done` or `null`; validator exits `0`; a later invocation follows RES-06 |
 
 ## Minimum pass criteria
 
-- AC01–AC04, AC10, and AC11 return the expected output or state exactly as described.
-- AC05 and AC06 both demonstrate the same fact from opposite ends: a status-letter or parent-repo
-  diff comparison alone reports no violation, while the content-addressed baseline comparison
-  catches it.
-- AC07 produces identical labels for every behaviour present in both runs.
-- AC08 shows the test tree and `docs/qa/` diverge in exactly the documented way — the blocked
-  scenario is missing from one and present, tagged, in the other — and that only `docs/qa/` is fit
-  to zip for import.
-- AC09 shows all three terminal outcomes of the selector gate reachable from one starting
-  precondition: offer-and-accept, offer-declined-with-fallback, and offer-declined-with-stop.
+A release candidate passes when:
 
-## Eval cases — manual, recorded, not CI gates
+1. `PKG-01` through `PKG-05` pass in CI or locally.
+2. All resume and state cases pass, including `RES-01`, `RES-04`, `RES-11`, `RES-12`, and `INT-07`.
+3. Required brainstorming cases pass, especially `BRN-01`, `BRN-02`, and `BRN-07`.
+4. Required review cases pass, especially `REV-01`, `REV-04`, and `REV-06`.
+5. One core-only end-to-end run passes with no adapter (`DES-07`).
+6. At least one included adapter passes an end-to-end handoff, and `ADP-04` proves source artifacts remain unchanged.
+7. Credential cases use temporary credentials/configuration and never print secrets.
 
-E1–E4 assert that a model pass returns a specific judgement. **One passing run does not distinguish
-a mechanism from luck**, so each runs **three times** and the number of runs producing the expected
-finding is recorded below. A case that does not reach 3/3 is recorded at its rate, not quietly
-dropped — the rate is the evidence this design asked for, and a rate nobody writes down is a design
-decision made by forgetting.
-
-Each fixture is a **complete 2.7b input set** in its own directory under
-`test-case/speckit-qa-auto/fixtures/` — `ticket.md`, the `.feature` file(s), `test-design.md`,
-`impact-candidates.md`, and a depth with its reason. The reviewer takes five inputs; a fixture
-supplying one cannot be run. The repository had no prior `fixtures/` convention, so these establish
-one.
-
-| # | Fixture | Attack task | Expected finding | Runs |
-|---|---|---|---|---|
-| E1 | `fixtures/out-scope-constraint/` | 1 | Names `ticket.md`'s line "Do not allow user/system modify any candidate has attached to APM's invoice", which no scenario covers although the coverage matrix reports none uncovered | `_/3` |
-| E2 | `fixtures/out-scope-constraint/` | 2 | Names the invariant `RefreshWorkOrderCandidates` creates — a candidate attached to an invoice must survive a refresh — citing `work-order-candidate.graphql:123` | `_/3` |
-| E3 | `fixtures/constraint-under-notes/` | 1 | Names the line "A charge that has been included in a settlement must not be re-rated or re-assigned…", filed under a heading called `Notes` | `_/3` |
-| E4 | `fixtures/constraint-under-notes/`, run once with an isolated reviewer and once inline | 1 | Both rates, recorded side by side | isolated `_/3`, inline `_/3` |
-
-**E3 is the case that matters most.** It is what distinguishes this design from a rule keyed to the
-word `Out-Scope`. Its acceptance-criteria table is deliberately complete without the constraint: if
-the table were internally incomplete, a reviewer could find the gap from the table alone and the
-fixture would prove nothing about reading the whole ticket. If the mechanism only fires on that one
-heading, E3 fails and the design is what it was accused of being.
-
-**E4 runs over E3's fixture, not E1's.** E1 is constructed so the finding is expected every time,
-and comparing two rates at the ceiling cannot discriminate between an isolated reviewer and an
-inline one — an earlier draft of this design made exactly that mistake. E3 is the harder case, so
-its rate has room to differ. `design.review_mode` is otherwise an observation of host capability
-with no flag to force it, and "no flag skips a gate" forecloses adding one casually; E4 is therefore
-run by dispatching the reviewer both ways against the fixture directory, outside a pipeline run.
-
-**What a rate obliges.** A case below 3/3 does not block this design. It is recorded, and it is the
-input to the open question of whether one adversarial pass needs a second one auditing it — a
-question the design deliberately deferred to evidence from real runs rather than settling by
-argument. A rate written down with no consequence named would be the same omission with extra steps,
-which is why the consequence is named here.
+Record environment, issue/fixture, adapter, result, and evidence path for every manual run. A
+blocked external dependency is `BLOCKED`, not `PASS` and not a reason to weaken the expected result.
