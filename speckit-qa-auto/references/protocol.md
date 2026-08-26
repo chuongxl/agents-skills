@@ -13,17 +13,19 @@ docs/qa/<issue>/
   ticket.md
   existing-tests.feature
   existing-tests-manual.md
-  brainstorm-notes.md
   test-design.md
   <domain>.feature
-  review-notes.md
   automation-result.json
 ```
 
-`existing-tests.feature`, `existing-tests-manual.md`, `brainstorm-notes.md`, `review-notes.md`,
-and `automation-result.json` may be absent when the source data, approval notes, review notes, or
-automation result is unavailable. `run.json`, `ticket.md`, `test-design.md`, and at least one
-authored `.feature` file are required before finish.
+`existing-tests.feature`, `existing-tests-manual.md`, and `automation-result.json` may be absent
+when the source data or automation result is unavailable. `run.json`, `ticket.md`,
+`test-design.md`, and at least one authored `.feature` file are required before finish.
+
+Do not add narrative side files for brainstorming or review. Brainstorm approval lives in
+`run.json.brainstorm` plus the approach section of `test-design.md`; review findings and
+decisions live in `run.json.review`. An artifact with no writer and no reader is not part of
+this contract.
 
 ## run.json
 

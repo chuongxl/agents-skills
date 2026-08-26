@@ -52,10 +52,8 @@ docs/qa/<issue>/
   ticket.md
   existing-tests.feature
   existing-tests-manual.md
-  brainstorm-notes.md
   test-design.md
   <domain>.feature
-  review-notes.md
   automation-result.json
 ```
 
