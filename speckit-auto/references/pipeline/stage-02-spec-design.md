@@ -1,31 +1,17 @@
 # Stage 02: Spec / Design (Provider-Agnostic)
 
-Stage order and per-step identity come from the resolved provider adapter
-([../providers/](../providers/)): github-speckit runs
+Already in context: `SKILL.md`, the run contract, the provider adapter, Stage 01 output. Load
+nothing else unless a step says to.
+
+Stage order and per-step identity come from the adapter's Stage Skill Map: github-speckit runs
 `specify → clarify → plan → checklist → tasks → analyze` in fixed order; superpowers runs
-`brainstorming` (design spec = specify+clarify) then `writing-plans` (plan = plan+checklist+
-tasks+analyze). Never skip, bypass, or reorder in either mode.
+`brainstorming` (= specify + clarify) then `writing-plans` (= plan + checklist + tasks + analyze).
+Never skip, bypass, or reorder in either mode.
 
-## Invocation
-
-Invoke each step via the `skill` tool using the skill name from the provider adapter's Stage
-Skill Map. This is identical on all three hosts (Copilot, Claude Code, OpenCode):
-
-- **github-speckit:** `skill speckit-specify`, `skill speckit-clarify`, etc.
-- **superpowers (all hosts):** `skill brainstorming`, `skill writing-plans`, etc.
-
-The `skill` tool is **synchronous** — it blocks until the skill finishes and returns inline.
-After every call, apply the **Step Execution and Completion Protocol** from the provider adapter:
-read the return value, verify the expected artifact on disk, retry once on failure, stop if still
-failing. Never proceed to the next step until the current step's artifact is confirmed present.
-
-Never the `task` tool with any skill name; never a nested CLI subprocess. Never emit
-`@speckit.*` or `/speckit.*` — all github-speckit steps are skills invoked via the `skill` tool.
-
-If any `skill` invocation fails (skill not found, tool error) → **stop immediately** and tell
-the user:
-> "Provider skills are not installed or not available. Please run
-> `/speckit-auto --integration {provider}` first, then re-run your command."
+Invoke each step via the `skill` tool (run contract, Invocation Channel). After every call apply
+the adapter's Step Completion Protocol — never proceed until the current step's artifact is
+confirmed on disk. An unresolvable skill is a provider validation failure → adapter install
+recovery, not a stop.
 
 ## Project Context Wiring (mandatory)
 
@@ -43,9 +29,8 @@ without consulting `repo_map`.
 
 ## Artifact Path Guard (superpowers only)
 
-`brainstorming` and `writing-plans` hardcode their own output paths; after each call verify the
-file exists at `specs/<feature_folder>/spec.md` (or `.../plan.md`) and relocate from the skill's
-default if not (adapter "Artifact Path Guard"). The instruction alone is never sufficient.
+Applies after each `brainstorming` / `writing-plans` call — see the adapter's "Artifact Path
+Guard". The instruction alone is never sufficient; always check the file.
 
 ## Review Behavior
 
@@ -122,13 +107,10 @@ Present the following prompt to the user via the host ask tool (one question, tw
 
 **On `Approve`:** proceed to Spec/Plan Commit + Push Gate below.
 
-**On `Request changes`:** capture the user's feedback verbatim. Apply Restart Routing:
-- Requirement intent change → restart from `specify` / `brainstorming`
-- Solution/architecture change → restart from `plan` / `writing-plans` structure
-- Task/detail change → restart from `tasks` / `writing-plans` task breakdown
-
-Re-run the affected steps through the Mandatory Self-Review Gate, then present this gate again.
-Never skip the gate on the next pass. Repeat until the user explicitly approves.
+**On `Request changes`:** capture the feedback verbatim, apply Restart Routing (see Review
+Behavior → Default mode), re-run the affected steps through the Mandatory Self-Review Gate, then
+present this gate again. Repeat until the user explicitly approves; never skip the gate on a
+later pass.
 
 ### YOLO mode
 
@@ -151,11 +133,12 @@ Do **not** skip this gate. Instead, delegate the review and approval to the agen
 ### Spec/Plan Commit + Push Gate (mandatory, both modes — runs after approval)
 
 Commit and push the approved Stage 02 artifacts with the auto message
-`docs(<artifact_id>): add spec, plan, and tasks` using
-[../shared/commit.md](../shared/commit.md). Already-clean tree → skip per the conditional-commit
-rule (success path). A failed commit/push here is a failure for the stage — stop with the exact
-error; do not enter Stage 03 without this commit/push succeeding (or being a legitimate no-op).
+`docs(<artifact_id>): add spec, plan, and tasks` — load
+[../shared/commit.md](../shared/commit.md) now (first commit of the run). Already-clean tree →
+skip per the conditional-commit rule (success path). A failed commit/push here is a stage failure
+— stop with the exact error; never enter Stage 03 without this succeeding (or being a legitimate
+no-op).
 
-Then discard Stage 02 interview context and invoke
-[stage-03-implement-review.md](stage-03-implement-review.md) **immediately, in the same turn** —
-no summary, no other questions, no waiting for another user message.
+Then discard Stage 02 interview context, drop the loaded guideline files that Stage 03 will not
+need, and load [stage-03-implement-review.md](stage-03-implement-review.md) **immediately, in the
+same turn** — no summary, no other questions, no waiting for another user message.
