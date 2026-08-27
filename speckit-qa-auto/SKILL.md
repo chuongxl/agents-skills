@@ -42,6 +42,19 @@ Load only the reference needed for the active stage:
 | 03 — Automation & Review | [references/pipeline/stage-03-automation-review.md](references/pipeline/stage-03-automation-review.md) | `automation-result.json` & verified test code |
 | 04 — Finish & PR | [references/pipeline/stage-04-finish.md](references/pipeline/stage-04-finish.md) | Final QA report, commit, optional PR |
 
+## On-Demand Capability Modules
+
+Load these module references **only when triggered** by active scenario requirements or execution events:
+
+| Capability | Module File | Trigger Condition |
+|---|---|---|
+| Failure & Flaky Diagnosis | [references/modules/flaky-diagnosis.md](references/modules/flaky-diagnosis.md) | Stage 03 test failure during verification |
+| Accessibility (A11y) | [references/modules/a11y-testing.md](references/modules/a11y-testing.md) | Accessibility scanning scenarios |
+| Visual Regression | [references/modules/visual-regression.md](references/modules/visual-regression.md) | Screenshot comparison scenarios |
+| Dynamic Test Data | [references/modules/test-data-factory.md](references/modules/test-data-factory.md) | Generating isolated step fixture data |
+| API Contract Validation | [references/modules/api-contract-testing.md](references/modules/api-contract-testing.md) | API response payload contract steps |
+| CI Matrix Sharding | [references/modules/ci-matrix-sharding.md](references/modules/ci-matrix-sharding.md) | Stage 04 finish CI workflow setup |
+
 ## Core Invariants
 
 - `specs/qa/<issue>/` is the source of truth. Test-tree files are derived automation output.

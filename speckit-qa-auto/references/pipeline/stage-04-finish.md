@@ -10,4 +10,5 @@ Stage 04 validates run state, writes the final report, and manages git commits a
    - Scenario stats (total, NEW, SKIP, REVIEW)
    - Automation results (passed, failed, blocked)
 3. **Commit & Push:** Commit artifact files and derived test code using `references/shared/commit.md`. Push branch to remote.
+   - *On-Demand Module*: Load `references/modules/ci-matrix-sharding.md` if generating or updating GitHub Actions CI matrix sharding workflows (`.github/workflows/qa-e2e.yml`).
 4. **PR (Optional):** If `--pr` was passed, open or update Pull Request. Mark `stage: finished`, `resume_target: done`.
