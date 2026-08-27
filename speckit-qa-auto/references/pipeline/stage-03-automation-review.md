@@ -9,12 +9,15 @@ Stage 03 executes BDD test automation using the resolved provider's tools/skills
 
 ## Steps
 
-1. **Provider Automation:** Execute automation via provider skills:
+1. **Monorepo & Multi-Project Discovery:**
+   - Probe repository root and child subdirectories for `package.json`, `playwright.config.ts`, test config, or build project files.
+   - Run test execution commands from the workspace directory containing the active test runner.
+2. **Provider Automation:** Execute automation via provider skills:
    - `github-speckit`: invoke `speckit-implement` → `speckit-converge`.
    - `superpowers`: invoke `subagent-driven-development` or `executing-plans` under `test-driven-development`.
-2. **Inline Verification Pass:**
+3. **Inline Verification Pass:**
    - Confirm generated code maps cleanly to source `.feature` scenarios.
-   - Run targeted test execution command (`npx bddgen && npx playwright test`) to verify tests pass.
-   - If Playwright tests fail, use the `playwright-trace` skill (or inspect `trace.zip` / `playwright-cli`) to diagnose root-cause locator/network/timeout failures before retrying or marking blocked.
+   - Automatically detect the repository's test framework and run the targeted test execution command to verify tests pass.
+   - If Playwright tests fail, use `playwright-trace` (or inspect `trace.zip` / `playwright-cli`) to diagnose root-cause failures before retrying or marking blocked.
    - Confirm source artifacts were not altered to force tests to pass.
-3. **Write Results:** Output `automation-result.json`. Update `run.json` (`automation.status: review-passed`, `automation.review.status: passed`, `stage: automation-complete`, `resume_target: finish`).
+4. **Write Results:** Output `automation-result.json`. Update `run.json` (`automation.status: review-passed`, `automation.review.status: passed`, `stage: automation-complete`, `resume_target: finish`).
