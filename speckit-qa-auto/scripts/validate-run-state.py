@@ -85,7 +85,7 @@ REVIEW_STATUSES = {"pending", "passed", "changes-requested"}
 def _workspace_root(run_dir: Path) -> Path:
     parts = run_dir.resolve().parts
     for idx in range(len(parts) - 2):
-        if parts[idx] == "docs" and parts[idx + 1] == "qa":
+        if (parts[idx] == "specs" or parts[idx] == "docs") and parts[idx + 1] == "qa":
             return Path(*parts[:idx]) if idx else Path("/")
     return run_dir.resolve()
 
@@ -242,7 +242,7 @@ def validate(path: Path) -> list[str]:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("run_json", type=Path, help="Path to docs/qa/<issue>/run.json")
+    parser.add_argument("run_json", type=Path, help="Path to specs/qa/<issue>/run.json")
     args = parser.parse_args()
 
     errors = validate(args.run_json)

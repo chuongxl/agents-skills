@@ -1,8 +1,11 @@
 ---
 name: speckit-qa-auto
 description: |
-  Use when a Jira story, epic, or Xray test key needs framework-neutral QA test design, reviewed deduped BDD scenarios, resumable run state, and optional automation through repository conventions or injected project skills.
-compatibility: "Runs on GitHub Copilot, Claude Code, and OpenCode. Discovered from ~/.agents/skills/, ~/.claude/skills/, or ~/.config/opencode/skills/. Requires git, bash, Python 3, Jira credentials, and optional Xray credentials. Automation uses the target repository's existing test stack and any injected project skills."
+  Runs an end-to-end QA test design and automation pipeline from a Jira issue or requirement using a
+  pluggable provider: github-speckit (repo-installed GitHub Spec Kit agents) or superpowers
+  (obra/superpowers skills library). Handles provider setup, interactive QA brainstorming, reviewed
+  deduped BDD scenarios, resumable run state, BDD automation, and PR generation.
+compatibility: "Runs on GitHub Copilot, Claude Code, and OpenCode. Discovered from ~/.agents/skills/, ~/.claude/skills/, or ~/.config/opencode/skills/. Requires git, bash, Python 3, Jira credentials, and optional Xray credentials."
 license: MIT
 allowed-tools: bash glob grep view create edit skill
 metadata:
@@ -12,68 +15,51 @@ metadata:
 
 # Speckit QA Auto
 
-## Entry Point
+Spec-driven QA test design and BDD automation pipeline with pluggable provider support (`github-speckit` and `superpowers`).
 
-Resume is step 0. On every invocation, read [references/resume.md](references/resume.md) before
-intake or design, even when the user supplies a fresh `--issue`. A run that already has
-`docs/qa/<issue>/run.json` continues from `resume_target`; it is not restarted from Jira prose.
+## Entry Dispatch (Do This First, Every Invocation)
 
-After resume routing, read [references/protocol.md](references/protocol.md) once. The protocol is
-the core contract for artifact folders, `run.json`, feature files, coverage labels, automation
-state, and result handoff. Keep core outputs framework-neutral.
+1. Load [references/shared/host-adaptation.md](references/shared/host-adaptation.md) once per run to detect host (Copilot / Claude Code / OpenCode).
+2. Parse invocation text:
+   - `--integration <value>` → setup intent (provider setup ONLY, no pipeline)
+   - `--issue <url>` → Jira QA pipeline intent
+   - `--automation` → request automation execution
+   - `--pr` → request PR creation
+3. **Setup intent** (`--integration` present): load [references/shared/integration-setup.md](references/shared/integration-setup.md) and execute setup. END TURN after.
+4. **Pipeline intent** (no `--integration`): resolve provider from `<repo-root>/.speckit/integration.json` (`integration` field). Missing file → stop and direct user to `/speckit-qa-auto --integration <github-speckit|superpowers>`.
+5. Load [references/shared/operating-rules.md](references/shared/operating-rules.md), provider adapter (`references/providers/github-speckit.md` or `references/providers/superpowers.md`), and enter pipeline.
 
-## Router
+## Pipeline Router
 
-Load only the reference needed for the current route:
+Load only the reference needed for the active stage:
 
-| Route | Read | Produces |
+| Stage | Reference File | Produces |
 |---|---|---|
-| No existing run | [references/intake.md](references/intake.md) | `ticket.md`, existing coverage exports, initial `run.json` |
-| QA brainstorming | [references/brainstorm.md](references/brainstorm.md) | approved test approach and confirmed assumptions |
-| Design or revise QA coverage | [references/design.md](references/design.md) | `test-design.md` and source `.feature` files under `docs/qa/<issue>/` |
-| Dedup existing coverage | [references/dedup.md](references/dedup.md) | stable `NEW` / `SKIP` / `REVIEW` labels |
-| QA review | [references/review.md](references/review.md) | reviewed artifacts and pass/change decisions |
-| Automation requested | [references/automation.md](references/automation.md) | `automation-result.json` and materialized test-tree files when possible |
-| Automation code changed | [references/automation-review.md](references/automation-review.md) | reviewed automation output |
-| Final report, commit, or PR | [references/finish.md](references/finish.md) | final run report, validated state, optional branch/PR |
-
-When automation is requested, discover the repository's existing test stack and conventions. Use
-project, domain, or framework skills already available in the session as additional context. Do not
-bootstrap a framework from core and do not add framework-specific rules to this skill.
+| Resume | [references/pipeline/resume.md](references/pipeline/resume.md) | Resolved stage routing |
+| Protocol | [references/pipeline/protocol.md](references/pipeline/protocol.md) | Artifact contract & schema |
+| 01 — Preflight + Intake | [references/pipeline/stage-01-intake.md](references/pipeline/stage-01-intake.md) | `ticket.md`, existing test exports, initial `run.json` |
+| 02 — QA Design & Dedup | [references/pipeline/stage-02-qa-design.md](references/pipeline/stage-02-qa-design.md) | `test-design.md`, dedup labels, source `.feature` files |
+| 03 — Automation & Review | [references/pipeline/stage-03-automation-review.md](references/pipeline/stage-03-automation-review.md) | `automation-result.json` & verified test code |
+| 04 — Finish & PR | [references/pipeline/stage-04-finish.md](references/pipeline/stage-04-finish.md) | Final QA report, commit, optional PR |
 
 ## Core Invariants
 
-- `docs/qa/<issue>/` is the source of truth. Test-tree files are derived automation output.
-- `run.json` is the resume authority. Validate it with `scripts/validate-run-state.py` whenever it
-  is created or updated.
-- Core references do not know about framework-specific selectors, helper objects, generation
-  commands, or step wiring.
-- Automation reads reviewed artifacts and writes automation results. It may not change the test
-  design to make automation pass.
-- QA review is required before automation or finish. Critical and Important findings route back to
-  design; they are not patched inside automation code.
-- Automation review is required when automation code is created or changed.
-- Xray is read-only here. Imports or result uploads belong to the repository's CI, not this skill.
-- Missing Xray credentials warn and continue as `coverage.xray: unavailable`; missing Jira
-  credentials stop intake.
+- `specs/qa/<issue>/` is the source of truth. Test-tree files are derived automation output.
+- `run.json` is the resume authority. Validate it with `scripts/validate-run-state.py`.
+- **Stage 02 Brainstorming Gate:** Conduct clarification interview; present full output summary for explicit human approval before drafting design artifacts.
+- **Stage 03 NO-STOP ZONE:** Automation implementation and verification loops continue autonomously until verified.
+- Provider is resolved from `.speckit/integration.json` and fixed for the run.
 
 ## Inputs
 
-- `--issue <jira-url-or-key>` — required for a new run; optional for resume when exactly one
-  resumable `docs/qa/**/run.json` exists.
-- `--related <KEY>[,<KEY>...]` — optional evidence hints for intake/design.
-- `--impact "<flow>[, <flow>...]"` — optional impact hints kept separate from discovered coverage.
-- `--design-only` — stop after reviewed core artifacts and set `resume_target: automation`.
-- `--automation` — request repository-specific automation after reviewed QA artifacts exist.
-- `--pr` — request finish to prepare or open a PR after artifacts are validated and committed.
+- `--issue <jira-url-or-key>` — required for Jira intake.
+- `--integration <github-speckit|superpowers>` — configure provider.
+- `--automation` — request test code automation.
+- `--pr` — prepare/open Pull Request after completion.
 
 ## Sub-Skill Dependencies
 
-Invoke `jira-to-speckit` by name for ticket intake. Invoke `xray-to-speckit` by name for existing
-Xray coverage export. Refer to these skills by name only; never link outside this folder.
-
-## Automation Extension
-
-Framework or project-specific automation rules belong in injected repository skills, not in
-`speckit-qa-auto`. Those skills can combine with this one by reading the same artifact contract and
-writing `automation-result.json`.
+- `jira-to-speckit` — Jira fetch + ticket snapshot write.
+- `xray-to-speckit` — Xray test export (optional).
+- `playwright-bdd-automation` — Playwright BDD test generator & runner integration (optional).
+- `playwright-cli` / `playwright-trace` — Official Playwright agent skills for live browser verification & trace analysis (optional).
