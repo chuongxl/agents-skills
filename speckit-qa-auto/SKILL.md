@@ -29,8 +29,10 @@ Load only the reference needed for the current route:
 | Route | Read | Produces |
 |---|---|---|
 | No existing run | [references/intake.md](references/intake.md) | `ticket.md`, existing coverage exports, initial `run.json` |
+| Impact analysis | [references/impact.md](references/impact.md) | `impact-candidates.md` and `run.json.impact` |
 | QA brainstorming | [references/brainstorm.md](references/brainstorm.md) | approved test approach and confirmed assumptions |
 | Design or revise QA coverage | [references/design.md](references/design.md) | `test-design.md` and source `.feature` files under `docs/qa/<issue>/` |
+| Converting existing Xray Manual tests | [references/manual-conversion.md](references/manual-conversion.md) | converted scenarios with declared deviations and `run.json.conversion` |
 | Dedup existing coverage | [references/dedup.md](references/dedup.md) | stable `NEW` / `SKIP` / `REVIEW` labels |
 | QA review | [references/review.md](references/review.md) | reviewed artifacts and pass/change decisions |
 | Automation requested | [references/automation.md](references/automation.md) | `automation-result.json` and materialized test-tree files when possible |
@@ -50,6 +52,13 @@ bootstrap a framework from core and do not add framework-specific rules to this 
   commands, or step wiring.
 - Automation reads reviewed artifacts and writes automation results. It may not change the test
   design to make automation pass.
+- Impact analysis returns evidence, never verdicts: a flow, a path, a line. Whether a flow breaks is
+  decided by a human reading a designed scenario, and a sweep that could not run records why rather
+  than reporting nothing found.
+- Deferred automation is finished QA work, not skipped automation. It requires a passed QA review,
+  and it records why it was deferred and what makes it resumable.
+- Converted Manual tests are linked, never overwritten. Overwrite is a per-test decision a human
+  makes after seeing the Gherkin, and every deviation from the source test is declared.
 - QA review is required before automation or finish. Critical and Important findings route back to
   design; they are not patched inside automation code.
 - Automation review is required when automation code is created or changed.
@@ -61,9 +70,13 @@ bootstrap a framework from core and do not add framework-specific rules to this 
 
 - `--issue <jira-url-or-key>` — required for a new run; optional for resume when exactly one
   resumable `docs/qa/**/run.json` exists.
-- `--related <KEY>[,<KEY>...]` — optional evidence hints for intake/design.
-- `--impact "<flow>[, <flow>...]"` — optional impact hints kept separate from discovered coverage.
-- `--design-only` — stop after reviewed core artifacts and set `resume_target: automation`.
+- `--related <KEY>[,<KEY>...]` — export each key's existing Xray coverage as additional dedup
+  evidence. A new story has little coverage linked to itself; the coverage that matters is usually
+  on sibling stories in the same flow, and this is how a human points at it.
+- `--impact "<flow>[, <flow>...]"` — flows a human declares as impacted. Kept in its own field and
+  never merged into what the impact sweep discovered.
+- `--design-only` — finish after reviewed core artifacts and record automation as `deferred` with a
+  reason and a re-entry condition. Use it when the test design is ready before the code is.
 - `--automation` — request repository-specific automation after reviewed QA artifacts exist.
 - `--pr` — request finish to prepare or open a PR after artifacts are validated and committed.
 

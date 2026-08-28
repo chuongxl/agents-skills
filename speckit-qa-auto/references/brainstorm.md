@@ -9,8 +9,9 @@ Read the framework-neutral evidence from the active artifact folder and reposito
 
 - `ticket.md`;
 - `existing-tests.feature` and `existing-tests-manual.md`, when present;
+- `existing-tests-<KEY>.feature` and `existing-tests-<KEY>-manual.md` for every `--related` key;
 - repository `.feature` files found during intake;
-- declared `--related` and `--impact` hints;
+- `impact-candidates.md` and `run.json.impact` — the flows this story imposes a new rule on;
 - whether automation was requested, as execution context only.
 
 Do not read framework-specific automation rules here unless they are already injected as project
@@ -29,7 +30,12 @@ trade-offs, such as:
 - UI-heavy coverage;
 - API-first with UI smoke;
 - thin regression around `NEW` behaviours;
-- manual-only or mixed coverage when automation would hide risk.
+- manual-only or mixed coverage when automation would hide risk;
+- converting existing Xray Manual tests into Gherkin rather than authoring fresh scenarios, when
+  the manual corpus already covers the behaviour — see `manual-conversion.md` before proposing it.
+
+Impact candidates are evidence, not scenarios. Raise them here so the approach accounts for
+regression scope, and let design decide which candidate becomes a scenario and which is dropped.
 
 Borrowed rules from related issues are hypotheses. They become test assertions only when the ticket
 states them or a human confirms them here.

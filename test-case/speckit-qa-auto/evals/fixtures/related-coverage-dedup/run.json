@@ -1,0 +1,38 @@
+{
+  "issue": "MOM-12500",
+  "stage": "brainstorm-approved",
+  "resume_target": "design",
+  "automation": {
+    "status": "not-requested",
+    "requested": false,
+    "tool": null,
+    "skill": null,
+    "result": null,
+    "review": {"status": "not-run", "findings": []}
+  },
+  "impact": {
+    "ran": true,
+    "reason": "ok",
+    "entities": ["vendor_assignment"],
+    "declared": [],
+    "candidates": [],
+    "approved_scenarios": [],
+    "dropped_scenarios": [],
+    "acknowledged_empty": true
+  },
+  "conversion": {"status": "not-run", "converted": []},
+  "brainstorm": {
+    "status": "approved",
+    "approach": "thin-regression-around-new-behaviour",
+    "questions": [],
+    "confirmed_assumptions": [],
+    "rejected_approaches": ["ui-heavy"]
+  },
+  "review": {"status": "pending", "findings": [], "decisions": []},
+  "artifacts": {"feature_files": [], "test_design": null},
+  "coverage": {
+    "dedup": "not-run",
+    "xray": "available",
+    "related_issues": ["MOM-12401", "MOM-12408"]
+  }
+}

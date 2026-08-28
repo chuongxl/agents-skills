@@ -1,0 +1,34 @@
+{
+  "issue": "MOM-12550",
+  "stage": "brainstorm-approved",
+  "resume_target": "design",
+  "automation": {
+    "status": "not-requested",
+    "requested": false,
+    "tool": null,
+    "skill": null,
+    "result": null,
+    "review": {"status": "not-run", "findings": []}
+  },
+  "impact": {
+    "ran": true,
+    "reason": "ok",
+    "entities": ["invoice"],
+    "declared": [],
+    "candidates": [],
+    "approved_scenarios": [],
+    "dropped_scenarios": [],
+    "acknowledged_empty": true
+  },
+  "conversion": {"status": "pending", "converted": []},
+  "brainstorm": {
+    "status": "approved",
+    "approach": "convert-existing-manual-pack",
+    "questions": [],
+    "confirmed_assumptions": ["the product behaviour does not change in this story"],
+    "rejected_approaches": ["author fresh scenarios from the ticket"]
+  },
+  "review": {"status": "pending", "findings": [], "decisions": []},
+  "artifacts": {"feature_files": [], "test_design": null},
+  "coverage": {"dedup": "not-run", "xray": "available", "related_issues": []}
+}

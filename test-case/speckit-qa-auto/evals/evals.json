@@ -1,0 +1,100 @@
+{
+  "skill_name": "speckit-qa-auto",
+  "notes": "Six evals over the capabilities restored after commit 4f0ca73: impact analysis, Manual-test conversion, --related coverage, and deferred automation. Assertions are graded by evals/grade.py where they are mechanical, and by a reviewer where they are not.",
+  "evals": [
+    {
+      "id": 1,
+      "name": "constraint-outside-the-ac-table",
+      "prompt": "Run the QA review for MOM-12194. The artifact folder is already at docs/qa/MOM-12194/ with ticket.md, test-design.md, the feature file, and the Xray exports. Tell me whether this design is ready to hand to automation.",
+      "files": [
+        "fixtures/out-scope-constraint/"
+      ],
+      "expected_output": "QA review reports the Out-Scope prohibition ('Do not allow user/system modify any candidate has attached to APM's invoice') as an uncovered testable constraint at Critical or Important severity, and routes back to design instead of passing.",
+      "assertions": [
+        "The review names the prohibition on modifying a candidate attached to an APM invoice",
+        "That finding is classified Critical or Important, not Minor",
+        "review.status is set to changes-requested and resume_target routes back to design",
+        "The review does not report the design as fully covering the ticket"
+      ]
+    },
+    {
+      "id": 2,
+      "name": "constraint-under-a-neutral-heading",
+      "prompt": "Review the QA design for the charge settlement story in docs/qa/MOM-12480/. Is anything from the ticket left uncovered?",
+      "files": [
+        "fixtures/constraint-under-notes/"
+      ],
+      "expected_output": "The review finds the settlement re-rate prohibition filed under Notes, proving the check reads the whole ticket rather than a heading named Out-Scope. The eight-row AC table is complete, so a reviewer reading only the table finds nothing.",
+      "assertions": [
+        "The review names the prohibition on re-rating or re-assigning a settled charge",
+        "The finding is raised even though every acceptance-criteria row is already covered",
+        "The review does not claim the design is complete because the AC table is complete"
+      ]
+    },
+    {
+      "id": 3,
+      "name": "impact-invariant-on-an-unnamed-flow",
+      "prompt": "Design the QA coverage for MOM-12194. The impact sweep has already run and its candidates are in docs/qa/MOM-12194/impact-candidates.md.",
+      "files": [
+        "fixtures/out-scope-constraint/"
+      ],
+      "expected_output": "Design produces a scenario for the refresh invariant (an invoice-attached candidate must survive RefreshWorkOrderCandidates), and every other impact candidate is either covered by a scenario or recorded in impact.dropped_scenarios with a reason.",
+      "assertions": [
+        "A scenario covers the RefreshWorkOrderCandidates invariant",
+        "Every entry in impact.candidates is named in approved_scenarios or dropped_scenarios",
+        "Each dropped candidate carries a non-empty reason",
+        "validate-run-state.py exits 0 on the resulting run.json",
+        "No impact candidate is marked as affected or high-risk in the artifacts; candidates stay evidence"
+      ]
+    },
+    {
+      "id": 4,
+      "name": "dedup-against-related-issue-coverage",
+      "prompt": "Design QA coverage for MOM-12500 and dedup it. Related stories MOM-12401 and MOM-12408 already have Xray coverage in the same flow; their exports are in the artifact folder.",
+      "files": [
+        "fixtures/related-coverage-dedup/"
+      ],
+      "expected_output": "The scenario that already exists in the MOM-12401 export is labeled SKIP, not NEW, and test-design.md names the file the match came from.",
+      "assertions": [
+        "The scenario already covered by MOM-12401 is labeled SKIP or REVIEW, never NEW",
+        "test-design.md names existing-tests-MOM-12401.feature as the file the match came from",
+        "The audit-trail behaviour, which exists only in the manual export, is labeled REVIEW and cites MOM-3042, rather than being reported as uncovered",
+        "Every existing-tests-<KEY>.feature is passed to the dedup script, not only existing-tests.feature",
+        "An all-NEW script result is not reported as evidence that the story has no existing coverage",
+        "coverage.dedup records that dedup ran"
+      ]
+    },
+    {
+      "id": 5,
+      "name": "manual-conversion-fidelity",
+      "prompt": "The team wants MOM-3110, an existing Xray Manual test, converted to Gherkin so it can be automated. Its export is in docs/qa/MOM-12550/existing-tests-manual.md. Convert it.",
+      "files": [
+        "fixtures/manual-conversion-fidelity/"
+      ],
+      "expected_output": "The conversion links rather than overwrites, declares every deviation, and refuses to invent an assertion for the unmechanizable step.",
+      "assertions": [
+        "No converted scenario carries a @TEST_ tag",
+        "conversion.converted[].mode is link",
+        "conversion.converted[].manual_test records MOM-3110",
+        "The vague verification step becomes a manual-surface scenario or an explicit question, never an invented assertion",
+        "Splitting the one manual case into several scenarios is reported as a deviation",
+        "The original manual steps are presented beside the Gherkin for the human to compare"
+      ]
+    },
+    {
+      "id": 6,
+      "name": "design-ready-before-code",
+      "prompt": "The story MOM-12600 is specced but the implementation is not merged yet. I want the test cases written and reviewed now, and automation later. Run speckit-qa-auto --issue MOM-12600 --design-only.",
+      "files": [],
+      "expected_output": "The run finishes with reviewed QA artifacts and automation.status: deferred, carrying a reason and a checkable resume_when. It does not write automation-result.json and does not report automation as blocked.",
+      "assertions": [
+        "automation.status is deferred, not blocked or not-run",
+        "automation.deferred.reason and automation.deferred.resume_when are both non-empty",
+        "resume_when names something a person can check later, not 'when the code is done'",
+        "No automation-result.json is written",
+        "validate-run-state.py exits 0 on the resulting run.json",
+        "The finish report states the deferral as the next action rather than as a coverage gap"
+      ]
+    }
+  ]
+}

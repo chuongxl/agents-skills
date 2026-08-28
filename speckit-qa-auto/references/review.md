@@ -8,10 +8,11 @@ the QA work product, not automation implementation. The review is read-only.
 Package only the evidence needed for review:
 
 - `ticket.md`;
-- `run.json`, especially `brainstorm`, `coverage`, and `artifacts`;
+- `run.json`, especially `impact`, `brainstorm`, `conversion`, `coverage`, and `artifacts`;
 - `test-design.md`;
+- `impact-candidates.md`, when the sweep produced one;
 - every source `.feature` path in `artifacts.feature_files`;
-- `existing-tests.feature` and `existing-tests-manual.md`, when present;
+- `existing-tests.feature`, `existing-tests-manual.md`, and every `existing-tests-<KEY>*` export;
 - repository feature paths used for dedup;
 - automation request and likely handoff risks only as context.
 
@@ -36,7 +37,13 @@ artifact set, accept or reject it with evidence, and update `run.json`.
 Review for:
 
 - Jira acceptance criteria, risk, and confirmed assumptions all trace to scenarios or explicit
-  open gaps;
+  open gaps — including constraints stated outside the acceptance-criteria table, in Out-Scope,
+  Notes, or description prose;
+- every entry in `impact.candidates` is either covered by a scenario or recorded in
+  `impact.dropped_scenarios` with a reason, and a sweep that could not run says so rather than
+  reading as a sweep that found nothing;
+- a `source: declared` candidate the sweep could not reach is treated as evidence of a blind spot,
+  not as a weaker finding;
 - borrowed related-story rules are not asserted as facts unless confirmed;
 - dedup labels are plausible and explained where they are `REVIEW`;
 - source Gherkin is framework-neutral: no selectors, locators, waits, page/helper names, or runner
@@ -44,7 +51,26 @@ Review for:
 - scenario count follows YAGNI: no scenario exists without an acceptance criterion, risk,
   regression gap, or explicit human concern;
 - important negative, permission, data-state, and edge cases are not missing;
+- dedup labels computed by the script were not read as covering manual coverage the script cannot
+  parse;
 - automation handoff risks are visible as `blocked`, `not-run`, or open issues rather than hidden.
+
+## Conversion Fidelity
+
+When `conversion.converted[]` is non-empty, add the fidelity task set from `manual-conversion.md`
+and ask it **both ways**:
+
+- what the source Manual test asserts that the Gherkin does not — a dropped step, a lost
+  precondition, an assertion softened into a navigation;
+- what the Gherkin asserts that the source does not — an added boundary case, an invented assertion,
+  one case silently split into three.
+
+Both directions, because a silent addition is indistinguishable from a mistranslation. A review
+asking only what was dropped audits one of the two ways a conversion goes wrong and reports clean on
+the other.
+
+An undeclared deviation is a Critical finding regardless of whether the deviation itself was an
+improvement. The defect is that it was silent.
 
 ## Findings
 

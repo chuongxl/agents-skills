@@ -71,6 +71,17 @@ def test_validate_run_state(tmp: Path) -> None:
                         "findings": [],
                     },
                 },
+                "impact": {
+                    "ran": True,
+                    "reason": "ok",
+                    "entities": [],
+                    "declared": [],
+                    "candidates": [],
+                    "approved_scenarios": [],
+                    "dropped_scenarios": [],
+                    "acknowledged_empty": True,
+                },
+                "conversion": {"status": "not-run", "converted": []},
                 "brainstorm": {
                     "status": "approved",
                     "approach": "api-first-plus-ui-smoke",
@@ -87,7 +98,7 @@ def test_validate_run_state(tmp: Path) -> None:
                     "feature_files": [str(feature.relative_to(tmp))],
                     "test_design": str(design.relative_to(tmp)),
                 },
-                "coverage": {"dedup": "ran", "xray": "available"},
+                "coverage": {"dedup": "ran", "xray": "available", "related_issues": []},
             },
             indent=2,
         ),
@@ -126,6 +137,17 @@ def test_validate_pre_design_state(tmp: Path) -> None:
                         "findings": [],
                     },
                 },
+                "impact": {
+                    "ran": True,
+                    "reason": "ok",
+                    "entities": [],
+                    "declared": [],
+                    "candidates": [],
+                    "approved_scenarios": [],
+                    "dropped_scenarios": [],
+                    "acknowledged_empty": True,
+                },
+                "conversion": {"status": "not-run", "converted": []},
                 "brainstorm": {
                     "status": "pending",
                     "approach": None,
@@ -139,7 +161,7 @@ def test_validate_pre_design_state(tmp: Path) -> None:
                     "decisions": [],
                 },
                 "artifacts": {"feature_files": [], "test_design": None},
-                "coverage": {"dedup": "not-run", "xray": "unavailable"},
+                "coverage": {"dedup": "not-run", "xray": "unavailable", "related_issues": []},
             },
             indent=2,
         ),
@@ -176,6 +198,17 @@ def test_design_requires_brainstorm(tmp: Path) -> None:
                         "findings": [],
                     },
                 },
+                "impact": {
+                    "ran": True,
+                    "reason": "ok",
+                    "entities": [],
+                    "declared": [],
+                    "candidates": [],
+                    "approved_scenarios": [],
+                    "dropped_scenarios": [],
+                    "acknowledged_empty": True,
+                },
+                "conversion": {"status": "not-run", "converted": []},
                 "brainstorm": {
                     "status": "pending",
                     "approach": None,
@@ -192,7 +225,7 @@ def test_design_requires_brainstorm(tmp: Path) -> None:
                     "feature_files": [str(feature.relative_to(tmp))],
                     "test_design": str(design.relative_to(tmp)),
                 },
-                "coverage": {"dedup": "ran", "xray": "available"},
+                "coverage": {"dedup": "ran", "xray": "available", "related_issues": []},
             },
             indent=2,
         ),
@@ -224,6 +257,17 @@ def test_brainstorm_approved_stage_requires_approved_status(tmp: Path) -> None:
                         "findings": [],
                     },
                 },
+                "impact": {
+                    "ran": True,
+                    "reason": "ok",
+                    "entities": [],
+                    "declared": [],
+                    "candidates": [],
+                    "approved_scenarios": [],
+                    "dropped_scenarios": [],
+                    "acknowledged_empty": True,
+                },
+                "conversion": {"status": "not-run", "converted": []},
                 "brainstorm": {
                     "status": "pending",
                     "approach": None,
@@ -237,7 +281,7 @@ def test_brainstorm_approved_stage_requires_approved_status(tmp: Path) -> None:
                     "decisions": [],
                 },
                 "artifacts": {"feature_files": [], "test_design": None},
-                "coverage": {"dedup": "not-run", "xray": "unavailable"},
+                "coverage": {"dedup": "not-run", "xray": "unavailable", "related_issues": []},
             },
             indent=2,
         ),
@@ -274,6 +318,17 @@ def test_automation_requires_review_passed(tmp: Path) -> None:
                         "findings": [],
                     },
                 },
+                "impact": {
+                    "ran": True,
+                    "reason": "ok",
+                    "entities": [],
+                    "declared": [],
+                    "candidates": [],
+                    "approved_scenarios": [],
+                    "dropped_scenarios": [],
+                    "acknowledged_empty": True,
+                },
+                "conversion": {"status": "not-run", "converted": []},
                 "brainstorm": {
                     "status": "approved",
                     "approach": "api-first-plus-ui-smoke",
@@ -290,7 +345,7 @@ def test_automation_requires_review_passed(tmp: Path) -> None:
                     "feature_files": [str(feature.relative_to(tmp))],
                     "test_design": str(design.relative_to(tmp)),
                 },
-                "coverage": {"dedup": "ran", "xray": "available"},
+                "coverage": {"dedup": "ran", "xray": "available", "related_issues": []},
             },
             indent=2,
         ),
@@ -322,6 +377,17 @@ def test_review_route_requires_design_artifacts(tmp: Path) -> None:
                         "findings": [],
                     },
                 },
+                "impact": {
+                    "ran": True,
+                    "reason": "ok",
+                    "entities": [],
+                    "declared": [],
+                    "candidates": [],
+                    "approved_scenarios": [],
+                    "dropped_scenarios": [],
+                    "acknowledged_empty": True,
+                },
+                "conversion": {"status": "not-run", "converted": []},
                 "brainstorm": {
                     "status": "approved",
                     "approach": "api-first-plus-ui-smoke",
@@ -335,7 +401,7 @@ def test_review_route_requires_design_artifacts(tmp: Path) -> None:
                     "decisions": [],
                 },
                 "artifacts": {"feature_files": [], "test_design": None},
-                "coverage": {"dedup": "not-run", "xray": "unavailable"},
+                "coverage": {"dedup": "not-run", "xray": "unavailable", "related_issues": []},
             },
             indent=2,
         ),
@@ -372,6 +438,17 @@ def test_implemented_automation_can_resume_to_review(tmp: Path) -> None:
                         "findings": [],
                     },
                 },
+                "impact": {
+                    "ran": True,
+                    "reason": "ok",
+                    "entities": [],
+                    "declared": [],
+                    "candidates": [],
+                    "approved_scenarios": [],
+                    "dropped_scenarios": [],
+                    "acknowledged_empty": True,
+                },
+                "conversion": {"status": "not-run", "converted": []},
                 "brainstorm": {
                     "status": "approved",
                     "approach": "api-first-plus-ui-smoke",
@@ -388,7 +465,7 @@ def test_implemented_automation_can_resume_to_review(tmp: Path) -> None:
                     "feature_files": [str(feature.relative_to(tmp))],
                     "test_design": str(design.relative_to(tmp)),
                 },
-                "coverage": {"dedup": "ran", "xray": "available"},
+                "coverage": {"dedup": "ran", "xray": "available", "related_issues": []},
             },
             indent=2,
         ),
@@ -420,6 +497,17 @@ def test_adapter_field_is_rejected(tmp: Path) -> None:
                         "findings": [],
                     },
                 },
+                "impact": {
+                    "ran": True,
+                    "reason": "ok",
+                    "entities": [],
+                    "declared": [],
+                    "candidates": [],
+                    "approved_scenarios": [],
+                    "dropped_scenarios": [],
+                    "acknowledged_empty": True,
+                },
+                "conversion": {"status": "not-run", "converted": []},
                 "brainstorm": {
                     "status": "pending",
                     "approach": None,
@@ -433,7 +521,7 @@ def test_adapter_field_is_rejected(tmp: Path) -> None:
                     "decisions": [],
                 },
                 "artifacts": {"feature_files": [], "test_design": None},
-                "coverage": {"dedup": "not-run", "xray": "unavailable"},
+                "coverage": {"dedup": "not-run", "xray": "unavailable", "related_issues": []},
             },
             indent=2,
         ),
@@ -485,6 +573,274 @@ Feature: Candidate invoice
     expect("new scenario is new", labels["reject unsupported invoice type"] == "NEW")
 
 
+def test_impact_must_record_outcome(tmp: Path) -> None:
+    print("impact-must-record-outcome")
+    run_dir = tmp / "docs" / "qa" / "mom-1234"
+    run_json = write(
+        run_dir / "run.json",
+        json.dumps(
+            {
+                "issue": "MOM-1234",
+                "stage": "discovered",
+                "resume_target": "brainstorm",
+                "automation": {
+                    "status": "not-requested",
+                    "requested": False,
+                    "tool": None,
+                    "skill": None,
+                    "result": None,
+                    "review": {"status": "not-run", "findings": []},
+                },
+                "impact": {
+                    "ran": False,
+                    "reason": "not-run",
+                    "entities": [],
+                    "declared": [],
+                    "candidates": [],
+                    "approved_scenarios": [],
+                    "dropped_scenarios": [],
+                    "acknowledged_empty": False,
+                },
+                "conversion": {"status": "not-run", "converted": []},
+                "brainstorm": {
+                    "status": "pending",
+                    "approach": None,
+                    "questions": [],
+                    "confirmed_assumptions": [],
+                    "rejected_approaches": [],
+                },
+                "review": {"status": "pending", "findings": [], "decisions": []},
+                "artifacts": {"feature_files": [], "test_design": None},
+                "coverage": {"dedup": "not-run", "xray": "unavailable", "related_issues": []},
+            },
+            indent=2,
+        ),
+    )
+    result = run_script("validate-run-state.py", run_json)
+    expect("impact still not-run past the gate exits nonzero", result.returncode == 1)
+    expect("impact still not-run past the gate is explained", "impact.reason" in result.stderr)
+
+
+def test_impact_candidates_must_be_satisfied(tmp: Path) -> None:
+    print("impact-candidates-must-be-satisfied")
+    run_dir = tmp / "docs" / "qa" / "mom-1234"
+    write(
+        run_dir / "invoice.feature",
+        "Feature: Invoice\n\n  Scenario: show invoice\n    Given an invoice exists\n",
+    )
+    write(run_dir / "test-design.md", "# Test Design\n")
+    run_json = write(
+        run_dir / "run.json",
+        json.dumps(
+            {
+                "issue": "MOM-1234",
+                "stage": "review-passed",
+                "resume_target": "finish",
+                "automation": {
+                    "status": "not-requested",
+                    "requested": False,
+                    "tool": None,
+                    "skill": None,
+                    "result": None,
+                    "review": {"status": "not-run", "findings": []},
+                },
+                "impact": {
+                    "ran": True,
+                    "reason": "ok",
+                    "entities": ["work_order_candidate"],
+                    "declared": [],
+                    "candidates": [
+                        {
+                            "flow": "RefreshWorkOrderCandidates",
+                            "evidence": "src/work-order-candidate.graphql:123",
+                            "writes": "work_order_candidate",
+                            "existing_tests": [],
+                            "source": "sweep",
+                        }
+                    ],
+                    "approved_scenarios": [],
+                    "dropped_scenarios": [],
+                    "acknowledged_empty": False,
+                },
+                "conversion": {"status": "not-run", "converted": []},
+                "brainstorm": {
+                    "status": "approved",
+                    "approach": "api-first",
+                    "questions": [],
+                    "confirmed_assumptions": [],
+                    "rejected_approaches": [],
+                },
+                "review": {"status": "passed", "findings": [], "decisions": []},
+                "artifacts": {
+                    "feature_files": ["docs/qa/mom-1234/invoice.feature"],
+                    "test_design": "docs/qa/mom-1234/test-design.md",
+                },
+                "coverage": {"dedup": "ran", "xray": "available", "related_issues": []},
+            },
+            indent=2,
+        ),
+    )
+    result = run_script("validate-run-state.py", run_json)
+    expect("undesigned impact candidate exits nonzero", result.returncode == 1)
+    expect("undesigned impact candidate is explained", "impact.candidates" in result.stderr)
+
+
+def test_related_issues_must_be_jira_keys(tmp: Path) -> None:
+    print("related-issues-must-be-jira-keys")
+    run_dir = tmp / "docs" / "qa" / "mom-1234"
+    run_json = write(
+        run_dir / "run.json",
+        json.dumps(
+            {
+                "issue": "MOM-1234",
+                "stage": "discovered",
+                "resume_target": "impact",
+                "automation": {
+                    "status": "not-requested",
+                    "requested": False,
+                    "tool": None,
+                    "skill": None,
+                    "result": None,
+                    "review": {"status": "not-run", "findings": []},
+                },
+                "impact": {
+                    "ran": False,
+                    "reason": "not-run",
+                    "entities": [],
+                    "declared": [],
+                    "candidates": [],
+                    "approved_scenarios": [],
+                    "dropped_scenarios": [],
+                    "acknowledged_empty": False,
+                },
+                "conversion": {"status": "not-run", "converted": []},
+                "brainstorm": {
+                    "status": "pending",
+                    "approach": None,
+                    "questions": [],
+                    "confirmed_assumptions": [],
+                    "rejected_approaches": [],
+                },
+                "review": {"status": "pending", "findings": [], "decisions": []},
+                "artifacts": {"feature_files": [], "test_design": None},
+                "coverage": {
+                    "dedup": "not-run",
+                    "xray": "unavailable",
+                    "related_issues": ["mom-1100"],
+                },
+            },
+            indent=2,
+        ),
+    )
+    result = run_script("validate-run-state.py", run_json)
+    expect("malformed related key exits nonzero", result.returncode == 1)
+    expect("malformed related key is explained", "coverage.related_issues" in result.stderr)
+
+
+def _deferred_run(review_status: str, automation: dict) -> dict:
+    return {
+        "issue": "MOM-1234",
+        "stage": "finished",
+        "resume_target": "done",
+        "automation": automation,
+        "impact": {
+            "ran": True,
+            "reason": "ok",
+            "entities": [],
+            "declared": [],
+            "candidates": [],
+            "approved_scenarios": [],
+            "dropped_scenarios": [],
+            "acknowledged_empty": True,
+        },
+        "conversion": {"status": "not-run", "converted": []},
+        "brainstorm": {
+            "status": "approved",
+            "approach": "api-first",
+            "questions": [],
+            "confirmed_assumptions": [],
+            "rejected_approaches": [],
+        },
+        "review": {"status": review_status, "findings": [], "decisions": []},
+        "artifacts": {
+            "feature_files": ["docs/qa/mom-1234/invoice.feature"],
+            "test_design": "docs/qa/mom-1234/test-design.md",
+        },
+        "coverage": {"dedup": "ran", "xray": "available", "related_issues": []},
+    }
+
+
+def _deferred_automation(**overrides: object) -> dict:
+    automation = {
+        "status": "deferred",
+        "requested": True,
+        "deferred": {
+            "reason": "implementation not merged yet",
+            "resume_when": "MOM-1234 code is on the target branch",
+        },
+        "tool": None,
+        "skill": None,
+        "result": None,
+        "review": {"status": "not-run", "findings": []},
+    }
+    automation.update(overrides)
+    return automation
+
+
+def _write_deferred(tmp: Path, data: dict) -> Path:
+    run_dir = tmp / "docs" / "qa" / "mom-1234"
+    write(
+        run_dir / "invoice.feature",
+        "Feature: Invoice\n\n  Scenario: show invoice\n    Given an invoice exists\n",
+    )
+    write(run_dir / "test-design.md", "# Test Design\n")
+    return write(run_dir / "run.json", json.dumps(data, indent=2))
+
+
+def test_deferred_automation_is_valid(tmp: Path) -> None:
+    print("deferred-automation-is-valid")
+    run_json = _write_deferred(tmp, _deferred_run("passed", _deferred_automation()))
+    result = run_script("validate-run-state.py", run_json)
+    expect("deferred automation exits 0", result.returncode == 0)
+    expect("deferred automation reports ok", '"ok": true' in result.stdout)
+
+
+def test_deferred_requires_passed_review(tmp: Path) -> None:
+    print("deferred-requires-passed-review")
+    data = _deferred_run("pending", _deferred_automation())
+    data["stage"] = "reviewing"
+    data["resume_target"] = "review"
+    run_json = _write_deferred(tmp, data)
+    result = run_script("validate-run-state.py", run_json)
+    expect("deferring before review exits nonzero", result.returncode == 1)
+    expect(
+        "deferring before review is explained",
+        "before automation can be deferred" in result.stderr,
+    )
+
+
+def test_deferred_requires_reason_and_resume_when(tmp: Path) -> None:
+    print("deferred-requires-reason-and-resume-when")
+    automation = _deferred_automation(deferred={"reason": "", "resume_when": "   "})
+    run_json = _write_deferred(tmp, _deferred_run("passed", automation))
+    result = run_script("validate-run-state.py", run_json)
+    expect("empty deferral record exits nonzero", result.returncode == 1)
+    expect("deferral reason is explained", "automation.deferred.reason" in result.stderr)
+    expect("deferral resume_when is explained", "automation.deferred.resume_when" in result.stderr)
+
+
+def test_deferred_block_needs_deferred_status(tmp: Path) -> None:
+    print("deferred-block-needs-deferred-status")
+    automation = _deferred_automation(status="not-run")
+    run_json = _write_deferred(tmp, _deferred_run("passed", automation))
+    result = run_script("validate-run-state.py", run_json)
+    expect("stale deferral block exits nonzero", result.returncode == 1)
+    expect(
+        "stale deferral block is explained",
+        "only valid when automation.status is deferred" in result.stderr,
+    )
+
+
 def main() -> int:
     with tempfile.TemporaryDirectory() as raw:
         tmp = Path(raw)
@@ -496,6 +852,13 @@ def main() -> int:
         test_review_route_requires_design_artifacts(tmp / "review-artifacts-required")
         test_implemented_automation_can_resume_to_review(tmp / "automation-review")
         test_adapter_field_is_rejected(tmp / "adapter-field")
+        test_impact_must_record_outcome(tmp / "impact-outcome")
+        test_impact_candidates_must_be_satisfied(tmp / "impact-satisfied")
+        test_related_issues_must_be_jira_keys(tmp / "related-keys")
+        test_deferred_automation_is_valid(tmp / "deferred-valid")
+        test_deferred_requires_passed_review(tmp / "deferred-review")
+        test_deferred_requires_reason_and_resume_when(tmp / "deferred-record")
+        test_deferred_block_needs_deferred_status(tmp / "deferred-stale")
         test_dedup_gherkin(tmp / "gherkin")
     print()
     if FAILURES:

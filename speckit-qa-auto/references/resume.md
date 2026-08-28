@@ -30,6 +30,7 @@ Use `resume_target` first:
 | `resume_target` | Route |
 |---|---|
 | `intake` | read `intake.md` |
+| `impact` | read `impact.md` |
 | `brainstorm` | read `brainstorm.md` |
 | `design` | read `design.md` |
 | `review` | read `review.md` |
@@ -37,5 +38,17 @@ Use `resume_target` first:
 | `automation-review` | read `automation-review.md` |
 | `finish` | read `finish.md` |
 | `done` or `null` | report current artifacts and stop unless the user asks for a new action |
+
+## Deferred Automation
+
+`resume_target: done` with `automation.status: deferred` is a finished run waiting for code. It is
+the one `done` state that has an expected next action.
+
+When the user resumes such a run with `--automation`, that is the new action: read `automation.md`
+and follow its re-entry rules, which require re-reading the ticket before anything is written.
+
+When the user resumes it without asking for anything, report the artifacts, the deferral reason, and
+the `resume_when` condition, then stop. Do not start automating because the code now appears to
+exist — the deferral was a decision, and resuming it is also a decision.
 
 `stage` is audit context; `resume_target` is the instruction.

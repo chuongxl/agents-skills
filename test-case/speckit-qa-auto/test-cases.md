@@ -11,6 +11,18 @@ framework-specific automation rules in `speckit-qa-auto`.
 
 Status values used while recording a run: `PASS`, `FAIL`, `BLOCKED`, `NOT RUN`.
 
+## Behaviour evals
+
+End-to-end evals live in [`evals/`](evals/README.md): six prompts with 29 assertions over impact
+analysis, `--related` coverage, Manual-test conversion, and deferred automation. The cases below
+test the contract; the evals test what a run actually produces against it.
+
+| ID | Scenario | Steps | Expected result |
+|---|---|---|---|
+| EVAL-01 | Eval suite is well-formed | Parse `evals/evals.json`; confirm every eval has an id, name, prompt, expected_output, and at least three assertions | Exit `0`; 6 evals parse |
+| EVAL-02 | Eval fixtures carry valid state | Run `validate-run-state.py` over every `evals/fixtures/*/run.json` | Each exits `0` |
+| EVAL-03 | Grader discriminates | Grade a run folder that satisfies an eval and one that violates it | The satisfying folder passes every mechanical check; the violating one fails the checks it violates and names the offending value as evidence |
+
 ## Repository and packaging
 
 | ID | Scenario | Preconditions | Steps | Expected result |

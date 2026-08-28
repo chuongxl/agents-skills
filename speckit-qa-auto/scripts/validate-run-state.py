@@ -15,6 +15,7 @@ ISSUE_RE = re.compile(r"^[A-Z][A-Z0-9]+-\d+$")
 STAGES = {
     "intake",
     "discovered",
+    "impact-analysis",
     "brainstorming",
     "brainstorm-approved",
     "design-drafting",
@@ -30,6 +31,7 @@ STAGES = {
 RESUME_TARGETS = {
     None,
     "intake",
+    "impact",
     "brainstorm",
     "design",
     "review",
@@ -42,9 +44,26 @@ COVERAGE_VALUES = {
     "dedup": {"not-run", "ran", "skipped"},
     "xray": {"available", "unavailable", "not-configured"},
 }
+IMPACT_REASONS = {"ok", "no-source-access", "entity-unresolved", "not-run"}
+IMPACT_SOURCES = {"sweep", "declared", "both"}
+CONVERSION_STATUSES = {"not-run", "pending", "approved"}
+CONVERSION_MODES = {"link", "overwrite"}
+IMPACT_RESOLVED_STAGES = {
+    "brainstorming",
+    "brainstorm-approved",
+    "design-drafting",
+    "design-approved",
+    "reviewing",
+    "review-passed",
+    "automation",
+    "automation-reviewing",
+    "automation-complete",
+    "finished",
+}
 AUTOMATION_STATUSES = {
     "not-requested",
     "pending",
+    "deferred",
     "implemented",
     "review-passed",
     "blocked",
@@ -137,7 +156,7 @@ def validate(path: Path) -> list[str]:
     automation_status = automation.get("status")
     if automation_status not in AUTOMATION_STATUSES:
         errors.append(
-            "automation.status must be not-requested, pending, implemented, review-passed, blocked, or not-run"
+            "automation.status must be one of " + ", ".join(sorted(AUTOMATION_STATUSES))
         )
     if not isinstance(automation.get("requested"), bool):
         errors.append("automation.requested must be a boolean")
@@ -161,6 +180,22 @@ def validate(path: Path) -> list[str]:
     if automation_status == "review-passed" and not automation.get("result"):
         errors.append("automation.result must point to automation-result.json when automation is review-passed")
 
+    deferred = automation.get("deferred")
+    if automation_status == "deferred":
+        if automation.get("requested") is not True:
+            errors.append("automation.requested must be true when automation is deferred")
+        if automation.get("result") is not None:
+            errors.append("automation.result must be null when automation is deferred")
+        if automation_review_status != "not-run":
+            errors.append("automation.review.status must be not-run when automation is deferred")
+        deferred_obj = _require_object(deferred, "automation.deferred", errors)
+        for field in ("reason", "resume_when"):
+            value = deferred_obj.get(field)
+            if not isinstance(value, str) or not value.strip():
+                errors.append(f"automation.deferred.{field} must be a non-empty string")
+    elif deferred is not None:
+        errors.append("automation.deferred is only valid when automation.status is deferred")
+
     brainstorm = _require_object(data.get("brainstorm"), "brainstorm", errors)
     brainstorm_status = brainstorm.get("status")
     if brainstorm_status not in BRAINSTORM_STATUSES:
@@ -179,6 +214,82 @@ def validate(path: Path) -> list[str]:
         if not isinstance(brainstorm.get(field), list):
             errors.append(f"brainstorm.{field} must be a list")
 
+    impact = _require_object(data.get("impact"), "impact", errors)
+    if not isinstance(impact.get("ran"), bool):
+        errors.append("impact.ran must be a boolean")
+    impact_reason = impact.get("reason")
+    if impact_reason not in IMPACT_REASONS:
+        errors.append(f"impact.reason must be one of {', '.join(sorted(IMPACT_REASONS))}")
+    if impact.get("ran") is True and impact_reason != "ok":
+        errors.append("impact.reason must be ok when impact.ran is true")
+    if impact.get("ran") is False and impact_reason == "ok":
+        errors.append("impact.reason ok requires impact.ran true")
+    for field in ("entities", "declared", "candidates", "approved_scenarios", "dropped_scenarios"):
+        if not isinstance(impact.get(field), list):
+            errors.append(f"impact.{field} must be a list")
+    if not isinstance(impact.get("acknowledged_empty"), bool):
+        errors.append("impact.acknowledged_empty must be a boolean")
+
+    candidates = impact.get("candidates")
+    if isinstance(candidates, list):
+        for idx, candidate in enumerate(candidates):
+            if not isinstance(candidate, dict):
+                errors.append(f"impact.candidates[{idx}] must be an object")
+                continue
+            for field in ("flow", "evidence"):
+                if not isinstance(candidate.get(field), str) or not candidate[field].strip():
+                    errors.append(f"impact.candidates[{idx}].{field} must be a non-empty string")
+            if candidate.get("source") not in IMPACT_SOURCES:
+                errors.append(
+                    f"impact.candidates[{idx}].source must be sweep, declared, or both"
+                )
+            if not isinstance(candidate.get("existing_tests", []), list):
+                errors.append(f"impact.candidates[{idx}].existing_tests must be a list")
+
+    dropped = impact.get("dropped_scenarios")
+    if isinstance(dropped, list):
+        for idx, drop in enumerate(dropped):
+            if not isinstance(drop, dict):
+                errors.append(f"impact.dropped_scenarios[{idx}] must be an object")
+                continue
+            for field in ("name", "reason"):
+                if not isinstance(drop.get(field), str) or not drop[field].strip():
+                    errors.append(
+                        f"impact.dropped_scenarios[{idx}].{field} must be a non-empty string"
+                    )
+
+    impact_resolved = (
+        stage in IMPACT_RESOLVED_STAGES
+        or resume_target in {"brainstorm", "design", "review", "automation", "automation-review", "finish", "done"}
+    )
+    if impact_resolved and impact_reason == "not-run":
+        errors.append("impact.reason must record an outcome once the run moves past impact")
+
+    conversion = _require_object(data.get("conversion"), "conversion", errors)
+    conversion_status = conversion.get("status")
+    if conversion_status not in CONVERSION_STATUSES:
+        errors.append("conversion.status must be not-run, pending, or approved")
+    converted = conversion.get("converted")
+    if not isinstance(converted, list):
+        errors.append("conversion.converted must be a list")
+    else:
+        if converted and conversion_status == "not-run":
+            errors.append("conversion.status not-run cannot carry converted entries")
+        for idx, entry in enumerate(converted):
+            if not isinstance(entry, dict):
+                errors.append(f"conversion.converted[{idx}] must be an object")
+                continue
+            manual_test = entry.get("manual_test")
+            if not isinstance(manual_test, str) or not ISSUE_RE.match(manual_test):
+                errors.append(
+                    f"conversion.converted[{idx}].manual_test must be a Jira key like MOM-1234"
+                )
+            for field in ("scenarios", "deviations"):
+                if not isinstance(entry.get(field), list):
+                    errors.append(f"conversion.converted[{idx}].{field} must be a list")
+            if entry.get("mode") not in CONVERSION_MODES:
+                errors.append(f"conversion.converted[{idx}].mode must be link or overwrite")
+
     review = _require_object(data.get("review"), "review", errors)
     review_status = review.get("status")
     if review_status not in REVIEW_STATUSES:
@@ -189,11 +300,27 @@ def validate(path: Path) -> list[str]:
     )
     if review_required and review_status != "passed":
         errors.append("review.status must be passed before automation, finish, or done")
+    if automation_status == "deferred" and review_status != "passed":
+        errors.append("review.status must be passed before automation can be deferred")
     if review_status == "changes-requested" and resume_target not in {"design", "review"}:
         errors.append("review.status changes-requested must route back to design or review")
     for field in ("findings", "decisions"):
         if not isinstance(review.get(field), list):
             errors.append(f"review.{field} must be a list")
+
+    if review_status == "passed" and isinstance(candidates, list):
+        approved = impact.get("approved_scenarios")
+        approved = approved if isinstance(approved, list) else []
+        dropped_list = dropped if isinstance(dropped, list) else []
+        if candidates and not approved and not dropped_list:
+            errors.append(
+                "impact.candidates must be covered by approved_scenarios or dropped_scenarios "
+                "before review passes"
+            )
+        if not candidates and impact.get("ran") is True and not impact.get("acknowledged_empty"):
+            errors.append(
+                "impact.acknowledged_empty must be true when the sweep ran and found no candidates"
+            )
 
     run_dir = path.resolve().parent
     workspace = _workspace_root(run_dir)
@@ -236,6 +363,14 @@ def validate(path: Path) -> list[str]:
         value = coverage.get(field)
         if value not in values:
             errors.append(f"coverage.{field} must be one of {', '.join(sorted(values))}")
+
+    related = coverage.get("related_issues")
+    if not isinstance(related, list):
+        errors.append("coverage.related_issues must be a list")
+    else:
+        for raw in related:
+            if not isinstance(raw, str) or not ISSUE_RE.match(raw):
+                errors.append(f"coverage.related_issues entry is not a Jira key: {raw!r}")
 
     return errors
 
