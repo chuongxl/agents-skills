@@ -124,10 +124,10 @@ branch gets renamed (§1.5).
 
 ## 6. Artifact Path + Stage 02 Entry
 
-- **github-speckit:** `specs/<issue_id>-<short_title>/` (`--issue`) or `specs/<nnn>-<slug>/`
-  (manual) — ticket snapshot, spec/plan/tasks/checklist, execution report (`--issue`).
-- **superpowers:** `specs/<feature_folder>/` with `spec.md` and `plan.md`; the adapter's Artifact
-  Path Guard applies.
+Same layout for both providers — the git branch name and the spec folder name are identical:
+`specs/<issue_id>-<short_title>/` (`--issue`) or `specs/<nnn>-<slug>/` (manual). Contents:
+ticket snapshot (`--issue`), spec/plan (both providers) plus tasks/checklist (github-speckit),
+execution report (`--issue`). The adapter's Artifact Path Guard still applies.
 
 Create the folder, run the branch rename, relocate the ticket snapshot (`--issue`), then load
 [stage-02-spec-design.md](stage-02-spec-design.md) and invoke its first step
