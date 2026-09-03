@@ -12,82 +12,86 @@ license: MIT
 allowed-tools: bash glob grep view create edit skill
 metadata:
   author: Alex Nguyen
-  version: "0.2.8"
+  version: "0.3.0"
 ---
 
 # Speckit Auto
 
-Small entry point: parse the invocation, resolve the provider, then run the shared pipeline
-stages. Load only what the current step needs — stage files say at the top which other files they
-load.
+Entry point only: parse the invocation, resolve the provider, then run the stages.
 
-## Entry Dispatch (Do This First, Every Invocation)
+**Progressive loading is a hard rule.** Load a reference file at the moment its step runs, never
+ahead of time. Never load a stage you are not in, a provider you did not resolve, an install-
+recovery file on a healthy run, or a file already in context. See the loading map below.
 
-1. Load [references/shared/host-adaptation.md](references/shared/host-adaptation.md) once per
-   run; detect the host (Copilot / Claude Code / OpenCode) from the discovery directory + tool
-   surface. The host is fixed for the whole run.
+## Entry Dispatch (every invocation)
 
-2. Parse the invocation text (slash-command body on Copilot/Claude Code; the natural-language
+1. **Parse the invocation text** (slash-command body on Copilot/Claude Code; the natural-language
    trigger message on OpenCode — flags may be embedded anywhere):
-   - `--integration <value>` → setup intent (provider setup ONLY, no pipeline)
+   - `--integration <value>` → setup intent (setup ONLY, no pipeline)
    - `--issue <url>` → Jira pipeline intent
    - `--yolo` → mode = yolo (else default)
    - free text → requirement pipeline intent
 
+2. **Note the host** from the directory this file was loaded from: `~/.copilot/skills/`,
+   `.github/skills/`, `~/.agents/skills/` → Copilot; `~/.claude/skills/` → Claude Code;
+   `~/.config/opencode/skills/`, `.opencode/skills/` → OpenCode. Directories that overlap
+   (`.claude/skills/`, `.agents/skills/`) or any other ambiguity → resolve via the tie-break in
+   [references/shared/host-adaptation.md](references/shared/host-adaptation.md). The host is fixed
+   for the run; look up host-specific values (ask tool, skill dirs, install host key) from that
+   same file when a step needs one.
+
 3. **Setup intent** (`--integration` present): load
-   [references/shared/integration-setup.md](references/shared/integration-setup.md) and follow
-   its steps. END TURN after — do not enter the pipeline.
+   [references/shared/integration-setup.md](references/shared/integration-setup.md) and follow it.
+   END TURN after — do not enter the pipeline, and do not load any pipeline file.
 
-4. **Pipeline intent** (no `--integration`): resolve the provider from **exactly one source** —
-   repo-local `<repo-root>/.speckit/integration.json` → `integration` field. There is no global
-   fallback and no first-run prompt:
-   - **Missing file, unparseable content, or an unsupported value** → stop immediately and tell
-     the user to configure the provider first:
-     `/speckit-auto --integration github-speckit` (or `superpowers`).
-   - On success, record the result as `integration` in run state; never re-read or change it
-     mid-run. Never infer the provider from repo contents — a missing framework installation is
-     handled by its provider's install recovery, never by switching provider.
+4. **Pipeline intent**: resolve the provider from **exactly one source** —
+   `<repo-root>/.speckit/integration.json` → `integration` field. No global fallback, no first-run
+   prompt. Missing file, unparseable content, or an unsupported value → stop immediately and tell
+   the user to run `/speckit-auto --integration github-speckit` (or `superpowers`) first. On
+   success, record it as `integration` in run state; never re-read or change it mid-run, and never
+   infer the provider from repo contents.
 
-5. Load [references/shared/operating-rules.md](references/shared/operating-rules.md), the
-   provider adapter [references/providers/github-speckit.md](references/providers/github-speckit.md)
-   or [references/providers/superpowers.md](references/providers/superpowers.md) for the resolved
-   provider, then enter Stage 01 **immediately, in this same turn**.
+5. Load **exactly three files**, then enter Stage 01 in this same turn:
+   [references/shared/operating-rules.md](references/shared/operating-rules.md), the adapter for
+   the resolved provider, and
+   [references/pipeline/stage-01-intake.md](references/pipeline/stage-01-intake.md).
 
 Never return an acknowledgement-only response. If the skill is already loaded mid-run (resume
 marker: `<skill-context name="speckit-auto">` on Claude Code, `<available_skills>` on OpenCode,
-the skill tool list on Copilot), resume from the current stage using available run context — never
-block asking the user to re-run the skill.
+the skill tool list on Copilot), resume from the current stage using available run context and
+load only that stage's file — never block asking the user to re-run the skill.
 
-## Stage Router (Load On Demand)
+## Loading Map
 
-Load only the stage file for the current stage; never load a file from the provider that was not
-selected.
+| File | Load when |
+|------|-----------|
+| `references/shared/operating-rules.md` | every pipeline run, at entry (the only eager load) |
+| `references/providers/<provider>.md` | every pipeline run, at entry — resolved provider only |
+| `references/pipeline/stage-01-intake.md` | entering Stage 01 |
+| `references/pipeline/stage-02-spec-design.md` | entering Stage 02 |
+| `references/pipeline/stage-03-implement-review.md` | entering Stage 03 |
+| `references/pipeline/stage-04-finish.md` | `speckit-code-review` returns `pass` |
+| `references/shared/commit.md` | first commit gate reached (Stage 02 → 03) |
+| `references/shared/host-adaptation.md` | a step needs an ask-tool name, skill dir, or install host key |
+| `references/shared/integration-setup.md` | `--integration` present (setup runs; no stage file loads) |
+| `references/providers/<provider>-install.md` | provider validation fails — never on a healthy run |
+| `references/pipeline/jira-fallback.md` | `--issue` run and `jira-to-speckit` is unavailable |
+| `assets/execution-report-template.md` | `--issue` run, at execution-report init |
 
-| Stage | File |
-|-------|------|
-| 01 — Preflight + Intake | [references/pipeline/stage-01-intake.md](references/pipeline/stage-01-intake.md) |
-| 02 — Spec / Design | [references/pipeline/stage-02-spec-design.md](references/pipeline/stage-02-spec-design.md) |
-| 03 — Implement + Code Review Loop | [references/pipeline/stage-03-implement-review.md](references/pipeline/stage-03-implement-review.md) |
-| 04 — Human Review / Commit / Completion | [references/pipeline/stage-04-finish.md](references/pipeline/stage-04-finish.md) |
-| Provider adapter | `references/providers/<provider>.md` |
-| Shared operating rules | [references/shared/operating-rules.md](references/shared/operating-rules.md) |
-| Host detection / tool names | [references/shared/host-adaptation.md](references/shared/host-adaptation.md) |
-| Integration setup (`--integration`) | [references/shared/integration-setup.md](references/shared/integration-setup.md) |
-| Commit + push procedure | [references/shared/commit.md](references/shared/commit.md) |
-
-Shared references are loaded by both providers; provider-specific behavior (install layout,
-stage agents/skills, artifact paths, fix routing) lives in the provider adapter and is the ONLY
-provider-specific file a stage reads. There is no per-provider pipeline tree — both providers run
-the same four stage files.
+Once loaded, a reference file from the table above stays in context for the run — never re-read
+it. That rule covers `references/**` pipeline files only. Stage-local context (interviews, failed
+review bodies) is dropped when leaving a stage; project **guideline** files are cached in
+`loaded_guidelines` and may be dropped from context and re-read on demand later — when you drop
+one, also drop its `loaded_guidelines` cache entry so a later stage knows to re-read it.
 
 ## Modes
 
 - **Default**: human-in-the-loop. Mandatory checkpoints: the Stage 02 approval interactions, the
   Stage 02 → Stage 03 start-implementation confirmation, and Stage 04.
-- **YOLO** (`--yolo`): no human checkpoints; all Stage 02 interactions and Stage 04 human review
-  are skipped, with an auto-generated commit message.
+- **YOLO** (`--yolo`): no human checkpoints; Stage 02 interactions and Stage 04 human review are
+  skipped, with an auto-generated commit message.
 
-Stage 03 is a NO-STOP ZONE in both modes (operating rule 8).
+Stage 03 is a NO-STOP ZONE in both modes.
 
 ## Sub-Skill Dependencies
 
@@ -97,12 +101,6 @@ Stage 03 is a NO-STOP ZONE in both modes (operating rule 8).
 | `speckit-code-review` | Authoritative JSON pass/fail review gate | `skill` tool, name `speckit-code-review` |
 
 Both are provider-independent and used by every provider.
-
-## Portability Note
-
-`allowed-tools` uses Copilot-style tool names; Claude Code and OpenCode expose the same
-capabilities under their own names (`Bash`, `Read`, `Edit`, `Write`, `Glob`, `Grep`, `skill`).
-Never refuse to act because a tool is named differently — see host-adaptation.md.
 
 ## Required Inputs
 
@@ -116,3 +114,9 @@ At each checkpoint, report: current stage, result (`done` / `needs changes` / `f
 stage. At completion, report: resolved provider, `speckit-code-review` final status (`pass`),
 implementation commit status/hash, and the spec completion commit hash. For a setup invocation
 (`--integration`), report: resolved provider, file written, scope, and the next command.
+
+## Portability Note
+
+`allowed-tools` uses Copilot-style tool names; Claude Code and OpenCode expose the same
+capabilities under their own names (`Bash`, `Read`, `Edit`, `Write`, `Glob`, `Grep`, `Skill`).
+Never refuse to act because a tool is named differently.

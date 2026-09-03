@@ -1,6 +1,6 @@
 # Speckit Auto — Spec-Driven Delivery Pipeline
 
-**Version**: 0.2.8
+**Version**: 0.3.0
 **Author**: Alex Nguyen
 
 ## Overview
@@ -138,6 +138,27 @@ repo map.
 
 - `jira-to-speckit` — Jira fetch + compaction + ticket snapshot (`--issue` only)
 - `speckit-code-review` — authoritative JSON pass/fail gate; the only way Stage 03 exits
+
+## Progressive Loading (context budget)
+
+`SKILL.md` is an entry point, not a manual. Only three reference files are loaded at the start of
+a pipeline run — the run contract, the resolved provider adapter, and the Stage 01 file. Every
+other file loads at the exact moment its step runs:
+
+| File | Load trigger |
+|------|--------------|
+| `references/shared/operating-rules.md` | pipeline entry (run contract) |
+| `references/providers/<provider>.md` | pipeline entry — resolved provider only |
+| `references/pipeline/stage-0N-*.md` | entering that stage |
+| `references/shared/commit.md` | first commit gate (Stage 02 → 03) |
+| `references/shared/host-adaptation.md` | a step needs an ask tool, skill dir, or install host key |
+| `references/shared/integration-setup.md` | `--integration` runs (no stage file loads at all) |
+| `references/providers/<provider>-install.md` | provider validation failed — never on a healthy run |
+| `references/pipeline/jira-fallback.md` | `jira-to-speckit` unavailable on an `--issue` run |
+
+Rules enforced by the skill: never load the unselected provider, never load a stage you are not
+in, never re-read a file already in context, and drop stage-local context (interviews, failed
+review bodies, unused guideline files) when leaving a stage.
 
 ## Troubleshooting
 
