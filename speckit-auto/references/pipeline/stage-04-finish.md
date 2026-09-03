@@ -64,4 +64,4 @@ log the error and continue — this step is non-blocking and does not affect pip
 
 At completion report: resolved provider, `speckit-code-review` final status (`pass`), the
 implementation commit(s) (hash + subject) and pushed branch, and the spec completion commit hash.
-In `--issue` mode, update the execution report first (Stage 01 section 8).
+In `--issue` mode, update the execution report first (Stage 01 §7).

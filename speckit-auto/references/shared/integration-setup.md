@@ -36,13 +36,23 @@ TURN (the one legitimate no-pipeline turn end in the whole skill). Never enter t
       2. `git checkout <base>` + `git pull origin <base>` (best-effort; failure → log, continue).
       3. `git checkout -b init-speckit-auto-<integration>`
          (e.g. `init-speckit-auto-github-speckit`).
-      4. Run the adapter's install commands (load
-         [../providers/github-speckit.md](../providers/github-speckit.md) or
-         [../providers/superpowers.md](../providers/superpowers.md)):
-         - **github-speckit:** install CLI → `specify version` sanity →
-           `specify init . --integration <host-key> --integration-options="--skills" --force` →
-           verify all nine skill files exist.
-         - **superpowers:** run the host's plugin/clone+copy command → verify on-disk skills.
+      4. Run the install commands **inline from here** — do NOT load the pipeline install-recovery
+         files (`../providers/*-install.md`); those are scoped to a pipeline run and assume a
+         worktree and a live Stage 01, neither of which exists in setup mode:
+         - **github-speckit:** install the Spec Kit CLI (`uv tool install specify-cli`, or
+           `--from git+https://github.com/github/spec-kit.git@vX.Y.Z`; fallbacks `pipx install
+           specify-cli` / `pip install specify-cli`) → `specify version` sanity check →
+           `specify init . --integration <host-key> --integration-options="--skills" --force` in
+           `<repo-root>` only → verify all nine skill files exist.
+         - **superpowers:** run the host's plugin/clone+copy command (Copilot:
+           `copilot plugin marketplace add obra/superpowers-marketplace` then
+           `copilot plugin install superpowers@superpowers-marketplace`; Claude Code: the
+           equivalent `/plugin` commands; OpenCode: clone `obra/superpowers` and copy
+           `skills/*` into the host skill dir) → verify on-disk skills.
+
+         Never invoke `speckit-constitution` or any other provider skill here — the host session
+         has not been restarted yet, so an unresolvable skill in setup mode is expected, not a
+         failure. Step 4 below tells the user to restart and run it.
       5. If any install step fails → stop, report the exact error, and tell the user to fix it
          manually before re-running `/speckit-auto --integration <value>`.
 

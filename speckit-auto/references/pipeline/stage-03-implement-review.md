@@ -1,43 +1,27 @@
 # Stage 03: Implement + Code Review Loop (Provider-Agnostic)
 
-Implementation identity, convergence step, and fix-application style come from the resolved
-provider adapter ([../providers/](../providers/)): github-speckit runs
-`speckit-implement → speckit-converge`; superpowers runs its implementation skill
-(`subagent-driven-development` preferred, `executing-plans` fallback, chosen once at entry) with
-per-step `test-driven-development` and `systematic-debugging` on failures. Discard Stage 02
-interview context at entry — this stage is a NO-STOP ZONE.
+Already in context: `SKILL.md`, the run contract, the provider adapter, the Stage 02 artifacts.
+Discard Stage 02 interview context at entry. This stage is a NO-STOP ZONE.
+
+Implementation identity, convergence step, and fix-application style come from the adapter:
+github-speckit runs `speckit-implement → speckit-converge`; superpowers runs its implementation
+skill (`subagent-driven-development` preferred, `executing-plans` fallback, chosen once at entry)
+with per-step `test-driven-development` and `systematic-debugging` on failures.
 
 ## Repository-Aware Implementation
 
 Before the implementation step, inject into its input: the Stage 01 Project Context `summary`,
 the `repo_map` (so each file lands in the right workspace), any relevant guideline from
 `loaded_guidelines` matched by task topic (load + cache now if matched but not yet cached), and —
-superpowers — the plan path `specs/<feature_folder>/plan.md`.
+superpowers — the plan path `specs/<feature_folder>/plan.md`. Nothing else.
 
 ## Invocation
 
-Invoke every step via the `skill` tool using the skill name from the provider adapter's Stage
-Skill Map. Identical on all three hosts:
-
-- **github-speckit:** `skill speckit-implement`, `skill speckit-converge`, etc.
-- **superpowers (all hosts):** `skill subagent-driven-development`, etc.
-
-The `skill` tool is **synchronous** — it blocks until the skill finishes and returns inline.
-After every call, apply the **Step Execution and Completion Protocol** from the provider adapter:
-read the return value, verify the expected artifact on disk (for `speckit-implement`: source/test
-files written; for `speckit-converge`: return value reports status), retry once on failure, stop
-if still failing. Never continue the loop until the current step's completion is confirmed.
-
-`speckit-code-review` runs **inline** via the `skill` tool on all hosts — never as a background
-agent — and always with the spec path passed explicitly (`specs/<feature_folder>/spec.md`).
-
-Never the `task` tool with any skill name; never a nested CLI subprocess. Never emit `@speckit.*`
-or `/speckit.*`.
-
-If any `skill` invocation fails (skill not found, tool error) → **stop immediately** and tell
-the user:
-> "Provider skills are not installed or not available. Please run
-> `/speckit-auto --integration {provider}` first, then re-run your command."
+Every step goes through the `skill` tool (run contract, Invocation Channel); after each call apply
+the adapter's Step Completion Protocol before continuing the loop. `speckit-code-review` runs
+**inline** via the `skill` tool — never as a background agent — and always with the spec path
+passed explicitly (`specs/<feature_folder>/spec.md`). An unresolvable skill is a provider
+validation failure → adapter install recovery, not a stop.
 
 ## Large Scope (condensed)
 
@@ -74,21 +58,20 @@ changes first, then the parent pointer update.
 ## NO-STOP ZONE (canonical statement)
 
 For the entire duration of this stage, in **both** modes: no human approval gates, no interview
-questions, no "do you approve?" prompts, no pauses, no report-and-stop on failed results.
+questions, no pauses, no report-and-stop on failed results.
 
 - The **only** success exit is `status = pass` from `speckit-code-review`.
 - The **only** other permitted exit is the circuit breaker: the exact same failure repeating 5
   consecutive iterations with no file change between them, or a git/filesystem error that
-  prevents writing code. Report the stuck state and stop.
+  prevents writing code. Report the stuck state and stop. A differing failure, or one followed by
+  any file edit, does not count toward the 5.
 - A `failed` review is NEVER a stop condition — it is the input for the next fix iteration. Fix
-  and loop immediately, in the same turn; never produce a prose summary of a failed result and
-  never ask the user what to do.
-- Superpowers gate skills are subordinated: `verification-before-completion` is a check to run,
-  not a place to stop; `requesting-code-review` verdicts never exit the stage;
-  `receiving-code-review` never authorizes ending the turn; `finishing-a-development-branch` is
-  **never called in Stage 03** — it belongs only to Stage 04 after final approval. The
-  implementation skill reporting "all tasks complete" or its terminal "finish the branch" handoff
-  are data, not exits (no PR, merge, branch/worktree deletion inside this stage).
+  and loop immediately, in the same turn; never write a prose summary of a failed result and never
+  ask the user what to do.
+- Superpowers gate skills are subordinated (see the adapter's Gate Handling):
+  `verification-before-completion` is a check, not a stop; review verdicts never exit the stage;
+  `finishing-a-development-branch` belongs only to Stage 04. "All tasks complete" and terminal
+  "finish the branch" handoffs are data, not exits.
 
 ## Review Range (both providers)
 
@@ -172,18 +155,15 @@ PHASE 2 — Code review loop
 - Never exit with `status = failed`; never end a turn or write a prose summary after one — the
   next action is always the next fix iteration.
 - Never ask the user for help; the only stop is the circuit breaker.
-- Retain only `state_file`, the top `fixes[]`, and the one category file needed for the current fix.
+- **Context discipline:** retain only `state_file`, the current `fixes[]`, and the one category
+  file needed for the fix in flight. Drop the rest of each failed review body, and never re-load a
+  category file already read for the same fix.
 - On iteration 3+ with the same failure, escalate fix depth (rewrite the method, not patch a line).
 - Log each iteration: `[Review loop #N] status=failed, scope=<code|tasks|plan>, fixing: <summary>`.
 
 ## Exit Routing
 
-`status = pass` from `speckit-code-review` is the **only** normal exit from Stage 03. When it
-fires, immediately load and execute [stage-04-finish.md](stage-04-finish.md) **in the same turn**
-— no summary, no turn end, no user question before Stage 04 begins. **Never invoke
-`finishing-a-development-branch` here — it fires only in Stage 04 after final approval.**
-
-- **Default mode:** Stage 04 human review + commit (mandatory, never skipped).
-- **`--yolo` mode:** Stage 04 YOLO auto-commit path.
-
-Do not wait for a user message to trigger Stage 04. The transition is automatic and immediate.
+`status = pass` is the **only** normal exit. When it fires, load and execute
+[stage-04-finish.md](stage-04-finish.md) **in the same turn** — no summary, no turn end, no user
+question first. Default mode → Stage 04 human review + commit (mandatory); `--yolo` → Stage 04
+auto-commit path. Never invoke `finishing-a-development-branch` here.
