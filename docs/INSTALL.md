@@ -48,6 +48,7 @@ mid-run.
 | `speckit-auto` | `jira-to-speckit`, `speckit-code-review` |
 | `speckit-code-review` | — |
 | `jira-to-speckit` | — |
+| `jira-issue` | — |
 | `job-security-scan` | — |
 
 For `speckit-auto` you effectively want all three speckit skills installed
@@ -65,6 +66,12 @@ JIRA_URL=https://your-org.atlassian.net
 JIRA_USERNAME=you@example.com
 JIRA_API_TOKEN=...
 ```
+
+### `jira-issue`
+
+Same `.env` credentials as `jira-to-speckit` above. Optionally add
+`JIRA_DEFAULT_PROJECT` so a create request that doesn't name a project isn't
+asked for one.
 
 ### `job-security-scan`
 
