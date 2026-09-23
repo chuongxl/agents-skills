@@ -89,6 +89,9 @@ cp -r speckit-code-review ~/.claude/skills/
 
 # OpenCode
 cp -r speckit-code-review ~/.config/opencode/skills/
+
+# Hermes Agent
+cp -r speckit-code-review ~/.hermes/skills/
 ```
 
 ### Standalone Use
@@ -268,6 +271,7 @@ Copy-Item -Recurse speckit-code-review $skillPath
 | GitHub Copilot CLI | ✅ Full | Auto-discovered from `~/.agents/skills/` |
 | Claude Code | ✅ Full | Install to `~/.claude/skills/`; invoked via the Skill tool |
 | OpenCode | ✅ Full | Install to `~/.config/opencode/skills/`; invoked via the skill tool |
+| Hermes Agent | ✅ Full | Install to `~/.hermes/skills/`; invoked via the `skill_view` tool |
 | Superpowers | ✅ Full | Invoked by speckit-auto skill |
 | GitHub Spec Kit | ✅ Full | Specs with pre-numbered FR-*/NFR-* requirements |
 | Superpowers Brainstorming | ✅ Full | Narrative specs; requires synthesis |
