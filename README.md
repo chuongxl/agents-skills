@@ -33,7 +33,7 @@ Full instructions, dependency graph, prerequisites, and troubleshooting:
 - **job-security-scan** — Scan repositories for vulnerabilities, secrets, and misconfigurations using industry-standard tools (Gitleaks, Trivy, Semgrep, Hadolint, OSV-Scanner, TruffleHog)
 
 ### Spec-Driven Delivery
-- **speckit-auto** — End-to-end delivery pipeline from requirements to implementation with automatic code review
+- **speckit-auto** — End-to-end delivery pipeline from requirements to implementation, with automatic code review, optional verification, and PR creation
 - **speckit-code-review** — Deep code review comparing implementation against specifications
 - **jira-to-speckit** — Convert Jira tickets into Speckit-ready feature specifications
 
@@ -49,7 +49,6 @@ Full instructions, dependency graph, prerequisites, and troubleshooting:
 | [speckit-auto](./speckit-auto/README.md) | End-to-end spec-driven delivery orchestrator. Runs intake, spec creation, design, implementation, code review loop, optional verification, commit, and PR creation—all in one turn. Supports `--yolo` mode for zero-human automation. | `.github/skills/` or `~/.agents/skills/` | GitHub Copilot, Claude, Local | Requirement text, `--issue <jira-url>`, `--yolo`, `--integration` | v0.4.0 / Alex Nguyen |
 | [speckit-code-review](./speckit-code-review/README.md) | Spec-to-code validation gate. Extracts requirements from specification and validates implementation against each requirement. Produces JSON with coverage %, business gaps, security issues, architecture issues, and unit test coverage. | `.github/skills/` or `~/.agents/skills/` | GitHub Copilot, Claude, Local | "speckit code review", "review with spec", "spec coverage audit" | v0.0.2 / Alex Nguyen |
 | [jira-to-speckit](./jira-to-speckit/README.md) | Jira-to-spec reader. Fetches a Jira issue, compacts it into a size-bounded Speckit-ready brief, and optionally writes a full-fidelity ticket snapshot for traceability. Does not run Speckit stages itself. | `.github/skills/` or `~/.agents/skills/` | GitHub Copilot, Claude, Local | Jira key (e.g., `DDM-1234`), Jira URL, `--issue <url>` | v0.2.0 / Alex Nguyen |
-
 | [how](./how/README.md) | Explains subsystem architecture and runtime flow at onboarding depth; can critique the architecture it just explained. | `.github/skills/` or `~/.agents/skills/` | GitHub Copilot, Claude, Local | "how does X work", "walk me through...", "which package owns this" | v0.1.0 / Alex Nguyen |
 | [create-verification-skill](./create-verification-skill/README.md) | Generates a project-local verification skill that launches the real app, drives a feature, and captures evidence; supports incremental updates to an existing generated skill's feature map. | `.github/skills/` or `~/.agents/skills/` | GitHub Copilot, Claude, Local | "make a control skill for this repo", "/create-verification-skill" | v0.1.0 / Alex Nguyen |
 

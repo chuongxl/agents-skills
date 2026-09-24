@@ -5,8 +5,9 @@ description: |
   pluggable provider: github-speckit (repo-installed GitHub Spec Kit agents) or superpowers
   (obra/superpowers skills library). Handles provider setup and auto-install, Jira intake via
   jira-to-speckit, spec/design, implementation, a speckit-code-review remediation loop until
-  pass, then human review (default) or YOLO commit and push. Use when a feature must go from
-  requirement to committed implementation in one run.
+  pass, human review (default) or YOLO commit, optional Stage 05 verification, and Stage 06
+  PR creation. Use when a feature must go from requirement to committed, PR-ready implementation
+  in one run.
 compatibility: "Runs on GitHub Copilot, Claude Code, and OpenCode. Discovered from ~/.agents/skills/, ~/.claude/skills/, or ~/.config/opencode/skills/. Requires git and bash; network access for Jira intake via --issue."
 license: MIT
 allowed-tools: bash glob grep view create edit skill

@@ -108,8 +108,8 @@ Run the full explain flow above (Steps 1-4). You must understand the architectur
 
 ### Step 2. Spawn Critics
 
-After the explanation is complete, spawn one architectural critic per configured critic model,
-all in a single message, using the host's subagent-dispatch tool, read-only.
+After the explanation is complete, spawn 2-3 independent architectural critics, all in a single
+message, using the host's subagent-dispatch tool, read-only.
 
 For each critic, read `references/critic-prompt.md` for the prompt template. Each critic gets:
 1. The explanation from Step 1 (so they don't re-explore)
