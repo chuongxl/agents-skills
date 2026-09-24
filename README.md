@@ -39,6 +39,7 @@ Full instructions, dependency graph, prerequisites, and troubleshooting:
 
 ### Architecture & Understanding
 - **how** — Explain subsystem architecture and runtime flow; can critique an architecture after explaining it
+- **create-verification-skill** — Generate (or incrementally update) a project-local skill that launches an app, drives a feature, and captures evidence
 
 ## Comprehensive Skills Table
 
@@ -50,6 +51,7 @@ Full instructions, dependency graph, prerequisites, and troubleshooting:
 | [jira-to-speckit](./jira-to-speckit/README.md) | Jira-to-spec reader. Fetches a Jira issue, compacts it into a size-bounded Speckit-ready brief, and optionally writes a full-fidelity ticket snapshot for traceability. Does not run Speckit stages itself. | `.github/skills/` or `~/.agents/skills/` | GitHub Copilot, Claude, Local | Jira key (e.g., `DDM-1234`), Jira URL, `--issue <url>` | v0.2.0 / Alex Nguyen |
 
 | [how](./how/README.md) | Explains subsystem architecture and runtime flow at onboarding depth; can critique the architecture it just explained. | `.github/skills/` or `~/.agents/skills/` | GitHub Copilot, Claude, Local | "how does X work", "walk me through...", "which package owns this" | v0.1.0 / Alex Nguyen |
+| [create-verification-skill](./create-verification-skill/README.md) | Generates a project-local verification skill that launches the real app, drives a feature, and captures evidence; supports incremental updates to an existing generated skill's feature map. | `.github/skills/` or `~/.agents/skills/` | GitHub Copilot, Claude, Local | "make a control skill for this repo", "/create-verification-skill" | v0.1.0 / Alex Nguyen |
 
 ### Companion configuration
 
