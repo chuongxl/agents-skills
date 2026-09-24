@@ -40,8 +40,8 @@ procedure in [../shared/commit.md](../shared/commit.md) with that message.
 After the implementation commit succeeded (or was skipped because nothing needed committing — see
 [../shared/commit.md](../shared/commit.md)'s conditional-commit rule), load
 [stage-05-verification.md](stage-05-verification.md) and enter Stage 05 in the same turn. Stage 05
-owns everything from here: verification (conditional), cleanup, marking the spec completed,
-pushing, and PR creation.
+(conditional verification) runs next; it in turn hands off to Stage 06, which owns cleanup,
+marking the spec completed, pushing, and PR creation.
 
 ## Failure Handling
 

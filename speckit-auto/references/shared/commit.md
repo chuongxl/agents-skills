@@ -1,14 +1,16 @@
 # Shared: Commit + Push Procedure (Provider-Agnostic)
 
-Used by: the Stage 02 → Stage 03 spec/plan commit gate, Stage 04 human-review commit (default
-mode), and the Stage 04 YOLO auto-commit. The procedure is identical; only the commit message
-source differs:
+Used by: the Stage 02 → Stage 03 spec/plan commit gate, the Stage 04 human-review commit (default
+mode), the Stage 04 YOLO auto-commit, and Stage 06's two commits (verification artifacts, spec
+completion). The procedure is identical; only the commit message source differs:
 
 | Call site | Message |
 |-----------|---------|
 | Stage 02 → 03 gate | auto: `docs(<artifact_id>): add spec, plan, and tasks` |
 | Stage 04 default | asked from the user |
 | Stage 04 YOLO | auto: `feat(<artifact_id>): <short summary from the spec or Jira summary>` |
+| Stage 06 verification artifacts | auto: `chore(verify-<app>): update verification for <artifact_id>` |
+| Stage 06 spec completion | auto: `chore(spec): mark <artifact_id> completed` |
 
 `artifact_id` is always defined: the Jira issue key in `--issue` runs, otherwise the artifact
 folder's prefix-slug (e.g. `007-user-export`). Never emit a literal `<issue_id>` placeholder.
