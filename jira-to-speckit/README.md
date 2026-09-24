@@ -1,23 +1,33 @@
-# jira-to-speckit: Bridge Jira Issues to Speckit Workflow
+# jira-to-speckit: Turn a Jira Issue Into a Speckit-Ready Brief
 
 ## Overview
 
-**jira-to-speckit** is the primary entry point for turning Jira issues into detailed specifications and implementation plans using the Speckit workflow. This skill acts as an orchestrator, automatically reading Jira tickets, compacting them to prevent context overflow, and then guiding users through a comprehensive 8-phase workflow that ensures requirements are clarified, planned, tested, and implemented with full traceability.
+**jira-to-speckit** is a pure Jira reader, not an orchestrator. It fetches one Jira issue, compacts
+it under strict size budgets so large tickets never overflow a caller's context, optionally writes
+a full-fidelity snapshot of the raw ticket to a file the caller names, and returns a structured
+brief plus a Jira-key-based feature name. Then it stops.
 
-When you have a Jira ticket as your source of truth, jira-to-speckit eliminates manual handoff friction. It reads your Jira credentials from a local `.env` file, compacts large or verbose tickets into spec-ready briefs, creates a Speckit feature specification with the Jira key preserved in the folder structure, and then orchestrates review loops at every stage—specification, planning, test planning, and task generation—before implementation begins.
+It never calls `speckit.specify`, `speckit.plan`, `speckit.tasks`, `speckit.implement`, or any
+other Speckit/Spec Kit stage. It never runs a clarification or review loop. It never touches git
+(no branches, no commits, no pushes, no PRs). It never creates or updates an execution report. All
+of that belongs to the caller, typically the `speckit-auto` skill, which consumes this skill's
+brief and owns every stage that follows: spec, plan, tasks, implementation, review, and commit.
+
+If you invoke this skill directly and expect it to build you a feature end to end, it won't; it
+hands back a brief and a suggested name, and your next step is to feed that into `speckit-auto` (or
+your own pipeline) yourself.
 
 ## Quick Start
 
 ### 1. Prerequisites
 
-- GitHub Copilot or Claude Code (for accessing the skill)
+- GitHub Copilot, Claude Code, or OpenCode (for accessing the skill)
 - `.env` file in your repository root with these Jira credentials:
   ```env
   JIRA_URL=https://your-jira-instance.atlassian.net
   JIRA_USERNAME=your-email@company.com
   JIRA_API_TOKEN=your-api-token-here
   ```
-- Git SSH access to your repository
 - Network access to your Jira instance
 
 ### 2. Invoke with a Jira Issue
@@ -35,55 +45,52 @@ or
 ```
 
 The skill will:
-1. Fetch the Jira issue and compact it into a spec-ready brief
-2. Start the Speckit specification workflow
-3. Guide you through clarification loops
-4. Advance through planning, test planning, and task generation when you confirm each phase
-5. Maintain a running execution report with progress, token usage, and cost estimates
+1. Fetch the Jira issue over the REST API using your `.env` credentials.
+2. Run it through the compaction pipeline (see below) to stay within size budgets.
+3. Optionally write a full-fidelity snapshot, if the caller supplied `ticket_output_path`.
+4. Return the Compact Output Template (issue key, title, type, suggested Speckit name, ticket
+   snapshot path, compact brief, open questions, truncation note) and end its turn.
 
-### 3. Work With Your Generated Spec
+Nothing else happens. No spec is created, no branch is made, no implementation runs. That's the
+caller's job.
 
-Your spec is created under `specs/{PREFIX}-{JIRA-KEY}-{kebab-summary}/`, preserving the Jira key for easy traceability:
-- `US-DDM-1234-reduce-review-time/` (for stories and features)
-- `Task-DDM-4567-fix-sync-error/` (for tasks and bugs)
+### 3. What You Get Back
 
-The execution report is updated at each phase and tracks cumulative progress, issues, and token usage.
+Every invocation returns exactly this shape:
 
----
+```
+Jira issue key: DDM-1234
+Jira title: Reduce DAR review time for compliance officers
+Jira type: Story
+Spec prefix: US-
+Suggested Speckit name: US-DDM-1234-reduce-dar-review-time
+Ticket snapshot: specs/US-DDM-1234-reduce-dar-review-time/ticket.md (or "not requested")
+Compact brief:
+  Compliance officers spend 8+ minutes per DAR review. We need to reduce this to
+  under 3 minutes by pre-filtering rejected items and providing a summary scorecard.
+  Acceptance criteria: search filters apply in <500ms, summary shows pass/fail count
+  and risk level, rejected items are hidden by default.
+Open questions:
+  - Should we persist filter state across sessions?
+  - Is risk level business-defined or computed from rejection reason?
+  - Do we need an audit trail for filter changes?
+Truncation note: Description was trimmed to 6000 chars; comments (5 records) were not fetched.
+```
 
-## The 8-Phase Workflow
+`Suggested Speckit name` preserves the Jira key so a caller-created spec folder stays traceable
+back to the ticket:
+- `US-DDM-1234-reduce-review-time` (stories and features)
+- `Task-DDM-4567-fix-sync-error` (tasks and bugs)
 
-jira-to-speckit orchestrates a complete 8-phase workflow to move from Jira ticket to implementation, with explicit review gates at each phase:
-
-### Phase 1: Intake
-The skill reads your Jira issue (key or URL) and extracts essential fields: summary, description, issue type, priority, acceptance criteria, constraints, and optional comments. The Jira REST API is used with your credentials; no secrets are ever printed to chat.
-
-### Phase 2: Clarification (Spec Review Loop)
-After compacting the Jira ticket, the skill presents a concise brief to you and enters an interactive clarification loop. It asks targeted questions about scope, acceptance criteria, business goals, and terminology—one at a time—until ambiguities are resolved. The spec is a living draft during this phase. When you confirm the spec is ready, the skill automatically advances to Phase 3.
-
-### Phase 3: Planning (speckit.plan)
-The skill runs the plan phase, generating a technical approach and implementation strategy based on your confirmed spec. A plan review loop follows, asking clarification questions about technical choices, dependencies, and boundaries. When you confirm the plan is clear, the skill automatically advances to Phase 4.
-
-### Phase 4: Test Planning (speckit.testplan)
-A dedicated test-planning phase ensures unit test coverage, e2e journey coverage, and acceptance criteria traceability are explicit before tasks are generated. The test plan review loop asks questions about coverage strategy, integration boundaries, and service-specific validation. When you confirm the test plan is complete, the skill automatically advances to Phase 5.
-
-### Phase 5: Task Generation (speckit.tasks)
-The skill generates a sequenced task list for implementation. A task review loop asks clarification questions about task ordering, missing work items, and parallelization. When you confirm the task list is ready, the skill automatically advances to Phase 6.
-
-### Phase 6: Implementation (speckit.implement)
-The skill prepares the repository, creates or updates the feature branch, and implements the code changes in small, traceable commits aligned with your task list. Each commit includes a conventional commit message with the feature name and Jira key.
-
-### Phase 7: Verification (speckit.verify)
-A GO/NO-GO readiness report is generated, including code evidence, unit test evidence, e2e test evidence, and service command evidence. Any gaps are flagged for remediation.
-
-### Phase 8: Reporting
-The execution report is finalized with cumulative Copilot request counts, total input and output tokens, and a final cost estimate. The report is preserved in your spec folder for audit and billing purposes.
+The folder itself, and everything after it, is the caller's responsibility. This skill never
+creates `specs/` content.
 
 ---
 
 ## Jira Compaction Pipeline: Handling Large Tickets
 
-Large or verbose Jira issues can cause context overflow when passed directly to Speckit. jira-to-speckit implements a mandatory four-stage compaction pipeline to prevent this:
+Large or verbose Jira issues can cause context overflow when passed directly to a downstream spec
+step. jira-to-speckit runs a mandatory four-stage compaction pipeline before returning its brief:
 
 ### Stage 1: Normalize Source Text
 - Convert Jira description from ADF (Atlassian Document Format) or wiki markup to plain text
@@ -97,7 +104,8 @@ Before summarization, the skill applies these limits (configurable via `.env`):
 - `JIRA_MAX_INPUT_CHARS`: 12,000 characters (default)
 - `JIRA_MAX_COMMENTS`: 5 comments (default, when `JIRA_FETCH_COMMENTS` is true)
 
-Large descriptions are trimmed to the budget. Comments are fetched only if ambiguity remains and are sampled to decision-bearing lines only.
+Large descriptions are trimmed to the budget. Comments are fetched only if ambiguity remains and
+are sampled to decision-bearing lines only.
 
 ### Stage 3: Prioritize Content for Spec Quality
 The skill ranks content by relevance:
@@ -106,29 +114,28 @@ The skill ranks content by relevance:
 3. **Constraints and dependencies** (what we must respect)
 4. **Status metadata** (lower priority)
 
-Exact identifiers (Jira keys, office codes, system names, SLA values) are always preserved. Implementation chatter unrelated to product behavior is discarded.
+Exact identifiers (Jira keys, office codes, system names, SLA values) are always preserved.
+Implementation chatter unrelated to product behavior is discarded.
 
 ### Stage 4: Produce Bounded Compact Brief
-The final compact brief must fit within `JIRA_MAX_OUTPUT_CHARS` (default 2,500 characters). If the budget is still exceeded after all compaction, the skill emits a short brief plus up to 3 targeted clarification questions instead of expanding context.
+The final compact brief must fit within `JIRA_MAX_OUTPUT_CHARS` (default 2,500 characters). If the
+budget is still exceeded after all compaction, the skill returns a short brief plus up to 3
+targeted clarification questions instead of expanding context, then still stops and returns
+control to the caller.
 
-**Example Compact Brief Output:**
-```
-Jira issue key: DDM-1234
-Jira title: Reduce DAR review time for compliance officers
-Jira type: Story
-Spec prefix: US-
-Suggested Speckit name: US-DDM-1234-reduce-dar-review-time
-Compact brief: 
-  Compliance officers spend 8+ minutes per DAR review. We need to reduce this to 
-  under 3 minutes by pre-filtering rejected items and providing a summary scorecard. 
-  Acceptance criteria: search filters apply in <500ms, summary shows pass/fail count 
-  and risk level, rejected items are hidden by default.
-Open questions:
-  - Should we persist filter state across sessions?
-  - Is risk level business-defined or computed from rejection reason?
-  - Do we need an audit trail for filter changes?
-Truncation note: Description was trimmed to 6000 chars; comments (5 records) were not fetched.
-```
+---
+
+## Optional: Full-Fidelity Ticket Snapshot
+
+When the caller supplies a `ticket_output_path`, the skill writes an unabridged, human-readable
+snapshot of the raw ticket (title, metadata, full description, acceptance criteria as written,
+comments, attachment list) to that path **before** compaction runs, so nothing is lost to the
+budgets above. The compact brief returned in chat never contains this raw content; only the file
+path is echoed back. See [`SKILL.md`](SKILL.md) § "2b. Write the ticket snapshot" for the exact
+frontmatter and section shape written.
+
+If the caller omits `ticket_output_path`, no file is written and the output template reports
+`Ticket snapshot: not requested`.
 
 ---
 
@@ -150,44 +157,22 @@ JIRA_MAX_DESCRIPTION_CHARS=6000
 JIRA_MAX_OUTPUT_CHARS=2500
 JIRA_FETCH_COMMENTS=false
 JIRA_MAX_COMMENTS=5
+
+# Optional: tuning for the ticket snapshot, when the caller requests one
+JIRA_SNAPSHOT_COMMENTS=true
 ```
 
-### Repository Detection
-
-The skill automatically discovers your target repository using:
-1. `git remote get-url origin` (primary source)
-2. Folder name inference (fallback)
-
-No additional configuration is needed; the repository is automatically matched to your Jira issue and feature spec folder.
-
----
-
-## Execution Report and Progress Tracking
-
-After each phase completes, the execution report is updated with:
-
-| Phase | Progress | Issue | Copilot Requests | Input Tokens | Response Tokens | Cost Estimate |
-|-------|----------|-------|------------------|--------------|-----------------|---------------|
-| Intake | Complete | None | 1 | 2,400 | 1,200 | $0.07 |
-| Specification | In Review | Ambiguity on scope | 5 | 8,900 | 4,500 | $0.28 |
-| Planning | In Review | — | 8 | 14,200 | 7,100 | $0.42 |
-
-The report includes:
-- **Phase name** and current progress status
-- **Issue or blocker** (if any)
-- **Cumulative Copilot request count** since intake
-- **Cumulative token counts** (input and response)
-- **Cost estimate** based on token usage and current API pricing
-
-The report is stored at `specs/{PREFIX}-{JIRA-KEY}-{slug}/execution-report.md` and is preserved for audit, billing, and workflow resumption.
+This skill never resolves a target repository, branch, or spec folder; it only reads `.env` for
+Jira credentials and compaction tuning. Repository and spec-folder decisions belong to the caller.
 
 ---
 
 ## Naming Convention: Preserving Jira Context
 
-All generated specs preserve the Jira key to maintain traceability:
+The `Suggested Speckit name` this skill returns preserves the Jira key, so a caller-created spec
+folder stays traceable back to Jira:
 
-**Spec Folder Naming:**
+**Suggested Naming (applied by the caller, not this skill):**
 - `specs/US-{JIRA-KEY}-{kebab-summary}/` (for stories and features)
 - `specs/Task-{JIRA-KEY}-{kebab-summary}/` (for tasks, bugs, spikes)
 
@@ -196,11 +181,9 @@ All generated specs preserve the Jira key to maintain traceability:
 - Task, Sub-task, Bug, Spike, Tech Task → `Task-`
 
 **Examples:**
-- `specs/US-DDM-1234-reduce-dar-review-time/`
-- `specs/Task-DDM-4567-fix-sync-error-reporting/`
-- `specs/US-DDM-9876-onboard-new-users/`
-
-This naming ensures every generated spec, branch, and commit can be traced directly back to the Jira issue.
+- `US-DDM-1234-reduce-dar-review-time`
+- `Task-DDM-4567-fix-sync-error-reporting`
+- `US-DDM-9876-onboard-new-users`
 
 ---
 
@@ -211,52 +194,38 @@ jira-to-speckit enforces strict security and usability guardrails:
 - **No secret exposure**: Jira tokens and `.env` values are never printed to chat, logs, or git output
 - **No credential requests**: The skill never asks you to paste secrets into chat; credentials are always read from `.env` only
 - **Preserved business identity**: Exact Jira IDs, office codes, system names, acceptance criteria, and dependencies are always preserved in the compacted brief
-- **No raw Jira payloads**: Raw Jira JSON, full comment threads, or ADF trees are never passed to Speckit; only compacted, business-focused briefs are used
-- **Character budget enforcement**: Large tickets are always compacted to fit within budgets before advancing to Speckit
-- **SSH-only git operations**: All git commands use SSH-authorized remotes; no hosting tokens are required
-- **No direct default-branch pushes**: Commits are always made to a feature branch; PRs are created for review before merging
+- **No raw Jira payloads in the return value**: Raw Jira JSON, full comment threads, or ADF trees are never passed back in the compact brief; the only place full-fidelity content can land is the optional `ticket_output_path` snapshot file, and even then its contents are never echoed into chat
+- **Character budget enforcement**: Large tickets are always compacted to fit within budgets before the brief is returned
+- **No git operations of any kind**: This skill never runs `git`, never creates branches, never commits, never pushes, and never opens pull requests — all of that is the caller's responsibility
 
 ---
 
 ## Common Workflows and Examples
 
-### Workflow 1: Simple Jira Issue to Spec
+### Workflow 1: Direct Invocation, Standalone
 
 ```bash
 @jira-to-speckit DDM-1234
-# Output: Compact brief, spec folder created, ready for clarification
-
-# (After clarification loop confirms spec)
-# Output: Spec folder updated, planning phase starts automatically
+# Output: Compact Output Template printed, skill's turn ends here.
 ```
+Nothing else happens automatically. If you want a spec, plan, and implementation, hand the
+returned brief to `speckit-auto` (or run your own pipeline) as a separate step.
 
 ### Workflow 2: Large Jira Issue with Auto-Compaction
 
 ```bash
 @jira-to-speckit https://jira.company.com/browse/DDM-4567
 # Issue has 15,000-char description; skill compacts to 2,500 chars
-# Output: Compact brief with truncation note, planning questions identified
+# Output: Compact brief with truncation note, then the skill stops
 ```
 
-### Workflow 3: Resuming a Paused Workflow
+### Workflow 3: Called From `speckit-auto` (Typical Usage)
 
-If the session grows too large (approx. 80,000 tokens), the skill pauses and asks you to run `/compact` to clear chat history. After compacting, the skill resumes from the latest confirmed phase without redoing completed work.
-
-### Workflow 4: From Jira to PR
-
-The full workflow from Jira to pull request:
-1. Invoke with Jira key
-2. Clarify spec (automatic review loop)
-3. Confirm spec is ready
-4. Plan phase (automatic review loop)
-5. Confirm plan is clear
-6. Test planning (automatic review loop)
-7. Confirm test plan is complete
-8. Task generation (automatic review loop)
-9. Confirm task list is ready
-10. Implementation (automatic commits and branch push)
-11. Verification (GO/NO-GO report generated)
-12. PR created; ready for review
+`speckit-auto` invokes this skill with a `ticket_output_path`, scoped to only steps 1–5 of its
+workflow (fetch, snapshot, compaction, prefix, name), then takes the returned brief, Jira key, and
+open questions and drives every subsequent stage itself: spec, plan, tasks, implementation, review,
+commit, and push. This skill has no visibility into, and does not participate in, any of those
+later stages.
 
 ---
 
@@ -274,16 +243,13 @@ The full workflow from Jira to pull request:
 **Issue: "JIRA_MAX_OUTPUT_CHARS exceeded; emitting brief with clarification questions instead"**
 - This is expected for very large or complex tickets
 - Answer the 3 clarification questions to refine the scope before proceeding
-- If needed, increase `JIRA_MAX_OUTPUT_CHARS` in `.env`, but this may increase context overflow risk
+- If needed, increase `JIRA_MAX_OUTPUT_CHARS` in `.env`, but this may increase the risk of context
+  overflow in the caller that receives this brief
 
-**Issue: "Repository not found"**
-- Ensure you have git SSH access to the repository
-- Verify `git remote get-url origin` returns a valid URL
-- If working in a cloned subdirectory, move to the repository root before invoking the skill
-
-**Issue: Spec folder created but empty**
-- The folder is a placeholder created by `speckit.specify`; content is added during clarification
-- Confirm the clarification loop is active and answer the first prompt
+**Issue: Ticket snapshot was not written**
+- Confirm the caller actually supplied `ticket_output_path` — without it, the skill reports
+  `Ticket snapshot: not requested` by design
+- Check the `Truncation note:` field; a failed write is reported there rather than aborting the run
 
 ---
 
@@ -291,11 +257,9 @@ The full workflow from Jira to pull request:
 
 1. **Keep Jira tickets well-formatted**: Clear acceptance criteria, no duplicate text, and focused scope lead to faster, smaller compacted briefs
 2. **Use comments for decisions, not chatter**: Only decision-bearing comments are fetched; implementation discussion can stay in Slack
-3. **Confirm before advancing**: The skill advances automatically when you confirm each phase; don't rush through review loops
-4. **Monitor token usage**: Check the execution report between phases; if token count grows unexpectedly, pause and run `/compact`
-5. **Use feature branch naming from Speckit**: The branch created during `speckit.specify` is reused throughout; do not create new branches manually
-6. **Commit incrementally**: Smaller commits with clear messages are easier to review and debug
-7. **Preserve spec folder structure**: Do not rename or move spec folders; they are referenced in the execution report and the PR
+3. **Monitor the truncation note**: If it reports heavy trimming, consider tightening the Jira ticket itself before re-invoking
+4. **Let the caller own naming and folders**: This skill only suggests a name; don't expect it to create or manage `specs/` content
+5. **Pass `ticket_output_path` when traceability matters**: Without it, the full ticket text is gone once the compact brief is returned
 
 ---
 
@@ -303,8 +267,7 @@ The full workflow from Jira to pull request:
 
 - **Platforms**: macOS, Linux, Windows (with WSL or Git Bash)
 - **Jira versions**: Jira Cloud and Server (7.0+) with REST API access
-- **Git**: SSH-authorized remotes only (no HTTPS tokens)
-- **Network**: Requires outbound access to Jira API endpoint and your git repository host
+- **Network**: Requires outbound access to the Jira API endpoint only — no git or hosting access is needed
 - **Agents**: GitHub Copilot, Claude Code, OpenCode, and compatible Copilot agents
 
 ### Installation Paths
@@ -319,8 +282,9 @@ The full workflow from Jira to pull request:
 ## References
 
 - **Jira API Guide**: See [`references/JIRA_API.md`](references/JIRA_API.md) for detailed API usage
-- **Speckit Workflow**: The `speckit-auto` skill consumes this skill's brief and owns every
-  stage that follows — spec, plan, tasks, implementation, review, and commit.
+- **Full contract**: See [`SKILL.md`](SKILL.md) for the exact workflow, inputs, output template, and edge cases
+- **Speckit Workflow**: The `speckit-auto` skill consumes this skill's brief and owns every stage
+  that follows — spec, plan, tasks, implementation, review, and commit
 
 This skill is self-contained: it reads nothing outside its own folder except the project `.env`,
 so it works when installed on its own.
