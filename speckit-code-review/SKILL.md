@@ -1,11 +1,11 @@
 ---
 name: speckit-code-review
 description: |
-  Deep line-by-line code review against the feature spec at specs/<feature-folder>/spec.md,
-  produced by either speckit.specify (GitHub Spec Kit) or superpowers:brainstorming.
-  Produces strict JSON pass/fail with business coverage, missing requirements, code issues, security issues, architecture issues, and unit test coverage.
-  Triggers: "speckit code review", "review with spec", "compare code to spec.md", "spec coverage audit",
-  "invoke speckit-code-review", "run speckit-code-review".
+  Use when the user asks for a spec-based code review: "speckit code review", "review with
+  spec", "compare code to spec.md", "spec coverage audit", "invoke speckit-code-review", "run
+  speckit-code-review", or a deep line-by-line review against the feature spec at
+  specs/<feature-folder>/spec.md. Load this file for the full review contract (submodule
+  expansion, JSON pass/fail shape, coverage gating) rather than treating this summary as it.
 compatibility: Runs on GitHub Copilot, Claude Code, and OpenCode. Discovered from ~/.agents/skills/, ~/.claude/skills/, or ~/.config/opencode/skills/. Requires git, bash, and a spec at specs/<feature-folder>/spec.md.
 license: MIT
 allowed-tools: bash glob grep view create edit
@@ -13,7 +13,7 @@ metadata:
   specification: agentskills.io/specification
   output_contract: strict-json
   author: Alex Nguyen
-  version: "0.0.2"
+  version: "0.0.3"
 ---
 
 # Speckit Code Review
