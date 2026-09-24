@@ -48,11 +48,11 @@ Decompose the question into 2-4 parallel exploration angles, each a distinct sli
 
 The right decomposition depends on the question. Use your judgment. Narrow questions: 2 explorers is fine. Broad subsystems: up to 4.
 
-Spawn all explorers in a single message:
+Spawn all explorers in a single message using the host's subagent-dispatch tool (`task` on
+Copilot/Claude Code; the OpenCode equivalent), read-only:
 
-- `subagent_type`: `generalPurpose`
-- `model`: your configured how-explorer model (default `grok-4.6-fast-xhigh`)
-- `readonly`: `true`
+- One dispatch per exploration angle, all in the same batch/message.
+- Read-only tools only (no edit/write capability granted to the explorer).
 
 Each explorer gets the same base prompt from `references/explorer-prompt.md` plus a specific exploration angle naming its slice. Each explorer should:
 - Start broad: Glob for relevant directories, Grep for key types/interfaces/class names
@@ -67,11 +67,8 @@ Then proceed to Step 3.
 
 ### Step 2b. Direct Explain (simple questions)
 
-Spawn a single Task subagent that explores and explains in one pass:
-
-- `subagent_type`: `generalPurpose`
-- `model`: your configured how-explainer model (default `claude-fable-5-thinking-max`)
-- `readonly`: `true`
+Spawn a single subagent (via `task`, or explore directly yourself if the host has no
+subagent-dispatch tool) that explores and explains in one pass, read-only.
 
 The agent does its own exploration (Glob, Grep, Read) and writes the explanation directly. Read `references/explainer-prompt.md` for the communication style and output format. Same structure, just no explorer findings as input.
 
@@ -79,11 +76,7 @@ Proceed to Step 4.
 
 ### Step 3. Synthesize (complex questions only)
 
-Once all explorers return, spawn a single Task subagent to synthesize their findings into one coherent explanation:
-
-- `subagent_type`: `generalPurpose`
-- `model`: your configured how-explainer model (default `claude-fable-5-thinking-max`)
-- `readonly`: `true`
+Once all explorers return, spawn a single subagent to synthesize their findings into one coherent explanation, read-only.
 
 The explainer gets all explorers' findings and writes the human-facing explanation (output format below). Read `references/explainer-prompt.md` for the full prompt template. The explainer reconciles overlapping findings, resolves contradictions, and weaves the slices into a unified picture.
 
@@ -115,21 +108,15 @@ Run the full explain flow above (Steps 1-4). You must understand the architectur
 
 ### Step 2. Spawn Critics
 
-After the explanation is complete, spawn one architectural critic per model in your configured how-critics list (defaults `claude-fable-5-thinking-max`, `gpt-5.6-sol-max`, `grok-4.6-fast-xhigh`, `claude-opus-5-thinking-xhigh`), all in a single message.
+After the explanation is complete, spawn one architectural critic per configured critic model,
+all in a single message, using the host's subagent-dispatch tool, read-only.
 
-For each critic:
-- `subagent_type`: `generalPurpose`
-- `model`: one model from the configured how-critics list. These are minimum reasoning levels. The lead should escalate any model when the architecture warrants deeper analysis.
-- `readonly`: `true`
-
-Read `references/critic-prompt.md` for the prompt template. Each critic gets:
+For each critic, read `references/critic-prompt.md` for the prompt template. Each critic gets:
 1. The explanation from Step 1 (so they don't re-explore)
 2. The relevant file paths (so they can read the actual code)
 3. The architectural critique rubric from `references/critique-rubric.md`
 
 ### Step 3. Lead Judgment
-
-Same framework as the interrogate skill. You're a pragmatic lead, not an aggregator.
 
 Categorize findings:
 - **Act on.** Architectural problems worth fixing now
