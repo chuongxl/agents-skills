@@ -7,11 +7,13 @@
 
 Add two new skills to this repo, `how` and `create-verification-skill`, cloned from their
 existing plugin-marketplace counterparts and adapted to this repo's self-containment contract.
-Extend `speckit-auto`'s pipeline from four stages to six: Stage 05 (Verification, conditional on
-an integration-time opt-in) runs a generated project-specific verification skill against the
-just-implemented feature; Stage 06 (Clean / Commit / Push / PR / Complete) absorbs the "mark spec
-completed" and PR-creation responsibilities that Stage 04 owns today, adds teardown of whatever
-Stage 05 launched, and replaces today's `superpowers`-only best-effort PR call with a
+`how` ships as a standalone, generically-usable skill and is not wired into speckit-auto's
+pipeline (its analysis duplicates what `create-verification-skill`'s own interview step already
+does). Extend `speckit-auto`'s pipeline from four stages to six: Stage 05 (Verification,
+conditional on an integration-time opt-in) runs a generated project-specific verification skill
+against the just-implemented feature; Stage 06 (Clean / Commit / Push / PR / Complete) absorbs the
+"mark spec completed" and PR-creation responsibilities that Stage 04 owns today, adds teardown of
+whatever Stage 05 launched, and replaces today's `superpowers`-only best-effort PR call with a
 provider-agnostic, per-repo (parent + each submodule) `gh pr create` step.
 
 ## Problem
@@ -38,9 +40,10 @@ inconsistent across providers: `github-speckit` mode never opens a PR at all tod
 Cloned from the existing `how` plugin skill (`SKILL.md` + `references/{explorer,explainer,critic}
 -prompt.md`, `critique-rubric.md`). No behavior changes beyond what's needed to satisfy this
 repo's `SKILL_SPEC.md` frontmatter contract (`name`, `description`, `compatibility`, `metadata`,
-`license`, `allowed-tools` only; `metadata.author`/`version` required). Used standalone for
-architecture/runtime-flow questions, and by `speckit-auto` (Stage 05, and once at integration
-setup) to produce the analysis that `create-verification-skill` needs as input.
+`license`, `allowed-tools` only; `metadata.author`/`version` required). Ships as a standalone
+skill for architecture/runtime-flow questions; not invoked by speckit-auto's pipeline, since
+`create-verification-skill`'s own interview step already covers the same ground for verification
+purposes.
 
 ### `create-verification-skill/` (new, cloned)
 
@@ -52,10 +55,11 @@ feature's file in `features/`, and only touch `SKILL.md` itself if Launch/Doctor
 actually changed — never a blind full regeneration." This is required because Stage 05 calls it
 once per implemented feature, long after integration setup already created the skill.
 
-Both skills are declared as sibling install dependencies of `speckit-auto`, the same pattern
-already used for `speckit-code-review` and `jira-to-speckit` (copied in together; `speckit-auto`
-invokes them via the `skill` tool and treats a missing/failed invocation as a stop-and-report
-condition when verification is enabled, since the user explicitly opted in).
+`create-verification-skill` is declared as a sibling install dependency of `speckit-auto`, the
+same pattern already used for `speckit-code-review` and `jira-to-speckit` (copied in together;
+`speckit-auto` invokes it via the `skill` tool and treats a missing/failed invocation as a
+stop-and-report condition when verification is enabled, since the user explicitly opted in).
+`how` is added to this repo as an independent skill but is not a speckit-auto install dependency.
 
 ## Integration-time opt-in
 
@@ -66,21 +70,16 @@ persisted alongside the provider choice, as a new `verification: true|false` fie
 provider choice already uses (repo-local → user-home → first-run ask).
 
 If **Yes**:
-1. Invoke `how`, scoped to "what does a user of this repo actually touch, how do they run it, how
-   can it be driven and observed" (the same interview `create-verification-skill` normally runs
-   itself) — reusing `how`'s output as the analysis input, rather than duplicating that interview
-   logic inside `create-verification-skill`.
-2. Feed that analysis to `create-verification-skill` to generate the full skill for this project:
-   Launch, Doctor, Drive, Evidence, Cleanup, Helpers, plus a feature map (`features/README.md` +
-   one file per identified feature, top 3-5 to start) covering the repo's **existing** top
-   features — not yet the feature this speckit-auto run is about to implement, which doesn't
-   exist yet at setup time.
-3. Prove the generated skill once (per `create-verification-skill`'s own step 4): launch, doctor,
+1. Invoke `create-verification-skill` directly (its own "Interview the repo" step observes surface,
+   run command, harness, and isolation from the codebase itself) to generate the full skill for
+   this project: Launch, Doctor, Drive, Evidence, Cleanup, Helpers, plus a feature map
+   (`features/README.md` + one file per identified feature, top 3-5 to start) covering the repo's
+   **existing** top features — not yet the feature this speckit-auto run is about to implement,
+   which doesn't exist yet at setup time.
+2. Prove the generated skill once (per `create-verification-skill`'s own step 4): launch, doctor,
    drive one mapped feature, capture evidence, clean up, confirm evidence survived cleanup.
-4. Commit the generated `.cursor/skills/verify-<app>/` skill + feature map as part of integration
-   setup (consistent with this session's established pattern: every artifact-producing step in
-   this pipeline commits before moving on, so nothing is left as uncommitted local state for the
-   user to discover later).
+3. Commit the generated `.cursor/skills/verify-<app>/` skill + feature map as part of integration
+   setup.
 
 If **No**: persist `verification: false`; generate nothing; Stage 05 will be skipped on every run
 for this repo until re-opted-in.
@@ -102,20 +101,19 @@ Removed from Stage 04 (moved to Stage 06): "Mark Spec Completed + Follow-up Comm
    `verification` at all) → treat as `false`, skip this stage entirely, proceed to Stage 06.
    (Never defaults a pre-existing repo into unexpected new behavior.)
 3. `true` →
-   a. Invoke `how`, scoped this time to just the feature this run implemented (spec + plan +
-      changed files as context), to identify what changed at the user-facing surface.
-   b. Invoke `create-verification-skill` in **update mode**: add a new feature file, or update the
-      existing one if this run modified a previously-mapped feature, in the existing
-      `.cursor/skills/verify-<app>/features/` map. Never touches other features' files.
-   c. Execute the (now current) `verify-<app>` skill, scoped to only this run's feature: launch,
+   a. Invoke `create-verification-skill` in **update mode**, with the just-completed spec + plan +
+      changed files as context: add a new feature file, or update the existing one if this run
+      modified a previously-mapped feature, in the existing `.cursor/skills/verify-<app>/features/`
+      map. Never touches other features' files.
+   b. Execute the (now current) `verify-<app>` skill, scoped to only this run's feature: launch,
       doctor, drive, capture evidence, per its own instructions.
-   d. Present the evidence summary in chat. Ask via the host ask tool: `Verification passed,
+   c. Present the evidence summary in chat. Ask via the host ask tool: `Verification passed,
       proceed to finish` / `Investigate further`.
-   e. **Investigate further** → route back exactly like Stage 04's "Request changes" path: restart
+   d. **Investigate further** → route back exactly like Stage 04's "Request changes" path: restart
       through the earliest affected step, re-run downstream stages, re-enter Stage 03's full
       no-stop flow if code changed, then re-enter Stage 05 from the top.
-4. Any hard failure inside `how`, `create-verification-skill`, or the generated skill itself
-   (skill missing, launch fails, doctor fails) is a stop-and-report condition — verification was
+4. Any hard failure inside `create-verification-skill` or the generated skill itself (skill
+   missing, launch fails, doctor fails) is a stop-and-report condition — verification was
    explicitly opted into, so a silent skip here would be misleading, unlike the historical
    best-effort PR call it replaces.
 
@@ -133,9 +131,9 @@ Removed from Stage 04 (moved to Stage 06): "Mark Spec Completed + Follow-up Comm
 5. **PR creation (provider-agnostic, replaces the old `finishing-a-development-branch` call)**:
    for the parent repo, then for each submodule that has commits ahead of its base branch:
    a. Detect the remote: `git remote get-url origin`.
-   b. If the host is `github.com` (or a GitHub Enterprise host recognized by an installed `gh`),
-      run `gh pr create` for that repo/submodule, with a title/body derived from the spec.
-      Treat "a PR already exists for this branch" as success, not an error (idempotent).
+   b. If the host is `github.com`, run `gh pr create` for that repo/submodule, with a title/body
+      derived from the spec. Treat "a PR already exists for this branch" as success, not an error
+      (idempotent).
    c. Any other host, or `gh` not installed/authenticated → report "PR not created for <repo>:
       <reason>" and continue — non-blocking, one repo's failure never stops another repo's PR or
       the overall stage.
@@ -144,8 +142,8 @@ Removed from Stage 04 (moved to Stage 06): "Mark Spec Completed + Follow-up Comm
 
 ## Final Report (Stage 06, replaces Stage 04's)
 
-Resolved provider, `speckit-code-review` final status, verification outcome (`ran: pass` / `ran:
-investigate-loop-count` / `skipped: verification disabled`), the implementation commit(s), the
+Resolved provider, `speckit-code-review` final status, verification outcome (`verification:
+skipped|passed`, plus `investigate_loops: N` when it ran), the implementation commit(s), the
 verification-artifact commit (if any), the spec completion commit, pushed branches, and per-repo
 PR outcomes.
 
