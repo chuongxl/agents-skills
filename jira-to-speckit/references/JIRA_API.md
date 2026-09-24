@@ -15,20 +15,28 @@ Read these from the repository `.env` file:
 Use Jira REST API v2 for compatibility with the existing DDM automation scripts.
 Always fetch in stages to control context size.
 
+Never pass `$JIRA_API_TOKEN` on the curl command line (`-u user:$JIRA_API_TOKEN`). Command
+arguments are visible to other processes on the same host via `ps`. Pass credentials through a
+curl config file read from stdin (`-K -`) instead, so the token never appears in argv or on disk:
+
 Stage 1 (required, minimal fields):
 
 ```bash
-curl -u "$JIRA_USERNAME:$JIRA_API_TOKEN" \
+curl -K - \
   -H "Accept: application/json" \
-  "$JIRA_URL/rest/api/2/issue/DDM-1234?fields=summary,description,issuetype,status,priority,labels,components,assignee,reporter,fixVersions,project,parent"
+  "$JIRA_URL/rest/api/2/issue/DDM-1234?fields=summary,description,issuetype,status,priority,labels,components,assignee,reporter,fixVersions,project,parent" <<CURLCFG
+user = "$JIRA_USERNAME:$JIRA_API_TOKEN"
+CURLCFG
 ```
 
 Stage 2 (optional, only if stage 1 leaves ambiguity):
 
 ```bash
-curl -u "$JIRA_USERNAME:$JIRA_API_TOKEN" \
+curl -K - \
   -H "Accept: application/json" \
-  "$JIRA_URL/rest/api/2/issue/DDM-1234/comment?maxResults=5"
+  "$JIRA_URL/rest/api/2/issue/DDM-1234/comment?maxResults=5" <<CURLCFG
+user = "$JIRA_USERNAME:$JIRA_API_TOKEN"
+CURLCFG
 ```
 
 Do not fetch unlimited comments by default.

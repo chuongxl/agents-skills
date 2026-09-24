@@ -6,7 +6,8 @@
 ._*
 
 # Custom folder icons
-Icon
+Icon
+
 
 # Volume root files
 .DocumentRevisions-V100
@@ -111,3 +112,6 @@ speckit-auto/.state/
 .superpowers/
 .speckit/
 .security-scan-results/
+
+### worktree
+.worktrees/
