@@ -7,12 +7,12 @@ description: |
   jira-to-speckit, spec/design, implementation, a speckit-code-review remediation loop until
   pass, then human review (default) or YOLO commit and push. Use when a feature must go from
   requirement to committed implementation in one run.
-compatibility: "Runs on GitHub Copilot, Claude Code, and OpenCode. Discovered from ~/.agents/skills/, ~/.claude/skills/, or ~/.config/opencode/skills/. Requires git and bash; network access for Jira intake via --issue."
+compatibility: "Runs on GitHub Copilot, Claude Code, and OpenCode. Discovered from ~/.agents/skills/, ~/.claude/skills/, or ~/.config/opencode/skills/. Requires git and bash; network access for Jira intake via --issue. Default mode also needs the host's ask/question tool (Copilot ask_user, Claude AskUser, OpenCode question) for the Stage 02 and Stage 04 checkpoints; see references/shared/host-adaptation.md."
 license: MIT
-allowed-tools: bash glob grep view create edit skill
+allowed-tools: bash glob grep view create edit skill ask_user
 metadata:
   author: Alex Nguyen
-  version: "0.3.0"
+  version: "0.3.1"
 ---
 
 # Speckit Auto

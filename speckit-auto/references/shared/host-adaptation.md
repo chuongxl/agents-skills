@@ -8,7 +8,7 @@ at entry and fixed for the whole run.
 | Aspect | GitHub Copilot | Claude Code | OpenCode |
 |--------|----------------|-------------|----------|
 | Skill dirs | `~/.agents/skills/`, `.agents/skills/`, `.github/skills/`, `~/.copilot/skills/`, `~/.copilot/installed-plugins/<marketplace>/superpowers/skills/` | `~/.claude/skills/`, `.claude/skills/` | `~/.config/opencode/skills/`, `.opencode/skills/`, plus `.claude/skills/` / `.agents/skills/` |
-| Tool names | `bash glob grep view create edit skill` | `Bash Read Edit Write Glob Grep Skill` | `bash glob grep view create edit skill` |
+| Tool names | `bash glob grep view create edit skill ask_user` | `Bash Read Edit Write Glob Grep Skill AskUser` | `bash glob grep view create edit skill question` |
 | Ask tool (default mode) | `ask_user` | `AskUser` | `question` |
 | Flags arrive via | slash-command body | slash-command body / `$ARGUMENTS` | the natural-language trigger message |
 | Mid-run resume marker | the skill tool list in tool context | `<skill-context name="...">` | `<available_skills>` block |
