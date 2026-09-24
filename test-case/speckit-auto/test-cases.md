@@ -26,10 +26,19 @@ all three host agents (GitHub Copilot, Claude Code, OpenCode).
 | T19 | Stage 03 code-review loop success | Implementation reviewable | Run Stage 03 | Reaches `speckit-code-review pass` and advances | Both |
 | T20 | Stage 03 review failure loop | Review fails | Run Stage 03 | Applies fixes and reruns until pass; no human stop inside Stage 03 | Both |
 | T21 | Default-mode checkpoint | Mode = default | Reach Stage 02 → Stage 03 boundary | Asks for start-implementation confirmation before entering Stage 03 | Both |
-| T22 | YOLO mode skips human gates | Mode = yolo | Run with `--yolo` | Skips Stage 02 interview/confirmation and Stage 04 entirely | Both |
+| T22 | YOLO mode skips human gates | Mode = yolo | Run with `--yolo` | Skips Stage 02 interview/confirmation and Stage 04's human-approval interaction (Stage 04 itself still runs: implementation is still committed) | Both |
 | T23 | Provider-specific stage routing | Provider resolved | Run pipeline | Loads stage files only from selected provider tree | Both |
 | T24 | Missing provider config + no selection | No persisted provider anywhere | Run pipeline | Asks once, persists selection, continues without restart | Both |
 | T25 | Unsupported stored provider | Corrupt `integration.json` | Run pipeline | Ignores bad value, falls through to next precedence or selection | Both |
+| T26 | Verification opt-in at setup | Running `--integration` for the first time on a repo | Answer "Yes" to the verification question | Generates `.cursor/skills/verify-<app>/`, proves it once, commits it, persists `verification: true` | Both |
+| T27 | Verification opt-out at setup | Running `--integration` for the first time on a repo | Answer "No" (or no answer) | Persists `verification: false`; nothing generated | Both |
+| T28 | Stage 05 skipped when disabled | `verification: false` in `.speckit/integration.json` | Run pipeline through Stage 04 | Stage 05 is skipped; report shows `verification: skipped`; proceeds straight to Stage 06 | Both |
+| T29 | Stage 05 runs when enabled | `verification: true` | Run pipeline through Stage 04 | Invokes `create-verification-skill` in update mode for the implemented feature, runs `verify-<app>`, asks pass/investigate | Both |
+| T30 | Stage 05 investigate loop | Verification enabled; human answers "Investigate further" | Reach Stage 05's confirmation | Routes back like a Stage 04 "Request changes"; re-enters Stage 05 after re-verification | Both |
+| T31 | Stage 06 always runs | Any mode, verification enabled or not | Reach end of Stage 05 | Cleans up (if Stage 05 ran), marks spec completed, pushes, attempts PR creation per repo | Both |
+| T32 | PR creation on GitHub remote | Parent repo (or submodule) origin is a `github.com` URL, `gh` installed and authenticated | Reach Stage 06 PR step | Runs `gh pr create`; treats an already-existing PR for the branch as success | Both |
+| T33 | PR creation skipped on non-GitHub or missing `gh` | Origin is not `github.com`, or `gh` unavailable | Reach Stage 06 PR step | Reports "PR not created for `<repo>`: `<reason>`" and continues; does not stop the stage | Both |
+| T34 | Submodule PR fan-out | Repo has submodules with local commits ahead of base | Reach Stage 06 PR step | Attempts a PR for the parent and for each such submodule independently; one failing does not block another | Both |
 
 ## Host-specific checks
 

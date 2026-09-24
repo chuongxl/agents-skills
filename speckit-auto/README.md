@@ -31,9 +31,17 @@ The pipeline:
    spec/plan commit before implementation starts.
 3. **Stage 03 — Implement + Code Review Loop** (NO-STOP ZONE): implement → converge/verify → run
    `speckit-code-review` → fix → repeat until `pass`. No human gates in either mode.
-4. **Stage 04 — Human Review / Commit / Completion**: default mode asks for human approval before
-   committing; YOLO mode auto-commits. Both modes then mark the spec `completed` with a follow-up
-   commit.
+4. **Stage 04 — Human Review / Implementation Commit**: default mode asks for human approval
+   before committing; YOLO mode auto-commits. Both modes hand off to Stage 05.
+5. **Stage 05 — Verification** (conditional): only runs when verification was enabled at
+   `--integration` setup time. Updates the project's generated `verify-<app>` skill for the
+   just-implemented feature, runs it, and asks for a pass/investigate confirmation before
+   continuing. Skipped entirely (with a report line saying so) when verification was not opted
+   into.
+6. **Stage 06 — Clean / Commit / Push / PR / Complete**: tears down anything Stage 05 launched,
+   commits verification artifacts (if any), marks the spec completed, pushes every repo/submodule
+   with local commits, and opens a pull request per repo (parent + each submodule) via `gh pr
+   create` where the remote is GitHub — non-blocking per repo.
 
 ## Install
 
@@ -74,15 +82,22 @@ Each provider includes stage-specific reference files that implement the pipelin
 ### YOLO vs Default Mode
 
 **Default Mode** (recommended for critical features):
-- Runs Stages 01–04 with mandatory human checkpoint at Stage 04
-- Requires explicit human approval before code is merged
+- Runs Stages 01–06, with mandatory human checkpoints at Stage 04 and (when verification is
+  enabled) Stage 05
+- Requires explicit human approval before code is merged, and — if verification is enabled —
+  explicit confirmation that verification passed
 - Best for production, regulatory, or high-stakes work
 
 **YOLO Mode** (`--yolo` flag):
-- Skips Stage 04, uses Stage 05 instead
-- Zero human checkpoints; fully automated merge and commit
+- Still routes through every stage, but skips the human checkpoints at Stage 04 and (when
+  verification is enabled) Stage 05
+- Zero human checkpoints; fully automated merge, verification confirmation, and commit/push/PR
 - Ideal for internal tools, experiments, or when continuous delivery is the goal
-- All code still passes speckit-code-review before merge
+- All code still passes speckit-code-review before merge; if verification is enabled, it still
+  runs — YOLO only skips asking a human to confirm the result
+
+**Verification is independent of mode.** It is enabled or disabled once, per repo, at
+`--integration` setup time — not per run, and not tied to `--yolo`.
 
 ---
 
