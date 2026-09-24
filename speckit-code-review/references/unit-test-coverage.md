@@ -2,9 +2,13 @@
 
 Run the project's test suite against the changed code and verify new code is covered at ≥ 80%.
 
-## Step 1 — Detect Test Runner
+## Step 1 — Detect Test Runner(s)
 
-First match wins:
+Detect once per distinct workspace root touched by the review scope: the repo root, plus each
+submodule path from the Submodule Expansion step (SKILL.md § Inputs) that has changed files. A
+submodule commonly has its own manifest and test runner independent of the parent repo's.
+
+First match wins, per workspace root:
 
 | Tool | Detection signal | Coverage command |
 |---|---|---|
@@ -16,18 +20,26 @@ First match wins:
 | Gradle | `build.gradle` | `./gradlew test jacocoTestReport` |
 | .NET | `*.csproj` | `dotnet test --collect:"XPlat Code Coverage"` |
 
-No runner detected → set `unit-test-coverage` to `"N/A (no test runner detected)"`, emit no `TEST-*`
-fixes, and skip the remaining steps (`N/A` counts as passing).
+Run each workspace root's command from inside that root (`cd <path> && <command>` for submodules).
+A workspace root with no runner detected contributes `"N/A"` for its own files only — it never
+blanks out coverage for files in a sibling workspace that does have a runner. If **every** touched
+workspace root has no runner, set `unit-test-coverage` to `"N/A (no test runner detected)"`, emit
+no `TEST-*` fixes, and skip the remaining steps (`N/A` counts as passing).
 
-## Step 2 — Run Against Changed Files Only
+## Step 2 — Scope to Changed Files
 
-Take changed files from `git status --porcelain` and `git diff --name-only HEAD`. Scope coverage to
-those source files/modules where possible, excluding generated, migration, config, and vendor files.
+Use the review scope resolved in SKILL.md § Procedure step 2 (already submodule-expanded — never
+re-derive it here with a fresh `git status`/`git diff` call, which would only see gitlink entries
+for submodule paths). Scope coverage to those source files/modules where possible, excluding
+generated, migration, config, and vendor files.
 
 ## Step 3 — Compute Coverage
 
-Parse **line coverage %** for the changed files. If reported per file, use the weighted average
-`sum(covered lines) / sum(total lines) * 100`. Round to one decimal place.
+Parse **line coverage %** for the changed files, per workspace root's coverage report. Combine
+across all touched workspace roots with one weighted average:
+`sum(covered lines across all roots) / sum(total lines across all roots) * 100`. A root reporting
+`"N/A"` contributes zero to both sums, it never drags the combined percentage down. Round to one
+decimal place.
 
 ## Step 4 — Identify Uncovered Areas
 

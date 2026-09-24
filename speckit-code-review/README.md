@@ -121,7 +121,7 @@ Reviewers iterate on fixes via `speckit-auto` without re-invoking `speckit-code-
 
 1. **Parse Requirements** — Extract or synthesize the requirement checklist from `specs/<feature>/spec.md`. If no requirement IDs exist, generate FR-*/NFR-* identifiers synthetically (see Requirement ID Synthesis above).
 
-2. **Define Scope** — Identify changed files from git (staged + unstaged). This defines which code paths require review.
+2. **Define Scope** — Identify changed files from git (staged + unstaged), expanding any changed git submodule gitlink into its own file-level diff so submodule changes are actually reviewed, not skipped. This defines which code paths require review.
 
 3. **Load Guidelines** — Optionally load project-specific reference files (architecture.md, code-style.md, etc.) to incorporate team-defined standards. Each reference file is discarded after use to avoid context bloat.
 
