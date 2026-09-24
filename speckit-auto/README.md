@@ -17,7 +17,7 @@ selected once and fixed for the run:
 | `github-speckit` | Repo-installed GitHub Spec Kit agents (`/speckit.specify`, `/speckit.plan`, `/speckit.implement`, ...) |
 | `superpowers` | The `obra/superpowers` skills library (`brainstorming`, `writing-plans`, `subagent-driven-development`, ...) |
 
-Both providers run the same four shared pipeline stages; only the stage agents/skills, install
+Both providers run the same six shared pipeline stages; only the stage agents/skills, install
 layout, and fix-application style differ (provider adapters under `references/providers/`).
 
 The pipeline:
@@ -48,13 +48,6 @@ The pipeline:
 Copy the `speckit-auto` folder (with `speckit-code-review` and `jira-to-speckit`) into the host's
 skill directory: `~/.agents/skills/` (Copilot), `~/.claude/skills/` (Claude Code), or
 `~/.config/opencode/skills/` (OpenCode). The skill is auto-discovered from those locations.
-
-1. **Stage 01: Preflight + Intake** — Validate the requirement, extract context from docs/guidelines, and prepare the project environment for spec authoring.
-2. **Stage 02: Spec / Design** — Author a detailed feature specification including acceptance criteria, edge cases, and architectural decisions.
-3. **Stage 03: Implement + Code Review Loop** — Execute implementation and automatically invoke speckit-code-review until the code passes the spec; no human approval required.
-4. **Stage 04: Human Review + Commit** (default mode only) — Human reviewer validates the implementation against the spec and makes the final decision before merge.
-5. **Stage 05: YOLO Commit Flow** (YOLO mode only) — Automatically merge and commit with zero human checkpoints.
-6. **Stage 06: Spec Completion** — Mark the spec as completed and create a final commit.
 
 **Key rule**: Stage 03 is a **NO-STOP ZONE** in both default and YOLO modes; code review loops continue automatically until the spec is satisfied.
 
