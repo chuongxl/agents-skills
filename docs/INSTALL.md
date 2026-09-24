@@ -45,13 +45,14 @@ mid-run.
 
 | Skill | Requires |
 |-------|----------|
-| `speckit-auto` | `jira-to-speckit`, `speckit-code-review` |
+| `speckit-auto` | `jira-to-speckit`, `speckit-code-review`, `create-verification-skill` (conditional — only needed if Stage 05 verification is opted into) |
 | `speckit-code-review` | — |
 | `jira-to-speckit` | — |
 | `job-security-scan` | — |
 
-For `speckit-auto` you effectively want all three speckit skills installed
-together.
+For `speckit-auto` you effectively want all four speckit-related skills installed
+together — `jira-to-speckit`, `speckit-code-review`, and `speckit-auto` unconditionally,
+plus `create-verification-skill` if you plan to opt into verification.
 
 ## Per-Skill Prerequisites
 

@@ -47,7 +47,9 @@ The pipeline:
 
 Copy the `speckit-auto` folder (with `speckit-code-review` and `jira-to-speckit`) into the host's
 skill directory: `~/.agents/skills/` (Copilot), `~/.claude/skills/` (Claude Code), or
-`~/.config/opencode/skills/` (OpenCode). The skill is auto-discovered from those locations.
+`~/.config/opencode/skills/` (OpenCode). The skill is auto-discovered from those locations. Also
+copy `create-verification-skill` if this repo opts into Stage 05 verification — it's a conditional
+dependency, only invoked when verification was enabled at `--integration` setup time.
 
 **Key rule**: Stage 03 is a **NO-STOP ZONE** in both default and YOLO modes; code review loops continue automatically until the spec is satisfied.
 
@@ -57,11 +59,11 @@ skill directory: `~/.agents/skills/` (Copilot), `~/.claude/skills/` (Claude Code
 
 ### Provider System
 
-Speckit Auto resolves a **provider** at the start of each run using a precedence chain:
-
-1. **Repo-local config**: `.speckit/integration.json` in the repository root
-2. **User home config**: `~/.agents/skills/speckit-auto/.state/integration.json`
-3. **First-run ask**: If neither exists, prompt once, persist, and continue
+Speckit Auto resolves a **provider** from a single source: `.speckit/integration.json` in the
+repository root, written once by `speckit-auto --integration <provider>`. There is no global/
+user-home state and no first-run ask mid-pipeline — a missing or unparseable file stops the run
+and tells you to run `--integration` first. The same file's `verification` field (also set at
+`--integration` setup time) gates Stage 05.
 
 Supported providers:
 
@@ -146,6 +148,9 @@ repo map.
 
 - `jira-to-speckit` — Jira fetch + compaction + ticket snapshot (`--issue` only)
 - `speckit-code-review` — authoritative JSON pass/fail gate; the only way Stage 03 exits
+- `create-verification-skill` — generates/updates the project's `verify-<app>` skill; conditional
+  on the `verification` opt-in persisted at `--integration` setup time; not needed if verification
+  was never enabled for this repo
 
 ## Progressive Loading (context budget)
 
