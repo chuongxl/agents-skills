@@ -63,24 +63,39 @@ also fails do you stop, with its restart-session message.
 
 ## 3. Guidelines Context
 
-Skipped silently when `docs/guidelines/architecture.md` is absent — continue with a fallback
-`repo_map`.
+Skipped silently when `docs/guidelines/architecture.md` is absent — continue with the fallback
+`repo_map` chain below. Never let the fallback default to `{ ".": "root" }` when the repo itself
+declares a multi-service layout elsewhere; that map is authoritative for every later
+task/workspace assignment (step 5), so a wrong map here misassigns backend/frontend features to
+the meta-repo root instead of their real submodule.
 
 1. Detect layout: `monorepo` if `pnpm-workspace.yaml`, `package.json.workspaces`, or `lerna.json`
-   exists, else `single-repo`. Resolve workspace folders from globs.
-2. Parse `architecture.md` **once** into an in-memory Project Context: `layout`, `workspaces`,
-   `repo_map` (explicit Repository Map section, else inferred from workspace names: backend /
-   frontend / bff / database / shared; single-repo → `{ ".": "root", "inferred": true }`),
-   `arch_pattern`, `dependency_rule` (one sentence), `bounded_context_layout` (compact),
-   `linked_guidelines` (stem → repo-relative path for every relative `.md` link), `summary`
-   (≤120 words), `loaded_guidelines` (cache, empty).
-3. **Lazy-load linked guidelines**: never during parse. Load one only when a stage needs detail
+   exists; `git-submodules` if a root `.gitmodules` exists; else `single-repo`. A repo can be both
+   `monorepo` and `git-submodules` — keep both signals, don't collapse to one.
+2. Derive `repo_map`, in this order, stopping at the first that yields entries:
+   1. `architecture.md`'s explicit Repository Map section, when the file exists.
+   2. **No `architecture.md`, layout includes `git-submodules`:** parse `.gitmodules` for
+      `path = <submodule-path>` entries and use each as a workspace. If the root `AGENTS.md` (or
+      equivalent contributor doc) declares names for those paths (e.g. a services/apps table),
+      use its names as the `repo_map` keys instead of raw paths — that file is the authoritative
+      service layout when `architecture.md` is absent.
+   3. `monorepo` glob-resolved workspace folders, inferred as backend / frontend / bff / database
+      / shared from folder names.
+   4. Only when none of the above produced any entries: `single-repo` →
+      `{ ".": "root", "inferred": true }`.
+3. Parse `architecture.md` **once**, when present, into an in-memory Project Context: `layout`,
+   `workspaces`, `repo_map` (from step 2), `arch_pattern`, `dependency_rule` (one sentence),
+   `bounded_context_layout` (compact), `linked_guidelines` (stem → repo-relative path for every
+   relative `.md` link), `summary` (≤120 words), `loaded_guidelines` (cache, empty). When
+   `architecture.md` is absent, populate the same Project Context shape with `repo_map` from step
+   2 and the remaining fields empty/best-effort.
+4. **Lazy-load linked guidelines**: never during parse. Load one only when a stage needs detail
    the cached fields lack, matched by stem (naming/style, database/data, workflow/process, or best
    match); cache it in `loaded_guidelines`; never load the same file twice.
-4. Downstream usage is mandatory: `repo_map` drives every task/workspace assignment; generated
+5. Downstream usage is mandatory: `repo_map` drives every task/workspace assignment; generated
    structure follows `arch_pattern`; `summary` prefixes provider stage prompts, with the relevant
    `repo_map` slice and loaded guidelines appended.
-5. Log one line: `[Preflight] Context loaded: layout=<...>, workspaces=<n>, arch=<...>,
+6. Log one line: `[Preflight] Context loaded: layout=<...>, workspaces=<n>, arch=<...>,
    linked_guidelines=<...>`.
 
 ## 4. Scratch Hygiene
