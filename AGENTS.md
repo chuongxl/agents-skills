@@ -13,8 +13,12 @@ CI (`.github/workflows/validate-skills.yml`) runs both, plus `bash -n` on `*.sh`
 
 ## Skills
 
-- `speckit-auto` — orchestrator; depends on `jira-to-speckit` + `speckit-code-review` being installed
+- `speckit-auto` — orchestrator; depends on `jira-to-speckit` + `speckit-code-review` +
+  `create-verification-skill` being installed
 - `speckit-code-review`, `jira-to-speckit`, `job-security-scan`
+- `how`, `create-verification-skill` — standalone; `create-verification-skill` is also a
+  `speckit-auto` install dependency (Stage 05, conditional on the `--integration` verification
+  opt-in)
 
 Not skills: `tools/`, `docs/`, `test-case/`, `speckit-companion-extension/`. Do not add a `SKILL.md` to `speckit-companion-extension/` — the validator would then treat it as a skill.
 
@@ -33,6 +37,6 @@ Every relative markdown link in `SKILL.md`, `README.md`, and `references/**` mus
 
 - `jira-to-speckit` reads Jira credentials from the project root `.env` (gitignored): `JIRA_URL`, `JIRA_USERNAME`, `JIRA_API_TOKEN`. Never print them; stop and ask the user if missing.
 - `speckit-code-review` is invoked as a **skill** (its strict JSON verdict must come back in-band), never as a background task agent.
-- `speckit-auto` resolves its provider only from repo-local `.speckit/integration.json` (no global state, no first-run prompt; missing file → stop and direct the user to `/speckit-auto --integration <provider>`). Provider is fixed for the whole run — never infer it from repo contents.
+- `speckit-auto` resolves its provider only from repo-local `.speckit/integration.json` (no global state, no first-run prompt; missing file → stop and direct the user to `/speckit-auto --integration <provider>`). Provider is fixed for the whole run — never infer it from repo contents. The same file's `verification` field (added at `--integration` setup time) gates Stage 05; absent or `false` → Stage 05 is skipped, never assumed enabled.
 - Gitignored runtime state/scratch: `speckit-auto/.state/`, `.superpowers/`, `.speckit/`, `.security-scan-results/`.
 - Manual test cases for `speckit-auto` live in `test-case/speckit-auto/test-cases.md`; there is no automated test framework for skill behavior.

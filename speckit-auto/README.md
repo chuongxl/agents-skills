@@ -17,7 +17,7 @@ selected once and fixed for the run:
 | `github-speckit` | Repo-installed GitHub Spec Kit agents (`/speckit.specify`, `/speckit.plan`, `/speckit.implement`, ...) |
 | `superpowers` | The `obra/superpowers` skills library (`brainstorming`, `writing-plans`, `subagent-driven-development`, ...) |
 
-Both providers run the same four shared pipeline stages; only the stage agents/skills, install
+Both providers run the same six shared pipeline stages; only the stage agents/skills, install
 layout, and fix-application style differ (provider adapters under `references/providers/`).
 
 The pipeline:
@@ -31,22 +31,25 @@ The pipeline:
    spec/plan commit before implementation starts.
 3. **Stage 03 — Implement + Code Review Loop** (NO-STOP ZONE): implement → converge/verify → run
    `speckit-code-review` → fix → repeat until `pass`. No human gates in either mode.
-4. **Stage 04 — Human Review / Commit / Completion**: default mode asks for human approval before
-   committing; YOLO mode auto-commits. Both modes then mark the spec `completed` with a follow-up
-   commit.
+4. **Stage 04 — Human Review / Implementation Commit**: default mode asks for human approval
+   before committing; YOLO mode auto-commits. Both modes hand off to Stage 05.
+5. **Stage 05 — Verification** (conditional): only runs when verification was enabled at
+   `--integration` setup time. Updates the project's generated `verify-<app>` skill for the
+   just-implemented feature, runs it, and asks for a pass/investigate confirmation before
+   continuing. Skipped entirely (with a report line saying so) when verification was not opted
+   into.
+6. **Stage 06 — Clean / Commit / Push / PR / Complete**: tears down anything Stage 05 launched,
+   commits verification artifacts (if any), marks the spec completed, pushes every repo/submodule
+   with local commits, and opens a pull request per repo (parent + each submodule) via `gh pr
+   create` where the remote is GitHub — non-blocking per repo.
 
 ## Install
 
 Copy the `speckit-auto` folder (with `speckit-code-review` and `jira-to-speckit`) into the host's
 skill directory: `~/.agents/skills/` (Copilot), `~/.claude/skills/` (Claude Code), or
-`~/.config/opencode/skills/` (OpenCode). The skill is auto-discovered from those locations.
-
-1. **Stage 01: Preflight + Intake** — Validate the requirement, extract context from docs/guidelines, and prepare the project environment for spec authoring.
-2. **Stage 02: Spec / Design** — Author a detailed feature specification including acceptance criteria, edge cases, and architectural decisions.
-3. **Stage 03: Implement + Code Review Loop** — Execute implementation and automatically invoke speckit-code-review until the code passes the spec; no human approval required.
-4. **Stage 04: Human Review + Commit** (default mode only) — Human reviewer validates the implementation against the spec and makes the final decision before merge.
-5. **Stage 05: YOLO Commit Flow** (YOLO mode only) — Automatically merge and commit with zero human checkpoints.
-6. **Stage 06: Spec Completion** — Mark the spec as completed and create a final commit.
+`~/.config/opencode/skills/` (OpenCode). The skill is auto-discovered from those locations. Also
+copy `create-verification-skill` if this repo opts into Stage 05 verification — it's a conditional
+dependency, only invoked when verification was enabled at `--integration` setup time.
 
 **Key rule**: Stage 03 is a **NO-STOP ZONE** in both default and YOLO modes; code review loops continue automatically until the spec is satisfied.
 
@@ -56,11 +59,11 @@ skill directory: `~/.agents/skills/` (Copilot), `~/.claude/skills/` (Claude Code
 
 ### Provider System
 
-Speckit Auto resolves a **provider** at the start of each run using a precedence chain:
-
-1. **Repo-local config**: `.speckit/integration.json` in the repository root
-2. **User home config**: `~/.agents/skills/speckit-auto/.state/integration.json`
-3. **First-run ask**: If neither exists, prompt once, persist, and continue
+Speckit Auto resolves a **provider** from a single source: `.speckit/integration.json` in the
+repository root, written once by `speckit-auto --integration <provider>`. There is no global/
+user-home state and no first-run ask mid-pipeline — a missing or unparseable file stops the run
+and tells you to run `--integration` first. The same file's `verification` field (also set at
+`--integration` setup time) gates Stage 05.
 
 Supported providers:
 
@@ -74,15 +77,22 @@ Each provider includes stage-specific reference files that implement the pipelin
 ### YOLO vs Default Mode
 
 **Default Mode** (recommended for critical features):
-- Runs Stages 01–04 with mandatory human checkpoint at Stage 04
-- Requires explicit human approval before code is merged
+- Runs Stages 01–06, with mandatory human checkpoints at Stage 04 and (when verification is
+  enabled) Stage 05
+- Requires explicit human approval before code is merged, and — if verification is enabled —
+  explicit confirmation that verification passed
 - Best for production, regulatory, or high-stakes work
 
 **YOLO Mode** (`--yolo` flag):
-- Skips Stage 04, uses Stage 05 instead
-- Zero human checkpoints; fully automated merge and commit
+- Still routes through every stage, but skips the human checkpoints at Stage 04 and (when
+  verification is enabled) Stage 05
+- Zero human checkpoints; fully automated merge, verification confirmation, and commit/push/PR
 - Ideal for internal tools, experiments, or when continuous delivery is the goal
-- All code still passes speckit-code-review before merge
+- All code still passes speckit-code-review before merge; if verification is enabled, it still
+  runs — YOLO only skips asking a human to confirm the result
+
+**Verification is independent of mode.** It is enabled or disabled once, per repo, at
+`--integration` setup time — not per run, and not tied to `--yolo`.
 
 ---
 
@@ -138,6 +148,9 @@ repo map.
 
 - `jira-to-speckit` — Jira fetch + compaction + ticket snapshot (`--issue` only)
 - `speckit-code-review` — authoritative JSON pass/fail gate; the only way Stage 03 exits
+- `create-verification-skill` — generates/updates the project's `verify-<app>` skill; conditional
+  on the `verification` opt-in persisted at `--integration` setup time; not needed if verification
+  was never enabled for this repo
 
 ## Progressive Loading (context budget)
 
