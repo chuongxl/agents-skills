@@ -116,10 +116,14 @@ testable requirements to the spec. Never return `pass` against an empty checklis
 6. `Business cover = round(covered / total * 100)`.
 7. Write `state_file`, plus one detail file **per category that has issues**. Skip empty categories;
    on `pass` write only `state_file`.
-8. Build `fixes` from all findings ordered high → medium → low severity, then keep only the **top 3**
-   inline. The rest live in `state_file` and the category detail files.
-9. `status` = `pass` only if `fixes` is empty **and** coverage ≥ 80% (or `N/A`) **and** the checklist
-   is non-empty; otherwise `failed`.
+8. Build `fixes` from all **blocking** findings ordered high → medium → low severity, then keep
+   only the **top 3** inline. Every finding is blocking except a `TEST-*` advisory gap (see
+   unit-test-coverage.md Step 4): those are recorded in `unit-tests.json` for visibility only and
+   never enter `fixes` or count toward step 9. The rest of the blocking findings live in
+   `state_file` and the category detail files.
+9. `status` = `pass` only if the blocking-finding count is zero **and** coverage ≥ 80% (or `N/A`)
+   **and** the checklist is non-empty; otherwise `failed`. `fixes` reflects the same blocking set,
+   so `fixes` empty and blocking-finding count zero always agree.
 
 ## Output Contract
 
@@ -168,7 +172,9 @@ A passing result is the same shape with `"status": "pass"`, `detail_files: {}`, 
 
 ## Quality Bar
 
-- Never report `pass` while `fixes` is non-empty, coverage < 80%, or the checklist is empty.
+- Never report `pass` while a blocking finding exists (`fixes` non-empty), coverage < 80%, or the
+  checklist is empty. A `TEST-*` advisory gap (unit-test-coverage.md Step 4, coverage already
+  ≥ 80%) is not a blocking finding and never fails a pass on its own.
 - Keep verbose analysis in the category files; the inline object stays under 400 tokens.
 - Severity scale for every area: `high` = exploitable or breaks a requirement/invariant;
   `medium` = degrades correctness, security posture, or maintainability; `low` = cosmetic or

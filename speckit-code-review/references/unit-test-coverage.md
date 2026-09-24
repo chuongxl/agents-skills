@@ -44,15 +44,26 @@ decimal place.
 ## Step 4 — Identify Uncovered Areas
 
 For each changed file below 100%, record every uncovered class/method as
-`{file, class_or_method, lines, reason}` in the detail file, where `reason` names the untested
-scenario (e.g. `"No test covers the case where password validation fails"`). Emit a matching `TEST-*`
-fix whose `action` states the test to add; use `lines: "new"` when the test file or case
-does not exist yet.
+`{file, class_or_method, lines, reason, blocking}` in the detail file, where `reason` names the
+untested scenario (e.g. `"No test covers the case where password validation fails"`).
+
+`blocking` is set from the **overall** combined coverage computed in Step 3, never per-file:
+
+- Overall coverage **< 80%** (the review is already failing on the Step 5 threshold): `blocking:
+  true`. Emit a matching `TEST-*` fix whose `action` states the test to add; these feed into
+  SKILL.md's `fixes` array and count toward `status`. Use `lines: "new"` when the test file or case
+  does not exist yet.
+- Overall coverage **≥ 80%**: `blocking: false`. Still record the gap in `unit-tests.json` for
+  visibility and future improvement, but do **not** emit a `TEST-*` fix for it and do **not** let it
+  enter SKILL.md's `fixes` array or count toward `status` — a file below 100% inside an already
+  ≥ 80% overall result is not a review failure, it is backlog. Never re-derive `blocking` from a
+  per-file percentage; the 80% line only ever applies to the overall figure.
 
 ## Step 5 — Threshold
 
-- ≥ 80% — passes; may still emit `TEST-*` fixes to guide improvement.
-- < 80% — `status` must be `failed`.
+- ≥ 80% — passes. Per-file gaps recorded in Step 4 stay advisory (`blocking: false`); they never
+  turn this into a `failed` result.
+- < 80% — `status` must be `failed`, and every gap recorded in Step 4 is blocking.
 
 ## Detail File — `unit-tests.json`
 
