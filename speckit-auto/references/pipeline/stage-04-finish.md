@@ -1,7 +1,8 @@
-# Stage 04: Human Review / Commit / Spec Completion (Provider-Agnostic)
+# Stage 04: Human Review / Implementation Commit (Provider-Agnostic)
 
 Load after `speckit-code-review` returns `pass`. Two paths: **default mode** (human review gate is
-mandatory, never skipped) and **YOLO** (no human interactions).
+mandatory, never skipped) and **YOLO** (no human interactions). Both paths end at the same place:
+the implementation is committed, and control passes to Stage 05.
 
 ## Default Mode — Human Manual Review Gate
 
@@ -34,34 +35,20 @@ Skip every human review/approval interaction. Auto-generate the commit message
 `feat(<artifact_id>): <short summary from the spec or Jira summary>`, then run the commit + push
 procedure in [../shared/commit.md](../shared/commit.md) with that message.
 
-## Mark Spec Completed + Follow-up Commit (both modes)
+## Handoff (both modes)
 
-After the implementation commit succeeded:
-
-1. Update the active spec (`specs/<feature_folder>/spec.md`): set the status field to `completed`
-   or add `Status: completed`.
-2. Commit the status update: `git add <spec-path>` and
-   `git commit -m "chore(spec): mark <artifact_id> completed"`.
-
-## Final Step — `finishing-a-development-branch` (superpowers only)
-
-**Runs only after ALL of the above have succeeded** (human approval or YOLO auto-approve,
-implementation commit/push, spec completion commit). Never called in Stage 03, never called
-before approval, never called to commit or push code.
-
-Invoke `skill finishing-a-development-branch` with no prompt. It handles any final branch
-lifecycle actions (e.g. opening a PR in default mode). If the skill is not available or fails,
-log the error and continue — this step is non-blocking and does not affect pipeline success.
+After the implementation commit succeeded (or was skipped because nothing needed committing — see
+[../shared/commit.md](../shared/commit.md)'s conditional-commit rule), load
+[stage-05-verification.md](stage-05-verification.md) and enter Stage 05 in the same turn. Stage 05
+owns everything from here: verification (conditional), cleanup, marking the spec completed,
+pushing, and PR creation.
 
 ## Failure Handling
 
-- Spec status update or completion commit fails → stop and report the exact error; do not claim
-  pipeline success without the completion commit.
 - A commit that was actually needed failing, a failed push, or an unresolved rebase → stop and
   report (shared/commit.md).
 
-## Final Report
+## Report
 
-At completion report: resolved provider, `speckit-code-review` final status (`pass`), the
-implementation commit(s) (hash + subject) and pushed branch, and the spec completion commit hash.
-In `--issue` mode, update the execution report first (Stage 01 §7).
+At this checkpoint report: resolved provider, `speckit-code-review` final status (`pass`), the
+implementation commit(s) (hash + subject) and pushed branch, then note Stage 05 is next.
