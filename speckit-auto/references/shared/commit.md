@@ -40,15 +40,23 @@ so the parent may need a commit even when it looked clean moments earlier.
 
 ## Branch Sync + Push (Required)
 
-After the commit decision (including the already-clean success path):
+After the commit decision (including the already-clean success path), sync and push **each
+submodule with local commits ahead of its pushed base first**, then the parent repo — same set
+identified in "With Submodules" above:
 
-1. `git pull --rebase origin <branch>` — if the remote branch does not exist yet, continue to push
+1. For each such submodule, `cd` into it and run steps 2-4 below inside it before doing the same
+   for the parent repo.
+2. `git pull --rebase origin <branch>` — if the remote branch does not exist yet, continue to push
    (new branch path). On conflicts: resolve, `git add <files>`, `git rebase --continue`, repeat; if
    unresolvable, stop and report.
-2. Push: first push `git push -u origin <branch>`; subsequent `git push origin <branch>`.
-3. Push failure → stop and report the exact error.
+3. Push: first push `git push -u origin <branch>`; subsequent `git push origin <branch>`.
+4. Push failure → stop and report the exact error.
 
-The stage must leave the implementation commit(s) available on the remote feature branch.
+Repos with no submodules just run steps 2-4 once, against the parent repo — this is the original,
+unchanged single-repo behavior.
+
+The stage must leave the implementation commit(s) available on the remote feature branch (and, for
+every affected submodule, its own remote branch too).
 
 ## Reporting and Failure Handling
 

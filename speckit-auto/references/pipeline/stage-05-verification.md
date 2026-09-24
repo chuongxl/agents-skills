@@ -22,11 +22,15 @@ and the list of files changed in the implementation commit as context. It adds a
 `features/<feature-slug>.md` file, or updates the existing one if this run modified a
 previously-mapped feature, inside the already-generated `.cursor/skills/verify-<app>/features/`
 map. It never touches other features' files, and only touches `SKILL.md` itself if this feature
-changed Launch/Doctor/Drive/Evidence/Cleanup.
+changed Launch/Doctor/Drive/Evidence/Cleanup. **Explicitly tell it to skip its own Step 4
+(Prove) proof-and-cleanup for this call** — Stage 05 §3 below is the real proof, driven against
+the full running app, and Stage 05/06 own the cleanup timing; a second launch/drive/cleanup cycle
+inside `create-verification-skill` itself would double-drive the app and risk tearing down an
+instance Stage 06 still expects to clean up.
 
 **Hard failure** (skill unavailable, or it reports it could not complete the update) → stop and
 report the exact error. Verification was explicitly opted into; a silent skip here would be
-misleading. Tell the user the implementation is already committed and pushed-pending (per Stage
+misleading. Tell the user the implementation is already committed and pushed (per Stage
 04), and that they can re-run Stage 05 manually or disable verification via
 `/speckit-auto --integration <value>` and re-run.
 
@@ -34,7 +38,7 @@ misleading. Tell the user the implementation is already committed and pushed-pen
 
 Run the (now current) `verify-<app>` skill's own instructions, scoped to only this run's feature:
 launch, doctor, drive using the harness recipe from `features/<feature-slug>.md`, capture
-evidence, per its own Cleanup section — but do **not** run cleanup yet; that happens once, in
+evidence, per its own Evidence section — but do **not** run cleanup yet; that happens once, in
 Stage 06, after the human confirms verification passed (a failed confirmation may mean rerunning
 the drive against the same still-launched instance).
 
@@ -44,8 +48,17 @@ the exact error, same failure philosophy as step 2.
 ## 4. Present evidence and confirm
 
 Present the captured evidence (screenshots, transcripts, response bodies — whatever
-`features/<feature-slug>.md` named) as a concise summary. Ask via the host ask tool:
-`Verification passed, proceed to finish` / `Investigate further`.
+`features/<feature-slug>.md` named) as a concise summary.
+
+### Default Mode
+
+Ask via the host ask tool: `Verification passed, proceed to finish` / `Investigate further`.
+
+### YOLO Path
+
+Skip the ask-tool confirmation entirely — the verification itself already ran in step 3; only the
+human confirmation is skipped. Auto-record `verification: passed` and note in the final report
+that this result was auto-approved (not skipped).
 
 ### If Investigate Further
 

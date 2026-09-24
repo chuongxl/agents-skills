@@ -38,7 +38,8 @@ TURN (the one legitimate no-pipeline turn end in the whole skill). Never enter t
       unless installing a provider framework, per step 3 below).
    4. Any failure in this sub-step (skill unavailable, generation fails, self-proof fails) is
       reported but does **not** abort the rest of setup — the provider is still persisted and
-      usable; report `verification: false` was effectively left in place for this run and tell the
+      usable. On this failure, re-run the same persist logic from step 2 with `verification:
+      false` so the JSON never claims a skill exists that wasn't actually generated, and tell the
       user they can retry by re-running `/speckit-auto --integration <value>` and opt in.
 
    **If verification = false:** skip this sub-step entirely; nothing is generated.
@@ -89,19 +90,25 @@ TURN (the one legitimate no-pipeline turn end in the whole skill). Never enter t
      > skill speckit-constitution "constitution project to understand the project architecture"
      > ```
      > to initialise the project constitution, then you can run your pipeline command.
-     >
-     > Verification is **enabled** for this project (a `.cursor/skills/verify-<app>/` skill was
-     > generated and committed) — Stage 05 will run it after every implementation. / Verification is
-     > **disabled** — Stage 05 will be skipped on every run until you re-run
+
+     If verification is enabled for this project:
+     > A `.cursor/skills/verify-<app>/` skill was generated and committed — Stage 05 will run it
+     > after every implementation.
+
+     If verification is disabled for this project:
+     > Verification is disabled — Stage 05 will be skipped on every run until you re-run
      > `/speckit-auto --integration <value>` and opt in.
 
    - **superpowers:**
      > ✅ Superpowers is configured. **Please restart your host session (Copilot / Claude Code /
      > OpenCode) now** so the new skills are discovered, then re-run your pipeline command.
-     >
-     > Verification is **enabled** for this project (a `.cursor/skills/verify-<app>/` skill was
-     > generated and committed) — Stage 05 will run it after every implementation. / Verification is
-     > **disabled** — Stage 05 will be skipped on every run until you re-run
+
+     If verification is enabled for this project:
+     > A `.cursor/skills/verify-<app>/` skill was generated and committed — Stage 05 will run it
+     > after every implementation.
+
+     If verification is disabled for this project:
+     > Verification is disabled — Stage 05 will be skipped on every run until you re-run
      > `/speckit-auto --integration <value>` and opt in.
 
 5. Report: resolved provider, verification opt-in result (enabled/disabled, and the generated

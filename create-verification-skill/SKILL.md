@@ -31,7 +31,11 @@ Every serious project needs a scripted way to drive the real app and prove behav
   4. Touch `SKILL.md` itself **only if** Launch, Doctor, Drive, Evidence, Cleanup, or Helpers
      actually changed because of this feature (a new command, a new port, a new harness) —
      otherwise leave it untouched. Never regenerate `SKILL.md` wholesale in update mode.
-  5. Run Step 4 (Prove) scoped to only this one feature file, not the whole map.
+  5. Run Step 4 (Prove) scoped to only this one feature file, not the whole map. **Exception:**
+     when this update-mode call is made by `speckit-auto`'s Stage 05, skip Step 4 entirely — Stage
+     05 §3 is itself the real proof, driven against the full running app, and Stage 05/06 own the
+     cleanup timing; running Step 4 here as well would double-drive the app and could tear down an
+     instance Stage 06 still expects to clean up.
   6. Skip Step 5 (Offer the maintenance loop) — already offered at create time.
 
 ## 1. Interview the repo, not the user
@@ -67,7 +71,9 @@ Run its own instructions end to end once: launch, doctor, drive ONE mapped featu
 
 ## 5. Offer the maintenance loop (create mode only)
 
-Point the user at `/maintain-verification-skill` for keeping the map honest as the app changes. Suggest a cadence only if they ask.
+Tell the user how to keep the map honest as the app changes: re-invoke this skill in **update
+mode**, naming the changed or new feature, whenever a feature's behavior, launch, or drive path
+changes. Suggest a cadence only if they ask.
 
 ## References
 
