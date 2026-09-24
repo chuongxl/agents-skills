@@ -13,7 +13,7 @@ metadata:
   specification: agentskills.io/specification
   output_contract: strict-json
   author: Alex Nguyen
-  version: "0.0.2"
+  version: "0.0.3"
 ---
 
 # Speckit Code Review
@@ -38,6 +38,25 @@ Claude Code and OpenCode expose the same capabilities under their own names (`Ba
   working-tree change set, so committed feature work is reviewed even when the tree is clean.
   `speckit-auto` always passes this. When invoked from `speckit-auto`, the caller must run this
   skill inline from inside the Stage 01 linked worktree, never from the base checkout.
+- **Submodule expansion (mandatory when `.gitmodules` exists):** a top-level `git diff`/`git
+  status` only ever shows a changed submodule as a single gitlink entry (mode `160000`), never the
+  files changed inside it — reviewing that entry alone is reviewing nothing. Resolve every area's
+  "git change set" as follows before any area review runs:
+  1. Compute the top-level change set as above. For every changed path that appears in
+     `.gitmodules`, that path is a submodule, not a regular file.
+  2. For each changed submodule path: `old_sha = git rev-parse <base_ref>:<path>` (skip if the
+     path didn't exist at `base_ref` — treat every tracked file in the submodule as new),
+     `new_sha = git rev-parse HEAD:<path>`.
+  3. Get its real file-level diff: `git -C <path> diff <old_sha> <new_sha>` (committed range)
+     **union** `git -C <path> diff` and `git -C <path> status --porcelain` (uncommitted work
+     inside the submodule). Prefix every resulting file path with `<path>/` so it composes with
+     the rest of the scope.
+  4. Replace the gitlink entry in the change set with these expanded file paths. The change set
+     every area below operates on is this expanded set, never the raw gitlink line.
+  5. Log one line per expanded submodule: `[Code Review] Expanded submodule <path>:
+     <old_sha>..<new_sha>, <n> file(s)`.
+  Nested submodules (a submodule with its own `.gitmodules`) are out of scope — flag any found as
+  a `CODE-*` finding recommending manual review instead of expanding recursively.
 
 ## Spec ID
 
@@ -73,7 +92,9 @@ testable requirements to the spec. Never return `pass` against an empty checklis
 
 1. Build the requirement checklist (see above).
 2. Resolve the git change set as review scope (union with `git diff <base_ref>...HEAD` when a
-   `base_ref` was passed).
+   `base_ref` was passed), applying the Submodule Expansion rules above when `.gitmodules` exists.
+   This expanded set is what every area below means by "the git change set" — no area re-derives
+   it independently.
 3. **Project guidelines (conditional)** — if `docs/guidelines/architecture.md` exists, load
    [references/project-guidelines-review.md](references/project-guidelines-review.md) and follow its
    Steps 1–4 to load only the guideline files matching the changed-file categories. Skip silently
@@ -95,10 +116,14 @@ testable requirements to the spec. Never return `pass` against an empty checklis
 6. `Business cover = round(covered / total * 100)`.
 7. Write `state_file`, plus one detail file **per category that has issues**. Skip empty categories;
    on `pass` write only `state_file`.
-8. Build `fixes` from all findings ordered high → medium → low severity, then keep only the **top 3**
-   inline. The rest live in `state_file` and the category detail files.
-9. `status` = `pass` only if `fixes` is empty **and** coverage ≥ 80% (or `N/A`) **and** the checklist
-   is non-empty; otherwise `failed`.
+8. Build `fixes` from all **blocking** findings ordered high → medium → low severity, then keep
+   only the **top 3** inline. Every finding is blocking except a `TEST-*` advisory gap (see
+   unit-test-coverage.md Step 4): those are recorded in `unit-tests.json` for visibility only and
+   never enter `fixes` or count toward step 9. The rest of the blocking findings live in
+   `state_file` and the category detail files.
+9. `status` = `pass` only if the blocking-finding count is zero **and** coverage ≥ 80% (or `N/A`)
+   **and** the checklist is non-empty; otherwise `failed`. `fixes` reflects the same blocking set,
+   so `fixes` empty and blocking-finding count zero always agree.
 
 ## Output Contract
 
@@ -147,7 +172,9 @@ A passing result is the same shape with `"status": "pass"`, `detail_files: {}`, 
 
 ## Quality Bar
 
-- Never report `pass` while `fixes` is non-empty, coverage < 80%, or the checklist is empty.
+- Never report `pass` while a blocking finding exists (`fixes` non-empty), coverage < 80%, or the
+  checklist is empty. A `TEST-*` advisory gap (unit-test-coverage.md Step 4, coverage already
+  ≥ 80%) is not a blocking finding and never fails a pass on its own.
 - Keep verbose analysis in the category files; the inline object stays under 400 tokens.
 - Severity scale for every area: `high` = exploitable or breaks a requirement/invariant;
   `medium` = degrades correctness, security posture, or maintainability; `low` = cosmetic or
