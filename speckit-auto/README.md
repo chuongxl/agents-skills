@@ -1,6 +1,6 @@
 # Speckit Auto — Spec-Driven Delivery Pipeline
 
-**Version**: 0.3.0
+**Version**: 0.3.1
 **Author**: Alex Nguyen
 
 ## Overview
@@ -41,15 +41,6 @@ Copy the `speckit-auto` folder (with `speckit-code-review` and `jira-to-speckit`
 skill directory: `~/.agents/skills/` (Copilot), `~/.claude/skills/` (Claude Code), or
 `~/.config/opencode/skills/` (OpenCode). The skill is auto-discovered from those locations.
 
-1. **Stage 01: Preflight + Intake** — Validate the requirement, extract context from docs/guidelines, and prepare the project environment for spec authoring.
-2. **Stage 02: Spec / Design** — Author a detailed feature specification including acceptance criteria, edge cases, and architectural decisions.
-3. **Stage 03: Implement + Code Review Loop** — Execute implementation and automatically invoke speckit-code-review until the code passes the spec; no human approval required.
-4. **Stage 04: Human Review + Commit** (default mode only) — Human reviewer validates the implementation against the spec and makes the final decision before merge.
-5. **Stage 05: YOLO Commit Flow** (YOLO mode only) — Automatically merge and commit with zero human checkpoints.
-6. **Stage 06: Spec Completion** — Mark the spec as completed and create a final commit.
-
-**Key rule**: Stage 03 is a **NO-STOP ZONE** in both default and YOLO modes; code review loops continue automatically until the spec is satisfied.
-
 <img width="754" height="501" alt="image" src="https://github.com/user-attachments/assets/bc5e90df-0523-4951-a195-3b740d1d38c6" />
 
 <img width="2120" height="3775" alt="spec-driven-development-Speckit-Auto-Skill drawio" src="https://github.com/user-attachments/assets/cbe59272-6c75-4f33-bdf9-ad7d0f6aaa22" />
@@ -79,7 +70,8 @@ Each provider includes stage-specific reference files that implement the pipelin
 - Best for production, regulatory, or high-stakes work
 
 **YOLO Mode** (`--yolo` flag):
-- Skips Stage 04, uses Stage 05 instead
+- Still routes through Stage 04 (`stage-04-finish.md`), which takes the YOLO path inside that same
+  stage: it skips only the human approval interaction, not the stage itself
 - Zero human checkpoints; fully automated merge and commit
 - Ideal for internal tools, experiments, or when continuous delivery is the goal
 - All code still passes speckit-code-review before merge
