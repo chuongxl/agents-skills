@@ -1,18 +1,17 @@
 ---
 name: speckit-auto
 description: |
-  Runs an end-to-end spec-driven delivery pipeline from a requirement or Jira issue using a
-  pluggable provider: github-speckit (repo-installed GitHub Spec Kit agents) or superpowers
-  (obra/superpowers skills library). Handles provider setup and auto-install, Jira intake via
-  jira-to-speckit, spec/design, implementation, a speckit-code-review remediation loop until
-  pass, then human review (default) or YOLO commit and push. Use when a feature must go from
-  requirement to committed implementation in one run.
+  Use when a feature or Jira issue must go from requirement to committed implementation in
+  one run: intake through spec/design, implementation, an automatic speckit-code-review
+  remediation loop, and human review (default) or YOLO commit and push. Runs on a pluggable
+  provider (github-speckit or superpowers). Load this file's progressive stages rather than
+  treating this description as the full workflow.
 compatibility: "Runs on GitHub Copilot, Claude Code, and OpenCode. Discovered from ~/.agents/skills/, ~/.claude/skills/, or ~/.config/opencode/skills/. Requires git and bash; network access for Jira intake via --issue."
 license: MIT
 allowed-tools: bash glob grep view create edit skill
 metadata:
   author: Alex Nguyen
-  version: "0.3.0"
+  version: "0.3.1"
 ---
 
 # Speckit Auto
