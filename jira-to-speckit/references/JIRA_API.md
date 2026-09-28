@@ -15,10 +15,19 @@ Read these from the repository `.env` file:
 Use Jira REST API v2 for compatibility with the existing DDM automation scripts.
 Always fetch in stages to control context size.
 
+Never pass `$JIRA_API_TOKEN` on the curl command line (`-u user:$JIRA_API_TOKEN`). Command
+arguments are visible to other processes on the same host via `ps`. Pass credentials through a
+curl config read from stdin (`-K -`) through a pipe from the `printf` builtin. Do not use a heredoc:
+zsh and bash before 5.1 back heredocs with a temp file, so the token would touch disk. A token
+containing `"` or `\` must be escaped for the curl config format; standard Jira API tokens do not.
+
+Load `.env` into the shell with the builtins `set -a; . ./.env; set +a`. Do not build the
+environment with `export $(... | xargs)` or similar; `xargs` puts each value in its own argv.
+
 Stage 1 (required, minimal fields):
 
 ```bash
-curl -u "$JIRA_USERNAME:$JIRA_API_TOKEN" \
+printf 'user = "%s:%s"\n' "$JIRA_USERNAME" "$JIRA_API_TOKEN" | curl -K - \
   -H "Accept: application/json" \
   "$JIRA_URL/rest/api/2/issue/DDM-1234?fields=summary,description,issuetype,status,priority,labels,components,assignee,reporter,fixVersions,project,parent"
 ```
@@ -26,7 +35,7 @@ curl -u "$JIRA_USERNAME:$JIRA_API_TOKEN" \
 Stage 2 (optional, only if stage 1 leaves ambiguity):
 
 ```bash
-curl -u "$JIRA_USERNAME:$JIRA_API_TOKEN" \
+printf 'user = "%s:%s"\n' "$JIRA_USERNAME" "$JIRA_API_TOKEN" | curl -K - \
   -H "Accept: application/json" \
   "$JIRA_URL/rest/api/2/issue/DDM-1234/comment?maxResults=5"
 ```
