@@ -7,12 +7,12 @@ description: |
   jira-to-speckit, spec/design, implementation, a speckit-code-review remediation loop until
   pass, then human review (default) or YOLO commit and push. Use when a feature must go from
   requirement to committed implementation in one run.
-compatibility: "Runs on GitHub Copilot, Claude Code, and OpenCode. Discovered from ~/.agents/skills/, ~/.claude/skills/, or ~/.config/opencode/skills/. Requires git and bash; network access for Jira intake via --issue."
+compatibility: "Runs on GitHub Copilot, Claude Code, OpenCode, and Hermes Agent. Discovered from ~/.agents/skills/, ~/.claude/skills/, ~/.config/opencode/skills/, or ~/.hermes/skills/ (/opt/data/skills/ in Docker). Requires git and bash; network access for Jira intake via --issue."
 license: MIT
 allowed-tools: bash glob grep view create edit skill
 metadata:
   author: Alex Nguyen
-  version: "0.3.0"
+  version: "0.4.0"
 ---
 
 # Speckit Auto
@@ -26,7 +26,7 @@ recovery file on a healthy run, or a file already in context. See the loading ma
 ## Entry Dispatch (every invocation)
 
 1. **Parse the invocation text** (slash-command body on Copilot/Claude Code; the natural-language
-   trigger message on OpenCode — flags may be embedded anywhere):
+   trigger message on OpenCode and Hermes Agent — flags may be embedded anywhere):
    - `--integration <value>` → setup intent (setup ONLY, no pipeline)
    - `--issue <url>` → Jira pipeline intent
    - `--yolo` → mode = yolo (else default)
@@ -34,7 +34,8 @@ recovery file on a healthy run, or a file already in context. See the loading ma
 
 2. **Note the host** from the directory this file was loaded from: `~/.copilot/skills/`,
    `.github/skills/`, `~/.agents/skills/` → Copilot; `~/.claude/skills/` → Claude Code;
-   `~/.config/opencode/skills/`, `.opencode/skills/` → OpenCode. Directories that overlap
+   `~/.config/opencode/skills/`, `.opencode/skills/` → OpenCode; `~/.hermes/skills/`,
+   `/opt/data/skills/` → Hermes Agent. Directories that overlap
    (`.claude/skills/`, `.agents/skills/`) or any other ambiguity → resolve via the tie-break in
    [references/shared/host-adaptation.md](references/shared/host-adaptation.md). The host is fixed
    for the run; look up host-specific values (ask tool, skill dirs, install host key) from that
@@ -58,7 +59,8 @@ recovery file on a healthy run, or a file already in context. See the loading ma
 
 Never return an acknowledgement-only response. If the skill is already loaded mid-run (resume
 marker: `<skill-context name="speckit-auto">` on Claude Code, `<available_skills>` on OpenCode,
-the skill tool list on Copilot), resume from the current stage using available run context and
+the skill tool list on Copilot; Hermes Agent sessions never rotate, so the running session itself
+is the resume marker), resume from the current stage using available run context and
 load only that stage's file — never block asking the user to re-run the skill.
 
 ## Loading Map
@@ -119,4 +121,6 @@ implementation commit status/hash, and the spec completion commit hash. For a se
 
 `allowed-tools` uses Copilot-style tool names; Claude Code and OpenCode expose the same
 capabilities under their own names (`Bash`, `Read`, `Edit`, `Write`, `Glob`, `Grep`, `Skill`).
+Hermes Agent exposes the same capabilities as `terminal`, `read_file`, `write_file`, `patch`,
+`search_files`, `skill_view` (see references/shared/host-adaptation.md).
 Never refuse to act because a tool is named differently.

@@ -6,7 +6,7 @@ license: MIT
 allowed-tools: bash view create
 metadata:
   author: Alex Nguyen
-  version: "0.2.0"
+  version: "0.3.0"
 ---
 
 # Jira to Speckit
@@ -23,8 +23,9 @@ owned by the caller (`speckit-auto`'s shared intake reference and its provider
 `stage-01-preflight-intake.md` files).
 
 Portability note: `allowed-tools` uses GitHub Copilot-style names (`bash view create`). Claude Code
-and OpenCode expose the same capabilities under their own names (`Bash`, `Read`, `Write`). The
-workflow below is identical on all three hosts.
+and OpenCode expose the same capabilities under their own names (`Bash`, `Read`, `Write`). Hermes
+Agent exposes them as `terminal`, `read_file`, `write_file`. The workflow below is identical on
+all four hosts.
 
 ## What This Skill Does
 

@@ -38,8 +38,9 @@ The pipeline:
 ## Install
 
 Copy the `speckit-auto` folder (with `speckit-code-review` and `jira-to-speckit`) into the host's
-skill directory: `~/.agents/skills/` (Copilot), `~/.claude/skills/` (Claude Code), or
-`~/.config/opencode/skills/` (OpenCode). The skill is auto-discovered from those locations.
+skill directory: `~/.agents/skills/` (Copilot), `~/.claude/skills/` (Claude Code),
+`~/.config/opencode/skills/` (OpenCode), or `~/.hermes/skills/` (Hermes Agent; `/opt/data/skills/`
+inside its Docker container). The skill is auto-discovered from those locations.
 
 1. **Stage 01: Preflight + Intake** — Validate the requirement, extract context from docs/guidelines, and prepare the project environment for spec authoring.
 2. **Stage 02: Spec / Design** — Author a detailed feature specification including acceptance criteria, edge cases, and architectural decisions.
@@ -112,8 +113,8 @@ skill speckit-auto --issue https://jira.example.com/browse/PROJ-123
 skill speckit-auto --yolo --issue https://jira.example.com/browse/PROJ-456
 ```
 
-On Copilot/Claude Code invoke as `/speckit-auto <flags>`; on OpenCode embed the flags in the
-trigger message.
+On Copilot/Claude Code invoke as `/speckit-auto <flags>`; on OpenCode and Hermes Agent embed the
+flags in the trigger message (e.g. a Slack thread `@hermes start DEMO-42 --issue <url>`).
 
 ### Provider setup (one-time)
 
@@ -167,7 +168,7 @@ review bodies, unused guideline files) when leaving a stage.
 | "Which provider?" on every run | Run `--integration <provider>` once to persist |
 | Jira intake fails | Ensure root `.env` has all three `JIRA_*` keys; test with `jira-to-speckit` directly |
 | Stage 03 review loop doesn't converge | Simplify the spec's acceptance criteria; avoid vague language ("elegant", "performant") |
-| Missing framework | At startup and any later step, failed provider validation triggers install recovery; if still failing after install, stop and ask the user to restart Copilot / Claude Code / OpenCode, then re-run |
+| Missing framework | At startup and any later step, failed provider validation triggers install recovery; if still failing after install, stop and ask the user to restart Copilot / Claude Code / OpenCode / Hermes Agent, then re-run |
 
 ## Notes
 

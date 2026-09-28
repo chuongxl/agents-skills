@@ -75,8 +75,10 @@ been made yet — make it now.
 
 ## Invocation Channel (canonical)
 
-All skills — including `speckit-*` — are invoked via the `skill` tool by name, on every host. The
+All skills — including `speckit-*` — are invoked via the `skill` tool by name, on every host
+(on Hermes Agent this is the `skill_view` tool — see references/shared/host-adaptation.md). The
 `skill` tool is **synchronous**: it returns inline in the same turn, so a skill call is never a
 turn boundary. Never use the `task` tool with a skill name; never shell out to a `copilot` /
-`claude` / `opencode` CLI subprocess; never emit `@speckit.*` or `/speckit.*`. If the `skill` tool
-cannot resolve a provider skill, that is a provider validation failure (rule 3), not a stop.
+`claude` / `opencode` / `hermes` CLI subprocess; never emit `@speckit.*` or `/speckit.*`. If the
+skill tool cannot resolve a provider skill, that is a provider validation failure (rule 3), not a
+stop.

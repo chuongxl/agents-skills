@@ -10,7 +10,7 @@ When you have a Jira ticket as your source of truth, jira-to-speckit eliminates 
 
 ### 1. Prerequisites
 
-- GitHub Copilot or Claude Code (for accessing the skill)
+- GitHub Copilot, Claude Code, OpenCode, or Hermes Agent (for accessing the skill)
 - `.env` file in your repository root with these Jira credentials:
   ```env
   JIRA_URL=https://your-jira-instance.atlassian.net
@@ -305,13 +305,14 @@ The full workflow from Jira to pull request:
 - **Jira versions**: Jira Cloud and Server (7.0+) with REST API access
 - **Git**: SSH-authorized remotes only (no HTTPS tokens)
 - **Network**: Requires outbound access to Jira API endpoint and your git repository host
-- **Agents**: GitHub Copilot, Claude Code, OpenCode, and compatible Copilot agents
+- **Agents**: GitHub Copilot, Claude Code, OpenCode, Hermes Agent, and compatible Copilot agents
 
 ### Installation Paths
 
 - GitHub Copilot: `.github/skills/` or `~/.agents/skills/`
 - Claude Code: `~/.claude/skills/`
 - OpenCode: `~/.config/opencode/skills/` or `.opencode/skills/`
+- Hermes Agent: `~/.hermes/skills/` (`/opt/data/skills/` in Docker)
 - Local: `~/.agents/skills/`
 
 ---
