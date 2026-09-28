@@ -8,7 +8,8 @@ path never loads this file.
 2. Fetch. Never pass the token on the curl command line (`-u user:$JIRA_API_TOKEN`); it would show
    up in `ps` for any other process on the host. Pass credentials through a curl config file read
    from stdin through a `printf` pipe. Not a heredoc: zsh and bash before 5.1 back it with a temp
-   file, so the token would touch disk.
+   file, so the token would touch disk. Load `.env` with the builtins `set -a; . ./.env; set +a`,
+   never `export $(... | xargs)`, which puts each value in argv.
    ```bash
    printf 'user = "%s:%s"\n' "$JIRA_USERNAME" "$JIRA_API_TOKEN" | curl -K - \
      -H "Accept: application/json" \

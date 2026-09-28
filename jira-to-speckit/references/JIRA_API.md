@@ -21,6 +21,9 @@ curl config read from stdin (`-K -`) through a pipe from the `printf` builtin. D
 zsh and bash before 5.1 back heredocs with a temp file, so the token would touch disk. A token
 containing `"` or `\` must be escaped for the curl config format; standard Jira API tokens do not.
 
+Load `.env` into the shell with the builtins `set -a; . ./.env; set +a`. Do not build the
+environment with `export $(... | xargs)` or similar; `xargs` puts each value in its own argv.
+
 Stage 1 (required, minimal fields):
 
 ```bash
