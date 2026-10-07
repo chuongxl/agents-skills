@@ -9,10 +9,61 @@ run. Timestamps are ISO 8601 values with an explicit UTC offset.
 Use Node.js 22.13 or later. The standalone emitter is
 `scripts/run-events.mjs`:
 
+Retain `source_repo_path`, `worktree_path`, `run_id`, optional uppercase `issue_key`,
+and absolute `event_helper_path` in run state. Resolve the helper from the loaded skill
+folder. Paths may contain spaces or shell metacharacters. Use the host's argument-vector
+tool when available. On bash hosts, supply path variables as process-environment data when
+the host supports it. Otherwise shell-quote each complete variable value with POSIX single
+quotes, escaping an embedded single quote as `'"'"'`. Never paste a raw path/URL into shell
+source, including double-quoted assignments, which still expand `$()` and backticks.
+Then use these exact invocations; the quoted heredocs prevent source expansion.
+
+Initialization, including discovery refresh after a move:
+
 ```sh
-node scripts/run-events.mjs init --repo <source-repo> --worktree <worktree> --run-id <uuid> [--issue-key <key>]
-printf '%s\n' '{"type":"stage_finished","stage":"01-intake"}' |
-  node scripts/run-events.mjs emit --worktree <worktree> --run-id <uuid>
+node --input-type=module - "$event_helper_path" "$source_repo_path" "$worktree_path" "$run_id" "${issue_key-}" <<'NODE'
+import { spawnSync } from 'node:child_process';
+const [helper, repo, worktree, runId, issueKey] = process.argv.slice(2);
+const args = [helper, 'init', '--repo', repo, '--worktree', worktree, '--run-id', runId];
+if (issueKey) args.push('--issue-key', issueKey);
+const result = spawnSync(process.execPath, args, { stdio: 'inherit' });
+if (result.error) throw result.error;
+process.exit(result.status ?? 1);
+NODE
+```
+
+Every `emit` instruction in a stage means execute this invocation with the corresponding
+allowlisted `payload` object. Change only that object, not the invocation. Compose bounded
+questions/messages yourself, never paste raw user or tool text into JavaScript or shell
+source. For runtime values such as a confirmed PR URL, pass them as an additional
+argument-vector element and read them from `process.argv`, never insert them into code.
+
+```sh
+node --input-type=module - "$event_helper_path" "$worktree_path" "$run_id" <<'NODE'
+import { spawnSync } from 'node:child_process';
+const [helper, worktree, runId] = process.argv.slice(2);
+const payload = { type: 'stage_finished', stage: '01-intake' };
+const result = spawnSync(process.execPath, [helper, 'emit', '--worktree', worktree, '--run-id', runId], {
+  input: JSON.stringify(payload), stdio: ['pipe', 'inherit', 'inherit'],
+});
+if (result.error) throw result.error;
+process.exit(result.status ?? 1);
+NODE
+```
+
+For a confirmed URL supplied as the shell-safe data variable `pr_url`:
+
+```sh
+node --input-type=module - "$event_helper_path" "$worktree_path" "$run_id" "$pr_url" <<'NODE'
+import { spawnSync } from 'node:child_process';
+const [helper, worktree, runId, prUrl] = process.argv.slice(2);
+const payload = { type: 'pr_opened', pr_url: prUrl };
+const result = spawnSync(process.execPath, [helper, 'emit', '--worktree', worktree, '--run-id', runId], {
+  input: JSON.stringify(payload), stdio: ['pipe', 'inherit', 'inherit'],
+});
+if (result.error) throw result.error;
+process.exit(result.status ?? 1);
+NODE
 ```
 
 The `emit` input is a JSON object containing `type` and only that event's
@@ -20,6 +71,10 @@ payload fields. The emitter adds identity, sequence, and timestamp fields.
 Always pass arguments as an argument vector; never interpolate event content
 into shell commands. It JSON-serializes data, appends one complete line, and
 fails if validation or a write fails.
+Check the process exit status before the next pipeline action. A failed init/emit is an
+instrumentation error: stop, report the diagnostic, and never claim completion. Do not
+swallow it, continue without events, or recursively attempt another event on the broken
+writer. Resume only after repairing the cause and inspecting the recorded history.
 
 `init` writes `run_started` and `stage_started` (`01-intake`) once for a new
 attempt. On resume it validates prior JSONL history, retains the next sequence,

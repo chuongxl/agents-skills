@@ -19,6 +19,143 @@ const fixtures = [
 
 const helperPath = new URL('../speckit-auto/scripts/run-events.mjs', import.meta.url);
 
+const readSkill = (file) => fs.readFileSync(new URL(`../speckit-auto/${file}`, import.meta.url), 'utf8');
+
+test('entry documents run identity, runtime, and progressive event loading', () => {
+  const entry = readSkill('SKILL.md');
+  assert.match(entry, /--run-id <uuid>/);
+  assert.match(entry, /Node\.js >=22\.13/);
+  assert.match(entry, /version: "0\.5\.0"/);
+  assert.match(entry, /run-events\.md.*first event initialization/);
+  assert.match(entry, /exactly three files/);
+});
+
+test('intake initializes the exact producer CLI and refreshes discovery after moves', () => {
+  const intake = readSkill('references/pipeline/stage-01-intake.md');
+  assert.match(intake, /run-events\.md/);
+  assert.match(intake, /init.*run_started.*stage_started/s);
+  assert.match(intake, /git worktree move.*init.*discovery/s);
+  assert.match(intake, /source_repo_path.*event_helper_path.*run_id/s);
+  assert.match(intake, /stage_finished.*01-intake/s);
+  assert.match(intake, /\.speckit\/.*git-ignored/s);
+});
+
+test('all later stages explicitly emit entry, success boundaries, and classified exits', () => {
+  for (const [file, stage] of [
+    ['stage-02-spec-design.md', '02-spec-design'],
+    ['stage-03-implement-review.md', '03-implement-review'],
+    ['stage-04-finish.md', '04-finish'],
+  ]) {
+    const text = readSkill(`references/pipeline/${file}`);
+    assert.match(text, new RegExp(`stage_started.*${stage}`));
+    assert.match(text, new RegExp(`stage_finished.*${stage}`));
+    assert.match(text, /run_failed/);
+  }
+  assert.match(readSkill('references/pipeline/stage-03-implement-review.md'), /review_loop_stuck/);
+  assert.match(readSkill('references/shared/commit.md'), /run_failed.*git_error/s);
+});
+
+test('named gates and questions preserve default, YOLO, and request-change semantics', () => {
+  const design = readSkill('references/pipeline/stage-02-spec-design.md');
+  const finish = readSkill('references/pipeline/stage-04-finish.md');
+  for (const gate of ['spec-approval', 'plan-approval', 'implementation-start']) {
+    assert.ok(design.includes(gate), `missing ${gate}`);
+  }
+  assert.ok(finish.includes('implementation-approval'));
+  for (const text of [design, finish]) {
+    assert.match(text, /gate_waiting/);
+    assert.match(text, /gate_answered/);
+    assert.match(text, /question_waiting/);
+    assert.match(text, /Request changes.*not.*run_failed/s);
+  }
+  assert.match(design, /github-speckit.*superpowers/s);
+  assert.match(design, /YOLO.*no.*gate_waiting/s);
+  const rules = readSkill('references/shared/operating-rules.md');
+  assert.match(rules, /question_waiting.*before.*ask/s);
+  assert.match(rules, /stage_started.*after.*response/s);
+  assert.match(rules, /raw.*answers/);
+});
+
+test('completion follows required spec push and only confirmed PR URLs are emitted', () => {
+  const finish = readSkill('references/pipeline/stage-04-finish.md');
+  assert.match(finish, /completion commit.*push/s);
+  assert.match(finish, /actual.*HTTPS.*PR URL.*pr_opened/s);
+  assert.ok(finish.indexOf('run_completed') > finish.indexOf('Mark Spec Completed'));
+  assert.match(finish, /stage_finished.*04-finish.*run_completed/s);
+  assert.match(finish, /write.*error.*never.*run_completed/s);
+});
+
+test('documented JSON stdin invocation is executable and uses only Node builtins', (t) => {
+  const docs = readSkill('references/shared/run-events.md');
+  const example = docs.match(/```sh\n(node --input-type=module - "\$event_helper_path" "\$worktree_path" "\$run_id" <<'NODE'\n([\s\S]*?)\nNODE)\n```/);
+  assert.ok(example, 'missing exact shell-safe Node emit example');
+  assert.doesNotMatch(docs, /echo .*type|printf.*type/);
+  assert.match(example[2], /JSON\.stringify\(payload\)/);
+  assert.match(example[2], /spawnSync\(process\.execPath/);
+  const { repo, worktree } = makeWorkspace(t);
+  const runId = '123e4567-e89b-42d3-a456-426614174118';
+  assert.equal(run(['init', '--repo', repo, '--worktree', worktree, '--run-id', runId]).status, 0);
+  const result = spawnSync(process.execPath, ['--input-type=module', '-', helperPath.pathname, worktree, runId], {
+    encoding: 'utf8', input: example[2],
+  });
+  assert.equal(result.status, 0, result.stderr);
+  const event = JSON.parse(fs.readFileSync(path.join(worktree, '.speckit', 'events.jsonl'), 'utf8').trim().split('\n').at(-1));
+  assert.equal(event.type, 'stage_finished');
+  assert.equal(event.stage, '01-intake');
+});
+
+test('documented init, emit, and confirmed-PR shell examples preserve argument data', (t) => {
+  const docs = readSkill('references/shared/run-events.md');
+  const examples = [...docs.matchAll(/```sh\n([\s\S]*?)\n```/g)].map((match) => match[1]);
+  assert.equal(examples.length, 3);
+  const { repo, worktree } = makeWorkspace(t);
+  const hostileWorktree = path.join(repo, "worktree ' 東京;$(touch injected)");
+  fs.renameSync(worktree, hostileWorktree);
+  const runId = '123e4567-e89b-42d3-a456-426614174119';
+  const prUrl = 'https://github.com/example/project/pull/18?note=$(touch%20injected)&label=東京';
+  const env = {
+    ...process.env,
+    event_helper_path: helperPath.pathname,
+    source_repo_path: repo,
+    worktree_path: hostileWorktree,
+    run_id: runId,
+    issue_key: 'US-18',
+    pr_url: prUrl,
+  };
+  for (const example of examples) {
+    const result = spawnSync('bash', ['-c', example], { encoding: 'utf8', env, cwd: repo });
+    assert.equal(result.status, 0, result.stderr);
+  }
+  const eventsPath = path.join(hostileWorktree, '.speckit', 'events.jsonl');
+  const events = fs.readFileSync(eventsPath, 'utf8').trim().split('\n').map(JSON.parse);
+  assert.deepEqual(events.map((event) => event.type), [
+    'run_started', 'stage_started', 'stage_finished', 'pr_opened',
+  ]);
+  assert.deepEqual(events.map((event) => event.seq), [1, 2, 3, 4]);
+  assert.ok(events.every((event) => event.issue_key === 'US-18'));
+  assert.equal(events.at(-1).pr_url, prUrl);
+  assert.equal(fs.existsSync(path.join(repo, 'injected')), false);
+  const beforeFailure = fs.readFileSync(eventsPath, 'utf8');
+  fs.writeFileSync(path.join(hostileWorktree, '.speckit', '.run-events.lock'), '999999\n');
+  const failed = spawnSync('bash', ['-c', examples[1]], { encoding: 'utf8', env, cwd: repo });
+  assert.notEqual(failed.status, 0);
+  assert.match(failed.stderr, /another producer|lock exists/i);
+  assert.equal(fs.readFileSync(eventsPath, 'utf8'), beforeFailure);
+});
+
+test('documented identities and badges agree, and manual event paths are covered', () => {
+  const root = fs.readFileSync(new URL('../README.md', import.meta.url), 'utf8');
+  assert.match(root, /speckit-auto.*--run-id <uuid>.*v0\.5\.0/);
+  const readme = readSkill('README.md');
+  assert.match(readme, /version-0\.5\.0-blue/);
+  assert.match(readme, /\*\*Version\*\*: 0\.5\.0/);
+  const cases = fs.readFileSync(new URL('../test-case/speckit-auto/test-cases.md', import.meta.url), 'utf8');
+  for (const scenario of [
+    'Default happy path', 'YOLO happy path', 'Request changes', 'Resume and move', 'Fresh retry',
+    'Failed event write', 'Manual questions', 'Terminal exits', 'PR confirmation', 'Completion push failure',
+  ]) assert.ok(cases.includes(scenario), `missing manual case ${scenario}`);
+});
+
 function run(args, input = '') {
   return spawnSync(process.execPath, [helperPath.pathname, ...args], {
     encoding: 'utf8',
