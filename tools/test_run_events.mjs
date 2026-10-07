@@ -40,6 +40,20 @@ test('validates all nine serialized event contract fixtures', () => {
   for (const fixture of fixtures) assert.equal(validateRunEvent(JSON.parse(fixture)).type, JSON.parse(fixture).type);
 });
 
+test('rejects impossible calendar dates and accepts Gregorian leap days', () => {
+  const event = JSON.parse(fixtures[0]);
+  for (const ts of [
+    '2026-02-31T20:00:00+07:00',
+    '2025-02-29T20:00:00+07:00',
+    '1900-02-29T20:00:00+07:00',
+  ]) {
+    assert.throws(() => validateRunEvent({ ...event, ts }), /timestamp/i);
+  }
+  for (const ts of ['2024-02-29T20:00:00+07:00', '2000-02-29T20:00:00+07:00']) {
+    assert.equal(validateRunEvent({ ...event, ts }).ts, ts);
+  }
+});
+
 test('rejects unknown reason codes, fields, and schema versions', () => {
   const base = JSON.parse(fixtures[8]);
   assert.throws(() => validateRunEvent({ ...base, reason: { code: 'unknown', message: 'No' } }), /reason\.code/);

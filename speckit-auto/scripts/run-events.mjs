@@ -20,6 +20,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-
 const ISSUE_KEY = /^[A-Z][A-Z0-9]*-\d+$/;
 const GATE_ID = /^[a-z0-9][a-z0-9_-]{0,63}$/;
 const OFFSET_ISO = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/;
+const ISO_CALENDAR_DATE = /^(\d{4})-(\d{2})-(\d{2})T/;
 const SECRET_PATTERNS = [
   /\bBearer\s+[A-Za-z0-9._~+/=-]{8,}/gi,
   /\b(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|sk-[A-Za-z0-9_-]{20,}|xox[baprs]-[A-Za-z0-9-]{10,})\b/g,
@@ -74,9 +75,24 @@ function sanitizeText(value) {
 }
 
 function validateIsoTimestamp(value) {
-  if (typeof value !== 'string' || !OFFSET_ISO.test(value) || !Number.isFinite(Date.parse(value))) {
+  if (
+    typeof value !== 'string' ||
+    !OFFSET_ISO.test(value) ||
+    !isValidCalendarDate(value) ||
+    !Number.isFinite(Date.parse(value))
+  ) {
     fail('ts must be a valid ISO timestamp with an explicit UTC offset');
   }
+}
+
+function isValidCalendarDate(value) {
+  const date = ISO_CALENDAR_DATE.exec(value);
+  if (!date) return false;
+  const [year, month, day] = date.slice(1).map(Number);
+  if (month < 1 || month > 12) return false;
+  const leapYear = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
+  const daysPerMonth = [31, leapYear ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  return day >= 1 && day <= daysPerMonth[month - 1];
 }
 
 function validateOptions(value, label) {
