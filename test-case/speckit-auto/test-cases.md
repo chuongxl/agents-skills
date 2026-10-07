@@ -64,6 +64,13 @@ Use isolated source repos/worktrees, Node.js >=22.13, and only the bundled helpe
 Inspect JSONL and discovery as data, not prose logs. Exercise host argument-vector tools
 and quoted bash invocations, including paths with spaces and shell metacharacters.
 
+These are manual host/provider scenarios, not automated test results. The Node tests execute
+the emitter and documented shell examples and assert instruction ordering. They do not run
+Claude, Jira, provider-native approval tools, real commits/pushes, or PR creation.
+Record each provider's actual manual result separately before claiming E01 through E13 passed.
+The application cross-repository smoke tests emitter-to-client-to-monitor delivery and timeline
+rendering in isolated fixtures; it does not substitute for these manual scenarios.
+
 | ID | Scenario | Steps | Expected result | Provider coverage |
 |---|---|---|---|---|
 | E01 | Default happy path | Run with a known Jira URL and UUID; approve all existing gates | Init before provider/intake emits run_started + 01-intake start; successful boundaries for all four stages; spec-approval, plan-approval, implementation-start, implementation-approval waits immediately before actual asks and answers immediately after; completion only after final spec push | Both |

@@ -182,6 +182,15 @@ without a success claim. No raw answers, credentials, file contents, or tool out
 See [references/shared/run-events.md](references/shared/run-events.md) for the exact invocation,
 schema, bounds, resume, and failure behavior.
 
+For Agent Ops, deploy the monitor and migrations first, then client 0.5.0, then this skill
+0.5.0. Old agents remain accepted by the monitor; new clients with old skills retain log
+fallback until this producer is installed. This release does not automatically install a
+package or replace an installed skill. Copy the reviewed bundle explicitly after deployment.
+
+Manual host/provider approval cases are listed in `test-case/speckit-auto/test-cases.md` in
+the source repository. The automated helper and instruction tests do not execute those cases
+or prove compliance by a live host. Record manual results separately.
+
 ## Troubleshooting
 
 | Symptom | Fix |

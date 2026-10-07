@@ -80,8 +80,12 @@ test('completion follows required spec push and only confirmed PR URLs are emitt
   const finish = readSkill('references/pipeline/stage-04-finish.md');
   assert.match(finish, /completion commit.*push/s);
   assert.match(finish, /actual.*HTTPS.*PR URL.*pr_opened/s);
-  assert.ok(finish.indexOf('run_completed') > finish.indexOf('Mark Spec Completed'));
-  assert.match(finish, /stage_finished.*04-finish.*run_completed/s);
+  const finalReport = finish.slice(finish.indexOf('## Final Report'));
+  assert.match(finalReport, /Only after all required commits, the spec completion push, and execution-report updates\s+succeed, emit/);
+  const successBoundary = finalReport.indexOf('{type: "stage_finished", stage: "04-finish"}');
+  const terminalSuccess = finalReport.indexOf('{type: "run_completed"}');
+  assert.ok(successBoundary > finalReport.indexOf('spec completion push'));
+  assert.ok(terminalSuccess > successBoundary, 'terminal success must follow the final pushed-stage boundary');
   assert.match(finish, /write.*error.*never.*run_completed/s);
 });
 
