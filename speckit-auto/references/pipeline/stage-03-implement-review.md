@@ -8,6 +8,12 @@ github-speckit runs `speckit-implement → speckit-converge`; superpowers runs i
 skill (`subagent-driven-development` preferred, `executing-plans` fallback, chosen once at entry)
 with per-step `test-driven-development` and `systematic-debugging` on failures.
 
+At actual entry or re-entry emit `{type: "stage_started", stage: "03-implement-review"}` via the
+shared JSON stdin invocation. Do not replay it merely because context resumed.
+No waiting events or questions are added in this no-stop stage. Review/test failures and
+plan regeneration remain working iterations, not terminal events; do not finish this stage
+until the authoritative review passes.
+
 ## Repository-Aware Implementation
 
 Before the implementation step, inject into its input: the Stage 01 Project Context `summary`,
@@ -167,3 +173,12 @@ PHASE 2 — Code review loop
 [stage-04-finish.md](stage-04-finish.md) **in the same turn** — no summary, no turn end, no user
 question first. Default mode → Stage 04 human review + commit (mandatory); `--yolo` → Stage 04
 auto-commit path. Never invoke `finishing-a-development-branch` here.
+Before loading Stage 04, emit `{type: "stage_finished", stage: "03-implement-review"}`.
+
+On a real circuit-breaker exit emit `run_failed` before stopping: use `review_loop_stuck` for
+identical stalled review/implementation failures, `tests_failing` if the five-iteration blocker
+is specifically failing tests, `git_error` for a blocking git failure, or `crashed` for a
+filesystem/runtime error. Missing non-submodule workspace paths or an unrecoverable provider
+policy block use `policy_blocked`; exhausted submodule init uses `git_error`. These classify
+existing hard exits, never add a stop on an ordinary failed result. Messages are deliberately
+composed, not copied from test output. Shared write-error handling still stops instrumentation.

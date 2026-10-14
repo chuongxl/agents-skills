@@ -73,6 +73,45 @@ been made yet — make it now.
     with the other artifacts, and is never read back into context wholesale. Stage 01 intake has
     **no interview gate** — continue to Stage 02 immediately after input is collected.
 
+## Event ordering, questions, and exits
+
+After Stage 01 initializes the producer, every instruction to emit uses the exact Node builtin
+JSON stdin invocation in `run-events.md`, with the retained helper path, worktree, and UUID.
+An event is a real tool call, never a prose claim. Keep the source repo, actual worktree,
+run ID, issue key, and helper path across stage/context transitions. Resume validates `init`
+and recorded history without replaying already-recorded boundaries or answers. A fresh retry
+gets a new ID and append-only history; a terminal run cannot resume under its old ID.
+
+For every pipeline-owned question, including install-recovery choices, Jira missing-input
+questions, clarification interviews, change details, constraints, commit-message asks, and
+optional branch-lifecycle choices: emit `question_waiting` immediately before the actual ask,
+then `stage_started` for the active stage immediately after the response and before continuing.
+Named approvals instead use `gate_waiting` and `gate_answered`. Never double-wrap an ask with
+both types. Use deliberately composed questions and bounded option labels, never raw answers,
+feedback, credentials, tool output, file contents, or arbitrary prompts. Do not emit waiting
+while a provider is still generating an artifact. Pass the same bracketing rule to an invoked
+provider/sub-skill for the actual questions it asks on behalf of the pipeline.
+
+YOLO emits no waiting events for skipped human gates and stays non-interactive in Stage 02/04.
+Existing install-recovery or genuinely missing-required-input asks, if needed, are still
+instrumented when initialized; instrumentation does not bypass an existing hard prerequisite.
+Stage 03 remains a no-question zone. Waiting for input/approval is not a failed run.
+
+Before an explicit terminal exit after init, emit exactly one `run_failed` with a composed,
+single-line reason after applying required provider recovery. Use `git_error` for required
+git/commit/push errors; `review_loop_stuck` for exhausted refinement or stalled reviews;
+`tests_failing` for a terminal test blocker; `policy_blocked` for unrecoverable prerequisites,
+permission denials, or an install Stop choice; `budget_exceeded` only for an actual reported
+budget stop; `crashed` for other unrecoverable tool/runtime/filesystem failures. This adds no
+budget enforcement or new review-loop exits. An uncatchable host crash cannot emit and is
+diagnosed by the client session lifecycle. Pre-init errors have no event file.
+
+Failed event validation/write is itself a hard instrumentation error: report it and stop.
+Never recurse trying to emit failure on the same broken writer, fall back to prose, or claim
+completion after a write error. A warning, recoverable failure, clean-tree commit skip, or
+Request changes is not `run_failed`. Only successful Stage 04 may emit `run_completed`, after
+required commits/push and spec completion; do not emit any event after a terminal record.
+
 ## Invocation Channel (canonical)
 
 All skills — including `speckit-*` — are invoked via the `skill` tool by name, on every host

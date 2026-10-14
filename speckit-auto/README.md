@@ -1,6 +1,8 @@
 # Speckit Auto — Spec-Driven Delivery Pipeline
 
-**Version**: 0.3.0
+![Version](https://img.shields.io/badge/version-0.5.0-blue)
+
+**Version**: 0.5.0
 **Author**: Alex Nguyen
 
 ## Overview
@@ -41,13 +43,7 @@ Copy the `speckit-auto` folder (with `speckit-code-review` and `jira-to-speckit`
 skill directory: `~/.agents/skills/` (Copilot), `~/.claude/skills/` (Claude Code),
 `~/.config/opencode/skills/` (OpenCode), or `~/.hermes/skills/` (Hermes Agent; `/opt/data/skills/`
 inside its Docker container). The skill is auto-discovered from those locations.
-
-1. **Stage 01: Preflight + Intake** — Validate the requirement, extract context from docs/guidelines, and prepare the project environment for spec authoring.
-2. **Stage 02: Spec / Design** — Author a detailed feature specification including acceptance criteria, edge cases, and architectural decisions.
-3. **Stage 03: Implement + Code Review Loop** — Execute implementation and automatically invoke speckit-code-review until the code passes the spec; no human approval required.
-4. **Stage 04: Human Review + Commit** (default mode only) — Human reviewer validates the implementation against the spec and makes the final decision before merge.
-5. **Stage 05: YOLO Commit Flow** (YOLO mode only) — Automatically merge and commit with zero human checkpoints.
-6. **Stage 06: Spec Completion** — Mark the spec as completed and create a final commit.
+Requires git, bash, and Node.js >=22.13 for the built-in structured event producer.
 
 **Key rule**: Stage 03 is a **NO-STOP ZONE** in both default and YOLO modes; code review loops continue automatically until the spec is satisfied.
 
@@ -57,11 +53,9 @@ inside its Docker container). The skill is auto-discovered from those locations.
 
 ### Provider System
 
-Speckit Auto resolves a **provider** at the start of each run using a precedence chain:
-
-1. **Repo-local config**: `.speckit/integration.json` in the repository root
-2. **User home config**: `~/.agents/skills/speckit-auto/.state/integration.json`
-3. **First-run ask**: If neither exists, prompt once, persist, and continue
+Speckit Auto resolves its provider only from repo-local `.speckit/integration.json`.
+Missing or invalid config stops the pipeline and directs you to `--integration <provider>`.
+There is no global fallback or first-run provider prompt.
 
 Supported providers:
 
@@ -75,13 +69,13 @@ Each provider includes stage-specific reference files that implement the pipelin
 ### YOLO vs Default Mode
 
 **Default Mode** (recommended for critical features):
-- Runs Stages 01–04 with mandatory human checkpoint at Stage 04
-- Requires explicit human approval before code is merged
+- Runs Stages 01–04 with Stage 02 approvals, implementation-start confirmation, and Stage 04 review
+- Requires explicit human approval before implementation commit/push
 - Best for production, regulatory, or high-stakes work
 
 **YOLO Mode** (`--yolo` flag):
-- Skips Stage 04, uses Stage 05 instead
-- Zero human checkpoints; fully automated merge and commit
+- Runs the same four stages, skipping human approvals and using autonomous checks
+- Stage 04 auto-commits, marks the spec completed, and pushes the completion commit
 - Ideal for internal tools, experiments, or when continuous delivery is the goal
 - All code still passes speckit-code-review before merge
 
@@ -111,6 +105,9 @@ skill speckit-auto --issue https://jira.example.com/browse/PROJ-123
 
 # Fully automated: no human checkpoints
 skill speckit-auto --yolo --issue https://jira.example.com/browse/PROJ-456
+
+# Optional caller-supplied attempt UUID, retained on resume
+skill speckit-auto --run-id 123e4567-e89b-42d3-a456-426614174000 --issue https://jira.example.com/browse/PROJ-123
 ```
 
 On Copilot/Claude Code invoke as `/speckit-auto <flags>`; on OpenCode and Hermes Agent embed the
@@ -151,6 +148,7 @@ other file loads at the exact moment its step runs:
 | `references/shared/operating-rules.md` | pipeline entry (run contract) |
 | `references/providers/<provider>.md` | pipeline entry — resolved provider only |
 | `references/pipeline/stage-0N-*.md` | entering that stage |
+| `references/shared/run-events.md` | after the worktree gate, at first event initialization |
 | `references/shared/commit.md` | first commit gate (Stage 02 → 03) |
 | `references/shared/host-adaptation.md` | a step needs an ask tool, skill dir, or install host key |
 | `references/shared/integration-setup.md` | `--integration` runs (no stage file loads at all) |
@@ -161,6 +159,38 @@ Rules enforced by the skill: never load the unselected provider, never load a st
 in, never re-read a file already in context, and drop stage-local context (interviews, failed
 review bodies, unused guideline files) when leaving a stage.
 
+## Structured run events
+
+Version 0.5.0 writes append-only contract-v1 JSONL to the actual worktree's
+`.speckit/events.jsonl`. After the worktree gate, `scripts/run-events.mjs init` records the
+run/stage start and atomic discovery at the source repo's `.speckit/runs/<run_id>.json`.
+Discovery is refreshed when a provisional worktree moves. Both locations are git-ignored.
+
+`--run-id <uuid>` is optional on every host. Without it, the pipeline generates a UUID once.
+Resume retains the ID and sequence; a fresh retry gets a new ID without truncating history.
+The helper path is resolved from the installed skill folder, never the project cwd.
+Setup-only invocations do not initialize events.
+
+Stages emit boundaries, default-mode named approvals, other input waits, confirmed PR URLs,
+and terminal completion/failure. Request changes answers the gate and restarts work, not a
+failed run. YOLO emits no waits for skipped gates. Completion follows required implementation
+and spec completion pushes, not just a passing review. PR events require a real HTTPS URL.
+
+The standalone helper uses Node builtins and JSON stdin via an argument-vector invocation,
+never interpolated shell JSON. An event validation/write error stops the pipeline explicitly
+without a success claim. No raw answers, credentials, file contents, or tool output are emitted.
+See [references/shared/run-events.md](references/shared/run-events.md) for the exact invocation,
+schema, bounds, resume, and failure behavior.
+
+For Agent Ops, deploy the monitor and migrations first, then client 0.5.0, then this skill
+0.5.0. Old agents remain accepted by the monitor; new clients with old skills retain log
+fallback until this producer is installed. This release does not automatically install a
+package or replace an installed skill. Copy the reviewed bundle explicitly after deployment.
+
+Manual host/provider approval cases are listed in `test-case/speckit-auto/test-cases.md` in
+the source repository. The automated helper and instruction tests do not execute those cases
+or prove compliance by a live host. Record manual results separately.
+
 ## Troubleshooting
 
 | Symptom | Fix |
@@ -169,6 +199,8 @@ review bodies, unused guideline files) when leaving a stage.
 | Jira intake fails | Ensure root `.env` has all three `JIRA_*` keys; test with `jira-to-speckit` directly |
 | Stage 03 review loop doesn't converge | Simplify the spec's acceptance criteria; avoid vague language ("elegant", "performant") |
 | Missing framework | At startup and any later step, failed provider validation triggers install recovery; if still failing after install, stop and ask the user to restart Copilot / Claude Code / OpenCode / Hermes Agent, then re-run |
+| Event initialization/write error | Repair the reported cause and validate existing history before resume; never delete/truncate events to continue |
+| Missing/old Node | Install Node.js >=22.13 before a pipeline run; no third-party emitter packages are needed |
 
 ## Notes
 

@@ -7,12 +7,12 @@ description: |
   jira-to-speckit, spec/design, implementation, a speckit-code-review remediation loop until
   pass, then human review (default) or YOLO commit and push. Use when a feature must go from
   requirement to committed implementation in one run.
-compatibility: "Runs on GitHub Copilot, Claude Code, OpenCode, and Hermes Agent. Discovered from ~/.agents/skills/, ~/.claude/skills/, ~/.config/opencode/skills/, or ~/.hermes/skills/ (/opt/data/skills/ in Docker). Requires git and bash; network access for Jira intake via --issue."
+compatibility: "Runs on GitHub Copilot, Claude Code, OpenCode, and Hermes Agent. Discovered from ~/.agents/skills/, ~/.claude/skills/, ~/.config/opencode/skills/, or ~/.hermes/skills/ (/opt/data/skills/ in Docker). Requires git, bash, and Node.js >=22.13; network access for Jira intake via --issue."
 license: MIT
 allowed-tools: bash glob grep view create edit skill
 metadata:
   author: Alex Nguyen
-  version: "0.4.0"
+  version: "0.5.0"
 ---
 
 # Speckit Auto
@@ -30,6 +30,10 @@ recovery file on a healthy run, or a file already in context. See the loading ma
    - `--integration <value>` → setup intent (setup ONLY, no pipeline)
    - `--issue <url>` → Jira pipeline intent
    - `--yolo` → mode = yolo (else default)
+   - `--run-id <uuid>` / `--run-id=<uuid>` → optional attempt identity, not requirement text.
+     Missing/invalid UUID → explicit invocation error. Preserve it across resumes; never
+     replace it mid-run. Without it, generate once with Node's `crypto.randomUUID()`.
+     A fresh retry after a terminal run needs a new UUID, even in a reused worktree.
    - free text → requirement pipeline intent
 
 2. **Note the host** from the directory this file was loaded from: `~/.copilot/skills/`,
@@ -52,6 +56,11 @@ recovery file on a healthy run, or a file already in context. See the loading ma
    success, record it as `integration` in run state; never re-read or change it mid-run, and never
    infer the provider from repo contents.
 
+   Before a new pipeline begins, check the runtime, not just `node --version`:
+   `node -e 'const [a,b]=process.versions.node.split(".").map(Number); if(a<22||(a===22&&b<13)){console.error("speckit-auto requires Node.js >=22.13");process.exit(1)}'`.
+   Missing/old Node → stop explicitly before worktree creation. Setup-only invocations do
+   not require event initialization.
+
 5. Load **exactly three files**, then enter Stage 01 in this same turn:
    [references/shared/operating-rules.md](references/shared/operating-rules.md), the adapter for
    the resolved provider, and
@@ -70,6 +79,7 @@ load only that stage's file — never block asking the user to re-run the skill.
 | `references/shared/operating-rules.md` | every pipeline run, at entry (the only eager load) |
 | `references/providers/<provider>.md` | every pipeline run, at entry — resolved provider only |
 | `references/pipeline/stage-01-intake.md` | entering Stage 01 |
+| `references/shared/run-events.md` | first event initialization after the worktree gate; retain for later emits |
 | `references/pipeline/stage-02-spec-design.md` | entering Stage 02 |
 | `references/pipeline/stage-03-implement-review.md` | entering Stage 03 |
 | `references/pipeline/stage-04-finish.md` | `speckit-code-review` returns `pass` |
@@ -124,3 +134,6 @@ capabilities under their own names (`Bash`, `Read`, `Edit`, `Write`, `Glob`, `Gr
 Hermes Agent exposes the same capabilities as `terminal`, `read_file`, `write_file`, `patch`,
 `search_files`, `skill_view` (see references/shared/host-adaptation.md).
 Never refuse to act because a tool is named differently.
+Resolve `scripts/run-events.mjs` relative to this loaded skill's folder, not the project cwd.
+Structured events use only Node builtins on every host; invoke the emitter with JSON stdin,
+never shell-interpolated JSON.
