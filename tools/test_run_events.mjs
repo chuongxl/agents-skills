@@ -167,6 +167,16 @@ function run(args, input = '') {
   });
 }
 
+test('the CLI runs when invoked through a symlinked skill directory', (t) => {
+  const root = fs.mkdtempSync(path.join(process.cwd(), 'tools', '.run-events-link-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const link = path.join(root, 'speckit-auto');
+  fs.symlinkSync(path.dirname(path.dirname(helperPath.pathname)), link);
+  const result = spawnSync(process.execPath, [path.join(link, 'scripts', 'run-events.mjs')], { encoding: 'utf8' });
+  assert.match(result.stderr, /usage: run-events\.mjs/);
+  assert.notEqual(result.status, 0);
+});
+
 function makeWorkspace(t) {
   const root = fs.mkdtempSync(path.join(process.cwd(), 'tools', '.run-events-test-'));
   const repo = path.join(root, 'repo');
