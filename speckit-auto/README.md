@@ -1,8 +1,8 @@
 # Speckit Auto — Spec-Driven Delivery Pipeline
 
-![Version](https://img.shields.io/badge/version-0.5.0-blue)
+![Version](https://img.shields.io/badge/version-0.6.0-blue)
 
-**Version**: 0.5.0
+**Version**: 0.6.0
 **Author**: Alex Nguyen
 
 ## Overview
@@ -35,7 +35,7 @@ The pipeline:
    `speckit-code-review` → fix → repeat until `pass`. No human gates in either mode.
 4. **Stage 04 — Human Review / Commit / Completion**: default mode asks for human approval before
    committing; YOLO mode auto-commits. Both modes then mark the spec `completed` with a follow-up
-   commit.
+   commit, push it, and open a draft PR (reusing an existing one) for either provider.
 
 ## Install
 
