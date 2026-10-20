@@ -35,7 +35,7 @@ The pipeline:
    `speckit-code-review` → fix → repeat until `pass`. No human gates in either mode.
 4. **Stage 04 — Human Review / Commit / Completion**: default mode asks for human approval before
    committing; YOLO mode auto-commits. Both modes then mark the spec `completed` with a follow-up
-   commit.
+   commit, push it, and open a draft PR (reusing an existing one) for either provider.
 
 ## Install
 

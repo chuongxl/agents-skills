@@ -62,22 +62,36 @@ After the implementation commit succeeded:
    Verify that the completion commit is on the remote branch. Neither the earlier implementation
    push nor a non-blocking finishing skill substitutes for this required final push.
 
-## Final Step — `finishing-a-development-branch` (superpowers only)
+## Final Step — Open the Pull Request (both providers)
 
 **Runs only after ALL of the above have succeeded** (human approval or YOLO auto-approve,
-implementation commit/push, spec completion commit). Never called in Stage 03, never called
-before approval, never called to commit or push code.
+implementation commit/push, spec completion commit and its verified push). Never run in Stage 03,
+never before approval, never to commit or push code. Both steps below are non-blocking: a failure
+is logged and does not affect pipeline success. No PR is required to complete the pipeline.
 
-Invoke `skill finishing-a-development-branch` with no prompt. It handles any final branch
-lifecycle actions (e.g. opening a PR in default mode). If the skill is not available or fails,
-log the error and continue — this step is non-blocking and does not affect pipeline success.
-Bracket any pipeline-owned lifecycle question with the shared question events in default mode;
-YOLO remains non-interactive. Once an actual absolute HTTPS PR URL is confirmed from creation
-or a verified existing PR lookup, emit `{type: "pr_opened", pr_url: <confirmed URL>}`.
-Pass the URL as data via an argument vector to the Node wrapper. Never interpolate it into
-code, emit a placeholder, infer a PR from a planned action, or repeat an already-recorded URL
-on resume. This applies to either provider whenever a PR is actually opened. No PR is required
-to complete the pipeline, and a failed optional PR action alone is not a failed run.
+1. **superpowers only** — invoke `skill finishing-a-development-branch` with no prompt, first.
+   If it is not available or fails, log the error and continue to step 2.
+2. **Ensure a PR exists (both providers).** The approval gate and the pushes above already
+   authorise it, so do not ask again, in either mode.
+   - Skip, and log why, when `gh` is missing or unauthenticated, the branch has no remote, or the
+     branch is the repository default branch.
+   - Look up an existing PR for the pushed branch (`gh pr list --head <branch> --state open
+     --json url`). If one exists, reuse its URL and do not create another. This also covers a PR
+     that step 1 just opened.
+   - Otherwise create a **draft** PR against the repository default branch with
+     `gh pr create --draft --base <default> --head <branch> --title <t> --body-file <f>`. Title:
+     the implementation commit subject. Body: a short summary from the spec (what changed and why),
+     the `speckit-code-review` status, the Jira issue link in `--issue` mode, and any known
+     limits the spec or plan records. Write the body to a file under the run's temp directory.
+     Never merge, never push to the default branch, never force-push.
+   - Draft is deliberate: CI has not run yet, and a human marks the PR ready.
+
+Once an actual absolute HTTPS PR URL is confirmed from creation or a verified existing PR
+lookup, emit `{type: "pr_opened", pr_url: <confirmed URL>}`. Pass the URL as data via an argument
+vector to the Node wrapper. Never interpolate it into code, emit a placeholder, infer a PR from a
+planned action, or repeat an already-recorded URL on resume. Bracket any pipeline-owned lifecycle
+question with the shared question events in default mode; YOLO remains non-interactive.
+Report the PR URL in the Final Report.
 
 ## Failure Handling
 
@@ -93,7 +107,8 @@ to complete the pipeline, and a failed optional PR action alone is not a failed 
 ## Final Report
 
 At completion report: resolved provider, `speckit-code-review` final status (`pass`), the
-implementation commit(s) (hash + subject) and pushed branch, and the spec completion commit hash.
+implementation commit(s) (hash + subject) and pushed branch, the spec completion commit hash, and
+the PR URL when one was opened or found.
 In `--issue` mode, update the execution report first (Stage 01 §7).
 Only after all required commits, the spec completion push, and execution-report updates
 succeed, emit `{type: "stage_finished", stage: "04-finish"}`, then `{type: "run_completed"}`.

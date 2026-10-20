@@ -17,7 +17,7 @@ hosts — superpowers ships no agents, slash commands, or prompt files. Adds to
 | Stage 03 native advisory review (first PHASE-2 entry only) | `requesting-code-review` |
 | Review feedback discipline | `receiving-code-review` |
 | Completion evidence gate | `verification-before-completion` |
-| Stage 04 final step (after approval + all commits) | `finishing-a-development-branch` |
+| Stage 04 final step (after approval + all commits), then the shared draft-PR step | `finishing-a-development-branch` |
 | Parallel independent work | `dispatching-parallel-agents` |
 
 Name resolution per step, first success wins: exact name in this session's available-skills list →
