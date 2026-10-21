@@ -204,7 +204,9 @@ function validatePayload(raw) {
 
 function parseArgs(argv) {
   const [command, ...args] = argv;
-  if (command !== 'init' && command !== 'emit') fail('usage: run-events.mjs init|emit [options]');
+  if (command !== 'init' && command !== 'emit' && command !== 'unlock') {
+    fail('usage: run-events.mjs init|emit|unlock [options]');
+  }
   const values = new Map();
   for (let i = 0; i < args.length; i += 2) {
     const key = args[i];
@@ -215,9 +217,16 @@ function parseArgs(argv) {
     if (values.has(key)) fail(`duplicate option: ${key}`);
     values.set(key, value);
   }
-  const required = command === 'init' ? ['--repo', '--worktree', '--run-id'] : ['--worktree', '--run-id'];
+  const required = command === 'init'
+    ? ['--repo', '--worktree', '--run-id']
+    : command === 'emit'
+      ? ['--worktree', '--run-id']
+      : ['--worktree'];
   for (const key of required) if (!values.has(key)) fail(`${key} is required`);
   if (command === 'emit' && values.has('--issue-key')) fail('--issue-key is valid only with init');
+  if (command === 'unlock' && (values.has('--repo') || values.has('--run-id') || values.has('--issue-key'))) {
+    fail('unlock accepts only --worktree');
+  }
   return { command, values };
 }
 
@@ -335,20 +344,130 @@ function atomicJsonWrite(filePath, value) {
 
 function withLock(speckitPath, action) {
   const lockPath = path.join(speckitPath, '.run-events.lock');
-  let descriptor;
+  const descriptor = acquireLock(lockPath);
   try {
-    descriptor = fs.openSync(lockPath, 'wx', 0o600);
-  } catch (error) {
-    if (error.code === 'EEXIST') fail(`another producer may be writing events (lock exists at ${lockPath})`);
-    throw error;
-  }
-  try {
-    fs.writeSync(descriptor, `${process.pid}\n`);
     return action();
   } finally {
-    fs.closeSync(descriptor);
-    fs.unlinkSync(lockPath);
+    releaseLock(lockPath, descriptor);
   }
+}
+
+// The lock file carries its owner as "<pid> <createdAtMs>". A stale lock is one whose
+// owner is provably gone; anything else stays locked, because removing a lock whose
+// writer is alive lets two producers write events and duplicate sequence numbers.
+const LOCK_STALE_AFTER_MS = 30_000;
+
+function readLockOwner(lockPath) {
+  let content;
+  try {
+    content = fs.readFileSync(lockPath, 'utf8');
+  } catch (error) {
+    if (error.code === 'ENOENT') return { state: 'missing' };
+    return { state: 'unreadable', detail: error.message };
+  }
+  const trimmed = content.trim();
+  if (trimmed === '') return { state: 'ownerless' };
+  const [pidText, createdText] = trimmed.split(/\s+/);
+  const pid = Number.parseInt(pidText, 10);
+  const createdAt = Number.parseInt(createdText, 10);
+  if (!Number.isInteger(pid) || pid <= 0 || !Number.isFinite(createdAt)) return { state: 'ownerless' };
+  return { state: 'owned', pid, createdAt };
+}
+
+function isProcessAlive(pid) {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    // EPERM means the process exists but belongs to another user: still alive.
+    return error.code !== 'ESRCH';
+  }
+}
+
+// A lock is stale only when its owner is dead AND the lock is old enough that it
+// cannot be a writer that has not yet recorded itself. An unparseable lock is never
+// stale: it may belong to a live writer whose record was truncated.
+function classifyLock(owner) {
+  if (owner.state === 'missing') return { stale: false, reason: 'missing' };
+  if (owner.state === 'unreadable') return { stale: false, reason: 'unreadable' };
+  if (owner.state === 'ownerless') return { stale: false, reason: 'ownerless' };
+  if (isProcessAlive(owner.pid)) return { stale: false, reason: 'alive', pid: owner.pid };
+  const age = Date.now() - owner.createdAt;
+  if (!(age >= LOCK_STALE_AFTER_MS)) return { stale: false, reason: 'recent', pid: owner.pid };
+  return { stale: true, reason: 'dead-owner', pid: owner.pid };
+}
+
+function acquireLock(lockPath) {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    let descriptor;
+    try {
+      descriptor = fs.openSync(lockPath, 'wx', 0o600);
+    } catch (error) {
+      if (error.code !== 'EEXIST') throw error;
+      const owner = readLockOwner(lockPath);
+      const state = classifyLock(owner);
+      if (!state.stale) {
+        if (state.reason === 'alive') {
+          fail(`another producer may be writing events (lock exists at ${lockPath}, pid ${state.pid} is running)`);
+        }
+        if (state.reason === 'ownerless') {
+          fail(`lock at ${lockPath} has no readable owner; run "run-events.mjs unlock --worktree <path>" to clear it`);
+        }
+        if (state.reason === 'recent') {
+          fail(`lock at ${lockPath} was left by dead pid ${state.pid} and is younger than ${LOCK_STALE_AFTER_MS}ms; retry shortly`);
+        }
+        fail(`another producer may be writing events (lock exists at ${lockPath})`);
+      }
+      // The owner is gone. Remove the lock and let the exclusive create below decide the
+      // winner: 'wx' cannot be won twice, so racing removers cannot produce two holders.
+      try {
+        fs.unlinkSync(lockPath);
+      } catch (unlinkError) {
+        if (unlinkError.code !== 'ENOENT') throw unlinkError;
+      }
+      continue;
+    }
+    try {
+      fs.writeSync(descriptor, `${process.pid} ${Date.now()}\n`);
+    } catch (error) {
+      try { fs.closeSync(descriptor); } catch {}
+      try { fs.unlinkSync(lockPath); } catch {}
+      throw error;
+    }
+    return descriptor;
+  }
+  fail(`another producer may be writing events (lock exists at ${lockPath})`);
+}
+
+// Cleanup must never turn a successful write into a reported failure, and it must not
+// leave the lock behind when closing the descriptor fails.
+function releaseLock(lockPath, descriptor) {
+  try {
+    fs.closeSync(descriptor);
+  } catch {}
+  try {
+    fs.unlinkSync(lockPath);
+  } catch (error) {
+    if (error.code !== 'ENOENT') {
+      process.stderr.write(`run-events: warning: could not remove lock ${lockPath}: ${error.message}\n`);
+    }
+  }
+}
+
+function unlock(speckitPath) {
+  const lockPath = path.join(speckitPath, '.run-events.lock');
+  const owner = readLockOwner(lockPath);
+  if (owner.state === 'missing') return 'no lock is present';
+  if (owner.state === 'owned' && isProcessAlive(owner.pid)) {
+    fail(`lock at ${lockPath} belongs to running process ${owner.pid}; refusing to remove it`);
+  }
+  try {
+    fs.unlinkSync(lockPath);
+  } catch (error) {
+    if (error.code === 'ENOENT') return 'no lock is present';
+    throw error;
+  }
+  return owner.state === 'owned' ? `removed stale lock for pid ${owner.pid}` : 'removed lock with no readable owner';
 }
 
 function makeEvent(runId, issueKey, seq, payload) {
@@ -471,11 +590,20 @@ function emit({ values }) {
   });
 }
 
+function unlockRun({ values }) {
+  const worktreePath = canonicalDirectory(values.get('--worktree'), '--worktree');
+  const speckitPath = path.join(worktreePath, '.speckit');
+  if (!fs.existsSync(speckitPath)) fail('run is not initialized; .speckit directory is missing');
+  const result = unlock(speckitPath);
+  process.stdout.write(`${result}\n`);
+}
+
 export function runEventsCli(argv = process.argv.slice(2)) {
   const [major, minor] = process.versions.node.split('.').map(Number);
   if (major < 22 || (major === 22 && minor < 13)) fail('structured run events require Node.js >=22.13');
   const parsed = parseArgs(argv);
   if (parsed.command === 'init') return init(parsed);
+  if (parsed.command === 'unlock') return unlockRun(parsed);
   return emit(parsed);
 }
 

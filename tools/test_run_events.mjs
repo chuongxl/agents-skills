@@ -21,11 +21,16 @@ const helperPath = new URL('../speckit-auto/scripts/run-events.mjs', import.meta
 
 const readSkill = (file) => fs.readFileSync(new URL(`../speckit-auto/${file}`, import.meta.url), 'utf8');
 
+const skillVersion = readSkill('SKILL.md').match(/version: "([0-9]+\.[0-9]+\.[0-9]+)"/)?.[1];
+const escapeRe = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const versionPattern = (value) => new RegExp(escapeRe(value));
+
 test('entry documents run identity, runtime, and progressive event loading', () => {
   const entry = readSkill('SKILL.md');
   assert.match(entry, /--run-id <uuid>/);
   assert.match(entry, /Node\.js >=22\.13/);
-  assert.match(entry, /version: "0\.5\.0"/);
+  assert.ok(skillVersion, 'SKILL.md must declare metadata.version');
+  assert.match(entry, versionPattern(`version: "${skillVersion}"`));
   assert.match(entry, /run-events\.md.*first event initialization/);
   assert.match(entry, /exactly three files/);
 });
@@ -111,7 +116,7 @@ test('documented JSON stdin invocation is executable and uses only Node builtins
 test('documented init, emit, and confirmed-PR shell examples preserve argument data', (t) => {
   const docs = readSkill('references/shared/run-events.md');
   const examples = [...docs.matchAll(/```sh\n([\s\S]*?)\n```/g)].map((match) => match[1]);
-  assert.equal(examples.length, 3);
+  assert.equal(examples.length, 4);
   const { repo, worktree } = makeWorkspace(t);
   const hostileWorktree = path.join(repo, "worktree ' 東京;$(touch injected)");
   fs.renameSync(worktree, hostileWorktree);
@@ -140,7 +145,7 @@ test('documented init, emit, and confirmed-PR shell examples preserve argument d
   assert.equal(events.at(-1).pr_url, prUrl);
   assert.equal(fs.existsSync(path.join(repo, 'injected')), false);
   const beforeFailure = fs.readFileSync(eventsPath, 'utf8');
-  fs.writeFileSync(path.join(hostileWorktree, '.speckit', '.run-events.lock'), '999999\n');
+  fs.writeFileSync(path.join(hostileWorktree, '.speckit', '.run-events.lock'), `${process.pid} ${Date.now()}\n`);
   const failed = spawnSync('bash', ['-c', examples[1]], { encoding: 'utf8', env, cwd: repo });
   assert.notEqual(failed.status, 0);
   assert.match(failed.stderr, /another producer|lock exists/i);
@@ -149,10 +154,11 @@ test('documented init, emit, and confirmed-PR shell examples preserve argument d
 
 test('documented identities and badges agree, and manual event paths are covered', () => {
   const root = fs.readFileSync(new URL('../README.md', import.meta.url), 'utf8');
-  assert.match(root, /speckit-auto.*--run-id <uuid>.*v0\.5\.0/);
+  assert.ok(skillVersion, 'SKILL.md must declare metadata.version');
+  assert.match(root, new RegExp(`speckit-auto.*--run-id <uuid>.*v${versionPattern(skillVersion).source}`));
   const readme = readSkill('README.md');
-  assert.match(readme, /version-0\.5\.0-blue/);
-  assert.match(readme, /\*\*Version\*\*: 0\.5\.0/);
+  assert.match(readme, versionPattern(`version-${skillVersion}-blue`));
+  assert.match(readme, versionPattern(`**Version**: ${skillVersion}`));
   const cases = fs.readFileSync(new URL('../test-case/speckit-auto/test-cases.md', import.meta.url), 'utf8');
   for (const scenario of [
     'Default happy path', 'YOLO happy path', 'Request changes', 'Resume and move', 'Fresh retry',
@@ -229,7 +235,8 @@ test('rejects metadata that is not an issue key and blocks overlapping writers',
   assert.notEqual(invalid.status, 0);
   assert.match(invalid.stderr, /issue key/i);
   fs.mkdirSync(path.join(worktree, '.speckit'), { recursive: true });
-  fs.writeFileSync(path.join(worktree, '.speckit', '.run-events.lock'), '999999\n');
+  // A live owner, not a dead pid: the emitter reclaims locks whose owner is provably gone.
+  fs.writeFileSync(path.join(worktree, '.speckit', '.run-events.lock'), `${process.pid} ${Date.now()}\n`);
   const locked = run(['init', '--repo', repo, '--worktree', worktree, '--run-id', runId]);
   assert.notEqual(locked.status, 0);
   assert.match(locked.stderr, /another producer|lock exists/i);
@@ -251,6 +258,85 @@ test('emits bounded Unicode and shell metacharacter text without executing it', 
   const last = JSON.parse(lines.at(-1));
   assert.equal(last.question, question.slice(0, 500));
   assert.equal(fs.existsSync(marker), false);
+});
+
+test('reclaims a lock whose owner is dead, and refuses one whose owner is alive or unreadable', (t) => {
+  const { repo, worktree } = makeWorkspace(t);
+  const runId = '123e4567-e89b-42d3-a456-426614174113';
+  const lockPath = path.join(worktree, '.speckit', '.run-events.lock');
+  fs.mkdirSync(path.join(worktree, '.speckit'), { recursive: true });
+
+  // Owner is dead and the lock is older than the staleness window: reclaimed automatically.
+  fs.writeFileSync(lockPath, `999999 ${Date.now() - 60_000}\n`);
+  const reclaimed = run(['init', '--repo', repo, '--worktree', worktree, '--run-id', runId]);
+  assert.equal(reclaimed.status, 0, reclaimed.stderr);
+  assert.equal(fs.existsSync(lockPath), false);
+
+  // Owner is dead but the lock is fresh: not yet reclaimable, and the reason is reported.
+  fs.writeFileSync(lockPath, `999999 ${Date.now()}\n`);
+  const fresh = run(['init', '--repo', repo, '--worktree', worktree, '--run-id', runId]);
+  assert.notEqual(fresh.status, 0);
+  assert.match(fresh.stderr, /dead pid/i);
+
+  // No readable owner: never reclaimed automatically, because the writer may be alive.
+  fs.writeFileSync(lockPath, '');
+  const ownerless = run(['init', '--repo', repo, '--worktree', worktree, '--run-id', runId]);
+  assert.notEqual(ownerless.status, 0);
+  assert.match(ownerless.stderr, /no readable owner/i);
+  assert.equal(fs.existsSync(lockPath), true);
+
+  // The documented manual recovery clears an owner-less lock.
+  const cleared = run(['unlock', '--worktree', worktree]);
+  assert.equal(cleared.status, 0, cleared.stderr);
+  assert.equal(fs.existsSync(lockPath), false);
+  assert.equal(run(['init', '--repo', repo, '--worktree', worktree, '--run-id', runId]).status, 0);
+});
+
+test('unlock refuses a lock whose owner is running and clears a dead one', (t) => {
+  const { repo, worktree } = makeWorkspace(t);
+  const lockPath = path.join(worktree, '.speckit', '.run-events.lock');
+  fs.mkdirSync(path.join(worktree, '.speckit'), { recursive: true });
+
+  fs.writeFileSync(lockPath, `${process.pid} ${Date.now()}\n`);
+  const live = run(['unlock', '--worktree', worktree]);
+  assert.notEqual(live.status, 0);
+  assert.match(live.stderr, /running process/i);
+  assert.equal(fs.existsSync(lockPath), true);
+
+  fs.writeFileSync(lockPath, `999999 ${Date.now() - 60_000}\n`);
+  const dead = run(['unlock', '--worktree', worktree]);
+  assert.equal(dead.status, 0, dead.stderr);
+  assert.match(dead.stdout, /removed stale lock/i);
+  assert.equal(fs.existsSync(lockPath), false);
+
+  const missing = run(['unlock', '--worktree', worktree]);
+  assert.equal(missing.status, 0, missing.stderr);
+  assert.match(missing.stdout, /no lock is present/i);
+});
+
+test('a successful write is not turned into a failure by lock cleanup', (t) => {
+  const { repo, worktree } = makeWorkspace(t);
+  const runId = '123e4567-e89b-42d3-a456-426614174114';
+  const lockPath = path.join(worktree, '.speckit', '.run-events.lock');
+  assert.equal(run(['init', '--repo', repo, '--worktree', worktree, '--run-id', runId]).status, 0);
+
+  // A racing cleaner removes the lock between the write and the release. The event must
+  // still be recorded and the command must still succeed.
+  const racing = spawnSync(process.execPath, ['-e', `
+    const fs = require('node:fs');
+    const { spawnSync } = require('node:child_process');
+    const helper = ${JSON.stringify(helperPath.pathname)};
+    const lock = ${JSON.stringify(lockPath)};
+    const timer = setInterval(() => { try { fs.unlinkSync(lock); } catch {} }, 1);
+    const result = spawnSync(process.execPath, [helper, 'emit', '--worktree', ${JSON.stringify(worktree)}, '--run-id', '${runId}'],
+      { input: JSON.stringify({ type: 'stage_finished', stage: '01-intake' }), encoding: 'utf8' });
+    clearInterval(timer);
+    process.stdout.write(JSON.stringify({ status: result.status, stderr: result.stderr }));
+  `], { encoding: 'utf8' });
+  const outcome = JSON.parse(racing.stdout);
+  assert.equal(outcome.status, 0, outcome.stderr);
+  const events = fs.readFileSync(path.join(worktree, '.speckit', 'events.jsonl'), 'utf8').trim().split('\n').map(JSON.parse);
+  assert.ok(events.some((event) => event.type === 'stage_finished'));
 });
 
 test('caps oversized questions and rejects overlong consumer events', (t) => {
