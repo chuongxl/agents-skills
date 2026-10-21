@@ -123,6 +123,11 @@ an owner that died moments ago is reported and left in place. Recover with
 owner is running, then resume the run. Never delete the lock by hand while its owner may be
 running, and never truncate or edit it.
 
+The producer repairs two interrupted-write states on its own and is **not** an error: a trailing
+record without its terminating newline is truncated back to the last complete record, and a run
+holding only `run_started` is completed by the next `init`. Both are reported on stderr. Neither
+blocks another run in the same worktree.
+
 ## Invocation Channel (canonical)
 
 All skills — including `speckit-*` — are invoked via the `skill` tool by name, on every host
