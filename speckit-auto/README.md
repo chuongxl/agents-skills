@@ -1,8 +1,8 @@
 # Speckit Auto — Spec-Driven Delivery Pipeline
 
-![Version](https://img.shields.io/badge/version-0.6.0-blue)
+![Version](https://img.shields.io/badge/version-0.6.1-blue)
 
-**Version**: 0.6.0
+**Version**: 0.6.1
 **Author**: Alex Nguyen
 
 ## Overview
@@ -35,7 +35,9 @@ The pipeline:
    `speckit-code-review` → fix → repeat until `pass`. No human gates in either mode.
 4. **Stage 04 — Human Review / Commit / Completion**: default mode asks for human approval before
    committing; YOLO mode auto-commits. Both modes then mark the spec `completed` with a follow-up
-   commit, push it, and open a draft PR (reusing an existing one) for either provider.
+   commit and push it. Opening a pull request sits behind its own gate: default mode asks
+   (`pr-publish`) and skips the PR when declined; YOLO opens the draft PR on its own. Either way
+   an existing PR for the branch is reused, never duplicated.
 
 ## Install
 
@@ -71,11 +73,14 @@ Each provider includes stage-specific reference files that implement the pipelin
 **Default Mode** (recommended for critical features):
 - Runs Stages 01–04 with Stage 02 approvals, implementation-start confirmation, and Stage 04 review
 - Requires explicit human approval before implementation commit/push
+- Requires explicit human approval before a pull request is opened — the implementation approval
+  alone does not authorize publishing the branch
 - Best for production, regulatory, or high-stakes work
 
 **YOLO Mode** (`--yolo` flag):
 - Runs the same four stages, skipping human approvals and using autonomous checks
 - Stage 04 auto-commits, marks the spec completed, and pushes the completion commit
+- Opens the draft pull request without a human wait — `--yolo` is the authorization to publish
 - Ideal for internal tools, experiments, or when continuous delivery is the goal
 - All code still passes speckit-code-review before merge
 
@@ -175,6 +180,8 @@ Stages emit boundaries, default-mode named approvals, other input waits, confirm
 and terminal completion/failure. Request changes answers the gate and restarts work, not a
 failed run. YOLO emits no waits for skipped gates. Completion follows required implementation
 and spec completion pushes, not just a passing review. PR events require a real HTTPS URL.
+The Stage 04 `pr-publish` decision is a named approval (`gate_waiting` / `gate_answered`),
+not a free-form question; declining it skips the PR and the run still completes.
 
 The standalone helper uses Node builtins and JSON stdin via an argument-vector invocation,
 never interpolated shell JSON. An event validation/write error stops the pipeline explicitly

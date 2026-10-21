@@ -19,7 +19,8 @@ been made yet — make it now.
 2. a genuinely missing required input, after one ask
 3. the user explicitly choosing `Stop` at an install-recovery ask
 4. a mandatory default-mode human checkpoint: a Stage 02 approval interaction, the Stage 02 →
-   Stage 03 start-implementation confirmation, or Stage 04
+   Stage 03 start-implementation confirmation, or Stage 04 — including the Stage 04 `pr-publish`
+   gate
 5. Stage 02 self-review failing the same check 3 consecutive times
 6. the Stage 03 circuit breaker (identical failure 5× with no file change, or a git/filesystem
    write error)
@@ -83,16 +84,19 @@ and recorded history without replaying already-recorded boundaries or answers. A
 gets a new ID and append-only history; a terminal run cannot resume under its old ID.
 
 For every pipeline-owned question, including install-recovery choices, Jira missing-input
-questions, clarification interviews, change details, constraints, commit-message asks, and
-optional branch-lifecycle choices: emit `question_waiting` immediately before the actual ask,
-then `stage_started` for the active stage immediately after the response and before continuing.
-Named approvals instead use `gate_waiting` and `gate_answered`. Never double-wrap an ask with
-both types. Use deliberately composed questions and bounded option labels, never raw answers,
-feedback, credentials, tool output, file contents, or arbitrary prompts. Do not emit waiting
-while a provider is still generating an artifact. Pass the same bracketing rule to an invoked
-provider/sub-skill for the actual questions it asks on behalf of the pipeline.
+questions, clarification interviews, change details, constraints, and commit-message asks: emit
+`question_waiting` immediately before the actual ask, then `stage_started` for the active stage
+immediately after the response and before continuing.
+Named approvals instead use `gate_waiting` and `gate_answered` — including the Stage 04
+`pr-publish` gate, which decides whether the run opens a pull request; it is a named approval,
+never a free-form question. Never double-wrap an ask with both types. Use deliberately composed
+questions and bounded option labels, never raw answers, feedback, credentials, tool output, file
+contents, or arbitrary prompts. Do not emit waiting while a provider is still generating an
+artifact. Pass the same bracketing rule to an invoked provider/sub-skill for the actual questions
+it asks on behalf of the pipeline.
 
-YOLO emits no waiting events for skipped human gates and stays non-interactive in Stage 02/04.
+YOLO emits no waiting events for skipped human gates and stays non-interactive in Stage 02/04 —
+including the Stage 04 `pr-publish` gate, which YOLO authorizes up front.
 Existing install-recovery or genuinely missing-required-input asks, if needed, are still
 instrumented when initialized; instrumentation does not bypass an existing hard prerequisite.
 Stage 03 remains a no-question zone. Waiting for input/approval is not a failed run.
