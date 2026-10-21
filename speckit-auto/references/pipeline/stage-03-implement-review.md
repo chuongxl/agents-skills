@@ -76,8 +76,8 @@ questions, no pauses, no report-and-stop on failed results.
   ask the user what to do.
 - Superpowers gate skills are subordinated (see the adapter's Gate Handling):
   `verification-before-completion` is a check, not a stop; review verdicts never exit the stage;
-  `finishing-a-development-branch` belongs only to Stage 04. "All tasks complete" and terminal
-  "finish the branch" handoffs are data, not exits.
+  `finishing-a-development-branch` is never invoked by the pipeline. "All tasks complete" and
+  terminal "finish the branch" handoffs are data, not exits.
 
 ## Review Range (both providers)
 
@@ -172,7 +172,7 @@ PHASE 2 — Code review loop
 `status = pass` is the **only** normal exit. When it fires, load and execute
 [stage-04-finish.md](stage-04-finish.md) **in the same turn** — no summary, no turn end, no user
 question first. Default mode → Stage 04 human review + commit (mandatory); `--yolo` → Stage 04
-auto-commit path. Never invoke `finishing-a-development-branch` here.
+auto-commit path. No PR, merge, branch deletion, or workspace deletion happens here.
 Before loading Stage 04, emit `{type: "stage_finished", stage: "03-implement-review"}`.
 
 On a real circuit-breaker exit emit `run_failed` before stopping: use `review_loop_stuck` for

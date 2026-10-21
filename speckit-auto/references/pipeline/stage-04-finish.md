@@ -60,38 +60,54 @@ After the implementation commit succeeded:
    Use the shared conditional-commit rule if the spec is already completed and clean.
 3. After the completion commit, sync and push the feature branch again per shared/commit.md.
    Verify that the completion commit is on the remote branch. Neither the earlier implementation
-   push nor a non-blocking finishing skill substitutes for this required final push.
+   push nor the later draft-PR step substitutes for this required final push.
 
 ## Final Step — Open the Pull Request (both providers)
 
 **Runs only after ALL of the above have succeeded** (human approval or YOLO auto-approve,
 implementation commit/push, spec completion commit and its verified push). Never run in Stage 03,
-never before approval, never to commit or push code. Both steps below are non-blocking: a failure
-is logged and does not affect pipeline success. No PR is required to complete the pipeline.
+never before approval, never to commit or push code. The step is non-blocking: a failure is
+logged and does not affect pipeline success. No PR is required to complete the pipeline.
 
-1. **superpowers only** — invoke `skill finishing-a-development-branch` with no prompt, first.
-   If it is not available or fails, log the error and continue to step 2.
-2. **Ensure a PR exists (both providers).** The approval gate and the pushes above already
-   authorise it, so do not ask again, in either mode.
-   - Skip, and log why, when `gh` is missing or unauthenticated, the branch has no remote, or the
-     branch is the repository default branch.
-   - Look up an existing PR for the pushed branch (`gh pr list --head <branch> --state open
-     --json url`). If one exists, reuse its URL and do not create another. This also covers a PR
-     that step 1 just opened.
-   - Otherwise create a **draft** PR against the repository default branch with
-     `gh pr create --draft --base <default> --head <branch> --title <t> --body-file <f>`. Title:
-     the implementation commit subject. Body: a short summary from the spec (what changed and why),
-     the `speckit-code-review` status, the Jira issue link in `--issue` mode, and any known
-     limits the spec or plan records. Write the body to a file under the run's temp directory.
-     Never merge, never push to the default branch, never force-push.
-   - Draft is deliberate: CI has not run yet, and a human marks the PR ready.
+### Authorization
+
+Opening a PR publishes the branch and its diff to everyone with repository access, notifies
+watchers, and triggers CI and bots. The implementation-approval gate covers the implementation
+only — it is not an authorization to publish.
+
+- **Default mode** — ask once, after the spec-completion push and before any PR command.
+  Immediately before the ask emit `gate_waiting` with `stage: "04-finish"` and
+  `gate: "pr-publish"`; immediately after the response emit `gate_answered` with the same
+  stage/gate and no answer text. Show the branch, the base branch, the title, and the full body
+  that would be published. Options: `Open draft PR` / `Skip PR`.
+  `Skip PR` → log the skip, create nothing, emit no `pr_opened`, and continue; the pipeline still
+  succeeds.
+- **YOLO mode** — create the draft PR with no wait. `--yolo` is the explicit authorization for
+  this: say so in the invocation output and in the Final Report.
+
+### Procedure (both providers, both modes)
+
+1. Resolve the repository default branch (`gh repo view --json defaultBranchRef`). It is not
+   necessarily the Stage 01 base branch and not necessarily `main`.
+2. Skip, and log why, when `gh` is missing or unauthenticated, the branch has no remote, or the
+   branch is the repository default branch.
+3. Look up an existing PR for the pushed branch (`gh pr list --head <branch> --state open
+   --json url`). If one exists, reuse its URL and do not create another.
+4. Otherwise create a **draft** PR against the resolved default branch with
+   `gh pr create --draft --base <default> --head <branch> --title <t> --body-file <f>`. Title:
+   the implementation commit subject. Body: a short summary from the spec (what changed and why),
+   the `speckit-code-review` status, the Jira issue link in `--issue` mode, and any known
+   limits the spec or plan records. Write the body to a file under the run's temp directory.
+   Never merge, never push to the default branch, never force-push.
+   - Draft is deliberate, and its limits are narrow: it blocks auto-merge and keeps the PR out of
+     the ready-for-review queue. It does **not** prevent publication — `pull_request` workflows
+     still run on `opened` for draft PRs, and watchers are still notified.
 
 Once an actual absolute HTTPS PR URL is confirmed from creation or a verified existing PR
 lookup, emit `{type: "pr_opened", pr_url: <confirmed URL>}`. Pass the URL as data via an argument
 vector to the Node wrapper. Never interpolate it into code, emit a placeholder, infer a PR from a
-planned action, or repeat an already-recorded URL on resume. Bracket any pipeline-owned lifecycle
-question with the shared question events in default mode; YOLO remains non-interactive.
-Report the PR URL in the Final Report.
+planned action, or repeat an already-recorded URL on resume. Report the PR URL in the Final
+Report; report a `Skip PR` decision as "no PR opened".
 
 ## Failure Handling
 
@@ -108,7 +124,9 @@ Report the PR URL in the Final Report.
 
 At completion report: resolved provider, `speckit-code-review` final status (`pass`), the
 implementation commit(s) (hash + subject) and pushed branch, the spec completion commit hash, and
-the PR URL when one was opened or found.
+the PR URL when one was opened or found — or "no PR opened" when the human skipped the
+`pr-publish` gate, the branch was skipped, or PR creation failed. In YOLO mode, state that the PR
+was opened under `--yolo` authorization rather than a human `pr-publish` approval.
 In `--issue` mode, update the execution report first (Stage 01 §7).
 Only after all required commits, the spec completion push, and execution-report updates
 succeed, emit `{type: "stage_finished", stage: "04-finish"}`, then `{type: "run_completed"}`.

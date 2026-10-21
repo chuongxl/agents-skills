@@ -5,14 +5,15 @@ description: |
   pluggable provider: github-speckit (repo-installed GitHub Spec Kit agents) or superpowers
   (obra/superpowers skills library). Handles provider setup and auto-install, Jira intake via
   jira-to-speckit, spec/design, implementation, a speckit-code-review remediation loop until
-  pass, then human review (default) or YOLO commit and push. Use when a feature must go from
+  pass, then human review (default) or YOLO commit and push, and a draft pull request behind its
+  own approval gate (default mode) or authorized by --yolo. Use when a feature must go from
   requirement to committed implementation in one run.
 compatibility: "Runs on GitHub Copilot, Claude Code, OpenCode, and Hermes Agent. Discovered from ~/.agents/skills/, ~/.claude/skills/, ~/.config/opencode/skills/, or ~/.hermes/skills/ (/opt/data/skills/ in Docker). Requires git, bash, and Node.js >=22.13; network access for Jira intake via --issue."
 license: MIT
 allowed-tools: bash glob grep view create edit skill
 metadata:
   author: Alex Nguyen
-  version: "0.6.0"
+  version: "0.6.1"
 ---
 
 # Speckit Auto
@@ -99,9 +100,11 @@ one, also drop its `loaded_guidelines` cache entry so a later stage knows to re-
 ## Modes
 
 - **Default**: human-in-the-loop. Mandatory checkpoints: the Stage 02 approval interactions, the
-  Stage 02 → Stage 03 start-implementation confirmation, and Stage 04.
-- **YOLO** (`--yolo`): no human checkpoints; Stage 02 interactions and Stage 04 human review are
-  skipped, with an auto-generated commit message.
+  Stage 02 → Stage 03 start-implementation confirmation, the Stage 04 implementation approval, and
+  the Stage 04 `pr-publish` gate — no pull request is opened until that gate is approved.
+- **YOLO** (`--yolo`): no human checkpoints; Stage 02 interactions, Stage 04 human review, and the
+  Stage 04 `pr-publish` gate are skipped, with an auto-generated commit message. YOLO authorizes
+  opening a draft pull request on its own.
 
 Stage 03 is a NO-STOP ZONE in both modes.
 

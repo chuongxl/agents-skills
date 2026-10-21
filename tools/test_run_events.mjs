@@ -21,11 +21,16 @@ const helperPath = new URL('../speckit-auto/scripts/run-events.mjs', import.meta
 
 const readSkill = (file) => fs.readFileSync(new URL(`../speckit-auto/${file}`, import.meta.url), 'utf8');
 
+const skillVersion = readSkill('SKILL.md').match(/version: "([0-9]+\.[0-9]+\.[0-9]+)"/)?.[1];
+const escapeRe = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const versionPattern = (value) => new RegExp(escapeRe(value));
+
 test('entry documents run identity, runtime, and progressive event loading', () => {
   const entry = readSkill('SKILL.md');
   assert.match(entry, /--run-id <uuid>/);
   assert.match(entry, /Node\.js >=22\.13/);
-  assert.match(entry, /version: "0\.5\.0"/);
+  assert.ok(skillVersion, 'SKILL.md must declare metadata.version');
+  assert.match(entry, versionPattern(`version: "${skillVersion}"`));
   assert.match(entry, /run-events\.md.*first event initialization/);
   assert.match(entry, /exactly three files/);
 });
@@ -149,14 +154,16 @@ test('documented init, emit, and confirmed-PR shell examples preserve argument d
 
 test('documented identities and badges agree, and manual event paths are covered', () => {
   const root = fs.readFileSync(new URL('../README.md', import.meta.url), 'utf8');
-  assert.match(root, /speckit-auto.*--run-id <uuid>.*v0\.5\.0/);
+  assert.ok(skillVersion, 'SKILL.md must declare metadata.version');
+  assert.match(root, new RegExp(`speckit-auto.*--run-id <uuid>.*v${versionPattern(skillVersion).source}`));
   const readme = readSkill('README.md');
-  assert.match(readme, /version-0\.5\.0-blue/);
-  assert.match(readme, /\*\*Version\*\*: 0\.5\.0/);
+  assert.match(readme, versionPattern(`version-${skillVersion}-blue`));
+  assert.match(readme, versionPattern(`**Version**: ${skillVersion}`));
   const cases = fs.readFileSync(new URL('../test-case/speckit-auto/test-cases.md', import.meta.url), 'utf8');
   for (const scenario of [
     'Default happy path', 'YOLO happy path', 'Request changes', 'Resume and move', 'Fresh retry',
-    'Failed event write', 'Manual questions', 'Terminal exits', 'PR confirmation', 'Completion push failure',
+    'Failed event write', 'Manual questions', 'Terminal exits', 'PR confirmation', 'PR publish gate',
+    'Completion push failure',
   ]) assert.ok(cases.includes(scenario), `missing manual case ${scenario}`);
 });
 

@@ -17,7 +17,6 @@ hosts — superpowers ships no agents, slash commands, or prompt files. Adds to
 | Stage 03 native advisory review (first PHASE-2 entry only) | `requesting-code-review` |
 | Review feedback discipline | `receiving-code-review` |
 | Completion evidence gate | `verification-before-completion` |
-| Stage 04 final step (after approval + all commits), then the shared draft-PR step | `finishing-a-development-branch` |
 | Parallel independent work | `dispatching-parallel-agents` |
 
 Name resolution per step, first success wins: exact name in this session's available-skills list →
@@ -76,8 +75,10 @@ Companion read them for progress.
 - `subagent-driven-development`'s terminal handoff ("finish the branch") is suspended: returning
   means "continue Stage 03". No PR, merge, branch deletion, or workspace deletion inside Stage 03;
   its per-task commits are expected and must not be suppressed.
-- `finishing-a-development-branch` is **never** called in Stage 03 — only in Stage 04 after final
-  approval and all commits.
+- `finishing-a-development-branch` is **never** called by the pipeline. Its menu offers a local
+  merge into the base branch and a non-draft PR, both of which Stage 04 forbids, and it asks a
+  branch-lifecycle question that default mode has no answer for. The shared Stage 04 draft-PR
+  step owns PR creation for both providers.
 
 ## Artifacts
 
