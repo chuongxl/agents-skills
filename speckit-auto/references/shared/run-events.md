@@ -82,8 +82,20 @@ and does not repeat start events. It atomically updates the source repository's
 `.speckit/runs/<run_id>.json` discovery record, including the canonical
 worktree path. A move updates this record without rewriting event history.
 The emitter uses an exclusive lock and rejects overlapping writers rather
-than risking duplicate sequence numbers; remove a lock only after confirming
-its writer is no longer running.
+than risking duplicate sequence numbers. The lock records its owner as
+`<pid> <createdAtMs>`. A lock is reclaimed automatically only when its owner
+is provably gone — the pid no longer exists and the lock is at least 30 seconds
+old — and the reclaiming process re-runs the exclusive create, so two racing
+reclaimers can never both win. A lock whose owner is alive, whose record is
+missing or unreadable, or whose owner died moments ago is left in place and
+reported instead of removed: dropping a live lock would let two producers write
+events and duplicate sequence numbers. To clear a leftover lock manually, run
+
+```sh
+node "$event_helper_path" unlock --worktree "$worktree_path"
+```
+
+which refuses to remove a lock whose pid is still running.
 
 ## Event variants
 

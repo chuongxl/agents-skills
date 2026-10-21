@@ -116,6 +116,13 @@ completion after a write error. A warning, recoverable failure, clean-tree commi
 Request changes is not `run_failed`. Only successful Stage 04 may emit `run_completed`, after
 required commits/push and spec completion; do not emit any event after a terminal record.
 
+A lock conflict is an instrumentation error, not a `run_failed`. The emitter reclaims a lock
+only when its owner is provably gone; a lock that still has a live owner, no readable owner, or
+an owner that died moments ago is reported and left in place. Recover with
+`node scripts/run-events.mjs unlock --worktree <worktree>`, which refuses to remove a lock whose
+owner is running, then resume the run. Never delete the lock by hand while its owner may be
+running, and never truncate or edit it.
+
 ## Invocation Channel (canonical)
 
 All skills — including `speckit-*` — are invoked via the `skill` tool by name, on every host
