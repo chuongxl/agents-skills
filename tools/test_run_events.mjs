@@ -340,6 +340,74 @@ test('a successful write is not turned into a failure by lock cleanup', (t) => {
   assert.ok(events.some((event) => event.type === 'stage_finished'));
 });
 
+test('completes an interrupted initialization instead of failing every run in the file', (t) => {
+  const { repo, worktree } = makeWorkspace(t);
+  const runA = '123e4567-e89b-42d3-a456-426614174201';
+  const runB = '223e4567-e89b-42d3-a456-426614174202';
+  const eventsPath = path.join(worktree, '.speckit', 'events.jsonl');
+  assert.equal(run(['init', '--repo', repo, '--worktree', worktree, '--run-id', runA]).status, 0);
+
+  // A producer that died between the two initialization appends left one record.
+  const lines = fs.readFileSync(eventsPath, 'utf8').trim().split('\n');
+  fs.writeFileSync(eventsPath, `${lines[0]}\n`);
+
+  // The interrupted run is completed, not rejected.
+  const completed = run(['init', '--repo', repo, '--worktree', worktree, '--run-id', runA]);
+  assert.equal(completed.status, 0, completed.stderr);
+  const repaired = fs.readFileSync(eventsPath, 'utf8').trim().split('\n').map(JSON.parse);
+  assert.equal(repaired.filter((event) => event.run_id === runA).length, 2);
+  assert.equal(repaired.at(-1).type, 'stage_started');
+
+  // An unrelated run in the same worktree is not blocked by the repaired run.
+  const fresh = run(['init', '--repo', repo, '--worktree', worktree, '--run-id', runB]);
+  assert.equal(fresh.status, 0, fresh.stderr);
+  const emitted = run(
+    ['emit', '--worktree', worktree, '--run-id', runB],
+    JSON.stringify({ type: 'stage_finished', stage: '01-intake' }),
+  );
+  assert.equal(emitted.status, 0, emitted.stderr);
+});
+
+test('refuses to emit into a run that was never initialized, without corrupting the file', (t) => {
+  const { repo, worktree } = makeWorkspace(t);
+  const runId = '123e4567-e89b-42d3-a456-426614174203';
+  const eventsPath = path.join(worktree, '.speckit', 'events.jsonl');
+  assert.equal(run(['init', '--repo', repo, '--worktree', worktree, '--run-id', runId]).status, 0);
+
+  const lines = fs.readFileSync(eventsPath, 'utf8').trim().split('\n');
+  fs.writeFileSync(eventsPath, `${lines[0]}\n`);
+
+  // Sequence 2 must be stage_started; emitting anything else there would write a record
+  // that no later read can accept.
+  const refused = run(
+    ['emit', '--worktree', worktree, '--run-id', runId],
+    JSON.stringify({ type: 'stage_finished', stage: '01-intake' }),
+  );
+  assert.notEqual(refused.status, 0);
+  assert.match(refused.stderr, /not initialized/i);
+  assert.equal(fs.readFileSync(eventsPath, 'utf8').trim().split('\n').length, 1);
+
+  // The run is still recoverable through init.
+  assert.equal(run(['init', '--repo', repo, '--worktree', worktree, '--run-id', runId]).status, 0);
+});
+
+test('repairs an interrupted trailing record instead of rejecting the whole file', (t) => {
+  const { repo, worktree } = makeWorkspace(t);
+  const runId = '123e4567-e89b-42d3-a456-426614174204';
+  const eventsPath = path.join(worktree, '.speckit', 'events.jsonl');
+  assert.equal(run(['init', '--repo', repo, '--worktree', worktree, '--run-id', runId]).status, 0);
+
+  // A write that was cut short leaves a final line without its terminating newline.
+  const content = fs.readFileSync(eventsPath, 'utf8');
+  fs.writeFileSync(eventsPath, content.slice(0, content.length - 5));
+
+  const repaired = run(['init', '--repo', repo, '--worktree', worktree, '--run-id', runId]);
+  assert.equal(repaired.status, 0, repaired.stderr);
+  const after = fs.readFileSync(eventsPath, 'utf8');
+  assert.ok(after.endsWith('\n'), 'the repaired file must end with a complete record');
+  assert.ok(after.length >= content.length - 5);
+});
+
 test('caps oversized questions and rejects overlong consumer events', (t) => {
   const { repo, worktree } = makeWorkspace(t);
   const runId = '123e4567-e89b-42d3-a456-426614174112';

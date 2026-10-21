@@ -77,8 +77,10 @@ swallow it, continue without events, or recursively attempt another event on the
 writer. Resume only after repairing the cause and inspecting the recorded history.
 
 `init` writes `run_started` and `stage_started` (`01-intake`) once for a new
-attempt. On resume it validates prior JSONL history, retains the next sequence,
-and does not repeat start events. It atomically updates the source repository's
+attempt. Both records go out in a single append and a single fsync, so an
+interrupted producer cannot leave a half-initialized run behind. On resume it
+validates prior JSONL history, retains the next sequence, and does not repeat
+start events. It atomically updates the source repository's
 `.speckit/runs/<run_id>.json` discovery record, including the canonical
 worktree path. A move updates this record without rewriting event history.
 The emitter uses an exclusive lock and rejects overlapping writers rather
@@ -96,6 +98,17 @@ node "$event_helper_path" unlock --worktree "$worktree_path"
 ```
 
 which refuses to remove a lock whose pid is still running.
+
+**Interrupted writes are repaired, not fatal.** A record is durable only once its
+terminating newline reaches the disk. Before reading, the producer truncates a
+trailing line that has no newline — the remains of an interrupted write — back to
+the last complete record, and reports the repair on stderr. Such a line was never
+acknowledged, because sequence numbers are derived from the file itself; no
+complete record is ever removed. A run that carries only `run_started` is an
+initialization that was interrupted between its two records: `init` completes it in
+place, and every other run in the file stays usable. `emit` refuses to write into
+a run that is not yet initialized, because sequence 2 must be the first
+`stage_started` and any other record there would make the file unreadable.
 
 ## Event variants
 

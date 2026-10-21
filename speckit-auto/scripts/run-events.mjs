@@ -264,7 +264,6 @@ function parseEventFile(filePath) {
   const sequenceByRun = new Map();
   const issueKeyByRun = new Map();
   const firstEventByRun = new Set();
-  const eventCountByRun = new Map();
   const terminalRuns = new Set();
   const parsed = [];
   for (let index = 0; index < lines.length; index += 1) {
@@ -290,7 +289,6 @@ function parseEventFile(filePath) {
       fail(`events.jsonl line ${index + 1}: sequence 2 must start stage ${STAGES[0]}`);
     }
     if (event.type === 'run_completed' || event.type === 'run_failed') terminalRuns.add(event.run_id);
-    eventCountByRun.set(event.run_id, expected);
     const priorIssueKey = issueKeyByRun.get(event.run_id);
     if (issueKeyByRun.has(event.run_id) && priorIssueKey !== event.issue_key) {
       fail(`events.jsonl line ${index + 1}: issue_key changed within a run`);
@@ -299,25 +297,63 @@ function parseEventFile(filePath) {
     sequenceByRun.set(event.run_id, event.seq);
     parsed.push(event);
   }
-  for (const [runId, count] of eventCountByRun) {
-    if (count < 2) fail(`run ${runId} has incomplete initialization`);
-  }
+  // A run that carries only run_started is an interrupted initialization. It is not a
+  // defect of the file: the check belongs to the run, not to every run in the file, so
+  // init completes that run in place and every other run stays usable.
   return parsed;
 }
 
 function writeEvent(eventsPath, event) {
-  validateRunEvent(event);
-  const line = `${JSON.stringify(event)}\n`;
-  const bytes = Buffer.from(line, 'utf8');
-  if (bytes.length > MAX_JSONL_LINE_BYTES) fail(`serialized event exceeds ${MAX_JSONL_LINE_BYTES} bytes`);
+  writeEvents(eventsPath, [event]);
+}
+
+// All events of one record are appended in a single write and a single fsync, so a
+// crash can never leave a partially written record behind.
+function writeEvents(eventsPath, events) {
+  const parts = [];
+  for (const event of events) {
+    validateRunEvent(event);
+    const line = `${JSON.stringify(event)}\n`;
+    const bytes = Buffer.from(line, 'utf8');
+    if (bytes.length > MAX_JSONL_LINE_BYTES) fail(`serialized event exceeds ${MAX_JSONL_LINE_BYTES} bytes`);
+    parts.push(bytes);
+  }
+  const payload = Buffer.concat(parts);
   const descriptor = fs.openSync(eventsPath, 'a', 0o600);
   try {
     let offset = 0;
-    while (offset < bytes.length) offset += fs.writeSync(descriptor, bytes, offset, bytes.length - offset);
+    while (offset < payload.length) offset += fs.writeSync(descriptor, payload, offset, payload.length - offset);
     fs.fsyncSync(descriptor);
   } finally {
     fs.closeSync(descriptor);
   }
+}
+
+// A record is durable only once its terminating newline is on disk. A trailing line
+// without one is the remains of an interrupted write: it was never acknowledged,
+// because sequence numbers are derived from the file itself. Truncating it back to
+// the last complete record removes nothing that any reader could have consumed.
+function repairTornTail(eventsPath) {
+  let content;
+  try {
+    content = fs.readFileSync(eventsPath);
+  } catch (error) {
+    if (error.code === 'ENOENT') return false;
+    throw error;
+  }
+  if (content.length === 0 || content.at(-1) === 10) return false;
+  const kept = content.subarray(0, content.lastIndexOf(10) + 1);
+  const descriptor = fs.openSync(eventsPath, 'r+');
+  try {
+    fs.ftruncateSync(descriptor, kept.length);
+    fs.fsyncSync(descriptor);
+  } finally {
+    fs.closeSync(descriptor);
+  }
+  process.stderr.write(
+    `run-events: repaired an interrupted trailing record in ${eventsPath} (${content.length - kept.length} bytes discarded)\n`,
+  );
+  return true;
 }
 
 function atomicJsonWrite(filePath, value) {
@@ -519,6 +555,7 @@ function init({ values }) {
   fs.mkdirSync(speckitPath, { recursive: true });
   return withLock(speckitPath, () => {
     const eventsPath = path.join(speckitPath, 'events.jsonl');
+    repairTornTail(eventsPath);
     const allEvents = parseEventFile(eventsPath);
     const runEvents = allEvents.filter((event) => event.run_id === runId);
     const previous = runEvents.at(-1);
@@ -531,14 +568,23 @@ function init({ values }) {
       fail('issue_key does not match the existing discovery record');
     }
     if (runEvents.length === 0) {
-      const started = makeEvent(runId, issueKey, 1, { type: 'run_started' });
-      writeEvent(eventsPath, started);
-      writeEvent(eventsPath, makeEvent(runId, issueKey, 2, { type: 'stage_started', stage: STAGES[0] }));
+      // One append and one fsync: a crash cannot leave a half-initialized run behind.
+      writeEvents(eventsPath, [
+        makeEvent(runId, issueKey, 1, { type: 'run_started' }),
+        makeEvent(runId, issueKey, 2, { type: 'stage_started', stage: STAGES[0] }),
+      ]);
     } else {
       if (runEvents[0].type !== 'run_started') fail('existing run does not begin with run_started');
       if (issueKey !== undefined && issueKey !== runEvents[0].issue_key) fail('issue_key does not match the existing run');
       if (previous.type === 'run_completed' || previous.type === 'run_failed') {
         fail(`cannot resume terminal run ${runId}`);
+      }
+      if (runEvents.length === 1) {
+        // Only run_started was written: an initialization interrupted between its two
+        // records. Complete it here instead of failing every run in the file.
+        writeEvents(eventsPath, [
+          makeEvent(runId, runEvents[0].issue_key, 2, { type: 'stage_started', stage: STAGES[0] }),
+        ]);
       }
     }
     atomicJsonWrite(discoveryPath, {
@@ -578,9 +624,13 @@ function emit({ values }) {
   if (!fs.existsSync(speckitPath)) fail('run is not initialized; .speckit directory is missing');
   return withLock(speckitPath, () => {
     const eventsPath = path.join(speckitPath, 'events.jsonl');
+    repairTornTail(eventsPath);
     const events = parseEventFile(eventsPath);
     const runEvents = events.filter((event) => event.run_id === runId);
-    if (runEvents.length === 0) fail(`run ${runId} has no initialized event history`);
+    // Sequence 2 must be stage_started for the first stage. Emitting into a run that
+    // never got one would write a record that no later read can accept, so the run is
+    // completed by init instead.
+    if (runEvents.length < 2) fail(`run ${runId} is not initialized; run init to complete it`);
     const latest = runEvents.at(-1);
     if (latest.type === 'run_completed' || latest.type === 'run_failed') fail(`run ${runId} is already terminal`);
     const payload = validatePayload(readInput());
