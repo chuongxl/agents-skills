@@ -83,11 +83,6 @@
         {
           "url": "https://spring.io/security",
           "format": "html"
-        },
-        {
-          "url": "https://spring.io/security.rss",
-          "format": "rss",
-          "note": "RSS URL to verify"
         }
       ]
     },
