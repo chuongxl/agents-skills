@@ -61,7 +61,7 @@ Key configuration:
 - `team` — Team identifier for reporting
 - `org` — GitHub organization name
 - `repos[]` — List of repositories to scan (with `active: true/false`)
-- `stack` — Tech stack (typescript, nodejs, python, go, java, etc.)
+- Languages and lockfiles are detected automatically (`ecosystems/*.json`); `stack` and `package-manager` are deprecated
 - `fail-on-severity` — Build failure threshold (CRITICAL, HIGH, MEDIUM, LOW)
 
 ### 3. Run Scan
@@ -125,7 +125,7 @@ Language-specific code analysis (SAST) for security and quality issues:
 - NestJS: Authentication, validation, injection vulnerabilities
 - General: OWASP Top 10 patterns (SQL injection, XSS, etc.)
 
-Rulesets are controlled by the `stack` field in `repository.md`.
+Rulesets follow the languages detected in each repo (see `references/ecosystems.md`).
 
 **Output:** `semgrep.json` with issue type, severity, code snippet, and fix guidance
 
@@ -202,12 +202,6 @@ team: my-team
 org: my-github-org
 monorepo-root: .
 ci-runner: ubuntu-latest
-package-manager: yarn
-stack:
-  - typescript
-  - nodejs
-  - docker
-
 repos:
   - name: api-backend
     active: true
