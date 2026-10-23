@@ -1,0 +1,114 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "advisory.schema.json",
+  "title": "job-security-scan advisory bundle",
+  "description": "One file holds one bundle of advisories. Validated by scripts/lib/advisory.py (a stdlib validator that supports: type, required, properties, additionalProperties, items, enum, const, pattern, minLength, minItems, minimum, maximum, $ref to #/$defs).",
+  "type": "object",
+  "required": ["schema_version", "advisories"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "const": 1 },
+    "advisories": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/advisory" }
+    }
+  },
+  "$defs": {
+    "advisory": {
+      "type": "object",
+      "required": ["id", "title", "summary", "severity", "status", "component", "affected", "source"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{2,127}$",
+          "description": "Primary id: CVE-*, GHSA-*, vendor id, or PENDING-* for a pre-announcement."
+        },
+        "aliases": { "type": "array", "items": { "type": "string", "minLength": 3 } },
+        "title": { "type": "string", "minLength": 5 },
+        "summary": { "type": "string", "minLength": 10 },
+        "severity": { "enum": ["critical", "high", "medium", "low", "unknown"] },
+        "cvss": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["score"],
+          "properties": {
+            "version": { "enum": ["3.1", "4.0"] },
+            "score": { "type": "number", "minimum": 0, "maximum": 10 },
+            "vector": { "type": "string", "minLength": 8 }
+          }
+        },
+        "status": {
+          "enum": ["pending", "published", "withdrawn"],
+          "description": "pending = vendor pre-announcement, details not yet public."
+        },
+        "published": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" },
+        "component": { "$ref": "#/$defs/component" },
+        "affected": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/affected" }
+        },
+        "conditions": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/condition" },
+          "description": "All conditions must hold for the advisory to apply; otherwise the finding is reported as 'affected if condition holds'."
+        },
+        "exploited": { "type": "boolean", "description": "True when listed in CISA KEV (set by enrichment)." },
+        "detect_hints": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 3 },
+          "description": "Ids of exposure rules (Semgrep) that indicate the risky API is used. Added in a later phase."
+        },
+        "references": { "type": "array", "items": { "type": "string", "pattern": "^https://" } },
+        "source": { "$ref": "#/$defs/source" }
+      }
+    },
+    "component": {
+      "type": "object",
+      "required": ["kind", "ecosystem", "name"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "enum": ["package", "runtime", "image", "os"] },
+        "ecosystem": { "type": "string", "pattern": "^[a-z][a-z0-9.+-]*$" },
+        "name": { "type": "string", "minLength": 1 },
+        "purl": { "type": "string", "pattern": "^pkg:[a-z][a-z0-9.+-]*/.+" }
+      }
+    },
+    "affected": {
+      "type": "object",
+      "required": ["line", "introduced"],
+      "additionalProperties": false,
+      "properties": {
+        "line": { "type": "string", "minLength": 1, "description": "Release line label, e.g. '22', '10-15', or '*' for all." },
+        "introduced": { "type": "string", "minLength": 1, "description": "First affected version; '0' means from the start of the line." },
+        "fixed": { "type": "string", "minLength": 1 },
+        "last_affected": { "type": "string", "minLength": 1 }
+      }
+    },
+    "condition": {
+      "type": "object",
+      "required": ["type", "value"],
+      "additionalProperties": false,
+      "properties": {
+        "type": { "enum": ["os", "libc", "arch", "feature", "router"] },
+        "value": { "type": "string", "minLength": 1 }
+      }
+    },
+    "source": {
+      "type": "object",
+      "required": ["tier", "vendor", "url", "fetched_at", "method"],
+      "additionalProperties": false,
+      "properties": {
+        "tier": { "enum": ["vendor", "aggregator", "enrichment", "lifecycle", "secondary"] },
+        "vendor": { "type": "string", "minLength": 2 },
+        "url": { "type": "string", "pattern": "^https://" },
+        "fetched_at": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$" },
+        "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "method": { "enum": ["feed", "manual", "llm-assisted"] },
+        "approved_by": { "type": "string", "minLength": 2 }
+      }
+    }
+  }
+}
