@@ -45,15 +45,14 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - uses: actions/setup-go@v5
-        with:
-          go-version: "stable"
-          cache: false
 
-      - name: Install osv-scanner v2
+      - name: Install osv-scanner v2 (latest; v2.0.0 cannot read trivy's CycloneDX 1.6)
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          go install github.com/google/osv-scanner/v2/cmd/osv-scanner@v2.0.0
-          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+          gh release download --repo google/osv-scanner --pattern 'osv-scanner_linux_amd64' --dir . \
+            || { echo "::error::could not download osv-scanner release"; exit 1; }
+          sudo install -m 0755 osv-scanner_linux_amd64 /usr/local/bin/osv-scanner
 
       - name: Install trivy
         env:
