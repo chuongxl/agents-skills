@@ -18,9 +18,25 @@ for t in osv-scanner trivy; do
 done
 
 FAILS=0
+
+# In GitHub Actions, surface failure details as annotations (readable without the raw log).
+annotate() { # annotate <text>
+  [[ -n "${GITHUB_ACTIONS:-}" ]] || return 0
+  local msg="${1:0:3500}"
+  msg="${msg//$'\n'/%0A}"
+  echo "::error::${msg}"
+}
+
 check() { # check <label> <command...>
   local label="$1"; shift
-  if "$@"; then echo "  ok    $label"; else echo "  FAIL  $label"; FAILS=$((FAILS+1)); fi
+  local out
+  if out=$("$@" 2>&1); then
+    echo "  ok    $label"
+  else
+    echo "  FAIL  $label"; echo "$out" | sed 's/^/        /'
+    annotate "FAIL: $label"$'\n'"$out"
+    FAILS=$((FAILS+1))
+  fi
 }
 
 # Workspace config pointing at the fixtures; one entry per fixture repo.
@@ -63,6 +79,10 @@ done
 
 OUT="$WORK/out"
 A="python3 -I $HERE/assert-findings.py"
+for f in "$OUT"/*/osv.stderr "$OUT"/*/osv-sbom.stderr; do
+  [[ -s "$f" ]] && annotate "$(basename "$(dirname "$f")")/$(basename "$f"):"$'\n'"$(head -c 1500 "$f")"
+done
+annotate "scan logs:"$'\n'"$(cat "$WORK/osv.log" "$WORK/sbom.log" | grep -v '^$' | head -60)"
 echo "== assertions"
 check "maven:  log4j-core has Log4Shell"        $A "$OUT/maven-log4j/osv.json" log4j-core CVE-2021-44228
 check "python: Django has CVE-2019-14234"       $A "$OUT/python-django/osv.json" django CVE-2019-14234
