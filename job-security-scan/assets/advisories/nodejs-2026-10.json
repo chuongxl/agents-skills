@@ -37,8 +37,10 @@
         "tier": "vendor",
         "vendor": "Node.js",
         "url": "https://nodejs.org/en/blog/vulnerability/october-2026-security-releases",
-        "fetched_at": "2026-10-23T00:00:00Z",
-        "method": "llm-assisted"
+        "fetched_at": "2026-10-23T05:25:38Z",
+        "sha256": "04e6cd57840f58779d7b9e5ec312c58259ba9276691dec6c453bdc3dbabd0a74",
+        "method": "llm-assisted",
+        "approved_by": "Alex Nguyen"
       }
     },
     {
@@ -72,8 +74,10 @@
         "tier": "vendor",
         "vendor": "Node.js",
         "url": "https://nodejs.org/en/blog/vulnerability/october-2026-security-releases",
-        "fetched_at": "2026-10-23T00:00:00Z",
-        "method": "llm-assisted"
+        "fetched_at": "2026-10-23T05:25:38Z",
+        "sha256": "04e6cd57840f58779d7b9e5ec312c58259ba9276691dec6c453bdc3dbabd0a74",
+        "method": "llm-assisted",
+        "approved_by": "Alex Nguyen"
       }
     },
     {
@@ -112,8 +116,10 @@
         "tier": "vendor",
         "vendor": "Node.js",
         "url": "https://nodejs.org/en/blog/vulnerability/october-2026-security-releases",
-        "fetched_at": "2026-10-23T00:00:00Z",
-        "method": "llm-assisted"
+        "fetched_at": "2026-10-23T05:25:38Z",
+        "sha256": "04e6cd57840f58779d7b9e5ec312c58259ba9276691dec6c453bdc3dbabd0a74",
+        "method": "llm-assisted",
+        "approved_by": "Alex Nguyen"
       }
     },
     {
@@ -152,8 +158,10 @@
         "tier": "vendor",
         "vendor": "Node.js",
         "url": "https://nodejs.org/en/blog/vulnerability/october-2026-security-releases",
-        "fetched_at": "2026-10-23T00:00:00Z",
-        "method": "llm-assisted"
+        "fetched_at": "2026-10-23T05:25:38Z",
+        "sha256": "04e6cd57840f58779d7b9e5ec312c58259ba9276691dec6c453bdc3dbabd0a74",
+        "method": "llm-assisted",
+        "approved_by": "Alex Nguyen"
       }
     },
     {
@@ -192,8 +200,10 @@
         "tier": "vendor",
         "vendor": "Node.js",
         "url": "https://nodejs.org/en/blog/vulnerability/october-2026-security-releases",
-        "fetched_at": "2026-10-23T00:00:00Z",
-        "method": "llm-assisted"
+        "fetched_at": "2026-10-23T05:25:38Z",
+        "sha256": "04e6cd57840f58779d7b9e5ec312c58259ba9276691dec6c453bdc3dbabd0a74",
+        "method": "llm-assisted",
+        "approved_by": "Alex Nguyen"
       }
     },
     {
@@ -232,8 +242,10 @@
         "tier": "vendor",
         "vendor": "Node.js",
         "url": "https://nodejs.org/en/blog/vulnerability/october-2026-security-releases",
-        "fetched_at": "2026-10-23T00:00:00Z",
-        "method": "llm-assisted"
+        "fetched_at": "2026-10-23T05:25:38Z",
+        "sha256": "04e6cd57840f58779d7b9e5ec312c58259ba9276691dec6c453bdc3dbabd0a74",
+        "method": "llm-assisted",
+        "approved_by": "Alex Nguyen"
       }
     },
     {
@@ -272,8 +284,10 @@
         "tier": "vendor",
         "vendor": "Node.js",
         "url": "https://nodejs.org/en/blog/vulnerability/october-2026-security-releases",
-        "fetched_at": "2026-10-23T00:00:00Z",
-        "method": "llm-assisted"
+        "fetched_at": "2026-10-23T05:25:38Z",
+        "sha256": "04e6cd57840f58779d7b9e5ec312c58259ba9276691dec6c453bdc3dbabd0a74",
+        "method": "llm-assisted",
+        "approved_by": "Alex Nguyen"
       }
     },
     {
@@ -302,8 +316,10 @@
         "tier": "vendor",
         "vendor": "Node.js",
         "url": "https://nodejs.org/en/blog/vulnerability/october-2026-security-releases",
-        "fetched_at": "2026-10-23T00:00:00Z",
-        "method": "llm-assisted"
+        "fetched_at": "2026-10-23T05:25:38Z",
+        "sha256": "04e6cd57840f58779d7b9e5ec312c58259ba9276691dec6c453bdc3dbabd0a74",
+        "method": "llm-assisted",
+        "approved_by": "Alex Nguyen"
       }
     },
     {
@@ -332,8 +348,10 @@
         "tier": "vendor",
         "vendor": "Node.js",
         "url": "https://nodejs.org/en/blog/vulnerability/october-2026-security-releases",
-        "fetched_at": "2026-10-23T00:00:00Z",
-        "method": "llm-assisted"
+        "fetched_at": "2026-10-23T05:25:38Z",
+        "sha256": "04e6cd57840f58779d7b9e5ec312c58259ba9276691dec6c453bdc3dbabd0a74",
+        "method": "llm-assisted",
+        "approved_by": "Alex Nguyen"
       }
     },
     {
@@ -372,8 +390,10 @@
         "tier": "vendor",
         "vendor": "Node.js",
         "url": "https://nodejs.org/en/blog/vulnerability/october-2026-security-releases",
-        "fetched_at": "2026-10-23T00:00:00Z",
-        "method": "llm-assisted"
+        "fetched_at": "2026-10-23T05:25:38Z",
+        "sha256": "04e6cd57840f58779d7b9e5ec312c58259ba9276691dec6c453bdc3dbabd0a74",
+        "method": "llm-assisted",
+        "approved_by": "Alex Nguyen"
       }
     },
     {
@@ -412,8 +432,10 @@
         "tier": "vendor",
         "vendor": "Node.js",
         "url": "https://nodejs.org/en/blog/vulnerability/october-2026-security-releases",
-        "fetched_at": "2026-10-23T00:00:00Z",
-        "method": "llm-assisted"
+        "fetched_at": "2026-10-23T05:25:38Z",
+        "sha256": "04e6cd57840f58779d7b9e5ec312c58259ba9276691dec6c453bdc3dbabd0a74",
+        "method": "llm-assisted",
+        "approved_by": "Alex Nguyen"
       }
     },
     {
@@ -452,8 +474,10 @@
         "tier": "vendor",
         "vendor": "Node.js",
         "url": "https://nodejs.org/en/blog/vulnerability/october-2026-security-releases",
-        "fetched_at": "2026-10-23T00:00:00Z",
-        "method": "llm-assisted"
+        "fetched_at": "2026-10-23T05:25:38Z",
+        "sha256": "04e6cd57840f58779d7b9e5ec312c58259ba9276691dec6c453bdc3dbabd0a74",
+        "method": "llm-assisted",
+        "approved_by": "Alex Nguyen"
       }
     },
     {
@@ -487,8 +511,10 @@
         "tier": "vendor",
         "vendor": "Node.js",
         "url": "https://nodejs.org/en/blog/vulnerability/october-2026-security-releases",
-        "fetched_at": "2026-10-23T00:00:00Z",
-        "method": "llm-assisted"
+        "fetched_at": "2026-10-23T05:25:38Z",
+        "sha256": "04e6cd57840f58779d7b9e5ec312c58259ba9276691dec6c453bdc3dbabd0a74",
+        "method": "llm-assisted",
+        "approved_by": "Alex Nguyen"
       }
     },
     {
@@ -517,8 +543,10 @@
         "tier": "vendor",
         "vendor": "Node.js",
         "url": "https://nodejs.org/en/blog/vulnerability/october-2026-security-releases",
-        "fetched_at": "2026-10-23T00:00:00Z",
-        "method": "llm-assisted"
+        "fetched_at": "2026-10-23T05:25:38Z",
+        "sha256": "04e6cd57840f58779d7b9e5ec312c58259ba9276691dec6c453bdc3dbabd0a74",
+        "method": "llm-assisted",
+        "approved_by": "Alex Nguyen"
       }
     },
     {
@@ -557,8 +585,10 @@
         "tier": "vendor",
         "vendor": "Node.js",
         "url": "https://nodejs.org/en/blog/vulnerability/october-2026-security-releases",
-        "fetched_at": "2026-10-23T00:00:00Z",
-        "method": "llm-assisted"
+        "fetched_at": "2026-10-23T05:25:38Z",
+        "sha256": "04e6cd57840f58779d7b9e5ec312c58259ba9276691dec6c453bdc3dbabd0a74",
+        "method": "llm-assisted",
+        "approved_by": "Alex Nguyen"
       }
     }
   ]
