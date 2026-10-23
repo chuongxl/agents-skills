@@ -56,16 +56,13 @@ jobs:
           echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
 
       - name: Install trivy
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          VER=0.58.0
-          URL="https://github.com/aquasecurity/trivy/releases/download/v${VER}/trivy_${VER}_Linux-64bit.tar.gz"
-          CODE=$(curl -sSL -o trivy.tgz -w '%{http_code} %{url_effective}' "$URL") || true
-          echo "download: $CODE"
-          if ! tar -tzf trivy.tgz >/dev/null 2>&1; then
-            echo "::error::trivy download failed: $CODE (file: $(file -b trivy.tgz | head -c 120))"
-            exit 1
-          fi
-          tar -xzf trivy.tgz trivy
+          # Latest release; pinning tool versions is tracked in the P5 hardening issue.
+          gh release download --repo aquasecurity/trivy --pattern 'trivy_*_Linux-64bit.tar.gz' --dir . \
+            || { echo "::error::could not download trivy release"; exit 1; }
+          tar -xzf trivy_*_Linux-64bit.tar.gz trivy
           sudo install -m 0755 trivy /usr/local/bin/trivy
 
       - name: Tool versions
