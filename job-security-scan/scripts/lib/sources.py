@@ -10,6 +10,7 @@ import json
 import re
 import socket
 import ssl
+import time
 import urllib.error
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
@@ -55,7 +56,7 @@ def _check_group(items, group, allowed, errors, need_components, seen_ids):
             errors.append("%s: must be an object" % where)
             continue
         sid = item.get("id", "")
-        if not isinstance(sid, str) or not _ID_RE.match(sid):
+        if not isinstance(sid, str) or not _ID_RE.fullmatch(sid):
             errors.append("%s: id must be lowercase kebab-case (got %r)" % (where, sid))
         elif sid in seen_ids:
             errors.append("%s: duplicate id '%s'" % (where, sid))
@@ -68,7 +69,7 @@ def _check_group(items, group, allowed, errors, need_components, seen_ids):
                 errors.append("%s: needs a non-empty components list" % where)
             else:
                 for pat in comps:
-                    if not isinstance(pat, str) or not _PATTERN_RE.match(pat):
+                    if not isinstance(pat, str) or not _PATTERN_RE.fullmatch(pat):
                         errors.append("%s: component pattern %r must be 'runtime:<name>' or 'pkg:<type>/...'" % (where, pat))
         if group == "aggregators" and item.get("tier") not in AGGREGATOR_TIERS:
             errors.append("%s: tier must be one of %s (got %r)" % (where, ", ".join(AGGREGATOR_TIERS), item.get("tier")))
@@ -85,7 +86,7 @@ def validate_sources(data):
     errors = []
     if not isinstance(data, dict):
         return ["sources.json: top level must be an object"]
-    if data.get("schema_version") != 1:
+    if type(data.get("schema_version")) is not int or data.get("schema_version") != 1:
         errors.append("schema_version: must be 1")
     allowed = data.get("allowed_hosts")
     if not isinstance(allowed, list) or not allowed:
@@ -134,8 +135,23 @@ class _AllowlistRedirect(urllib.request.HTTPRedirectHandler):
         return urllib.request.HTTPRedirectHandler.redirect_request(self, req, fp, code, msg, headers, newurl)
 
 
+def _retry_once(opener, url, timeout):
+    """One delayed retry for a rate-limited or failing server (429/5xx)."""
+    time.sleep(2)
+    req = urllib.request.Request(url, method="GET", headers={"User-Agent": USER_AGENT})
+    try:
+        with opener.open(req, timeout=timeout) as resp:
+            return 200 <= resp.status < 300
+    except (urllib.error.URLError, socket.timeout, ssl.SSLError, OSError):
+        return False
+
+
 def check_url(url, allowed, timeout=20):
     """HEAD (falling back to GET) one URL. Returns dict(url, ok, status, note)."""
+    if not isinstance(url, str) or not url.startswith("https://"):
+        return {"url": url, "ok": False, "status": None, "note": "refused: URL is not https"}
+    if _host(url) not in allowed:
+        return {"url": url, "ok": False, "status": None, "note": "refused: host '%s' is not allowlisted" % _host(url)}
     opener = urllib.request.build_opener(_AllowlistRedirect(allowed))
     last = {"url": url, "ok": False, "status": None, "note": ""}
     for method in ("HEAD", "GET"):
@@ -149,6 +165,9 @@ def check_url(url, allowed, timeout=20):
             last = {"url": url, "ok": False, "status": exc.code, "note": "HTTP %d" % exc.code}
             if exc.code in (400, 403, 405, 501) and method == "HEAD":
                 continue  # some servers reject HEAD; retry with GET
+            if exc.code == 429 or exc.code >= 500:
+                if _retry_once(opener, url, timeout):
+                    return {"url": url, "ok": True, "status": 200, "note": "ok after retry"}
             return last
         except (urllib.error.URLError, socket.timeout, ssl.SSLError, OSError) as exc:
             reason = getattr(exc, "reason", exc)

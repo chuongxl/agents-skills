@@ -29,6 +29,14 @@ import advisory  # noqa: E402
 import sources  # noqa: E402
 
 
+def _display(path):
+    """Relative path when possible, so every message prints paths the same way."""
+    try:
+        return os.path.relpath(path)
+    except ValueError:  # different drive on Windows
+        return path
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description="Validate advisory bundles and sources.json")
     ap.add_argument("paths", nargs="*", help="bundle files or directories (default: assets/advisories and assets/advisory-examples)")
@@ -41,6 +49,7 @@ def main(argv=None):
     args = ap.parse_args(argv)
 
     paths = args.paths or [os.path.join(SKILL_DIR, "assets", d) for d in ("advisories", "advisory-examples")]
+    paths = [_display(p) for p in paths]
 
     try:
         schema = advisory.load_json(args.schema)
@@ -64,7 +73,10 @@ def main(argv=None):
 
     checks = None
     if args.check_sources:
-        checks = sources.check_sources(src_data, timeout=args.timeout)
+        if src_errors:
+            print("NOTE   skipping --check-sources: sources.json has errors; fix them first", file=sys.stderr)
+        else:
+            checks = sources.check_sources(src_data, timeout=args.timeout)
 
     n_err = len(src_errors) + sum(len(r["errors"]) for r in results)
     n_warn = sum(len(r["warnings"]) for r in results)

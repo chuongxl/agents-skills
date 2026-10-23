@@ -14,6 +14,7 @@ validator and a seed dataset; scanning is wired in later phases.
 | `assets/advisories/**/*.json` | Committed advisory bundles (used for scanning) |
 | `assets/advisory-examples/` | Format examples, validated but never used for scanning |
 | `scripts/validate-advisories.py` | Validates bundles and `sources.json` |
+| `scripts/test-advisory-lib.py` | Self-tests (`python3 -I scripts/test-advisory-lib.py`) |
 
 ## Resolution order
 
