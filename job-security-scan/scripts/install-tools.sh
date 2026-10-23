@@ -76,16 +76,14 @@ else
 fi
 
 # 6. OSV-Scanner — needed for every ecosystem (lockfiles are detected per repo)
-if true; then
-  if command -v osv-scanner &>/dev/null; then ok "osv-scanner"; else
-    log "Installing osv-scanner..."
-    if [[ "$OS" == "Darwin" ]]; then
-      brew install osv-scanner 2>/dev/null && ok "osv-scanner" || fail "osv-scanner"
-    else
-      curl -sSfL -o /usr/local/bin/osv-scanner \
-        "https://github.com/google/osv-scanner/releases/latest/download/osv-scanner_linux_amd64" \
-        && chmod +x /usr/local/bin/osv-scanner && ok "osv-scanner" || fail "osv-scanner"
-    fi
+if command -v osv-scanner &>/dev/null; then ok "osv-scanner"; else
+  log "Installing osv-scanner..."
+  if [[ "$OS" == "Darwin" ]]; then
+    brew install osv-scanner 2>/dev/null && ok "osv-scanner" || fail "osv-scanner"
+  else
+    curl -sSfL -o /usr/local/bin/osv-scanner \
+      "https://github.com/google/osv-scanner/releases/latest/download/osv-scanner_linux_amd64" \
+      && chmod +x /usr/local/bin/osv-scanner && ok "osv-scanner" || fail "osv-scanner"
   fi
 fi
 

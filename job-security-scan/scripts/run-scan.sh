@@ -79,9 +79,10 @@ osv_out_flag() {
   echo "$OSV_OUT_FLAG"
 }
 
-# Ecosystem detection (descriptors in ecosystems/*.json). Output is cached per repo.
+# Ecosystem detection (descriptors in ecosystems/*.json).
 detect_cached() {  # detect_cached <path> <format>  -> prints detection output
-  python3 -I "$SKILL_DIR/scripts/detect-ecosystems.py" "$1" --format "$2" 2>/dev/null
+  python3 -I "$SKILL_DIR/scripts/detect-ecosystems.py" "$1" --format "$2" \
+    || echo "  ⚠️  ecosystem detection failed for $1 (see error above) - results may be incomplete" >&2
 }
 
 # ─── SCANNERS ─────────────────────────────────────────────────────────────

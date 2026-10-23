@@ -2,7 +2,7 @@ name: job-security-scan-tests
 
 on:
   push:
-    branches: ["**"]
+    branches: [main]
     paths:
       - "job-security-scan/**"
       - ".github/workflows/job-security-scan-e2e.yml"
