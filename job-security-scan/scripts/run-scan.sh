@@ -275,7 +275,7 @@ run_sbom() {
   mkdir -p "$(dirname "$sbom")"
 
   _log sbom "$repo" "Unmapped or lockfile-less stack - generating CycloneDX SBOM..."
-  trivy fs "$path" --scanners none --format cyclonedx --output "$sbom" --no-progress --quiet 2>"$OUTPUT_BASE/$repo/sbom.stderr" || true
+  trivy fs "$path" --scanners license --format cyclonedx --output "$sbom" --no-progress --quiet 2>"$OUTPUT_BASE/$repo/sbom.stderr" || true
   if [[ ! -s "$sbom" ]]; then _warn sbom "$repo" "could not generate SBOM - see $OUTPUT_BASE/$repo/sbom.stderr"; return; fi
 
   local comps
