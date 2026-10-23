@@ -1,0 +1,37 @@
+name: job-security-scan-advisory-watch
+
+# Daily: fetch vendor advisories, match them against this repository, open one issue per new hit.
+on:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Print what would be opened, create nothing"
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  watch:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/cache@v4
+        with:
+          path: .advisory-cache
+          key: advisories-${{ github.run_id }}
+          restore-keys: advisories-
+      - name: Watch
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          python3 -I job-security-scan/scripts/advisory-watch.py \
+            --github-repo "${{ github.repository }}" --cache .advisory-cache --target . \
+            ${{ (github.event_name == 'workflow_dispatch' && inputs.dry_run) && '--dry-run' || '' }}

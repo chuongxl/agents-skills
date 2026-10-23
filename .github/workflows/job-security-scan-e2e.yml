@@ -32,6 +32,8 @@ jobs:
         run: python3 -I job-security-scan/scripts/test-advisory-lib.py
       - name: Ecosystem tests
         run: python3 -I job-security-scan/scripts/test-ecosystems.py
+      - name: Advisory engine tests
+        run: python3 -I job-security-scan/scripts/test-engine.py
       - name: Advisory data validates
         run: python3 -I job-security-scan/scripts/validate-advisories.py --strict
       - name: Ecosystem descriptors validate
@@ -89,3 +91,49 @@ jobs:
 
       - name: Real end-to-end scan of fixtures
         run: bash job-security-scan/tests/e2e/run-e2e.sh
+
+  advisory-live:
+    name: Live advisory fetch and match
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Fetch every source in sources.json
+        run: |
+          S=job-security-scan/scripts
+          python3 -I $S/fetch-advisories.py --out "$RUNNER_TEMP/adv" \
+            || { c=$?; [ $c -eq 3 ] && echo "::warning::some sources unreachable" || { echo "::error::fetch exit $c"; exit $c; }; }
+          python3 -I $S/validate-advisories.py "$RUNNER_TEMP/adv/advisories" --strict \
+            || { echo "::error::fetched advisories failed schema validation"; exit 1; }
+          n=$(ls "$RUNNER_TEMP/adv/advisories" | wc -l)
+          echo "advisory files: $n"
+          [ "$n" -ge 1 ] || { echo "::error::no advisories fetched"; exit 1; }
+          python3 -I - "$RUNNER_TEMP/adv/manifest.json" <<'PY'
+          import json, sys
+          m = json.load(open(sys.argv[1]))
+          for k, v in sorted(m.get("sources", {}).items()):
+              print("%-28s %s" % (k, v.get("status") if isinstance(v, dict) else v))
+              if isinstance(v, dict) and v.get("status") != "ok":
+                  print("::warning::source %s: %s" % (k, v))
+          PY
+      - name: Match fixtures against live data
+        run: |
+          S=job-security-scan/scripts; F=job-security-scan/tests/fixtures/node-22-14-demo
+          python3 -I $S/match.py --repo $F --cache "$RUNNER_TEMP/adv" --fail-on none --format json --output "$RUNNER_TEMP/m22.json" >/dev/null
+          python3 -I - "$RUNNER_TEMP/m22.json" <<'PY'
+          import json, sys
+          ids = {f["id"] for f in json.load(open(sys.argv[1]))["findings"] if f["component"] == "runtime:node"}
+          if not ids: print("::error::Node 22.14.0 matched nothing against live data"); sys.exit(1)
+          print("node 22.14.0 findings:", len(ids))
+          PY
+      - name: Re-fetch produces no diff
+        run: |
+          S=job-security-scan/scripts
+          (cd "$RUNNER_TEMP/adv" && find . -type f ! -name manifest.json | sort | xargs sha256sum) > "$RUNNER_TEMP/h1"
+          python3 -I $S/fetch-advisories.py --out "$RUNNER_TEMP/adv" || [ $? -eq 3 ]
+          (cd "$RUNNER_TEMP/adv" && find . -type f ! -name manifest.json | sort | xargs sha256sum) > "$RUNNER_TEMP/h2"
+          diff "$RUNNER_TEMP/h1" "$RUNNER_TEMP/h2" || { echo "::error::second fetch changed files"; exit 1; }
+      - name: Watch dry run
+        run: python3 -I job-security-scan/scripts/advisory-watch.py --github-repo ${{ github.repository }} --cache "$RUNNER_TEMP/adv" --no-fetch --target job-security-scan/tests/fixtures/node-22-14-demo --dry-run
