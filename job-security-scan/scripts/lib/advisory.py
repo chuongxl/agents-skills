@@ -54,6 +54,11 @@ def _resolve_ref(ref, root):
     return node
 
 
+def _strict_end(pattern):
+    # Python's '$' also matches before a trailing newline; JSON Schema's does not.
+    return re.sub(r"(?<!\\)\$$", r"\\Z", pattern)
+
+
 def validate_schema(instance, schema, root=None, path="$"):
     """Return a list of error strings; empty list means valid."""
     root = root if root is not None else schema
@@ -62,7 +67,7 @@ def validate_schema(instance, schema, root=None, path="$"):
     if "$ref" in schema:
         return validate_schema(instance, _resolve_ref(schema["$ref"], root), root, path)
 
-    if "const" in schema and instance != schema["const"]:
+    if "const" in schema and (instance != schema["const"] or type(instance) is not type(schema["const"])):
         errors.append("%s: must be %r" % (path, schema["const"]))
         return errors
 
@@ -82,7 +87,7 @@ def validate_schema(instance, schema, root=None, path="$"):
     if isinstance(instance, str):
         if "minLength" in schema and len(instance) < schema["minLength"]:
             errors.append("%s: shorter than %d characters" % (path, schema["minLength"]))
-        if "pattern" in schema and not re.search(schema["pattern"], instance):
+        if "pattern" in schema and not re.search(_strict_end(schema["pattern"]), instance):
             errors.append("%s: %r does not match pattern %s" % (path, instance, schema["pattern"]))
 
     if isinstance(instance, (int, float)) and not isinstance(instance, bool):

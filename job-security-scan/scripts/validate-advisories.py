@@ -5,7 +5,7 @@ Usage:
   python3 -I scripts/validate-advisories.py [PATH ...] [--strict] [--check-sources] [--json]
                                             [--sources FILE] [--schema FILE] [--timeout SECONDS]
 
-PATH is a bundle file or a directory (searched recursively); default is assets/advisories.
+PATH is a bundle file or a directory (searched recursively); default is assets/advisories plus assets/advisory-examples.
 
 Exit codes:
   0  everything valid (and every source reachable when --check-sources is used)
@@ -31,7 +31,7 @@ import sources  # noqa: E402
 
 def main(argv=None):
     ap = argparse.ArgumentParser(description="Validate advisory bundles and sources.json")
-    ap.add_argument("paths", nargs="*", help="bundle files or directories (default: assets/advisories)")
+    ap.add_argument("paths", nargs="*", help="bundle files or directories (default: assets/advisories and assets/advisory-examples)")
     ap.add_argument("--sources", default=os.path.join(SKILL_DIR, "assets", "sources.json"))
     ap.add_argument("--schema", default=os.path.join(SKILL_DIR, "assets", "advisory.schema.json"))
     ap.add_argument("--strict", action="store_true", help="treat warnings (e.g. unapproved llm-assisted data) as errors")
@@ -40,7 +40,7 @@ def main(argv=None):
     ap.add_argument("--json", action="store_true", help="machine-readable output")
     args = ap.parse_args(argv)
 
-    paths = args.paths or [os.path.join(SKILL_DIR, "assets", "advisories")]
+    paths = args.paths or [os.path.join(SKILL_DIR, "assets", d) for d in ("advisories", "advisory-examples")]
 
     try:
         schema = advisory.load_json(args.schema)

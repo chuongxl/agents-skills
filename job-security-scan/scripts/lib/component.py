@@ -79,8 +79,10 @@ def parse_purl(purl):
             qualifiers[k.lower()] = unquote(v)
 
     version = None
-    if "@" in rest:
-        rest, version = rest.rsplit("@", 1)
+    head, slash, last = rest.rpartition("/")
+    if "@" in last:  # a scope's '@' (pkg:npm/@scope/name) sits before the last '/'
+        last, version = last.rsplit("@", 1)
+        rest = head + slash + last
         version = unquote(version)
         if version == "":
             raise PurlError("empty version in %r" % (purl,))
@@ -154,4 +156,5 @@ def matches_pattern(component, pattern):
         return key == pattern
     if not pattern.startswith("pkg:"):
         return False
+    pattern = pattern.replace("@", "%40")  # keys are canonical, so '@scope' is '%40scope'
     return fnmatch.fnmatchcase(key, pattern)

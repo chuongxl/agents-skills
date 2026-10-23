@@ -11,8 +11,8 @@ validator and a seed dataset; scanning is wired in later phases.
 | --- | --- |
 | `assets/advisory.schema.json` | Format of an advisory bundle |
 | `assets/sources.json` | Trusted-source registry: allowed hosts, vendors, aggregators |
-| `assets/advisories/*.json` | Committed advisory bundles (used for scanning) |
-| `assets/advisories/examples/` | Format examples, validated but never used for scanning |
+| `assets/advisories/**/*.json` | Committed advisory bundles (used for scanning) |
+| `assets/advisory-examples/` | Format examples, validated but never used for scanning |
 | `scripts/validate-advisories.py` | Validates bundles and `sources.json` |
 
 ## Resolution order
@@ -26,7 +26,7 @@ When two sources disagree, the vendor range wins and the conflict is flagged for
 
 ## Add an advisory
 
-1. Copy a bundle from `assets/advisories/examples/` and edit it.
+1. Copy a bundle from `assets/advisory-examples/` and edit it.
 2. Set `source.url` to the vendor page; its host must be in `allowed_hosts` of `sources.json`.
 3. Use `method: "manual"` if you typed it from the bulletin, `"llm-assisted"` if a model parsed it.
    LLM-assisted data stays a warning until a human sets `source.approved_by`;
