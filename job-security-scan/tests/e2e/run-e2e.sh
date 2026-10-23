@@ -79,16 +79,16 @@ done
 
 OUT="$WORK/out"
 A="python3 -I $HERE/assert-findings.py"
-for f in "$OUT"/*/osv.stderr "$OUT"/*/osv-sbom.stderr; do
+for f in "$OUT"/*/osv.stderr "$OUT"/*/osv-sbom.stderr "$OUT"/*/sbom.stderr; do
   [[ -s "$f" ]] && annotate "$(basename "$(dirname "$f")")/$(basename "$f"):"$'\n'"$(head -c 1500 "$f")"
 done
 annotate "scan logs:"$'\n'"$(cat "$WORK/osv.log" "$WORK/sbom.log" | grep -v '^$' | head -60)"
 echo "== assertions"
-check "maven:  log4j-core has Log4Shell"        $A "$OUT/maven-log4j/osv.json" log4j-core CVE-2021-44228
+check "maven:  log4j-core has Log4Shell"        $A "$OUT/maven-log4j/osv.json" org.apache.logging.log4j:log4j-core CVE-2021-44228
 check "python: Django has CVE-2019-14234"       $A "$OUT/python-django/osv.json" django CVE-2019-14234
 check "go:     x/text has CVE-2020-14040"       $A "$OUT/go-text/osv.json" golang.org/x/text CVE-2020-14040
 check "node:   lodash has CVE-2020-8203"        $A "$OUT/node-lodash/osv.json" lodash CVE-2020-8203
-check "monorepo: Maven part found"              $A "$OUT/monorepo/osv.json" log4j-core CVE-2021-44228
+check "monorepo: Maven part found"              $A "$OUT/monorepo/osv.json" org.apache.logging.log4j:log4j-core CVE-2021-44228
 check "monorepo: Node part found"               $A "$OUT/monorepo/osv.json" lodash CVE-2020-8203
 check "unmapped: SBOM produced"                 test -s "$OUT/unmapped-swift/sbom.cdx.json"
 check "unmapped: SBOM-matched finding"          $A "$OUT/unmapped-swift/osv-sbom.json" swift-nio-http2 CVE-2023-44487 GHSA-qppj-fm5r-hxr3

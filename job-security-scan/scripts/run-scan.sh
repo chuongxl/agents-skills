@@ -275,8 +275,8 @@ run_sbom() {
   mkdir -p "$(dirname "$sbom")"
 
   _log sbom "$repo" "Unmapped or lockfile-less stack - generating CycloneDX SBOM..."
-  trivy fs "$path" --scanners none --format cyclonedx --output "$sbom" --no-progress --quiet 2>/dev/null || true
-  if [[ ! -s "$sbom" ]]; then _warn sbom "$repo" "could not generate SBOM"; return; fi
+  trivy fs "$path" --scanners none --format cyclonedx --output "$sbom" --no-progress --quiet 2>"$OUTPUT_BASE/$repo/sbom.stderr" || true
+  if [[ ! -s "$sbom" ]]; then _warn sbom "$repo" "could not generate SBOM - see $OUTPUT_BASE/$repo/sbom.stderr"; return; fi
 
   local comps
   comps=$(python3 -c "import json; print(len(json.load(open('$sbom')).get('components',[])))" 2>/dev/null || echo 0)
