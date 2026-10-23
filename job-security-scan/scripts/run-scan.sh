@@ -7,7 +7,7 @@
 # Flags:
 #   --config   Path to repository.md config file (default: auto-discover)
 #   --repo     Scan one repo by name only (default: all active repos)
-#   --scanner  Run one scanner only: gitleaks|trivy|semgrep|hadolint|osv|trufflehog|all
+#   --scanner  Run one scanner only: gitleaks|trivy|semgrep|hadolint|osv|sbom|trufflehog|all
 #
 # Reads all team/repo config from repository.md — no hardcoded values.
 
@@ -69,6 +69,11 @@ _fail() { echo "  🔴 [$1] $2: $3"; GLOBAL_EXIT=2; }
 _skip() { echo "  ⏭️  [$1] $2: $3 — skipped"; }
 
 has_tool() { command -v "$1" &>/dev/null; }
+
+# Ecosystem detection (descriptors in ecosystems/*.json). Output is cached per repo.
+detect_cached() {  # detect_cached <path> <format>  -> prints detection output
+  python3 -I "$SKILL_DIR/scripts/detect-ecosystems.py" "$1" --format "$2" 2>/dev/null
+}
 
 # ─── SCANNERS ─────────────────────────────────────────────────────────────
 
@@ -167,10 +172,15 @@ run_semgrep() {
 
   if ! has_tool semgrep; then _skip semgrep "$repo" "tool not installed"; return; fi
 
-  _log semgrep "$repo" "Running SAST (${#SEMGREP_RULESETS[@]} rulesets)..."
+  # Rulesets = base set from config + rulesets of every detected language, de-duplicated.
+  local rulesets=()
+  while IFS= read -r r; do [[ -n "$r" ]] && rulesets+=("$r"); done < <(
+    { printf '%s\n' "${SEMGREP_RULESETS[@]}"; detect_cached "$path" semgrep; } | sort -u)
+
+  _log semgrep "$repo" "Running SAST (${#rulesets[@]} rulesets: ${rulesets[*]})..."
 
   local config_args=()
-  for r in "${SEMGREP_RULESETS[@]}"; do
+  for r in "${rulesets[@]}"; do
     config_args+=(--config "$r")
   done
 
@@ -218,20 +228,27 @@ run_hadolint() {
 
 run_osv() {
   local repo="$1" path="$2"
-  local lockfile="$path/yarn.lock"
+  local out="$OUTPUT_BASE/$repo/osv.json"
 
-  if [[ ! -f "$lockfile" ]]; then _skip osv "$repo" "no yarn.lock"; return; fi
+  local lockfiles=()
+  while IFS= read -r lf; do [[ -n "$lf" ]] && lockfiles+=("$lf"); done < <(detect_cached "$path" lockfiles)
+
+  if [[ ${#lockfiles[@]} -eq 0 ]]; then _skip osv "$repo" "no supported lockfile found"; return; fi
   if ! has_tool osv-scanner; then _skip osv "$repo" "tool not installed"; return; fi
 
-  local out="$OUTPUT_BASE/$repo/osv.json"
   mkdir -p "$(dirname "$out")"
+  _log osv "$repo" "Scanning ${#lockfiles[@]} lockfile(s) via OSV.dev: ${lockfiles[*]}"
 
-  _log osv "$repo" "Scanning transitive deps via OSV.dev..."
-  osv-scanner scan \
-    --lockfile "yarn:$lockfile" \
-    --format json \
-    --output "$out" \
-    2>/dev/null || true
+  # osv-scanner v2: `scan source -L <file>` (repeatable); the parser is chosen from the file name.
+  local args=()
+  for lf in "${lockfiles[@]}"; do args+=(-L "$path/$lf"); done
+  osv-scanner scan source "${args[@]}" --format json --output "$out" 2>"$OUTPUT_BASE/$repo/osv.stderr"
+  local rc=$?
+  # exit 0 = clean, 1 = vulnerabilities found; anything else is a scanner error
+  if [[ $rc -gt 1 || ! -s "$out" ]]; then
+    _warn osv "$repo" "osv-scanner failed (exit $rc) - see $OUTPUT_BASE/$repo/osv.stderr"
+    return
+  fi
 
   local count
   count=$(python3 -c \
@@ -241,7 +258,45 @@ run_osv() {
   if [[ "$count" -eq 0 ]]; then
     _pass osv "$repo" "No OSV vulnerabilities"
   else
-    _warn osv "$repo" "$count package(s) with CVEs — see $out"
+    _warn osv "$repo" "$count package(s) with CVEs - see $out"
+  fi
+}
+
+run_sbom() {
+  local repo="$1" path="$2"
+
+  if [[ "$(detect_cached "$path" needs-sbom)" != "true" ]]; then
+    _skip sbom "$repo" "every detected ecosystem has a lockfile"; return
+  fi
+  if ! has_tool trivy; then _skip sbom "$repo" "tool not installed"; return; fi
+
+  local sbom="$OUTPUT_BASE/$repo/sbom.cdx.json"
+  local out="$OUTPUT_BASE/$repo/osv-sbom.json"
+  mkdir -p "$(dirname "$sbom")"
+
+  _log sbom "$repo" "Unmapped or lockfile-less stack - generating CycloneDX SBOM..."
+  trivy fs "$path" --scanners none --format cyclonedx --output "$sbom" --no-progress --quiet 2>/dev/null || true
+  if [[ ! -s "$sbom" ]]; then _warn sbom "$repo" "could not generate SBOM"; return; fi
+
+  local comps
+  comps=$(python3 -c "import json; print(len(json.load(open('$sbom')).get('components',[])))" 2>/dev/null || echo 0)
+  if [[ "$comps" -eq 0 ]]; then _skip sbom "$repo" "SBOM has no components"; return; fi
+
+  if ! has_tool osv-scanner; then _pass sbom "$repo" "SBOM written ($comps components) - osv-scanner missing, not matched"; return; fi
+
+  osv-scanner scan source --sbom "$sbom" --format json --output "$out" 2>"$OUTPUT_BASE/$repo/osv-sbom.stderr"
+  local rc=$?
+  if [[ $rc -gt 1 || ! -s "$out" ]]; then
+    _warn sbom "$repo" "SBOM match failed (exit $rc) - see $OUTPUT_BASE/$repo/osv-sbom.stderr"; return
+  fi
+  local count
+  count=$(python3 -c \
+    "import json; d=json.load(open('$out')); print(sum(len(r.get('packages',[])) for r in d.get('results',[])))" \
+    2>/dev/null || echo 0)
+  if [[ "$count" -eq 0 ]]; then
+    _pass sbom "$repo" "SBOM ($comps components) - no OSV vulnerabilities"
+  else
+    _warn sbom "$repo" "SBOM ($comps components): $count package(s) with CVEs - see $out"
   fi
 }
 
@@ -290,6 +345,7 @@ run_scanner_for_repo() {
     semgrep)    run_semgrep    "$repo" "$path" ;;
     hadolint)   run_hadolint   "$repo" "$path" ;;
     osv)        run_osv        "$repo" "$path" ;;
+    sbom)       run_sbom       "$repo" "$path" ;;
     trufflehog) run_trufflehog "$repo" "$path" ;;
     all)
       run_gitleaks   "$repo" "$path"
@@ -297,11 +353,12 @@ run_scanner_for_repo() {
       run_semgrep    "$repo" "$path"
       run_hadolint   "$repo" "$path"
       run_osv        "$repo" "$path"
+      run_sbom       "$repo" "$path"
       run_trufflehog "$repo" "$path"
       ;;
     *)
       echo "Unknown scanner: $SCANNER"
-      echo "Valid: gitleaks | trivy | semgrep | hadolint | osv | trufflehog | all"
+      echo "Valid: gitleaks | trivy | semgrep | hadolint | osv | sbom | trufflehog | all"
       exit 1
       ;;
   esac

@@ -1,0 +1,86 @@
+name: job-security-scan-tests
+
+on:
+  push:
+    branches: ["**"]
+    paths:
+      - "job-security-scan/**"
+      - ".github/workflows/job-security-scan-e2e.yml"
+  pull_request:
+    paths:
+      - "job-security-scan/**"
+      - ".github/workflows/job-security-scan-e2e.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  offline:
+    name: Offline tests (Python ${{ matrix.python }})
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.8", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Advisory library tests
+        run: python3 -I job-security-scan/scripts/test-advisory-lib.py
+      - name: Ecosystem tests
+        run: python3 -I job-security-scan/scripts/test-ecosystems.py
+      - name: Advisory data validates
+        run: python3 -I job-security-scan/scripts/validate-advisories.py --strict
+      - name: Ecosystem descriptors validate
+        run: python3 -I job-security-scan/scripts/detect-ecosystems.py --validate
+
+  e2e:
+    name: Real scanners on fixtures (osv-scanner + trivy)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "stable"
+
+      - name: Install osv-scanner v2
+        run: |
+          go install github.com/google/osv-scanner/v2/cmd/osv-scanner@v2.0.0
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+
+      - name: Install trivy
+        run: |
+          curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh \
+            | sudo sh -s -- -b /usr/local/bin v0.58.0
+
+      - name: Tool versions
+        run: |
+          osv-scanner --version
+          trivy --version
+
+      - name: Every Semgrep ruleset in the descriptors exists in the registry
+        run: |
+          python3 - <<'PY'
+          import glob, json, sys, urllib.request, urllib.error
+          rulesets = sorted({r for f in glob.glob("job-security-scan/ecosystems/*.json")
+                             for r in json.load(open(f)).get("semgrep", [])})
+          bad = []
+          for r in rulesets:
+              try:
+                  code = urllib.request.urlopen("https://semgrep.dev/c/" + r, timeout=30).status
+              except urllib.error.HTTPError as e:
+                  code = e.code
+              print(r, code)
+              if code != 200:
+                  bad.append(r)
+          sys.exit("unknown rulesets: %s" % bad if bad else 0)
+          PY
+
+      - name: Real end-to-end scan of fixtures
+        run: bash job-security-scan/tests/e2e/run-e2e.sh

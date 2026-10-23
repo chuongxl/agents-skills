@@ -13,7 +13,7 @@ eval "$(python3 "$SKILL_DIR/scripts/parse-config.py" "$CONFIG")"
 
 log()  { echo "  [install] $*"; }
 ok()   { echo "  ✅ $1 ready ($(command -v "$1"))"; }
-skip() { echo "  ⏭️  $1 not needed for stack [$STACK] — skipping"; }
+skip() { echo "  ⏭️  $1 not needed — skipping"; }
 fail() { echo "  ❌ $1 failed to install"; FAILED+=("$1"); }
 
 install_brew_linux() {
@@ -61,7 +61,7 @@ else
   skip "hadolint"
 fi
 
-# 5. Semgrep — only if stack includes ts/js/py languages
+# 5. Semgrep — base rulesets always apply; language rulesets are added per repo at scan time
 NEEDS_SEMGREP=false
 for s in "${SEMGREP_RULESETS[@]:-}"; do
   [[ "$s" == p/* ]] && NEEDS_SEMGREP=true && break
@@ -75,8 +75,8 @@ else
   skip "semgrep"
 fi
 
-# 6. OSV-Scanner — only if package manager is yarn/npm/pnpm
-if [[ "$PACKAGE_MANAGER" =~ ^(yarn|npm|pnpm)$ ]]; then
+# 6. OSV-Scanner — needed for every ecosystem (lockfiles are detected per repo)
+if true; then
   if command -v osv-scanner &>/dev/null; then ok "osv-scanner"; else
     log "Installing osv-scanner..."
     if [[ "$OS" == "Darwin" ]]; then
@@ -87,8 +87,6 @@ if [[ "$PACKAGE_MANAGER" =~ ^(yarn|npm|pnpm)$ ]]; then
         && chmod +x /usr/local/bin/osv-scanner && ok "osv-scanner" || fail "osv-scanner"
     fi
   fi
-else
-  skip "osv-scanner"
 fi
 
 echo ""
