@@ -79,10 +79,6 @@ done
 
 OUT="$WORK/out"
 A="python3 -I $HERE/assert-findings.py"
-for f in "$OUT"/*/osv.stderr "$OUT"/*/osv-sbom.stderr "$OUT"/*/sbom.stderr; do
-  [[ -s "$f" ]] && annotate "$(basename "$(dirname "$f")")/$(basename "$f"):"$'\n'"$(head -c 1500 "$f")"
-done
-annotate "scan logs:"$'\n'"$(cat "$WORK/osv.log" "$WORK/sbom.log" | grep -v '^$' | head -60)"
 echo "== assertions"
 check "maven:  log4j-core has Log4Shell"        $A "$OUT/maven-log4j/osv.json" org.apache.logging.log4j:log4j-core CVE-2021-44228
 check "python: Django has CVE-2019-14234"       $A "$OUT/python-django/osv.json" django CVE-2019-14234
@@ -93,6 +89,13 @@ check "monorepo: Node part found"               $A "$OUT/monorepo/osv.json" loda
 check "unmapped: SBOM produced"                 test -s "$OUT/unmapped-swift/sbom.cdx.json"
 check "unmapped: SBOM-matched finding"          $A "$OUT/unmapped-swift/osv-sbom.json" github.com/apple/swift-nio-http2 CVE-2023-44487 GHSA-qppj-fm5r-hxr3
 check "mapped repos skip the SBOM fallback"     test ! -e "$OUT/maven-log4j/sbom.cdx.json"
+
+if [[ $FAILS -gt 0 ]]; then
+  for f in "$OUT"/*/osv.stderr "$OUT"/*/osv-sbom.stderr "$OUT"/*/sbom.stderr; do
+    [[ -s "$f" ]] && annotate "$(basename "$(dirname "$f")")/$(basename "$f"):"$'\n'"$(head -c 1500 "$f")"
+  done
+  annotate "scan logs:"$'\n'"$(cat "$WORK/osv.log" "$WORK/sbom.log" | grep -v '^$' | head -60)"
+fi
 
 echo
 if [[ $FAILS -eq 0 ]]; then echo "e2e: all checks passed"; else echo "e2e: $FAILS check(s) failed"; fi
