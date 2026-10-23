@@ -29,8 +29,8 @@ def main(argv):
     if hit:
         print("PASS  %s: %s" % (package, ", ".join(sorted(hit))))
         return 0
-    print("FAIL  %s: expected one of %s; package reported %s; packages with findings: %s" % (
-        package, sorted(wanted), "yes" if package in seen else "no", sorted(k for k, v in seen.items() if v)))
+    print("FAIL  %s: expected one of %s; ids reported for it: %s; packages with findings: %s" % (
+        package, sorted(wanted), sorted(seen.get(package, set())) or "none", sorted(k for k, v in seen.items() if v)))
     return 1
 
 

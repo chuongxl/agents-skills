@@ -186,7 +186,7 @@ class ScannerWiringTests(unittest.TestCase):
         self.calls = os.path.join(self.work, "calls.log")
         stub = '#!/usr/bin/env bash\necho "$(basename "$0") $*" >> "%s"\n' % self.calls
         # osv-scanner stub writes a report to the --output path
-        osv = stub + ('out=""; prev=""; for a in "$@"; do [ "$prev" = "--output" ] && out="$a"; prev="$a"; done\n'
+        osv = stub + ('out=""; prev=""; for a in "$@"; do case "$prev" in --output|--output-file) out="$a";; esac; prev="$a"; done\n'
                       '[ -n "$out" ] && echo \'{"results":[]}\' > "$out"\nexit 0\n')
         trivy = stub + ('out=""; prev=""; for a in "$@"; do [ "$prev" = "--output" ] && out="$a"; prev="$a"; done\n'
                         '[ -n "$out" ] && echo \'{"components":[{"name":"x"}]}\' > "$out"\nexit 0\n')
@@ -222,7 +222,7 @@ class ScannerWiringTests(unittest.TestCase):
         self.assertEqual(len(sbom_calls), 1, calls)
         self.assertIn("unmapped-swift", sbom_calls[0])
         self.assertIn("--format cyclonedx", sbom_calls[0])
-        self.assertIn("--sbom", calls)
+        self.assertIn("-L ", calls)
         self.assertIn("every detected ecosystem has a lockfile", r.stdout)
 
     def test_semgrep_gets_detected_rulesets_without_stack(self):

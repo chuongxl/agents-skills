@@ -91,7 +91,7 @@ check "node:   lodash has CVE-2020-8203"        $A "$OUT/node-lodash/osv.json" l
 check "monorepo: Maven part found"              $A "$OUT/monorepo/osv.json" org.apache.logging.log4j:log4j-core CVE-2021-44228
 check "monorepo: Node part found"               $A "$OUT/monorepo/osv.json" lodash CVE-2020-8203
 check "unmapped: SBOM produced"                 test -s "$OUT/unmapped-swift/sbom.cdx.json"
-check "unmapped: SBOM-matched finding"          $A "$OUT/unmapped-swift/osv-sbom.json" swift-nio-http2 CVE-2023-44487 GHSA-qppj-fm5r-hxr3
+check "unmapped: SBOM-matched finding"          $A "$OUT/unmapped-swift/osv-sbom.json" github.com/apple/swift-nio-http2 CVE-2023-44487 GHSA-qppj-fm5r-hxr3
 check "mapped repos skip the SBOM fallback"     test ! -e "$OUT/maven-log4j/sbom.cdx.json"
 
 echo

@@ -70,6 +70,15 @@ _skip() { echo "  ⏭️  [$1] $2: $3 — skipped"; }
 
 has_tool() { command -v "$1" &>/dev/null; }
 
+# osv-scanner flag names changed across v2 releases (--output -> --output-file, --sbom -> -L).
+OSV_OUT_FLAG=""
+osv_out_flag() {
+  if [[ -z "$OSV_OUT_FLAG" ]]; then
+    if osv-scanner scan source --help 2>&1 | grep -q -- '--output-file'; then OSV_OUT_FLAG="--output-file"; else OSV_OUT_FLAG="--output"; fi
+  fi
+  echo "$OSV_OUT_FLAG"
+}
+
 # Ecosystem detection (descriptors in ecosystems/*.json). Output is cached per repo.
 detect_cached() {  # detect_cached <path> <format>  -> prints detection output
   python3 -I "$SKILL_DIR/scripts/detect-ecosystems.py" "$1" --format "$2" 2>/dev/null
@@ -242,7 +251,7 @@ run_osv() {
   # osv-scanner v2: `scan source -L <file>` (repeatable); the parser is chosen from the file name.
   local args=()
   for lf in "${lockfiles[@]}"; do args+=(-L "$path/$lf"); done
-  osv-scanner scan source "${args[@]}" --format json --output "$out" 2>"$OUTPUT_BASE/$repo/osv.stderr"
+  osv-scanner scan source "${args[@]}" --format json "$(osv_out_flag)" "$out" 2>"$OUTPUT_BASE/$repo/osv.stderr"
   local rc=$?
   # exit 0 = clean, 1 = vulnerabilities found; anything else is a scanner error
   if [[ $rc -gt 1 || ! -s "$out" ]]; then
@@ -284,8 +293,13 @@ run_sbom() {
 
   if ! has_tool osv-scanner; then _pass sbom "$repo" "SBOM written ($comps components) - osv-scanner missing, not matched"; return; fi
 
-  osv-scanner scan source --sbom "$sbom" --format json --output "$out" 2>"$OUTPUT_BASE/$repo/osv-sbom.stderr"
+  # Newer osv-scanner reads an SBOM with -L; older v2 releases only know --sbom.
+  osv-scanner scan source -L "$sbom" --format json "$(osv_out_flag)" "$out" 2>"$OUTPUT_BASE/$repo/osv-sbom.stderr"
   local rc=$?
+  if [[ $rc -gt 1 ]]; then
+    osv-scanner scan source --sbom "$sbom" --format json "$(osv_out_flag)" "$out" 2>"$OUTPUT_BASE/$repo/osv-sbom.stderr"
+    rc=$?
+  fi
   if [[ $rc -gt 1 || ! -s "$out" ]]; then
     _warn sbom "$repo" "SBOM match failed (exit $rc) - see $OUTPUT_BASE/$repo/osv-sbom.stderr"; return
   fi
