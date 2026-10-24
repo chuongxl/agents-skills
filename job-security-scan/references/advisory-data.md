@@ -58,3 +58,13 @@ confirmed against the live site.
 ## Exit codes
 
 0 ok, 1 validation errors, 2 usage or unreadable input, 3 unreachable sources.
+
+## Fetch, match and watch
+
+| Script | Purpose |
+|---|---|
+| `scripts/fetch-advisories.py --out DIR` | Fetch every source in `sources.json` (host allowlist, HTTPS only, size limits, schema-validated, never executed). Writes only when content changed, so an unchanged source yields no diff. Exit 3 = some sources unreachable (previous data kept). |
+| `scripts/match.py --repo DIR --cache DIR` | Match the inventory (runtimes, Dockerfile base images, SBOM) against the advisories. States: affected, possibly-affected, affected-end-of-life, affected-if-condition-holds, pending, unknown-version. KEV raises severity one step. Conditions: `--env os=linux --env libc=glibc`. |
+| `scripts/advisory-watch.py --github-repo O/N --cache DIR --target DIR` | The scheduled job: fetch, match, open one issue per new hit (deduplicated by marker, closed issues are not reopened). `--dry-run` prints only. |
+
+The daily job is `.github/workflows/job-security-scan-advisories.yml`. Set `ADVISORY_OFFLINE=1` to make `run-scan.sh` skip fetching.

@@ -301,8 +301,59 @@ def parse_trufflehog(repo, results_dir, workspace):
 
 # ─── Collect All Findings ─────────────────────────────────────────────────────
 
+def parse_advisories(repo, results_dir, workspace):
+    """Parse match.py output (vendor-first advisory engine)."""
+    findings = []
+    json_path = Path(results_dir) / repo / "advisories.json"
+    if not json_path.exists():
+        return findings
+    try:
+        data = json.loads(json_path.read_text())
+    except Exception:
+        return findings
+    labels = {
+        "affected": "Affected",
+        "possibly-affected": "Possibly affected (version not pinned)",
+        "affected-end-of-life": "Affected (end-of-life line)",
+        "affected-if-condition-holds": "Affected if condition holds",
+        "pending": "Vendor pre-announcement (details pending)",
+        "unknown-version": "Version unknown",
+    }
+    for f in data.get("findings", []):
+        sev = f.get("severity", "unknown").upper()
+        if f.get("state") == "pending":
+            sev = "LOW"
+        elif sev == "UNKNOWN":
+            sev = "MEDIUM"
+        note = labels.get(f.get("state"), f.get("state", ""))
+        if f.get("unmet_conditions"):
+            note += ": " + ", ".join("%s=%s" % (c["type"], c["value"]) for c in f["unmet_conditions"])
+        if f.get("exploited"):
+            note += " | actively exploited (CISA KEV)"
+        if f.get("conflicts"):
+            note += " | sources disagree on the fixed version"
+        src = f.get("source", {})
+        findings.append({
+            "repo": repo,
+            "scanner": "advisory",
+            "type": "vulnerability",
+            "severity": sev,
+            "file": f.get("location") or f.get("component", ""),
+            "line": None,
+            "package": f.get("component", ""),
+            "installed_version": f.get("installed") or "",
+            "fixed_version": f.get("fixed_in") or "",
+            "rule_id": f.get("id", ""),
+            "title": f.get("title", ""),
+            "description": ("%s - source: %s (%s)" % (note, src.get("vendor", ""), src.get("tier", "")))[:300],
+            "url": src.get("url", ""),
+            "workspace": workspace,
+        })
+    return findings
+
+
 def collect_findings(results_dir, repos, workspace):
-    parsers = [parse_gitleaks, parse_trufflehog, parse_trivy, parse_semgrep, parse_hadolint, parse_osv]
+    parsers = [parse_gitleaks, parse_trufflehog, parse_trivy, parse_semgrep, parse_hadolint, parse_osv, parse_advisories]
     all_findings = []
     for repo in repos:
         for parser in parsers:

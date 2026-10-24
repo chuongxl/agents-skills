@@ -18,7 +18,7 @@ from urllib.parse import urlparse
 
 from advisory import AdvisoryError, load_json
 
-FORMATS = ("html", "rss", "json", "osv", "ghsa", "text")
+FORMATS = ("html", "rss", "json", "osv", "ghsa", "ghsa-repo", "text")
 AGGREGATOR_TIERS = ("aggregator", "enrichment", "lifecycle")
 _ID_RE = re.compile(r"^[a-z][a-z0-9-]*$")
 _PATTERN_RE = re.compile(r"^(runtime:[a-z][a-z0-9.+-]*|pkg:[a-z][a-z0-9.+-]*/\S+)$")

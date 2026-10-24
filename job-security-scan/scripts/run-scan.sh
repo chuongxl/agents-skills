@@ -7,7 +7,7 @@
 # Flags:
 #   --config   Path to repository.md config file (default: auto-discover)
 #   --repo     Scan one repo by name only (default: all active repos)
-#   --scanner  Run one scanner only: gitleaks|trivy|semgrep|hadolint|osv|sbom|trufflehog|all
+#   --scanner  Run one scanner only: gitleaks|trivy|semgrep|hadolint|osv|sbom|advisories|trufflehog|all
 #
 # Reads all team/repo config from repository.md — no hardcoded values.
 
@@ -315,6 +315,57 @@ run_sbom() {
   fi
 }
 
+# Vendor-first advisory engine: fetch once per run, then match every repo against the cache.
+ADVISORY_CACHE=""
+fetch_advisories_once() {
+  [[ -n "$ADVISORY_CACHE" ]] && return
+  ADVISORY_CACHE="$OUTPUT_BASE/.advisory-cache"
+  mkdir -p "$ADVISORY_CACHE"
+  [[ -n "${ADVISORY_OFFLINE:-}" ]] && return   # use committed advisories only (tests, air-gapped runs)
+  # Network trouble must not break the scan: committed advisories (assets/advisories) still apply.
+  python3 -I "$SKILL_DIR/scripts/fetch-advisories.py" --out "$ADVISORY_CACHE" \
+    --only nodejs nextjs go cisa-kev endoflife ghsa \
+    >"$OUTPUT_BASE/advisory-fetch.log" 2>&1 \
+    || echo "  🟡 [advisories] some sources could not be fetched - see $OUTPUT_BASE/advisory-fetch.log"
+}
+
+run_advisories() {
+  local repo="$1" path="$2"
+  local out="$OUTPUT_BASE/$repo/advisories.json"
+  mkdir -p "$(dirname "$out")"
+
+  fetch_advisories_once
+
+  local args=(--repo "$path" --cache "$ADVISORY_CACHE" --output "$out" --fail-on none)
+  if has_tool trivy; then
+    local sbom="$OUTPUT_BASE/$repo/advisories-sbom.cdx.json"
+    trivy fs "$path" --scanners license --format cyclonedx --output "$sbom" --no-progress --quiet 2>/dev/null || true
+    [[ -s "$sbom" ]] && args+=(--sbom "$sbom")
+  fi
+
+  _log advisories "$repo" "Matching vendor and aggregator advisories..."
+  python3 -I "$SKILL_DIR/scripts/match.py" "${args[@]}" >"$OUTPUT_BASE/$repo/advisories.txt" 2>&1
+  local rc=$?
+  if [[ $rc -ne 0 ]]; then
+    _warn advisories "$repo" "advisory matching failed - see $OUTPUT_BASE/$repo/advisories.txt"; return
+  fi
+
+  local crit_high actionable
+  read -r crit_high actionable < <(python3 -c "
+import json
+d = json.load(open('$out'))
+act = [f for f in d['findings'] if f['state'] != 'pending']
+print(sum(1 for f in act if f['severity'] in ('critical', 'high')), len(act))
+" 2>/dev/null || echo "0 0")
+  if [[ "${crit_high:-0}" -gt 0 ]]; then
+    _fail advisories "$repo" "$crit_high critical/high of $actionable applicable advisory(ies) - see $OUTPUT_BASE/$repo/advisories.txt"
+  elif [[ "${actionable:-0}" -gt 0 ]]; then
+    _warn advisories "$repo" "$actionable applicable advisory(ies) - see $OUTPUT_BASE/$repo/advisories.txt"
+  else
+    _pass advisories "$repo" "No applicable advisories"
+  fi
+}
+
 run_trufflehog() {
   local repo="$1" path="$2"
   local out="$OUTPUT_BASE/$repo/trufflehog.json"
@@ -361,6 +412,7 @@ run_scanner_for_repo() {
     hadolint)   run_hadolint   "$repo" "$path" ;;
     osv)        run_osv        "$repo" "$path" ;;
     sbom)       run_sbom       "$repo" "$path" ;;
+    advisories) run_advisories "$repo" "$path" ;;
     trufflehog) run_trufflehog "$repo" "$path" ;;
     all)
       run_gitleaks   "$repo" "$path"
@@ -369,11 +421,12 @@ run_scanner_for_repo() {
       run_hadolint   "$repo" "$path"
       run_osv        "$repo" "$path"
       run_sbom       "$repo" "$path"
+      run_advisories "$repo" "$path"
       run_trufflehog "$repo" "$path"
       ;;
     *)
       echo "Unknown scanner: $SCANNER"
-      echo "Valid: gitleaks | trivy | semgrep | hadolint | osv | sbom | trufflehog | all"
+      echo "Valid: gitleaks | trivy | semgrep | hadolint | osv | sbom | advisories | trufflehog | all"
       exit 1
       ;;
   esac
