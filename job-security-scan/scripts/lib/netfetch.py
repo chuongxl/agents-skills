@@ -23,6 +23,18 @@ class FetchError(Exception):
     pass
 
 
+class _NoAuthAcrossHosts(_AllowlistRedirect):
+    """Allowlisted redirects, but never forward an Authorization header to another host."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        new = _AllowlistRedirect.redirect_request(self, req, fp, code, msg, headers, newurl)
+        if new is not None and urlparse(newurl).hostname != urlparse(req.full_url).hostname:
+            for h in ("Authorization", "authorization"):
+                new.headers.pop(h, None)
+                new.unredirected_hdrs.pop(h, None)
+        return new
+
+
 def host_of(url):
     return (urlparse(url).hostname or "").lower()
 
@@ -33,7 +45,7 @@ def fetch(url, allowed_hosts, max_bytes=DEFAULT_MAX_BYTES, timeout=30, headers=N
         raise FetchError("refused: not https: %s" % url)
     if host_of(url) not in allowed_hosts:
         raise FetchError("refused: host '%s' is not allowlisted" % host_of(url))
-    opener = urllib.request.build_opener(_AllowlistRedirect(set(allowed_hosts)))
+    opener = urllib.request.build_opener(_NoAuthAcrossHosts(set(allowed_hosts)))
     hdrs = {"User-Agent": USER_AGENT, "Accept": "application/json, text/xml, text/html;q=0.8, */*;q=0.5"}
     hdrs.update(headers or {})
     last = None

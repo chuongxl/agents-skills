@@ -344,6 +344,18 @@ class FetchTests(unittest.TestCase):
         self.assertEqual(rc, 2)
 
 
+class NetfetchTests(unittest.TestCase):
+    def test_authorization_not_forwarded_to_another_host(self):
+        import urllib.request
+        import netfetch
+        h = netfetch._NoAuthAcrossHosts({"a.example", "b.example"})
+        req = urllib.request.Request("https://a.example/x", headers={"Authorization": "Bearer t"})
+        def has_auth(r):
+            return "Authorization" in {k.title() for k in list(r.headers) + list(r.unredirected_hdrs)}
+        self.assertFalse(has_auth(h.redirect_request(req, None, 302, "", {}, "https://b.example/y")))
+        self.assertTrue(has_auth(h.redirect_request(req, None, 302, "", {}, "https://a.example/z")))
+
+
 class MatchCliTests(unittest.TestCase):
     def run_cli(self, *args):
         return subprocess.run([sys.executable, "-I", MATCH] + list(args), capture_output=True, text=True)
@@ -379,6 +391,17 @@ class MatchCliTests(unittest.TestCase):
         self.assertIn("Ignored 15 unapproved", r.stdout)
         r = self.run_cli("--repo", os.path.join(FIX, "node-22-14-demo"), "--advisories", d, "--trust-unapproved")
         self.assertEqual(r.returncode, 1)
+
+    def test_fixtures_are_not_scanned_from_a_parent_dir(self):
+        """The daily job scans the whole repo; test fixtures must not be inventoried."""
+        self.assertEqual(inventory.runtimes_from_repo(os.path.dirname(os.path.dirname(FIX))), [])
+
+    def test_allow_empty_inventory(self):
+        d = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, d)
+        self.assertEqual(self.run_cli("--repo", d).returncode, 2)
+        r = self.run_cli("--repo", d, "--allow-empty", "--fail-on", "none")
+        self.assertEqual(r.returncode, 0, r.stderr)
 
     def test_usage_and_invalid_data(self):
         self.assertEqual(self.run_cli().returncode, 2)

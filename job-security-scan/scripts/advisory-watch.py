@@ -122,7 +122,7 @@ def main(argv=None):
         print("fetch: exit %d%s" % (r.returncode, " (some sources unreachable)" if r.returncode == 3 else ""))
 
     report_path = os.path.join(args.cache, "match-report.json")
-    cmd = py + [os.path.join(SKILL_DIR, "scripts", "match.py"), "--cache", args.cache, "--output", report_path, "--fail-on", "none", "--format", "json"]
+    cmd = py + [os.path.join(SKILL_DIR, "scripts", "match.py"), "--cache", args.cache, "--output", report_path, "--fail-on", "none", "--format", "json", "--allow-empty"]
     for flag, val in (("--repo", args.target), ("--sbom", args.sbom), ("--inventory", args.inventory)):
         if val:
             cmd += [flag, val]

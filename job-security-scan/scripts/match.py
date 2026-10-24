@@ -101,7 +101,7 @@ def run(args):
     if args.inventory:
         comps += inventory.from_json(args.inventory)
     env.update(parse_env(args.env))
-    if not comps:
+    if not comps and not args.allow_empty:
         print("ERROR: empty inventory - give --repo, --sbom or --inventory with something in it", file=sys.stderr)
         return 2
 
@@ -166,6 +166,7 @@ def main(argv=None):
     ap.add_argument("--format", choices=["text", "json"], default="text")
     ap.add_argument("--output", help="also write the JSON report here")
     ap.add_argument("--fail-on", choices=LEVELS, default="high")
+    ap.add_argument("--allow-empty", action="store_true", help="an empty inventory is a valid result, not an error")
     ap.add_argument("--trust-unapproved", action="store_true")
     ap.add_argument("--schema", default=os.path.join(SKILL_DIR, "assets", "advisory.schema.json"))
     ap.add_argument("--now", help=argparse.SUPPRESS)
