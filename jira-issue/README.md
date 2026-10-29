@@ -15,12 +15,15 @@ moment the issue is written and reports its key and URL.
 
 ### 1. Prerequisites
 
-- A `.env` file in your repository root with Jira credentials:
-  ```env
-  JIRA_URL=https://your-jira-instance.atlassian.net
-  JIRA_USERNAME=your-email@company.com
-  JIRA_API_TOKEN=your-api-token-here
-  ```
+- Jira access, one of:
+  - **Jira MCP (preferred):** the official Atlassian MCP server
+    (https://github.com/atlassian/atlassian-mcp-server) connected in your agent; or
+  - **`.env` fallback:** a file in your repository root with Jira credentials:
+    ```env
+    JIRA_URL=https://your-jira-instance.atlassian.net
+    JIRA_USERNAME=your-email@company.com
+    JIRA_API_TOKEN=your-api-token-here
+    ```
 - Network access to your Jira instance.
 
 ### 2. Invoke it
@@ -59,7 +62,7 @@ Created PAYR-52: https://your-jira-instance.atlassian.net/browse/PAYR-52
   never a paraphrase — and treats anything short of explicit approval as "keep refining."
 - **No guessing on updates**: requires an explicit issue key or URL in the prompt; never searches
   Jira to find one.
-- **Credential safety**: reads Jira credentials from `.env` only, never asks you to paste secrets
+- **Credential safety**: uses a connected Jira MCP server, else credentials from `.env`; never asks you to paste secrets
   into chat, and never prints them to logs or chat output.
 
 ## Installation
@@ -91,7 +94,8 @@ Restart your agent session so it's discovered.
 
 ## Configuration
 
-Required `.env` entries:
+If a Jira/Atlassian MCP server is connected, the skill uses it and the credential entries below
+are not needed. Otherwise, required `.env` entries:
 
 ```env
 JIRA_URL=https://your-jira-instance.atlassian.net
@@ -132,8 +136,9 @@ When `JIRA_DEFAULT_PROJECT` is unset, the interview asks for the project instead
 
 ## Troubleshooting
 
-**"Missing `.env` keys"** — populate `JIRA_URL`, `JIRA_USERNAME`, `JIRA_API_TOKEN` in the
-repository root `.env`; the skill stops before starting the interview until all three are present.
+**"No Jira access is configured"** — connect the Atlassian MCP server, or populate `JIRA_URL`,
+`JIRA_USERNAME`, `JIRA_API_TOKEN` in the repository root `.env`; the skill stops before starting
+the interview until one of them is available.
 
 **"401/403 from Jira"** — the API token is invalid or lacks permission for that project/action;
 generate a fresh token and confirm project access.

@@ -1,7 +1,9 @@
 # Jira API Reference
 
 This reference supports the `jira-issue` skill. Uses Jira REST API v2 (same as `jira-to-speckit`,
-for compatibility with existing automation) and Basic auth from `.env`.
+for compatibility with existing automation) and Basic auth from `.env`. It covers the `.env`
+fallback only: when a Jira/Atlassian MCP server is connected, the skill uses its tools instead
+(SKILL.md step 1).
 
 ## Required Environment Variables
 
@@ -15,40 +17,62 @@ Optional:
 
 - `JIRA_DEFAULT_PROJECT` — project key assumed for `create` requests that don't name one.
 
-Source `.env` and call curl in the **same** shell invocation — shell state does not persist between
-separate tool calls, so sourcing in one command and calling curl in the next sends empty
-credentials:
+Load `.env` and call curl in the **same** shell invocation — shell state does not persist between
+separate tool calls, so loading in one command and calling curl in the next sends empty
+credentials. Use bash or zsh (Git Bash or WSL on Windows), not PowerShell.
 
 ```bash
-set -a; source .env; set +a && curl -u "$JIRA_USERNAME:$JIRA_API_TOKEN" ...
+set -a; eval "$(tr -d '\r' < .env)"; set +a
+curl -sS -K <(printf 'user = "%s:%s"\n' "$JIRA_USERNAME" "$JIRA_API_TOKEN") -w '\nHTTP %{http_code}\n' ...
 ```
 
-Every example below omits the `set -a; source .env; set +a &&` prefix for brevity — prepend it to
-the same command, never run it separately.
+- **Never** use `curl -u "$JIRA_USERNAME:$JIRA_API_TOKEN"`: command arguments are visible to every
+  process on the host via `ps`. `-K <(printf ...)` hands curl the credentials through a pipe
+  (`printf` is a shell builtin, so they never reach argv or disk).
+- `tr -d '\r'` strips Windows CRLF line endings that would leave `\r` in the token (401).
+- Do not build the environment with `export $(... | xargs)`; `xargs` puts each value in argv.
+- A token containing `"` or `\` must be escaped for curl's config format; standard Jira API tokens
+  do not contain either.
+- The trailing `HTTP <code>` line is what the error handling below reads; Jira's 401 body is often
+  empty, and a successful `PUT` has no body at all.
+
+Every example below omits the `set -a; eval "$(tr -d '\r' < .env)"; set +a` line for brevity —
+put it in the same command, never run it separately.
+
+### Request bodies
+
+Send JSON bodies through a quoted heredoc (`--data-binary @- <<'JSON'`), not `-d '...'`. A
+description containing an apostrophe breaks out of a single-quoted `-d` argument, and the quoted
+heredoc stops the shell from expanding `$` or backticks in user text. The body must still be valid
+JSON: escape `"`, `\`, and newlines (`\n`) inside string values.
 
 ## Fetch an issue (update path, step 3.1)
 
 ```bash
-curl -u "$JIRA_USERNAME:$JIRA_API_TOKEN" \
+curl -sS -K <(printf 'user = "%s:%s"\n' "$JIRA_USERNAME" "$JIRA_API_TOKEN") \
+  -w '\nHTTP %{http_code}\n' \
   -H "Accept: application/json" \
   "$JIRA_URL/rest/api/2/issue/PAYR-31?fields=summary,description,issuetype,status,priority,labels,components,project"
 ```
 
-## Create an issue (create path, step 6)
+## Create an issue (create path, step 7)
 
 ```bash
-curl -u "$JIRA_USERNAME:$JIRA_API_TOKEN" \
+curl -sS -K <(printf 'user = "%s:%s"\n' "$JIRA_USERNAME" "$JIRA_API_TOKEN") \
+  -w '\nHTTP %{http_code}\n' \
   -X POST \
   -H "Content-Type: application/json" \
   "$JIRA_URL/rest/api/2/issue" \
-  -d '{
-    "fields": {
-      "project": { "key": "PAYR" },
-      "summary": "Issue title",
-      "description": "Plain text or wiki markup body (API v2 uses plain string, not ADF)",
-      "issuetype": { "name": "Story" }
-    }
-  }'
+  --data-binary @- <<'JSON'
+{
+  "fields": {
+    "project": { "key": "PAYR" },
+    "summary": "Issue title",
+    "description": "Plain text or wiki markup body (API v2 uses plain string, not ADF)",
+    "issuetype": { "name": "Story" }
+  }
+}
+JSON
 ```
 
 Optional fields to include only when the user explicitly asked for them:
@@ -63,7 +87,8 @@ Optional fields to include only when the user explicitly asked for them:
 Resolving an `accountId` for assignee (if the user names a person, not an ID):
 
 ```bash
-curl -u "$JIRA_USERNAME:$JIRA_API_TOKEN" \
+curl -sS -K <(printf 'user = "%s:%s"\n' "$JIRA_USERNAME" "$JIRA_API_TOKEN") \
+  -w '\nHTTP %{http_code}\n' \
   -H "Accept: application/json" \
   "$JIRA_URL/rest/api/2/user/search?query=<name-or-email>"
 ```
@@ -71,19 +96,22 @@ curl -u "$JIRA_USERNAME:$JIRA_API_TOKEN" \
 Successful create response includes `"key"` (e.g. `"PAYR-45"`) and `"self"` — build the browse
 URL as `{JIRA_URL}/browse/{key}`.
 
-## Update an issue (update path, step 6)
+## Update an issue (update path, step 7)
 
 ```bash
-curl -u "$JIRA_USERNAME:$JIRA_API_TOKEN" \
+curl -sS -K <(printf 'user = "%s:%s"\n' "$JIRA_USERNAME" "$JIRA_API_TOKEN") \
+  -w '\nHTTP %{http_code}\n' \
   -X PUT \
   -H "Content-Type: application/json" \
   "$JIRA_URL/rest/api/2/issue/PAYR-31" \
-  -d '{
-    "fields": {
-      "summary": "New title",
-      "description": "New full description body"
-    }
-  }'
+  --data-binary @- <<'JSON'
+{
+  "fields": {
+    "summary": "New title",
+    "description": "New full description body"
+  }
+}
+JSON
 ```
 
 A successful `PUT` returns `204 No Content` — there is no response body to parse; re-fetch the
@@ -92,7 +120,8 @@ issue (the "Fetch an issue" call above) if you need to show the user the saved s
 ## Discovering valid issue types for a project
 
 ```bash
-curl -u "$JIRA_USERNAME:$JIRA_API_TOKEN" \
+curl -sS -K <(printf 'user = "%s:%s"\n' "$JIRA_USERNAME" "$JIRA_API_TOKEN") \
+  -w '\nHTTP %{http_code}\n' \
   -H "Accept: application/json" \
   "$JIRA_URL/rest/api/2/issue/createmeta?projectKeys=PAYR&expand=projects.issuetypes"
 ```

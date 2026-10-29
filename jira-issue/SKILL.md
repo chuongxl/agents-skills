@@ -1,7 +1,7 @@
 ---
 name: jira-issue
 description: Use when the user wants a Jira issue created or an existing one updated from a natural-language request — e.g. `/jira-issue create a ticket for...`, "update PAYR-31 to add...", "file a bug in Jira for...", "log this as a Jira story". Not for reading/summarizing a ticket only (see jira-to-speckit) or for any non-Jira task tracker.
-compatibility: Requires network access and Jira REST API access. Requires `.env` entries for `JIRA_URL`, `JIRA_USERNAME`, and `JIRA_API_TOKEN`. Optional `JIRA_DEFAULT_PROJECT`.
+compatibility: Requires network access and either a connected Jira/Atlassian MCP server (preferred) or Jira REST API access with `.env` entries for `JIRA_URL`, `JIRA_USERNAME`, and `JIRA_API_TOKEN`. Optional `JIRA_DEFAULT_PROJECT`.
 license: MIT
 allowed-tools: bash view
 metadata:
@@ -33,8 +33,8 @@ OpenCode expose the same capabilities under their own names (`Bash`, `Read`).
   leaves ambiguous (e.g. replace vs. append a section, which field changes).
 - Shows the **complete draft** (title + full body + every field it will set) and stops for
   explicit confirmation before writing anything.
-- Writes via the Jira REST API (curl, Basic auth from `.env`) and reports the resulting issue
-  key and URL.
+- Reads and writes through a connected Jira/Atlassian MCP server when one is available, else via
+  the Jira REST API (curl, Basic auth from `.env`), and reports the resulting issue key and URL.
 
 ## What This Skill Does NOT Do
 
@@ -48,10 +48,9 @@ OpenCode expose the same capabilities under their own names (`Bash`, `Read`).
 ## Required Inputs
 
 - A natural-language prompt (from `/jira-issue {prompt}`) describing what to create or change.
-- Jira credentials in the repository root `.env`:
-  - `JIRA_URL`
-  - `JIRA_USERNAME`
-  - `JIRA_API_TOKEN`
+- One Jira source (see step 1), in this order of preference:
+  1. A connected Jira/Atlassian MCP server that can read, create, and edit issues, or
+  2. Jira credentials in the repository root `.env`: `JIRA_URL`, `JIRA_USERNAME`, `JIRA_API_TOKEN`.
 
 ## Optional Inputs
 
@@ -60,9 +59,10 @@ OpenCode expose the same capabilities under their own names (`Bash`, `Read`).
 
 ## Guardrails
 
-- Do not ask the user to paste secrets into chat; read credentials from `.env` only.
-- If `JIRA_URL`, `JIRA_USERNAME`, or `JIRA_API_TOKEN` is missing, stop and instruct the user to
-  populate `.env` locally — do not proceed with the interview.
+- Do not ask the user to paste secrets into chat. Use a connected Jira MCP server, else
+  credentials from `.env`.
+- If neither a Jira MCP server nor complete `.env` credentials are available, stop and show the
+  setup message from step 1c — do not proceed with the interview.
 - Update requires an explicit issue key or URL in the prompt. If absent, ask the user for one;
   never search or guess which issue is meant.
 - Ask one clarifying question at a time during the interview.
@@ -71,22 +71,48 @@ OpenCode expose the same capabilities under their own names (`Bash`, `Read`).
 - Treat anything other than a clear approval ("yes", "go ahead", "confirmed") as "keep refining"
   — re-ask or re-draft, don't write.
 - Never print `JIRA_API_TOKEN` or other `.env` values in logs or chat output.
-- Never inline the literal value of a `.env` secret into a command string — always source `.env`
-  and call curl in the same shell invocation, referencing the secret as a variable.
+- Never inline the literal value of a `.env` secret into a command string, and never pass it as a
+  curl argument (`-u user:$JIRA_API_TOKEN` shows up in `ps`). Load `.env` and call curl in the
+  same shell invocation, feeding credentials through `-K` as shown in `references/JIRA_API.md`.
 - Cap brainstormed enhancement suggestions at 3–5, grounded in the stated request. Present once;
   a decline or no reply means drop them all and move on — never re-pitch or stall on them.
 
 ## Workflow
 
-### 1. Load and verify credentials
+### 1. Choose the Jira source
 
-Load `JIRA_URL`, `JIRA_USERNAME`, `JIRA_API_TOKEN` from the repository root `.env` into the shell
-environment of the **same command** that calls curl, e.g. `set -a; source .env; set +a && curl ...`
-as one invocation — shell state does not persist between separate tool calls, so sourcing `.env` in
-one command and calling curl in the next silently sends empty credentials. Never substitute the
-literal secret value into a command string; always reference it as a shell variable (`$JIRA_API_TOKEN`)
-so it never appears in tool-call text or logs. If any variable is missing or empty, stop and tell the
-user which `.env` keys to populate, then end the skill's turn.
+Check in this order and use the first that works, for every read and write in this run. Never mix
+sources mid-run.
+
+**a. Jira MCP (preferred).** Look in this session's tool list for Jira/Atlassian MCP tools that
+get, create, and edit an issue — e.g. `getJiraIssue` / `createJiraIssue` / `editJiraIssue`
+(Atlassian Rovo MCP server) or `jira_get_issue` / `jira_create_issue` / `jira_update_issue`
+(`mcp-atlassian`). Hosts prefix names differently, so match on the operation, not the prefix.
+If the server needs a site or cloud ID, resolve it with its accessible-resources tool; if several
+sites exist and the prompt doesn't pin one (by URL host), ask which. If the server can read but has
+no create/edit tool, or its first call fails with an authentication, authorization, or
+not-connected error, treat MCP as unavailable and go to (b). A `404` / issue-not-found from a
+working server is a real answer (step 3.1), not a reason to switch source.
+
+**b. `.env` fallback.** Load `JIRA_URL`, `JIRA_USERNAME`, `JIRA_API_TOKEN` from the repository
+root `.env` in the **same command** that calls curl — shell state does not persist between
+separate tool calls, so loading `.env` in one command and calling curl in the next silently sends
+empty credentials. Follow `references/JIRA_API.md` exactly: it keeps the token out of curl's
+arguments and out of tool-call text. If any variable is missing or empty, go to (c).
+
+**c. Neither available.** Stop before the interview and tell the user, without printing any value:
+
+> No Jira access is configured. Set up one of these, then rerun:
+> 1. **Jira MCP (recommended):** connect the official Atlassian MCP server —
+>    https://github.com/atlassian/atlassian-mcp-server (endpoint `https://mcp.atlassian.com/v1/mcp`).
+> 2. **API token in `.env`:** add `JIRA_URL`, `JIRA_USERNAME`, and `JIRA_API_TOKEN` to the
+>    project-root `.env` (gitignored). Create a token at
+>    https://id.atlassian.com/manage-profile/security/api-tokens.
+
+Then end the skill's turn.
+
+The REST calls named in later steps are the `.env` path; with MCP, call the matching tool with the
+same fields.
 
 ### 2. Classify the request
 
@@ -152,7 +178,8 @@ proceed on anything less than explicit approval — go back to interviewing if t
 
 ### 8. Report and stop
 
-Report the issue key and its `{JIRA_URL}/browse/{key}` URL. End the skill's turn — do not chain
+Report the issue key and its browse URL (`{JIRA_URL}/browse/{key}`, or the URL/site the MCP
+tool returned). End the skill's turn — do not chain
 into any other skill or workflow.
 
 ## Common Edge Cases
