@@ -21,12 +21,17 @@ curl config read from stdin (`-K -`) through a pipe from the `printf` builtin. D
 zsh and bash before 5.1 back heredocs with a temp file, so the token would touch disk. A token
 containing `"` or `\` must be escaped for the curl config format; standard Jira API tokens do not.
 
-Load `.env` into the shell with the builtins `set -a; . ./.env; set +a`. Do not build the
+Load `.env` with `set -a; eval "$(tr -d '\r' < .env)"; set +a`. The `tr` strips Windows CRLF
+line endings that would otherwise leave a trailing `\r` in the token (401). Do not build the
 environment with `export $(... | xargs)` or similar; `xargs` puts each value in its own argv.
+Load and fetch in the same command: agent shell tools usually start a fresh shell per call, so
+variables loaded in an earlier call are gone. Run these in a POSIX shell (bash/zsh; Git Bash or WSL
+on Windows), not PowerShell.
 
 Stage 1 (required, minimal fields):
 
 ```bash
+set -a; eval "$(tr -d '\r' < .env)"; set +a
 printf 'user = "%s:%s"\n' "$JIRA_USERNAME" "$JIRA_API_TOKEN" | curl -K - \
   -H "Accept: application/json" \
   "$JIRA_URL/rest/api/2/issue/DDM-1234?fields=summary,description,issuetype,status,priority,labels,components,assignee,reporter,fixVersions,project,parent"
@@ -35,6 +40,7 @@ printf 'user = "%s:%s"\n' "$JIRA_USERNAME" "$JIRA_API_TOKEN" | curl -K - \
 Stage 2 (optional, only if stage 1 leaves ambiguity):
 
 ```bash
+set -a; eval "$(tr -d '\r' < .env)"; set +a
 printf 'user = "%s:%s"\n' "$JIRA_USERNAME" "$JIRA_API_TOKEN" | curl -K - \
   -H "Accept: application/json" \
   "$JIRA_URL/rest/api/2/issue/DDM-1234/comment?maxResults=5"
