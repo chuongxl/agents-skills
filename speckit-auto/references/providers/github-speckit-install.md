@@ -18,8 +18,8 @@ and continues the pipeline in the same turn. It never switches provider and neve
 2. **Sanity check**: `specify version` must print a version. Command not found after a
    successful-looking install → PATH likely missing the tool dir; report the exact output and
    stop. Never proceed with a broken install.
-3. **Resolve the host key** (`copilot` / `claude` / `opencode`) from the run's fixed host — see
-   [../shared/host-adaptation.md](../shared/host-adaptation.md). Never guess, never ask.
+3. **Resolve the host key** (`copilot` / `claude` / `opencode` / `hermes`) from the run's fixed
+   host — see [../shared/host-adaptation.md](../shared/host-adaptation.md). Never guess, never ask.
 4. **Ask the user once**: `Install GitHub Speckit` / `Stop`. `Stop` → halt and report that
    installation is required. Steps 1–2 may run before or after the ask; step 5 never runs before
    it.
