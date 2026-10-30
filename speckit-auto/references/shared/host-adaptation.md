@@ -8,7 +8,7 @@ at entry and fixed for the whole run.
 | Aspect | GitHub Copilot | Claude Code | OpenCode | Hermes Agent |
 |--------|----------------|-------------|----------|--------------|
 | Skill dirs | `~/.agents/skills/`, `.agents/skills/`, `.github/skills/`, `~/.copilot/skills/`, `~/.copilot/installed-plugins/<marketplace>/superpowers/skills/` | `~/.claude/skills/`, `.claude/skills/` | `~/.config/opencode/skills/`, `.opencode/skills/`, plus `.claude/skills/` / `.agents/skills/` | `~/.hermes/skills/` (bind-mounted as `/opt/data/skills/` in Docker) |
-| Tool names | `bash glob grep view create edit skill` | `Bash Read Edit Write Glob Grep Skill` | `bash glob grep view create edit skill` | `terminal read_file write_file patch search_files skill_view` |
+| Tool names | `bash glob grep view create edit skill ask_user` | `Bash Read Edit Write Glob Grep Skill AskUser` | `bash glob grep view create edit skill question` | `terminal read_file write_file patch search_files skill_view` |
 | Ask tool (default mode) | `ask_user` | `AskUser` | `question` | plain chat message in the session; user approves via a Slack button, `!approve`/`!deny` in the thread, or a reply in the desktop app |
 | Flags arrive via | slash-command body | slash-command body / `$ARGUMENTS` | the natural-language trigger message | the natural-language trigger message (e.g. `@hermes start DEMO-42 --issue <url>` in a Slack thread, or a desktop message) |
 | Mid-run resume marker | the skill tool list in tool context | `<skill-context name="...">` | `<available_skills>` block | none needed -- Hermes sessions never rotate on timers; the same Slack thread / session id is the run |
