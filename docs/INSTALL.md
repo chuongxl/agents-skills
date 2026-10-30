@@ -69,7 +69,9 @@ JIRA_API_TOKEN=...
 
 ### `jira-issue`
 
-Same `.env` credentials as `jira-to-speckit` above. Optionally add
+Uses a connected Jira/Atlassian MCP server
+(https://github.com/atlassian/atlassian-mcp-server) when available; otherwise the same `.env`
+credentials as `jira-to-speckit` above. Optionally add
 `JIRA_DEFAULT_PROJECT` so a create request that doesn't name a project isn't
 asked for one.
 
