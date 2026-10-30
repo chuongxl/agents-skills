@@ -44,8 +44,8 @@ Key fields:
 | `org` | GitHub organisation | `ocean-network-express` |
 | `monorepo-root` | Path to workspace root | `.` |
 | `ci-runner` | GitHub Actions runner label | `om-ddm-runner` |
-| `package-manager` | Determines lockfile type | `yarn` |
-| `stack` | Controls Semgrep rulesets | `[typescript, nodejs, nestjs]` |
+| `package-manager` | *Deprecated* - lockfiles are auto-detected | - |
+| `stack` | *Deprecated* - languages are auto-detected | - |
 | `repos[].name` | Repo directory name | `om-ddm-backend` |
 | `repos[].active` | Include in scan | `true` / `false` |
 | `repos[].has-dockerfile` | Run Hadolint | `true` / `false` |
@@ -87,7 +87,7 @@ bash scripts/install-tools.sh
 `install-tools.sh` reads the config to skip irrelevant tools:
 - **Hadolint** only installed if any repo has `has-dockerfile: true`
 - **Semgrep** only installed if stack includes TypeScript/JavaScript
-- **OSV-Scanner** only installed if `package-manager` is yarn/npm/pnpm
+- **OSV-Scanner** always installed (lockfiles of every supported ecosystem are detected per repo)
 
 ## Phase 1 — Secret Detection (Gitleaks)
 
@@ -103,8 +103,8 @@ Checks Dockerfiles against CIS benchmarks. Severity threshold from config
 
 ## Phase 3 — SAST (Semgrep)
 
-Semgrep rulesets are derived automatically from the `stack` field in
-`repository.md`. Ruleset mapping:
+Semgrep rulesets are derived automatically from the languages detected in each repo
+(`ecosystems/*.json`; see `references/ecosystems.md`). The deprecated `stack` field, if present, adds to them. Legacy `stack` mapping:
 
 | Stack entry | Semgrep ruleset |
 |-------------|----------------|
@@ -123,8 +123,10 @@ Runs only on repos where `has-dockerfile: true` in `repository.md`. Uses
 
 ## Phase 5 — Transitive CVE Scan (OSV-Scanner)
 
-Google's OSV-Scanner checks `yarn.lock` against the OSV.dev DB — catches
-transitive dependencies that Trivy sometimes misses.
+Google's OSV-Scanner checks every detected lockfile (npm, yarn, pnpm, Maven, Gradle, pip, Poetry, Go, Composer, Bundler, Cargo, NuGet) against the OSV.dev DB — catches
+transitive dependencies that Trivy sometimes misses. Repos with no recognised
+ecosystem (or an ecosystem without a lockfile) get an SBOM fallback: Trivy writes a
+CycloneDX SBOM and OSV-Scanner matches it (`sbom.cdx.json`, `osv-sbom.json`).
 
 ## Phase 6 — Verified Secret Detection (TruffleHog)
 

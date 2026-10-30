@@ -1,0 +1,285 @@
+{
+  "schema_version": 1,
+  "description": "Trusted-source registry for the advisory engine. Vendor bulletins are read first; aggregators fill gaps; enrichment and lifecycle sources only annotate. A URL is fetched only if its host is in allowed_hosts and it uses HTTPS.",
+  "tiers": {
+    "vendor": "Publisher of the software; authoritative for affected/fixed versions",
+    "aggregator": "OSV / GitHub Advisory Database; broad but can lag vendors",
+    "enrichment": "Annotates existing advisories (e.g. CISA KEV exploited flag)",
+    "lifecycle": "End-of-life dates",
+    "secondary": "Independent national CERT alerts used only to cross-check vendors"
+  },
+  "allowed_hosts": [
+    "nodejs.org",
+    "raw.githubusercontent.com",
+    "github.com",
+    "api.github.com",
+    "nextjs.org",
+    "spring.io",
+    "vuln.go.dev",
+    "go.dev",
+    "www.python.org",
+    "pypi.org",
+    "www.djangoproject.com",
+    "devblogs.microsoft.com",
+    "tomcat.apache.org",
+    "logging.apache.org",
+    "www.oracle.com",
+    "api.osv.dev",
+    "osv-vulnerabilities.storage.googleapis.com",
+    "www.cisa.gov",
+    "endoflife.date",
+    "www.csa.gov.sg",
+    "advisories.ncsc.nl"
+  ],
+  "vendors": [
+    {
+      "id": "nodejs",
+      "name": "Node.js",
+      "tier": "vendor",
+      "components": [
+        "runtime:node"
+      ],
+      "sources": [
+        {
+          "url": "https://nodejs.org/en/blog/vulnerability/",
+          "format": "html",
+          "note": "Bulletin index; one page per security release"
+        },
+        {
+          "url": "https://raw.githubusercontent.com/nodejs/security-wg/main/vuln/core/index.json",
+          "format": "json",
+          "note": "Machine-readable core vulnerabilities (path to verify)"
+        }
+      ]
+    },
+    {
+      "id": "nextjs",
+      "name": "Next.js (Vercel)",
+      "tier": "vendor",
+      "components": [
+        "pkg:npm/next"
+      ],
+      "sources": [
+        {
+          "url": "https://nextjs.org/blog",
+          "format": "html"
+        },
+        {
+          "url": "https://github.com/vercel/next.js/security/advisories",
+          "format": "html",
+          "note": "GHSA advisories published by the vendor"
+        }
+      ]
+    },
+    {
+      "id": "spring",
+      "name": "Spring (VMware Tanzu)",
+      "tier": "vendor",
+      "components": [
+        "pkg:maven/org.springframework*",
+        "pkg:maven/org.springframework.boot/*"
+      ],
+      "sources": [
+        {
+          "url": "https://spring.io/security",
+          "format": "html"
+        },
+        {
+          "url": "https://spring.io/security.rss",
+          "format": "rss",
+          "note": "RSS URL to verify"
+        }
+      ]
+    },
+    {
+      "id": "go",
+      "name": "Go",
+      "tier": "vendor",
+      "components": [
+        "runtime:go",
+        "pkg:golang/stdlib"
+      ],
+      "sources": [
+        {
+          "url": "https://vuln.go.dev/index/vulns.json",
+          "format": "osv",
+          "note": "Go vulnerability database, OSV format"
+        }
+      ]
+    },
+    {
+      "id": "cpython",
+      "name": "CPython / PSF",
+      "tier": "vendor",
+      "components": [
+        "runtime:python",
+        "pkg:pypi/*"
+      ],
+      "sources": [
+        {
+          "url": "https://www.python.org/dev/security/",
+          "format": "html"
+        },
+        {
+          "url": "https://github.com/psf/advisory-database",
+          "format": "ghsa",
+          "note": "PSF advisory database repo (to verify)"
+        }
+      ]
+    },
+    {
+      "id": "django",
+      "name": "Django",
+      "tier": "vendor",
+      "components": [
+        "pkg:pypi/django"
+      ],
+      "sources": [
+        {
+          "url": "https://www.djangoproject.com/weblog/",
+          "format": "html"
+        },
+        {
+          "url": "https://www.djangoproject.com/rss/weblog/",
+          "format": "rss",
+          "note": "Feed URL to verify"
+        }
+      ]
+    },
+    {
+      "id": "dotnet",
+      "name": ".NET (Microsoft)",
+      "tier": "vendor",
+      "components": [
+        "runtime:dotnet",
+        "pkg:nuget/microsoft.*"
+      ],
+      "sources": [
+        {
+          "url": "https://github.com/dotnet/announcements/issues",
+          "format": "html",
+          "note": "Security announcements"
+        }
+      ]
+    },
+    {
+      "id": "tomcat",
+      "name": "Apache Tomcat",
+      "tier": "vendor",
+      "components": [
+        "pkg:maven/org.apache.tomcat*",
+        "runtime:tomcat"
+      ],
+      "sources": [
+        {
+          "url": "https://tomcat.apache.org/security.html",
+          "format": "html"
+        }
+      ]
+    },
+    {
+      "id": "log4j",
+      "name": "Apache Log4j",
+      "tier": "vendor",
+      "components": [
+        "pkg:maven/org.apache.logging.log4j/*"
+      ],
+      "sources": [
+        {
+          "url": "https://logging.apache.org/log4j/2.x/security.html",
+          "format": "html"
+        }
+      ]
+    },
+    {
+      "id": "oracle-cpu",
+      "name": "Oracle Critical Patch Updates (Java/MySQL)",
+      "tier": "vendor",
+      "components": [
+        "runtime:java",
+        "pkg:maven/mysql/*"
+      ],
+      "sources": [
+        {
+          "url": "https://www.oracle.com/security-alerts/",
+          "format": "html",
+          "note": "URL to verify"
+        }
+      ]
+    }
+  ],
+  "aggregators": [
+    {
+      "id": "osv",
+      "name": "OSV.dev",
+      "tier": "aggregator",
+      "sources": [
+        {
+          "url": "https://api.osv.dev/v1/query",
+          "format": "osv"
+        },
+        {
+          "url": "https://osv-vulnerabilities.storage.googleapis.com/",
+          "format": "osv",
+          "note": "Per-ecosystem dumps"
+        }
+      ]
+    },
+    {
+      "id": "ghsa",
+      "name": "GitHub Advisory Database",
+      "tier": "aggregator",
+      "sources": [
+        {
+          "url": "https://api.github.com/advisories",
+          "format": "ghsa"
+        }
+      ]
+    },
+    {
+      "id": "cisa-kev",
+      "name": "CISA Known Exploited Vulnerabilities",
+      "tier": "enrichment",
+      "sources": [
+        {
+          "url": "https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json",
+          "format": "json"
+        }
+      ]
+    },
+    {
+      "id": "endoflife",
+      "name": "endoflife.date",
+      "tier": "lifecycle",
+      "sources": [
+        {
+          "url": "https://endoflife.date/api/nodejs.json",
+          "format": "json",
+          "note": "Pattern: /api/{product}.json"
+        }
+      ]
+    }
+  ],
+  "secondary": [
+    {
+      "id": "csa-sg",
+      "name": "CSA Singapore alerts",
+      "sources": [
+        {
+          "url": "https://www.csa.gov.sg/alerts-and-advisories/alerts",
+          "format": "html"
+        }
+      ]
+    },
+    {
+      "id": "ncsc-nl",
+      "name": "NCSC-NL advisories",
+      "sources": [
+        {
+          "url": "https://advisories.ncsc.nl/",
+          "format": "html"
+        }
+      ]
+    }
+  ]
+}

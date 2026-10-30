@@ -145,23 +145,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Detect lockfile from repository.md package-manager
+      - name: Detect lockfiles of every supported ecosystem
         id: lock
         run: |
-          PM=$(python3 ${{ env.SKILL_DIR }}/scripts/parse-config.py \
-                ${{ env.CONFIG }} --key package-manager)
-          case "$PM" in
-            yarn) echo "lockfile=yarn:./yarn.lock" >> $GITHUB_OUTPUT ;;
-            npm)  echo "lockfile=npm:./package-lock.json" >> $GITHUB_OUTPUT ;;
-            pnpm) echo "lockfile=pnpm:./pnpm-lock.yaml" >> $GITHUB_OUTPUT ;;
-            *)    echo "lockfile=" >> $GITHUB_OUTPUT ;;
-          esac
+          ARGS=""
+          while IFS= read -r lf; do
+            [ -n "$lf" ] && ARGS="$ARGS -L ./$lf"
+          done < <(python3 -I ${{ env.SKILL_DIR }}/scripts/detect-ecosystems.py . --format lockfiles)
+          echo "scan_args=$ARGS" >> $GITHUB_OUTPUT
 
       - uses: google/osv-scanner-action@v2
-        if: steps.lock.outputs.lockfile != ''
+        if: steps.lock.outputs.scan_args != ''
         with:
-          scan-args: |-
-            --lockfile=${{ steps.lock.outputs.lockfile }}
+          scan-args: ${{ steps.lock.outputs.scan_args }}
 
   # ── 6. Verified Secret Detection (TruffleHog) ─────────────────────────────
   trufflehog-scan:
