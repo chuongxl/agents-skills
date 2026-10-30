@@ -128,6 +128,8 @@ same fields.
 ### 3. Update path
 
 1. Fetch the current issue: `GET {JIRA_URL}/rest/api/2/issue/{key}?fields=summary,description,issuetype,status,priority,labels,components,project` (see `references/JIRA_API.md`).
+   With MCP, call its get-issue tool instead; treat its not-found / permission errors like the
+   status codes below.
    - `404` → tell the user the key wasn't found, ask them to confirm it.
    - `401`/`403` → tell the user credentials may be invalid or lack permission.
 2. Compare the prompt's intent against the current fields. Ask one question at a time wherever
@@ -145,7 +147,7 @@ same fields.
 3. Interview — one question at a time — until you have:
    - A concise summary/title.
    - A structured description: goal, key decisions/requirements, acceptance criteria, out of
-     scope (mirror the shape used for existing well-formed tickets in this project, e.g. PAYR-31).
+     scope (mirror the shape of existing well-formed tickets in the target project).
    - Any explicitly-requested fields (assignee, labels, priority, parent/epic link).
 
 ### 5. Brainstorm enhancements (create path only)

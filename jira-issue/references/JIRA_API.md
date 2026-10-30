@@ -22,28 +22,31 @@ separate tool calls, so loading in one command and calling curl in the next send
 credentials. Use bash or zsh (Git Bash or WSL on Windows), not PowerShell.
 
 ```bash
-set -a; eval "$(tr -d '\r' < .env)"; set +a
+while IFS='=' read -r k v || [ -n "$k" ]; do case $k in JIRA_*) v=${v%$'\r'}; v=${v#[\"\']}; v=${v%[\"\']}; export "$k=$v";; esac; done < .env
 curl -sS -K <(printf 'user = "%s:%s"\n' "$JIRA_USERNAME" "$JIRA_API_TOKEN") -w '\nHTTP %{http_code}\n' ...
 ```
 
 - **Never** use `curl -u "$JIRA_USERNAME:$JIRA_API_TOKEN"`: command arguments are visible to every
   process on the host via `ps`. `-K <(printf ...)` hands curl the credentials through a pipe
   (`printf` is a shell builtin, so they never reach argv or disk).
-- `tr -d '\r'` strips Windows CRLF line endings that would leave `\r` in the token (401).
+- The loop reads only `JIRA_*` lines as data — never `source` or `eval` `.env`, which would run
+  any shell code in it. It strips a trailing `\r` (Windows CRLF would leave it in the token → 401)
+  and one pair of surrounding quotes. `export` is a builtin, so values never reach argv.
 - Do not build the environment with `export $(... | xargs)`; `xargs` puts each value in argv.
 - A token containing `"` or `\` must be escaped for curl's config format; standard Jira API tokens
   do not contain either.
 - The trailing `HTTP <code>` line is what the error handling below reads; Jira's 401 body is often
   empty, and a successful `PUT` has no body at all.
 
-Every example below omits the `set -a; eval "$(tr -d '\r' < .env)"; set +a` line for brevity —
-put it in the same command, never run it separately.
+Every example below omits the `.env` loading line for brevity — put it in the same command,
+never run it separately.
 
 ### Request bodies
 
-Send JSON bodies through a quoted heredoc (`--data-binary @- <<'JSON'`), not `-d '...'`. A
+Send JSON bodies through a quoted heredoc (`--data-binary @- <<'JIRA_BODY'`), not `-d '...'`. A
 description containing an apostrophe breaks out of a single-quoted `-d` argument, and the quoted
-heredoc stops the shell from expanding `$` or backticks in user text. The body must still be valid
+heredoc stops the shell from expanding `$` or backticks in user text; the unusual delimiter keeps
+a user line reading `JSON` from ending the body early. The body must still be valid
 JSON: escape `"`, `\`, and newlines (`\n`) inside string values.
 
 ## Fetch an issue (update path, step 3.1)
@@ -63,7 +66,7 @@ curl -sS -K <(printf 'user = "%s:%s"\n' "$JIRA_USERNAME" "$JIRA_API_TOKEN") \
   -X POST \
   -H "Content-Type: application/json" \
   "$JIRA_URL/rest/api/2/issue" \
-  --data-binary @- <<'JSON'
+  --data-binary @- <<'JIRA_BODY'
 {
   "fields": {
     "project": { "key": "PAYR" },
@@ -72,7 +75,7 @@ curl -sS -K <(printf 'user = "%s:%s"\n' "$JIRA_USERNAME" "$JIRA_API_TOKEN") \
     "issuetype": { "name": "Story" }
   }
 }
-JSON
+JIRA_BODY
 ```
 
 Optional fields to include only when the user explicitly asked for them:
@@ -90,7 +93,8 @@ Resolving an `accountId` for assignee (if the user names a person, not an ID):
 curl -sS -K <(printf 'user = "%s:%s"\n' "$JIRA_USERNAME" "$JIRA_API_TOKEN") \
   -w '\nHTTP %{http_code}\n' \
   -H "Accept: application/json" \
-  "$JIRA_URL/rest/api/2/user/search?query=<name-or-email>"
+  -G --data-urlencode "query=<name-or-email>" \
+  "$JIRA_URL/rest/api/2/user/search"
 ```
 
 Successful create response includes `"key"` (e.g. `"PAYR-45"`) and `"self"` — build the browse
@@ -104,14 +108,14 @@ curl -sS -K <(printf 'user = "%s:%s"\n' "$JIRA_USERNAME" "$JIRA_API_TOKEN") \
   -X PUT \
   -H "Content-Type: application/json" \
   "$JIRA_URL/rest/api/2/issue/PAYR-31" \
-  --data-binary @- <<'JSON'
+  --data-binary @- <<'JIRA_BODY'
 {
   "fields": {
     "summary": "New title",
     "description": "New full description body"
   }
 }
-JSON
+JIRA_BODY
 ```
 
 A successful `PUT` returns `204 No Content` — there is no response body to parse; re-fetch the
@@ -123,11 +127,12 @@ issue (the "Fetch an issue" call above) if you need to show the user the saved s
 curl -sS -K <(printf 'user = "%s:%s"\n' "$JIRA_USERNAME" "$JIRA_API_TOKEN") \
   -w '\nHTTP %{http_code}\n' \
   -H "Accept: application/json" \
-  "$JIRA_URL/rest/api/2/issue/createmeta?projectKeys=PAYR&expand=projects.issuetypes"
+  "$JIRA_URL/rest/api/2/issue/createmeta/PAYR/issuetypes"
 ```
 
 Use this only if the interview needs to offer the project's actual configured issue types rather
-than the common defaults (Story, Task, Bug).
+than the common defaults (Story, Task, Bug). The older
+`createmeta?projectKeys=...&expand=projects.issuetypes` form is deprecated on Jira Cloud.
 
 ## Error Handling
 
