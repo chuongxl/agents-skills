@@ -1,6 +1,8 @@
 # Speckit Auto — Spec-Driven Delivery Pipeline
 
-**Version**: 0.3.0
+![Version](https://img.shields.io/badge/version-0.6.2-blue)
+
+**Version**: 0.6.2
 **Author**: Alex Nguyen
 
 ## Overview
@@ -33,15 +35,71 @@ The pipeline:
    `speckit-code-review` → fix → repeat until `pass`. No human gates in either mode.
 4. **Stage 04 — Human Review / Commit / Completion**: default mode asks for human approval before
    committing; YOLO mode auto-commits. Both modes then mark the spec `completed` with a follow-up
-   commit.
+   commit and push it. Opening a pull request sits behind its own gate: default mode asks
+   (`pr-publish`) and skips the PR when declined; YOLO opens the draft PR on its own. Either way
+   an existing PR for the branch is reused, never duplicated.
 
 ## Install
 
 Copy the `speckit-auto` folder (with `speckit-code-review` and `jira-to-speckit`) into the host's
-skill directory: `~/.agents/skills/` (Copilot), `~/.claude/skills/` (Claude Code), or
-`~/.config/opencode/skills/` (OpenCode). The skill is auto-discovered from those locations.
+skill directory: `~/.agents/skills/` (Copilot), `~/.claude/skills/` (Claude Code),
+`~/.config/opencode/skills/` (OpenCode), or `~/.hermes/skills/` (Hermes Agent; `/opt/data/skills/`
+inside its Docker container). The skill is auto-discovered from those locations.
+Requires git, bash, and Node.js >=22.13 for the built-in structured event producer.
 
-## Usage
+**Key rule**: Stage 03 is a **NO-STOP ZONE** in both default and YOLO modes; code review loops continue automatically until the spec is satisfied.
+
+<img width="754" height="501" alt="image" src="https://github.com/user-attachments/assets/bc5e90df-0523-4951-a195-3b740d1d38c6" />
+
+<img width="2120" height="3775" alt="spec-driven-development-Speckit-Auto-Skill drawio" src="https://github.com/user-attachments/assets/cbe59272-6c75-4f33-bdf9-ad7d0f6aaa22" />
+
+### Provider System
+
+Speckit Auto resolves its provider only from repo-local `.speckit/integration.json`.
+Missing or invalid config stops the pipeline and directs you to `--integration <provider>`.
+There is no global fallback or first-run provider prompt.
+
+Supported providers:
+
+| Provider | Location | Use Case |
+|----------|----------|----------|
+| `github-speckit` | Repo-installed GitHub Spec Kit agents | GitHub Actions + Spec Kit environment |
+| `superpowers` | Superpowers skills library (obra/superpowers) | Local, Claude Code, flexible environments |
+
+Each provider includes stage-specific reference files that implement the pipeline logic for that environment.
+
+### YOLO vs Default Mode
+
+**Default Mode** (recommended for critical features):
+- Runs Stages 01–04 with Stage 02 approvals, implementation-start confirmation, and Stage 04 review
+- Requires explicit human approval before implementation commit/push
+- Requires explicit human approval before a pull request is opened — the implementation approval
+  alone does not authorize publishing the branch
+- Best for production, regulatory, or high-stakes work
+
+**YOLO Mode** (`--yolo` flag):
+- Runs the same four stages, skipping human approvals and using autonomous checks
+- Stage 04 auto-commits, marks the spec completed, and pushes the completion commit
+- Opens the draft pull request without a human wait — `--yolo` is the authorization to publish
+- Ideal for internal tools, experiments, or when continuous delivery is the goal
+- All code still passes speckit-code-review before merge
+
+---
+
+## 3. Quick Start
+
+### Installation
+
+#### GitHub Copilot CLI
+Speckit Auto is auto-discovered from `~/.agents/skills/` or the repository's `.github/skills/` path, depending on how the skill is installed. No manual setup is required after copying the skill into one of those locations.
+
+#### Claude Code
+Install the skill from the Superpowers skills library, or copy the skill directory to `~/.claude/skills/`.
+
+#### Local Usage (Standalone)
+Clone the skill and ensure `.env` credentials are configured if using `--issue` with Jira.
+
+### First Use: Default Mode (With Human Review)
 
 ```bash
 # Requirement pipeline (default mode, human review at the end)
@@ -52,10 +110,13 @@ skill speckit-auto --issue https://jira.example.com/browse/PROJ-123
 
 # Fully automated: no human checkpoints
 skill speckit-auto --yolo --issue https://jira.example.com/browse/PROJ-456
+
+# Optional caller-supplied attempt UUID, retained on resume
+skill speckit-auto --run-id 123e4567-e89b-42d3-a456-426614174000 --issue https://jira.example.com/browse/PROJ-123
 ```
 
-On Copilot/Claude Code invoke as `/speckit-auto <flags>`; on OpenCode embed the flags in the
-trigger message.
+On Copilot/Claude Code invoke as `/speckit-auto <flags>`; on OpenCode and Hermes Agent embed the
+flags in the trigger message (e.g. a Slack thread `@hermes start DEMO-42 --issue <url>`).
 
 ### Provider setup (one-time)
 
@@ -92,6 +153,7 @@ other file loads at the exact moment its step runs:
 | `references/shared/operating-rules.md` | pipeline entry (run contract) |
 | `references/providers/<provider>.md` | pipeline entry — resolved provider only |
 | `references/pipeline/stage-0N-*.md` | entering that stage |
+| `references/shared/run-events.md` | after the worktree gate, at first event initialization |
 | `references/shared/commit.md` | first commit gate (Stage 02 → 03) |
 | `references/shared/host-adaptation.md` | a step needs an ask tool, skill dir, or install host key |
 | `references/shared/integration-setup.md` | `--integration` runs (no stage file loads at all) |
@@ -102,6 +164,40 @@ Rules enforced by the skill: never load the unselected provider, never load a st
 in, never re-read a file already in context, and drop stage-local context (interviews, failed
 review bodies, unused guideline files) when leaving a stage.
 
+## Structured run events
+
+Version 0.5.0 writes append-only contract-v1 JSONL to the actual worktree's
+`.speckit/events.jsonl`. After the worktree gate, `scripts/run-events.mjs init` records the
+run/stage start and atomic discovery at the source repo's `.speckit/runs/<run_id>.json`.
+Discovery is refreshed when a provisional worktree moves. Both locations are git-ignored.
+
+`--run-id <uuid>` is optional on every host. Without it, the pipeline generates a UUID once.
+Resume retains the ID and sequence; a fresh retry gets a new ID without truncating history.
+The helper path is resolved from the installed skill folder, never the project cwd.
+Setup-only invocations do not initialize events.
+
+Stages emit boundaries, default-mode named approvals, other input waits, confirmed PR URLs,
+and terminal completion/failure. Request changes answers the gate and restarts work, not a
+failed run. YOLO emits no waits for skipped gates. Completion follows required implementation
+and spec completion pushes, not just a passing review. PR events require a real HTTPS URL.
+The Stage 04 `pr-publish` decision is a named approval (`gate_waiting` / `gate_answered`),
+not a free-form question; declining it skips the PR and the run still completes.
+
+The standalone helper uses Node builtins and JSON stdin via an argument-vector invocation,
+never interpolated shell JSON. An event validation/write error stops the pipeline explicitly
+without a success claim. No raw answers, credentials, file contents, or tool output are emitted.
+See [references/shared/run-events.md](references/shared/run-events.md) for the exact invocation,
+schema, bounds, resume, and failure behavior.
+
+For Agent Ops, deploy the monitor and migrations first, then client 0.5.0, then this skill
+0.5.0. Old agents remain accepted by the monitor; new clients with old skills retain log
+fallback until this producer is installed. This release does not automatically install a
+package or replace an installed skill. Copy the reviewed bundle explicitly after deployment.
+
+Manual host/provider approval cases are listed in `test-case/speckit-auto/test-cases.md` in
+the source repository. The automated helper and instruction tests do not execute those cases
+or prove compliance by a live host. Record manual results separately.
+
 ## Troubleshooting
 
 | Symptom | Fix |
@@ -109,7 +205,9 @@ review bodies, unused guideline files) when leaving a stage.
 | "Which provider?" on every run | Run `--integration <provider>` once to persist |
 | Jira intake fails | Ensure root `.env` has all three `JIRA_*` keys; test with `jira-to-speckit` directly |
 | Stage 03 review loop doesn't converge | Simplify the spec's acceptance criteria; avoid vague language ("elegant", "performant") |
-| Missing framework | At startup and any later step, failed provider validation triggers install recovery; if still failing after install, stop and ask the user to restart Copilot / Claude Code / OpenCode, then re-run |
+| Missing framework | At startup and any later step, failed provider validation triggers install recovery; if still failing after install, stop and ask the user to restart Copilot / Claude Code / OpenCode / Hermes Agent, then re-run |
+| Event initialization/write error | Repair the reported cause and validate existing history before resume; never delete/truncate events to continue |
+| Missing/old Node | Install Node.js >=22.13 before a pipeline run; no third-party emitter packages are needed |
 
 ## Notes
 

@@ -47,8 +47,8 @@ TURN (the one legitimate no-pipeline turn end in the whole skill). Never enter t
          - **superpowers:** run the host's plugin/clone+copy command (Copilot:
            `copilot plugin marketplace add obra/superpowers-marketplace` then
            `copilot plugin install superpowers@superpowers-marketplace`; Claude Code: the
-           equivalent `/plugin` commands; OpenCode: clone `obra/superpowers` and copy
-           `skills/*` into the host skill dir) → verify on-disk skills.
+           equivalent `/plugin` commands; OpenCode and Hermes Agent: clone `obra/superpowers`
+           and copy `skills/*` into the host skill dir) → verify on-disk skills.
 
          Never invoke `speckit-constitution` or any other provider skill here — the host session
          has not been restarted yet, so an unresolvable skill in setup mode is expected, not a
@@ -60,7 +60,7 @@ TURN (the one legitimate no-pipeline turn end in the whole skill). Never enter t
 
    - **github-speckit:**
      > ✅ GitHub Speckit is configured. **Please restart your host session (Copilot / Claude
-     > Code / OpenCode) now.** After restarting, run:
+     > Code / OpenCode / Hermes Agent) now.** After restarting, run:
      > ```
      > skill speckit-constitution "constitution project to understand the project architecture"
      > ```
@@ -68,6 +68,6 @@ TURN (the one legitimate no-pipeline turn end in the whole skill). Never enter t
 
    - **superpowers:**
      > ✅ Superpowers is configured. **Please restart your host session (Copilot / Claude Code /
-     > OpenCode) now** so the new skills are discovered, then re-run your pipeline command.
+     > OpenCode / Hermes Agent) now** so the new skills are discovered, then re-run your pipeline command.
 
 5. Report: resolved provider and file path written. **END TURN.**

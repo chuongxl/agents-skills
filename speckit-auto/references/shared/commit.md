@@ -54,9 +54,16 @@ Report resulting commits (hash + subject) and the pushed branch. If nothing need
 report the Stage 03 commits instead — never report "no commit" as a failure. A failed commit that
 was actually needed, a failed push, or an unresolved rebase is a failure for the stage; a skipped
 commit on an already-clean tree is not.
+For an initialized run, emit `run_failed` with `reason.code: "git_error"` and a composed bounded
+summary before this hard stop, using the shared JSON stdin invocation. Return that terminal
+status to the calling stage so it does not emit a second failure or any success boundary.
+The exact git error stays in the human diagnostic, never in the event payload. Event write
+failure stops instrumentation explicitly; do not try to continue or claim completion.
 
 ## Scratch Must Already Be Ignored
 
 `git add -A` would otherwise sweep run scratch into the feature commit. Stage 01 guarantees
 `.superpowers/` in superpowers mode may be git-ignored if needed. The relocated `ticket.md`
 inside the artifact folder is **not** scratch and is committed with the artifacts.
+`.speckit/` must also be git-ignored in source and worktree for both providers; check that event
+history, discovery records, and locks are not staged before committing.

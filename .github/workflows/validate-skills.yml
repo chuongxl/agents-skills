@@ -31,3 +31,6 @@ jobs:
 
       - name: Python script syntax check
         run: python3 -m compileall -q tools */scripts
+
+      - name: Structured event producer tests
+        run: node --test tools/test_run_events.mjs
