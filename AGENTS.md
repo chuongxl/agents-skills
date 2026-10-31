@@ -14,7 +14,7 @@ CI (`.github/workflows/validate-skills.yml`) runs both, plus `bash -n` on `*.sh`
 ## Skills
 
 - `speckit-auto` — orchestrator; depends on `jira-to-speckit` + `speckit-code-review` being installed
-- `speckit-code-review`, `jira-to-speckit`, `job-security-scan`
+- `speckit-code-review`, `jira-to-speckit`, `jira-issue`, `job-security-scan`
 
 Not skills: `tools/`, `docs/`, `test-case/`, `speckit-companion-extension/`. Do not add a `SKILL.md` to `speckit-companion-extension/` — the validator would then treat it as a skill.
 

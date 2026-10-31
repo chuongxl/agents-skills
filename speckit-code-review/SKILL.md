@@ -6,7 +6,7 @@ description: |
   Produces strict JSON pass/fail with business coverage, missing requirements, code issues, security issues, architecture issues, and unit test coverage.
   Triggers: "speckit code review", "review with spec", "compare code to spec.md", "spec coverage audit",
   "invoke speckit-code-review", "run speckit-code-review".
-compatibility: Runs on GitHub Copilot, Claude Code, and OpenCode. Discovered from ~/.agents/skills/, ~/.claude/skills/, or ~/.config/opencode/skills/. Requires git, bash, and a spec at specs/<feature-folder>/spec.md.
+compatibility: Runs on GitHub Copilot, Claude Code, OpenCode, and Hermes Agent. Discovered from ~/.agents/skills/, ~/.claude/skills/, ~/.config/opencode/skills/, or ~/.hermes/skills/. Requires git, bash, and a spec at specs/<feature-folder>/spec.md.
 license: MIT
 allowed-tools: bash glob grep view create edit
 metadata:
@@ -26,7 +26,8 @@ The spec may come from `speckit.specify` (usually already has `FR-*`/`NFR-*` IDs
 
 Portability note: `allowed-tools` uses GitHub Copilot-style names (`bash glob grep view create edit`).
 Claude Code and OpenCode expose the same capabilities under their own names (`Bash`, `Read`, `Edit`,
-`Write`, `Glob`, `Grep`). The review procedure below is identical on all three hosts.
+`Write`, `Glob`, `Grep`). Hermes Agent exposes them as `terminal`, `read_file`, `patch`,
+`write_file`, `search_files`. The review procedure below is identical on all four hosts.
 
 ## Inputs
 

@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "advisories": [
+    {
+      "id": "CVE-2026-96889",
+      "title": "Next.js RCE affecting glibc-based Linux deployments (example of a conditional advisory)",
+      "summary": "Example only: applies when the app runs on Linux with glibc. Versions from line 16 before 16.4.1 and 10-15 before 15.5.28 are affected.",
+      "severity": "critical",
+      "status": "published",
+      "published": "2026-10-14",
+      "component": {
+        "kind": "package",
+        "ecosystem": "npm",
+        "name": "next",
+        "purl": "pkg:npm/next"
+      },
+      "affected": [
+        {
+          "line": "16",
+          "introduced": "16.0.0",
+          "fixed": "16.4.1"
+        },
+        {
+          "line": "10-15",
+          "introduced": "10.0.0",
+          "fixed": "15.5.28"
+        }
+      ],
+      "conditions": [
+        {
+          "type": "os",
+          "value": "linux"
+        },
+        {
+          "type": "libc",
+          "value": "glibc"
+        }
+      ],
+      "references": [
+        "https://www.csa.gov.sg/alerts-and-advisories/alerts"
+      ],
+      "source": {
+        "tier": "secondary",
+        "vendor": "CSA Singapore",
+        "url": "https://www.csa.gov.sg/alerts-and-advisories/alerts",
+        "fetched_at": "2026-10-23T00:00:00Z",
+        "method": "manual",
+        "approved_by": "example-only"
+      }
+    }
+  ]
+}
