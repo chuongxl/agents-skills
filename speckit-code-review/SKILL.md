@@ -13,7 +13,7 @@ metadata:
   specification: agentskills.io/specification
   output_contract: strict-json
   author: Alex Nguyen
-  version: "0.0.3"
+  version: "0.0.4"
 ---
 
 # Speckit Code Review
