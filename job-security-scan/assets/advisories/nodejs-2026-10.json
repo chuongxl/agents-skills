@@ -1,0 +1,595 @@
+{
+  "schema_version": 1,
+  "advisories": [
+    {
+      "id": "CVE-2026-105482",
+      "title": "dns.resolve truncates names containing NUL char",
+      "summary": "Node.js security release of 2026-10-21: dns.resolve truncates names containing NUL char. Fixed in 26.12.1, 24.22.1, 22.23.4.",
+      "severity": "high",
+      "status": "published",
+      "published": "2026-10-21",
+      "component": {
+        "kind": "runtime",
+        "ecosystem": "node",
+        "name": "node"
+      },
+      "affected": [
+        {
+          "line": "26",
+          "introduced": "0",
+          "fixed": "26.12.1"
+        },
+        {
+          "line": "24",
+          "introduced": "0",
+          "fixed": "24.22.1"
+        },
+        {
+          "line": "22",
+          "introduced": "0",
+          "fixed": "22.23.4"
+        }
+      ],
+      "references": [
+        "https://nodejs.org/en/blog/vulnerability/october-2026-security-releases"
+      ],
+      "source": {
+        "tier": "vendor",
+        "vendor": "Node.js",
+        "url": "https://nodejs.org/en/blog/vulnerability/october-2026-security-releases",
+        "fetched_at": "2026-10-23T05:25:38Z",
+        "sha256": "04e6cd57840f58779d7b9e5ec312c58259ba9276691dec6c453bdc3dbabd0a74",
+        "method": "llm-assisted",
+        "approved_by": "Alex Nguyen"
+      }
+    },
+    {
+      "id": "CVE-2026-105483",
+      "title": "TLS certificate hostname bypass when IP is written with fullwidth digits",
+      "summary": "Node.js security release of 2026-10-21: TLS certificate hostname bypass when IP is written with fullwidth digits. Fixed in 26.12.1, 24.22.1.",
+      "severity": "high",
+      "status": "published",
+      "published": "2026-10-21",
+      "component": {
+        "kind": "runtime",
+        "ecosystem": "node",
+        "name": "node"
+      },
+      "affected": [
+        {
+          "line": "26",
+          "introduced": "0",
+          "fixed": "26.12.1"
+        },
+        {
+          "line": "24",
+          "introduced": "0",
+          "fixed": "24.22.1"
+        }
+      ],
+      "references": [
+        "https://nodejs.org/en/blog/vulnerability/october-2026-security-releases"
+      ],
+      "source": {
+        "tier": "vendor",
+        "vendor": "Node.js",
+        "url": "https://nodejs.org/en/blog/vulnerability/october-2026-security-releases",
+        "fetched_at": "2026-10-23T05:25:38Z",
+        "sha256": "04e6cd57840f58779d7b9e5ec312c58259ba9276691dec6c453bdc3dbabd0a74",
+        "method": "llm-assisted",
+        "approved_by": "Alex Nguyen"
+      }
+    },
+    {
+      "id": "CVE-2026-106069",
+      "title": "TLS certificate hostname bypass when host loosely resolves to an IP address",
+      "summary": "Node.js security release of 2026-10-21: TLS certificate hostname bypass when host loosely resolves to an IP address. Fixed in 26.12.1, 24.22.1, 22.23.4.",
+      "severity": "high",
+      "status": "published",
+      "published": "2026-10-21",
+      "component": {
+        "kind": "runtime",
+        "ecosystem": "node",
+        "name": "node"
+      },
+      "affected": [
+        {
+          "line": "26",
+          "introduced": "0",
+          "fixed": "26.12.1"
+        },
+        {
+          "line": "24",
+          "introduced": "0",
+          "fixed": "24.22.1"
+        },
+        {
+          "line": "22",
+          "introduced": "0",
+          "fixed": "22.23.4"
+        }
+      ],
+      "references": [
+        "https://nodejs.org/en/blog/vulnerability/october-2026-security-releases"
+      ],
+      "source": {
+        "tier": "vendor",
+        "vendor": "Node.js",
+        "url": "https://nodejs.org/en/blog/vulnerability/october-2026-security-releases",
+        "fetched_at": "2026-10-23T05:25:38Z",
+        "sha256": "04e6cd57840f58779d7b9e5ec312c58259ba9276691dec6c453bdc3dbabd0a74",
+        "method": "llm-assisted",
+        "approved_by": "Alex Nguyen"
+      }
+    },
+    {
+      "id": "CVE-2026-111497",
+      "title": "Brotli decoder out-of-bounds write permits remote code execution",
+      "summary": "Node.js security release of 2026-10-21: Brotli decoder out-of-bounds write permits remote code execution. Fixed in 26.12.1, 24.22.1, 22.23.4.",
+      "severity": "high",
+      "status": "published",
+      "published": "2026-10-21",
+      "component": {
+        "kind": "runtime",
+        "ecosystem": "node",
+        "name": "node"
+      },
+      "affected": [
+        {
+          "line": "26",
+          "introduced": "0",
+          "fixed": "26.12.1"
+        },
+        {
+          "line": "24",
+          "introduced": "0",
+          "fixed": "24.22.1"
+        },
+        {
+          "line": "22",
+          "introduced": "0",
+          "fixed": "22.23.4"
+        }
+      ],
+      "references": [
+        "https://nodejs.org/en/blog/vulnerability/october-2026-security-releases"
+      ],
+      "source": {
+        "tier": "vendor",
+        "vendor": "Node.js",
+        "url": "https://nodejs.org/en/blog/vulnerability/october-2026-security-releases",
+        "fetched_at": "2026-10-23T05:25:38Z",
+        "sha256": "04e6cd57840f58779d7b9e5ec312c58259ba9276691dec6c453bdc3dbabd0a74",
+        "method": "llm-assisted",
+        "approved_by": "Alex Nguyen"
+      }
+    },
+    {
+      "id": "CVE-2026-105481",
+      "title": "Keep-alive socket processes a response written before the request was sent",
+      "summary": "Node.js security release of 2026-10-21: Keep-alive socket processes a response written before the request was sent. Fixed in 26.12.1, 24.22.1, 22.23.4.",
+      "severity": "medium",
+      "status": "published",
+      "published": "2026-10-21",
+      "component": {
+        "kind": "runtime",
+        "ecosystem": "node",
+        "name": "node"
+      },
+      "affected": [
+        {
+          "line": "26",
+          "introduced": "0",
+          "fixed": "26.12.1"
+        },
+        {
+          "line": "24",
+          "introduced": "0",
+          "fixed": "24.22.1"
+        },
+        {
+          "line": "22",
+          "introduced": "0",
+          "fixed": "22.23.4"
+        }
+      ],
+      "references": [
+        "https://nodejs.org/en/blog/vulnerability/october-2026-security-releases"
+      ],
+      "source": {
+        "tier": "vendor",
+        "vendor": "Node.js",
+        "url": "https://nodejs.org/en/blog/vulnerability/october-2026-security-releases",
+        "fetched_at": "2026-10-23T05:25:38Z",
+        "sha256": "04e6cd57840f58779d7b9e5ec312c58259ba9276691dec6c453bdc3dbabd0a74",
+        "method": "llm-assisted",
+        "approved_by": "Alex Nguyen"
+      }
+    },
+    {
+      "id": "CVE-2026-106072",
+      "title": "Non-canonical IPv4 hostnames let DNS SANs authenticate IP endpoints",
+      "summary": "Node.js security release of 2026-10-21: Non-canonical IPv4 hostnames let DNS SANs authenticate IP endpoints. Fixed in 26.12.1, 24.22.1, 22.23.4.",
+      "severity": "medium",
+      "status": "published",
+      "published": "2026-10-21",
+      "component": {
+        "kind": "runtime",
+        "ecosystem": "node",
+        "name": "node"
+      },
+      "affected": [
+        {
+          "line": "26",
+          "introduced": "0",
+          "fixed": "26.12.1"
+        },
+        {
+          "line": "24",
+          "introduced": "0",
+          "fixed": "24.22.1"
+        },
+        {
+          "line": "22",
+          "introduced": "0",
+          "fixed": "22.23.4"
+        }
+      ],
+      "references": [
+        "https://nodejs.org/en/blog/vulnerability/october-2026-security-releases"
+      ],
+      "source": {
+        "tier": "vendor",
+        "vendor": "Node.js",
+        "url": "https://nodejs.org/en/blog/vulnerability/october-2026-security-releases",
+        "fetched_at": "2026-10-23T05:25:38Z",
+        "sha256": "04e6cd57840f58779d7b9e5ec312c58259ba9276691dec6c453bdc3dbabd0a74",
+        "method": "llm-assisted",
+        "approved_by": "Alex Nguyen"
+      }
+    },
+    {
+      "id": "CVE-2026-106074",
+      "title": "crypto.randomUUID() and randomInt() entropy caches saved into startup snapshots and SEAs",
+      "summary": "Node.js security release of 2026-10-21: crypto.randomUUID() and randomInt() entropy caches saved into startup snapshots and SEAs. Fixed in 26.12.1, 24.22.1, 22.23.4.",
+      "severity": "medium",
+      "status": "published",
+      "published": "2026-10-21",
+      "component": {
+        "kind": "runtime",
+        "ecosystem": "node",
+        "name": "node"
+      },
+      "affected": [
+        {
+          "line": "26",
+          "introduced": "0",
+          "fixed": "26.12.1"
+        },
+        {
+          "line": "24",
+          "introduced": "0",
+          "fixed": "24.22.1"
+        },
+        {
+          "line": "22",
+          "introduced": "0",
+          "fixed": "22.23.4"
+        }
+      ],
+      "references": [
+        "https://nodejs.org/en/blog/vulnerability/october-2026-security-releases"
+      ],
+      "source": {
+        "tier": "vendor",
+        "vendor": "Node.js",
+        "url": "https://nodejs.org/en/blog/vulnerability/october-2026-security-releases",
+        "fetched_at": "2026-10-23T05:25:38Z",
+        "sha256": "04e6cd57840f58779d7b9e5ec312c58259ba9276691dec6c453bdc3dbabd0a74",
+        "method": "llm-assisted",
+        "approved_by": "Alex Nguyen"
+      }
+    },
+    {
+      "id": "CVE-2026-106070",
+      "title": "ZipFile returns attacker-controlled prefix bytes after failed ZIP header validation",
+      "summary": "Node.js security release of 2026-10-21: ZipFile returns attacker-controlled prefix bytes after failed ZIP header validation. Fixed in 26.12.1.",
+      "severity": "low",
+      "status": "published",
+      "published": "2026-10-21",
+      "component": {
+        "kind": "runtime",
+        "ecosystem": "node",
+        "name": "node"
+      },
+      "affected": [
+        {
+          "line": "26",
+          "introduced": "0",
+          "fixed": "26.12.1"
+        }
+      ],
+      "references": [
+        "https://nodejs.org/en/blog/vulnerability/october-2026-security-releases"
+      ],
+      "source": {
+        "tier": "vendor",
+        "vendor": "Node.js",
+        "url": "https://nodejs.org/en/blog/vulnerability/october-2026-security-releases",
+        "fetched_at": "2026-10-23T05:25:38Z",
+        "sha256": "04e6cd57840f58779d7b9e5ec312c58259ba9276691dec6c453bdc3dbabd0a74",
+        "method": "llm-assisted",
+        "approved_by": "Alex Nguyen"
+      }
+    },
+    {
+      "id": "CVE-2026-106071",
+      "title": "Permission Model filesystem over-grant via wildcard radix lookup",
+      "summary": "Node.js security release of 2026-10-21: Permission Model filesystem over-grant via wildcard radix lookup. Fixed in 26.12.1.",
+      "severity": "low",
+      "status": "published",
+      "published": "2026-10-21",
+      "component": {
+        "kind": "runtime",
+        "ecosystem": "node",
+        "name": "node"
+      },
+      "affected": [
+        {
+          "line": "26",
+          "introduced": "0",
+          "fixed": "26.12.1"
+        }
+      ],
+      "references": [
+        "https://nodejs.org/en/blog/vulnerability/october-2026-security-releases"
+      ],
+      "source": {
+        "tier": "vendor",
+        "vendor": "Node.js",
+        "url": "https://nodejs.org/en/blog/vulnerability/october-2026-security-releases",
+        "fetched_at": "2026-10-23T05:25:38Z",
+        "sha256": "04e6cd57840f58779d7b9e5ec312c58259ba9276691dec6c453bdc3dbabd0a74",
+        "method": "llm-assisted",
+        "approved_by": "Alex Nguyen"
+      }
+    },
+    {
+      "id": "CVE-2026-106073",
+      "title": "Permission Model bypass with fs.realpathSync",
+      "summary": "Node.js security release of 2026-10-21: Permission Model bypass with fs.realpathSync. Fixed in 26.12.1, 24.22.1, 22.23.4.",
+      "severity": "low",
+      "status": "published",
+      "published": "2026-10-21",
+      "component": {
+        "kind": "runtime",
+        "ecosystem": "node",
+        "name": "node"
+      },
+      "affected": [
+        {
+          "line": "26",
+          "introduced": "0",
+          "fixed": "26.12.1"
+        },
+        {
+          "line": "24",
+          "introduced": "0",
+          "fixed": "24.22.1"
+        },
+        {
+          "line": "22",
+          "introduced": "0",
+          "fixed": "22.23.4"
+        }
+      ],
+      "references": [
+        "https://nodejs.org/en/blog/vulnerability/october-2026-security-releases"
+      ],
+      "source": {
+        "tier": "vendor",
+        "vendor": "Node.js",
+        "url": "https://nodejs.org/en/blog/vulnerability/october-2026-security-releases",
+        "fetched_at": "2026-10-23T05:25:38Z",
+        "sha256": "04e6cd57840f58779d7b9e5ec312c58259ba9276691dec6c453bdc3dbabd0a74",
+        "method": "llm-assisted",
+        "approved_by": "Alex Nguyen"
+      }
+    },
+    {
+      "id": "NODE-2026-10-DEP-c-ares",
+      "title": "Bundled dependency update: c-ares",
+      "summary": "The 2026-10-21 Node.js security releases update the bundled c-ares dependency. Severity and CVEs are not given by the bulletin.",
+      "severity": "unknown",
+      "status": "published",
+      "published": "2026-10-21",
+      "component": {
+        "kind": "runtime",
+        "ecosystem": "node",
+        "name": "node"
+      },
+      "affected": [
+        {
+          "line": "26",
+          "introduced": "0",
+          "fixed": "26.12.1"
+        },
+        {
+          "line": "24",
+          "introduced": "0",
+          "fixed": "24.22.1"
+        },
+        {
+          "line": "22",
+          "introduced": "0",
+          "fixed": "22.23.4"
+        }
+      ],
+      "references": [
+        "https://nodejs.org/en/blog/vulnerability/october-2026-security-releases"
+      ],
+      "source": {
+        "tier": "vendor",
+        "vendor": "Node.js",
+        "url": "https://nodejs.org/en/blog/vulnerability/october-2026-security-releases",
+        "fetched_at": "2026-10-23T05:25:38Z",
+        "sha256": "04e6cd57840f58779d7b9e5ec312c58259ba9276691dec6c453bdc3dbabd0a74",
+        "method": "llm-assisted",
+        "approved_by": "Alex Nguyen"
+      }
+    },
+    {
+      "id": "NODE-2026-10-DEP-ca-cert-emudhra",
+      "title": "Bundled dependency update: ca-cert-emudhra",
+      "summary": "The 2026-10-21 Node.js security releases update the bundled ca-cert-emudhra dependency. Severity and CVEs are not given by the bulletin.",
+      "severity": "unknown",
+      "status": "published",
+      "published": "2026-10-21",
+      "component": {
+        "kind": "runtime",
+        "ecosystem": "node",
+        "name": "node"
+      },
+      "affected": [
+        {
+          "line": "26",
+          "introduced": "0",
+          "fixed": "26.12.1"
+        },
+        {
+          "line": "24",
+          "introduced": "0",
+          "fixed": "24.22.1"
+        },
+        {
+          "line": "22",
+          "introduced": "0",
+          "fixed": "22.23.4"
+        }
+      ],
+      "references": [
+        "https://nodejs.org/en/blog/vulnerability/october-2026-security-releases"
+      ],
+      "source": {
+        "tier": "vendor",
+        "vendor": "Node.js",
+        "url": "https://nodejs.org/en/blog/vulnerability/october-2026-security-releases",
+        "fetched_at": "2026-10-23T05:25:38Z",
+        "sha256": "04e6cd57840f58779d7b9e5ec312c58259ba9276691dec6c453bdc3dbabd0a74",
+        "method": "llm-assisted",
+        "approved_by": "Alex Nguyen"
+      }
+    },
+    {
+      "id": "NODE-2026-10-DEP-openssl",
+      "title": "Bundled dependency update: openssl",
+      "summary": "The 2026-10-21 Node.js security releases update the bundled openssl dependency. Severity and CVEs are not given by the bulletin.",
+      "severity": "unknown",
+      "status": "published",
+      "published": "2026-10-21",
+      "component": {
+        "kind": "runtime",
+        "ecosystem": "node",
+        "name": "node"
+      },
+      "affected": [
+        {
+          "line": "24",
+          "introduced": "0",
+          "fixed": "24.22.1"
+        },
+        {
+          "line": "22",
+          "introduced": "0",
+          "fixed": "22.23.4"
+        }
+      ],
+      "references": [
+        "https://nodejs.org/en/blog/vulnerability/october-2026-security-releases"
+      ],
+      "source": {
+        "tier": "vendor",
+        "vendor": "Node.js",
+        "url": "https://nodejs.org/en/blog/vulnerability/october-2026-security-releases",
+        "fetched_at": "2026-10-23T05:25:38Z",
+        "sha256": "04e6cd57840f58779d7b9e5ec312c58259ba9276691dec6c453bdc3dbabd0a74",
+        "method": "llm-assisted",
+        "approved_by": "Alex Nguyen"
+      }
+    },
+    {
+      "id": "NODE-2026-10-DEP-sqlite",
+      "title": "Bundled dependency update: sqlite",
+      "summary": "The 2026-10-21 Node.js security releases update the bundled sqlite dependency. Severity and CVEs are not given by the bulletin.",
+      "severity": "unknown",
+      "status": "published",
+      "published": "2026-10-21",
+      "component": {
+        "kind": "runtime",
+        "ecosystem": "node",
+        "name": "node"
+      },
+      "affected": [
+        {
+          "line": "22",
+          "introduced": "0",
+          "fixed": "22.23.4"
+        }
+      ],
+      "references": [
+        "https://nodejs.org/en/blog/vulnerability/october-2026-security-releases"
+      ],
+      "source": {
+        "tier": "vendor",
+        "vendor": "Node.js",
+        "url": "https://nodejs.org/en/blog/vulnerability/october-2026-security-releases",
+        "fetched_at": "2026-10-23T05:25:38Z",
+        "sha256": "04e6cd57840f58779d7b9e5ec312c58259ba9276691dec6c453bdc3dbabd0a74",
+        "method": "llm-assisted",
+        "approved_by": "Alex Nguyen"
+      }
+    },
+    {
+      "id": "NODE-2026-10-DEP-undici",
+      "title": "Bundled dependency update: undici",
+      "summary": "The 2026-10-21 Node.js security releases update the bundled undici dependency. Severity and CVEs are not given by the bulletin.",
+      "severity": "unknown",
+      "status": "published",
+      "published": "2026-10-21",
+      "component": {
+        "kind": "runtime",
+        "ecosystem": "node",
+        "name": "node"
+      },
+      "affected": [
+        {
+          "line": "26",
+          "introduced": "0",
+          "fixed": "26.12.1"
+        },
+        {
+          "line": "24",
+          "introduced": "0",
+          "fixed": "24.22.1"
+        },
+        {
+          "line": "22",
+          "introduced": "0",
+          "fixed": "22.23.4"
+        }
+      ],
+      "references": [
+        "https://nodejs.org/en/blog/vulnerability/october-2026-security-releases"
+      ],
+      "source": {
+        "tier": "vendor",
+        "vendor": "Node.js",
+        "url": "https://nodejs.org/en/blog/vulnerability/october-2026-security-releases",
+        "fetched_at": "2026-10-23T05:25:38Z",
+        "sha256": "04e6cd57840f58779d7b9e5ec312c58259ba9276691dec6c453bdc3dbabd0a74",
+        "method": "llm-assisted",
+        "approved_by": "Alex Nguyen"
+      }
+    }
+  ]
+}

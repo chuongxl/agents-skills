@@ -21,7 +21,7 @@ your own pipeline) yourself.
 
 ### 1. Prerequisites
 
-- GitHub Copilot, Claude Code, or OpenCode (for accessing the skill)
+- GitHub Copilot, Claude Code, OpenCode, or Hermes Agent (for accessing the skill)
 - `.env` file in your repository root with these Jira credentials:
   ```env
   JIRA_URL=https://your-jira-instance.atlassian.net
@@ -268,13 +268,14 @@ later stages.
 - **Platforms**: macOS, Linux, Windows (with WSL or Git Bash)
 - **Jira versions**: Jira Cloud and Server (7.0+) with REST API access
 - **Network**: Requires outbound access to the Jira API endpoint only — no git or hosting access is needed
-- **Agents**: GitHub Copilot, Claude Code, OpenCode, and compatible Copilot agents
+- **Agents**: GitHub Copilot, Claude Code, OpenCode, Hermes Agent, and compatible Copilot agents
 
 ### Installation Paths
 
 - GitHub Copilot: `.github/skills/` or `~/.agents/skills/`
 - Claude Code: `~/.claude/skills/`
 - OpenCode: `~/.config/opencode/skills/` or `.opencode/skills/`
+- Hermes Agent: `~/.hermes/skills/` (`/opt/data/skills/` in Docker)
 - Local: `~/.agents/skills/`
 
 ---

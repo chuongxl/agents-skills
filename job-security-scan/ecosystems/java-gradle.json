@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "id": "java-gradle",
+  "name": "Java / Kotlin (Gradle)",
+  "detect": [
+    "build.gradle",
+    "build.gradle.kts",
+    "settings.gradle",
+    "settings.gradle.kts"
+  ],
+  "lockfiles": [
+    "gradle.lockfile",
+    "buildscript-gradle.lockfile"
+  ],
+  "osv_ecosystem": "Maven",
+  "semgrep": [
+    "p/java",
+    "p/kotlin"
+  ],
+  "docker": {
+    "images": [
+      "gradle",
+      "eclipse-temurin",
+      "openjdk",
+      "amazoncorretto"
+    ]
+  },
+  "runtime": {
+    "name": "java",
+    "extractors": [
+      {
+        "file": ".java-version",
+        "regex": "^(\\d[\\w.]*)"
+      },
+      {
+        "file": ".sdkmanrc",
+        "regex": "^java=(\\S+)"
+      }
+    ],
+    "eol_product": "eclipse-temurin"
+  }
+}
