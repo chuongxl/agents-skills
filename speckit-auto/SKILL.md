@@ -13,7 +13,7 @@ license: MIT
 allowed-tools: bash glob grep view create edit skill ask_user
 metadata:
   author: Alex Nguyen
-  version: "0.6.3"
+  version: "0.6.4"
 ---
 
 # Speckit Auto
