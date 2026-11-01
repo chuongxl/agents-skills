@@ -18,6 +18,9 @@ provider (run contract, rule 2).
    - **OpenCode** — `git clone https://github.com/obra/superpowers.git /tmp/superpowers`, then
      `mkdir -p <skills dir> && cp -R /tmp/superpowers/skills/* <skills dir>/`, where
      `<skills dir>` is `~/.config/opencode/skills/` or `.opencode/skills/`.
+   - **Hermes Agent** — `git clone https://github.com/obra/superpowers.git /tmp/superpowers`, then
+     `mkdir -p <skills dir> && cp -R /tmp/superpowers/skills/* <skills dir>/`, where
+     `<skills dir>` is `~/.hermes/skills/` (`/opt/data/skills/` inside the Docker container).
 
    Host-specific command unavailable → stop and report it as a concrete install failure.
 3. **Confirm the install landed on disk**: re-run the on-disk probe from the current linked

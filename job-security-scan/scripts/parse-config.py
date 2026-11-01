@@ -111,7 +111,11 @@ def dockerfile_repos(data):
 
 
 def semgrep_rulesets(data):
-    """Map stack entries to Semgrep ruleset IDs."""
+    """Base rulesets plus any from the deprecated 'stack' field.
+
+    Rulesets for the languages actually present in each repo are added at scan time by
+    scripts/detect-ecosystems.py, so a repo needs no 'stack' entry.
+    """
     stack_map = {
         "typescript": "p/typescript",
         "nodejs": "p/nodejs",
@@ -140,6 +144,14 @@ if __name__ == "__main__":
         key_filter = sys.argv[idx + 1] if idx + 1 < len(sys.argv) else None
 
     data = parse_frontmatter(filepath)
+
+    # package-manager and stack are replaced by automatic ecosystem detection
+    # (ecosystems/*.json). They keep working, but are deprecated.
+    for legacy, why in (("package-manager", "lockfiles are now detected automatically"),
+                        ("stack", "Semgrep rulesets now follow the languages detected in each repo")):
+        if legacy in data:
+            print("WARNING: '%s' in %s is deprecated - %s. Remove it; support will be dropped in a future release."
+                  % (legacy, filepath, why), file=sys.stderr)
 
     # Computed keys
     data["active-repos"]       = active_repos(data)
