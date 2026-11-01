@@ -41,7 +41,7 @@ import engine  # noqa: E402
 import inventory  # noqa: E402
 
 LEVELS = ["none", "low", "medium", "high", "critical"]
-ACTIONABLE = ("affected", "affected-end-of-life", "affected-if-condition-holds", "possibly-affected")
+ACTIONABLE = ("affected", "affected-end-of-life", "end-of-life", "affected-if-condition-holds", "possibly-affected")
 
 
 def parse_env(pairs):
@@ -100,6 +100,7 @@ def run(args):
         comps += inventory.from_cyclonedx(args.sbom)
     if args.inventory:
         comps += inventory.from_json(args.inventory)
+    comps = inventory.refine(comps)
     env.update(parse_env(args.env))
     if not comps and not args.allow_empty:
         print("ERROR: empty inventory - give --repo, --sbom or --inventory with something in it", file=sys.stderr)

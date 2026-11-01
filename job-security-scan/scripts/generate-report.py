@@ -316,6 +316,8 @@ def parse_advisories(repo, results_dir, workspace):
         "possibly-affected": "Possibly affected (version not pinned)",
         "affected-end-of-life": "Affected (end-of-life line)",
         "affected-if-condition-holds": "Affected if condition holds",
+        "end-of-life": "End-of-life runtime line",
+        "unpinned": "Runtime not pinned to a patch version",
         "pending": "Vendor pre-announcement (details pending)",
         "unknown-version": "Version unknown",
     }

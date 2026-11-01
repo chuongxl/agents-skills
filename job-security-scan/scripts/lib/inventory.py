@@ -13,6 +13,7 @@ import re
 import advisory as adv_lib
 import versions
 import ecosystems
+import runtimes
 from component import Component, PurlError, parse_purl, canonical_purl
 
 
@@ -41,6 +42,10 @@ def from_json(path):
         comps.append(Component(c["kind"], c["ecosystem"], c["name"], c.get("version"), c.get("purl"),
                                c.get("location"), {"exact": c.get("exact", True)}))
     return comps
+
+
+# build files that declare a language level, not the runtime that ships; never reported as unpinned
+LEVEL_FILES = frozenset(["pom.xml", "go.mod"])
 
 
 def _is_exact(version):
@@ -72,8 +77,18 @@ def runtimes_from_repo(repo, descriptors=None):
                     seen.add((rt["name"], v, d))
                     found.append(Component("runtime", rt["name"], rt["name"], v, None,
                                            os.path.join(d, ex["file"]) if d else ex["file"],
-                                           {"exact": _is_exact(v)}))
-    return found
+                                           {"exact": _is_exact(v), "level": os.path.basename(ex["file"]) in LEVEL_FILES}))
+    for c in runtimes.from_repo(repo):
+        if (c.name, c.version, c.location) not in {(x.name, x.version, x.location) for x in found}:
+            found.append(c)
+    return refine(found)
+
+
+def refine(comps):
+    """Drop a partial declaration ('22') that an exact one for the same runtime refines ('22.14.0')."""
+    exact = [c for c in comps if c.extra.get("exact")]
+    return [c for c in comps if c.extra.get("exact") or c.extra.get("floating") or c.kind != "runtime"
+            or not any(e.name == c.name and versions.line_covers(c.version, e.version) for e in exact)]
 
 
 def _normalize_version(v):

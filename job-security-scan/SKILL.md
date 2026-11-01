@@ -21,7 +21,7 @@ compatibility: >
 license: MIT
 metadata:
   author: one-om-ddm-team
-  version: "2.0"
+  version: "2.1"
   config-file: assets/repository.md
 allowed-tools: bash glob grep view create edit
 ---
@@ -139,6 +139,7 @@ Catches issues the CVE databases lag on, such as a runtime security release anno
 `run-scan.sh --scanner advisories` fetches vendor bulletins first, then GHSA/OSV, then CISA KEV and endoflife.date
 enrichment into `.advisory-cache`, and matches them against the repository's runtimes, images and dependencies
 (`scripts/fetch-advisories.py`, `scripts/match.py`). Results appear in the report as "Vendor advisories".
+It also checks the runtime itself: Dockerfile base images (probed with `node -v` and equivalents when docker is available), compose files, CI `setup-*` actions and version files; end-of-life lines and unpinned tags (`node:22-alpine`, `latest`) are reported.
 Set `ADVISORY_OFFLINE=1` to skip the fetch and use the cache. Details: `references/advisory-data.md`.
 
 To ingest a new bulletin: `python3 -I scripts/fetch-advisories.py --advisory <url> --out assets/advisories/<name>.json`,

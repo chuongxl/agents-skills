@@ -25,6 +25,7 @@ import adapters  # noqa: E402
 import advisory  # noqa: E402
 import engine  # noqa: E402
 import inventory  # noqa: E402
+import runtimes  # noqa: E402
 import versions  # noqa: E402
 from component import Component  # noqa: E402
 
@@ -148,11 +149,29 @@ class MatchTests(unittest.TestCase):
         f, _ = engine.match([node("20.11.0")], m)
         self.assertEqual(f, [], "unlisted line without EOL data is not guessed")
         f, _ = engine.match([node("20.11.0")], m, eol={"runtime:node": {"20"}})
-        self.assertTrue(f and all(x["state"] == "affected-end-of-life" for x in f))
+        adv = [x for x in f if x["state"] != "end-of-life"]
+        self.assertTrue(adv and all(x["state"] == "affected-end-of-life" for x in adv))
+        self.assertIn("end-of-life", [x["state"] for x in f])
+        f, _ = engine.match([node("18.20.1")], [], eol={"runtime:node": {"18"}})
+        self.assertEqual([x["state"] for x in f], ["end-of-life"])
+        f, _ = engine.match([Component("runtime", "python", "python", "3.8.10", None, "x", {"exact": True})], [], eol={"runtime:python": {"3.8"}})
+        self.assertEqual([x["state"] for x in f], ["end-of-life"], "multi-part cycles match on the cycle prefix")
 
     def test_unpinned_runtime_is_possibly_affected(self):
         f, _ = engine.match([node("22", exact=False)], merged(SEED))
-        self.assertTrue(f and all(x["state"] == "possibly-affected" for x in f))
+        self.assertIn("unpinned", [x["state"] for x in f])
+        adv = [x for x in f if x["state"] != "unpinned"]
+        self.assertTrue(adv and all(x["state"] == "possibly-affected" for x in adv))
+
+    def test_floating_runtime_is_one_unpinned_finding(self):
+        c = Component("runtime", "node", "node", None, None, "Dockerfile", {"exact": False, "floating": True, "declared": "node:latest"})
+        f, _ = engine.match([c], merged(SEED))
+        self.assertEqual([(x["state"], x["id"]) for x in f], [("unpinned", "UNPINNED-node-node:latest")])
+
+    def test_language_level_is_not_reported_unpinned(self):
+        c = Component("runtime", "java", "java", "17", None, "pom.xml", {"exact": False, "level": True})
+        f, _ = engine.match([c], [])
+        self.assertEqual(f, [])
 
     def test_vendor_only_advisory_absent_from_aggregator_is_flagged(self):
         vendor, _ = adapters.ghsa(jpayload("ghsa-repo-next.json"), "https://api.github.com/x", AT, SHA, "vendor", "Vercel")
@@ -223,8 +242,36 @@ class MatchTests(unittest.TestCase):
 class InventoryTests(unittest.TestCase):
     def test_runtime_from_repo_and_ranges_dropped(self):
         comps = inventory.runtimes_from_repo(os.path.join(FIX, "node-22-14-demo"))
-        self.assertEqual([(c.key, c.version) for c in comps], [("runtime:node", "22.14.0")])   # engines ">=22" ignored
+        self.assertEqual([(c.key, c.version) for c in comps], [("runtime:node", "22.14.0")])   # engines ">=22" ignored; image tag '22' refined by .nvmrc
         self.assertTrue(comps[0].extra["exact"])
+
+    def test_runtimes_from_images_compose_and_ci(self):
+        d = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, d)
+
+        def w(rel, text):
+            p = os.path.join(d, rel)
+            os.makedirs(os.path.dirname(p), exist_ok=True)
+            open(p, "w").write(text)
+        w("Dockerfile", "ARG NODE=22.23.4\nFROM node:${NODE}-alpine AS build\nRUN x\nFROM build AS final\nFROM python:3.12-slim\n")
+        w("web/Dockerfile.prod", "FROM node:lts-alpine\n")
+        w("docker-compose.yml", "services:\n  a:\n    image: eclipse-temurin:17.0.9_9-jdk\n  b:\n    image: postgres:16\n")
+        w(".github/workflows/ci.yml", "steps:\n  - uses: actions/setup-node@v4\n    with:\n      node-version: 18.x\n      go-version: ${{ matrix.go }}\n")
+        got = sorted(((c.key, c.version or "", c.location, bool(c.extra["floating"])) for c in inventory.runtimes_from_repo(d)))
+        self.assertEqual(got, sorted([
+            ("runtime:python", "3.12", "Dockerfile", False),        # final stage wins; build stage ignored
+            ("runtime:node", "", os.path.join("web", "Dockerfile.prod"), True),
+            ("runtime:java", "17.0.9", "docker-compose.yml", False),
+            ("runtime:node", "18", os.path.join(".github", "workflows", "ci.yml"), False),
+            ("runtime:go", "", os.path.join(".github", "workflows", "ci.yml"), True)]))
+
+    def test_dockerfile_arg_and_stage_alias(self):
+        d = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, d)
+        p = os.path.join(d, "Dockerfile")
+        open(p, "w").write("ARG NODE=22.23.4\nFROM node:${NODE}-alpine AS base\nFROM base\n")
+        c = runtimes.from_dockerfile(p, "Dockerfile")
+        self.assertEqual([(x.version, x.extra["exact"]) for x in c], [("22.23.4", True)])
 
     def test_facts_from_dockerfile(self):
         self.assertEqual(inventory.facts_from_repo(os.path.join(FIX, "node-22-14-demo")), {"os": "linux", "libc": "glibc"})
@@ -349,6 +396,50 @@ class FetchTests(unittest.TestCase):
         with contextlib.redirect_stderr(io.StringIO()):
             rc = self.fetch.main(["--advisory", "https://not-a-source.example.com/x", "--out", out])
         self.assertEqual(rc, 2)
+
+
+class ProbeTests(unittest.TestCase):
+    def load(self):
+        spec = importlib.util.spec_from_file_location("probe_runtime", os.path.join(SKILL_DIR, "scripts", "probe-runtime.py"))
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        return mod
+
+    def test_parse_version(self):
+        pv = self.load().parse_version
+        self.assertEqual(pv("node", "v22.23.4\n"), "22.23.4")
+        self.assertEqual(pv("python", "Python 3.12.1"), "3.12.1")
+        self.assertEqual(pv("go", "go version go1.22.3 linux/amd64"), "1.22.3")
+        self.assertEqual(pv("java", 'openjdk version "17.0.9" 2023-10-17'), "17.0.9")
+        self.assertIsNone(pv("node", "not found"))
+
+    def test_probe_writes_exact_inventory_and_skips_without_docker(self):
+        mod = self.load()
+        out = os.path.join(tempfile.mkdtemp(), "p.json")
+        self.addCleanup(shutil.rmtree, os.path.dirname(out))
+        repo = os.path.join(FIX, "node-22-14-demo")
+        orig = mod.subprocess.run
+
+        def no_docker(cmd, **kw):
+            raise FileNotFoundError("docker")
+        mod.subprocess.run = no_docker
+        self.addCleanup(setattr, mod.subprocess, "run", orig)
+        with contextlib.redirect_stderr(io.StringIO()) as err:
+            self.assertEqual(mod.main(["--repo", repo, "--output", out]), 0)
+        self.assertIn("SKIPPED", err.getvalue())
+        self.assertFalse(os.path.exists(out), "a skipped probe writes nothing, never a clean result")
+
+        class R:
+            returncode, stdout, stderr = 0, "v22.23.4\n", ""
+        calls = []
+        mod.subprocess.run = lambda cmd, **kw: (calls.append(cmd), R())[1]
+        with contextlib.redirect_stderr(io.StringIO()):
+            self.assertEqual(mod.main(["--repo", repo, "--output", out]), 0)
+        comps = json.load(open(out))["components"]
+        self.assertEqual([(c["name"], c["version"], c["exact"]) for c in comps], [("node", "22.23.4", True)])
+        run = [c for c in calls if c[:2] == ["docker", "run"]][0]
+        self.assertEqual(run[run.index("--network") + 1], "none")
+        self.assertEqual(run[run.index("--entrypoint") + 1], "node")
 
 
 class NetfetchTests(unittest.TestCase):

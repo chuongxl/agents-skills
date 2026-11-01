@@ -128,6 +128,22 @@ jobs:
           if not ids: print("::error::Node 22.14.0 matched nothing against live data"); sys.exit(1)
           print("node 22.14.0 findings:", len(ids))
           PY
+      - name: Runtime checks - EOL, unpinned, and the probe against real node images
+        run: |
+          S=job-security-scan/scripts; F=job-security-scan/tests/fixtures
+          states() { python3 -I $S/match.py --repo "$1" ${2:+--inventory "$2"} --cache "$RUNNER_TEMP/adv" --fail-on none --format json \
+            | python3 -c "import json,sys; print(' '.join(sorted({'%s/%s' % (f['state'], f['installed']) for f in json.load(sys.stdin)['findings'] if f['component']=='runtime:node'})))"; }
+          states $F/node-18-eol | grep -q 'end-of-life/18.20.4' || { echo "::error::Node 18 not flagged end-of-life"; exit 1; }
+          states $F/node-floating | grep -q 'unpinned/22' || { echo "::error::node:22-alpine not reported unpinned"; exit 1; }
+          python3 -I $S/probe-runtime.py --repo $F/node-22-14-demo --output "$RUNNER_TEMP/probe.json"
+          probed=$(python3 -c "import json,sys; print(json.load(open(sys.argv[1]))['components'][0]['version'])" "$RUNNER_TEMP/probe.json")
+          real=$(docker run --rm node:22-bookworm-slim node -v | tr -d v)
+          [ "$probed" = "$real" ] || { echo "::error::probe says $probed, node -v says $real"; exit 1; }
+          echo "probe == node -v == $real"
+          out=$(states $F/node-22-14-demo "$RUNNER_TEMP/probe.json")
+          echo "$out" | grep -q 'affected/22.14.0' || { echo "::error::22.14.0 not flagged"; exit 1; }
+          echo "$out" | grep -q "/$real" && { echo "::error::patched $real flagged: $out"; exit 1; }
+          echo ok
       - name: Re-fetch produces no diff
         run: |
           S=job-security-scan/scripts

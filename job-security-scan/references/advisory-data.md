@@ -64,7 +64,13 @@ confirmed against the live site.
 | Script | Purpose |
 |---|---|
 | `scripts/fetch-advisories.py --out DIR` | Fetch every source in `sources.json` (host allowlist, HTTPS only, size limits, schema-validated, never executed). Writes only when content changed, so an unchanged source yields no diff. Exit 3 = some sources unreachable (previous data kept). |
-| `scripts/match.py --repo DIR --cache DIR` | Match the inventory (runtimes, Dockerfile base images, SBOM) against the advisories. States: affected, possibly-affected, affected-end-of-life, affected-if-condition-holds, pending, unknown-version. KEV raises severity one step. Conditions: `--env os=linux --env libc=glibc`. |
+| `scripts/match.py --repo DIR --cache DIR` | Match the inventory (runtimes, Dockerfile base images, SBOM) against the advisories. States: affected, possibly-affected, affected-end-of-life, affected-if-condition-holds, end-of-life (the runtime line itself is unsupported), unpinned (tag or version too loose to prove patched), pending, unknown-version. KEV raises severity one step. Conditions: `--env os=linux --env libc=glibc`. |
 | `scripts/advisory-watch.py --github-repo O/N --cache DIR --target DIR` | The scheduled job: fetch, match, open one issue per new hit (deduplicated by marker, closed issues are not reopened). `--dry-run` prints only. |
 
 The daily job is `.github/workflows/job-security-scan-advisories.yml`. Set `ADVISORY_OFFLINE=1` to make `run-scan.sh` skip fetching.
+
+## Runtime declarations and the image probe
+
+`match.py --repo` reads the runtime from version files (`.nvmrc`, `.tool-versions`, `pom.xml`, `go.mod`, ...), the **final stage** of every `Dockerfile` (`ARG` and stage aliases resolved), `docker-compose` `image:` lines and `setup-node` / `setup-python` / `setup-go` / `setup-java` / `setup-dotnet` version inputs in GitHub workflows. A tag with no concrete version (`latest`, `lts-alpine`, a matrix reference) or only a major (`22-alpine`) is reported as `unpinned`; a `pom.xml` / `go.mod` language level never is. An end-of-life line (endoflife.date data from the fetch) is always `end-of-life`, severity high.
+
+`scripts/probe-runtime.py --repo DIR --output FILE` runs `node -v`, `python -V`, `go version` or `java -version` inside each Dockerfile base image (no network, entrypoint set to the runtime binary) and writes an exact inventory for `match.py --inventory`. `run-scan.sh --scanner advisories` does this automatically; without docker it prints `SKIPPED` - an unverified tag is not a clean result. A pinned declaration that the probe refines is reported once.
