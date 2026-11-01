@@ -43,6 +43,7 @@ def main(argv=None):
     ap.add_argument("--sources", default=os.path.join(SKILL_DIR, "assets", "sources.json"))
     ap.add_argument("--schema", default=os.path.join(SKILL_DIR, "assets", "advisory.schema.json"))
     ap.add_argument("--strict", action="store_true", help="treat warnings (e.g. unapproved llm-assisted data) as errors")
+    ap.add_argument("--allow-duplicate-ids", action="store_true", help="ids may repeat across files (fetched caches); still unique inside a file")
     ap.add_argument("--check-sources", action="store_true", help="live-check every URL in sources.json")
     ap.add_argument("--timeout", type=float, default=20.0, help="per-URL timeout for --check-sources")
     ap.add_argument("--json", action="store_true", help="machine-readable output")
@@ -62,7 +63,7 @@ def main(argv=None):
     allowed = sources.allowed_hosts_of(src_data)
 
     try:
-        results = advisory.validate_paths(paths, schema, allowed or None, args.strict)
+        results = advisory.validate_paths(paths, schema, allowed or None, args.strict, not args.allow_duplicate_ids)
     except advisory.AdvisoryError as exc:
         print("ERROR: %s" % exc, file=sys.stderr)
         return 2

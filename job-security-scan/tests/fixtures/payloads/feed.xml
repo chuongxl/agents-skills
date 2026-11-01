@@ -1,0 +1,5 @@
+<?xml version="1.0"?>
+<rss version="2.0"><channel><title>Spring security</title>
+<item><title>CVE-2026-91000: Spring Framework path traversal</title><link>https://spring.io/security/cve-2026-91000</link><pubDate>Mon, 19 Oct 2026 10:00:00 GMT</pubDate></item>
+<item><title>Spring Boot 4.1 released</title><link>https://spring.io/blog/x</link></item>
+</channel></rss>

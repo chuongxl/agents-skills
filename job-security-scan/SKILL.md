@@ -133,6 +133,18 @@ CycloneDX SBOM and OSV-Scanner matches it (`sbom.cdx.json`, `osv-sbom.json`).
 Scans git history and **actively verifies** whether found credentials are
 still valid via live API calls. Reports `VERIFIED ACTIVE` vs `unverified`.
 
+## Phase 7 — Vendor Advisories (any language or runtime)
+
+Catches issues the CVE databases lag on, such as a runtime security release announced by its vendor.
+`run-scan.sh --scanner advisories` fetches vendor bulletins first, then GHSA/OSV, then CISA KEV and endoflife.date
+enrichment into `.advisory-cache`, and matches them against the repository's runtimes, images and dependencies
+(`scripts/fetch-advisories.py`, `scripts/match.py`). Results appear in the report as "Vendor advisories".
+Set `ADVISORY_OFFLINE=1` to skip the fetch and use the cache. Details: `references/advisory-data.md`.
+
+To ingest a new bulletin: `python3 -I scripts/fetch-advisories.py --advisory <url> --out assets/advisories/<name>.json`,
+complete the drafted JSON from the saved page text, and set `source.approved_by` after human review;
+unapproved LLM-assisted data is ignored by the matcher.
+
 ## HTML Report
 
 After all scanners complete, `run-scan.sh` automatically calls

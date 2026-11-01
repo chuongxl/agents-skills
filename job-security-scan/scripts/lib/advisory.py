@@ -235,10 +235,16 @@ def validate_file(path, schema, allowed_hosts=None, strict=False):
     return result
 
 
-def validate_paths(paths, schema, allowed_hosts=None, strict=False):
-    """Validate many files and check ids are unique across all of them."""
+def validate_paths(paths, schema, allowed_hosts=None, strict=False, unique_ids=True):
+    """Validate many files; with unique_ids, also check ids are unique across all of them.
+
+    Fetched caches legitimately repeat an id across bundles (vendor feed plus aggregator plus
+    curated seed); the engine merges those by alias, so they pass unique_ids=False.
+    """
     files = iter_advisory_files(paths)
     results = [validate_file(f, schema, allowed_hosts, strict) for f in files]
+    if not unique_ids:
+        return results
     owner = {}
     for r in results:
         for aid in r["ids"]:

@@ -20,6 +20,7 @@ SKIP_DIRS = frozenset([
     ".git", ".hg", ".svn", "node_modules", "vendor", "target", "build", "dist", "out",
     ".gradle", ".next", ".nuxt", ".venv", "venv", "env", "__pycache__", ".tox", ".mypy_cache",
     ".idea", ".vscode", "obj", "bin", ".terraform", ".security-scan-results", "site-packages",
+    "fixtures",
 ])
 
 DEFAULT_MAX_DEPTH = 4

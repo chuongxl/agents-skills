@@ -1,0 +1,25 @@
+[
+  {
+    "ghsa_id": "GHSA-xxxx-yyyy-zzzz",
+    "cve_id": "CVE-2026-90001",
+    "summary": "Next.js request handling flaw allows bypass of middleware checks",
+    "description": "Example payload shaped like GET /repos/{owner}/{repo}/security-advisories. Synthetic test data.",
+    "severity": "high",
+    "state": "published",
+    "published_at": "2026-10-20T12:00:00Z",
+    "html_url": "https://github.com/vercel/next.js/security/advisories/GHSA-xxxx-yyyy-zzzz",
+    "cvss": { "score": 7.5, "vector_string": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:H/A:N" },
+    "vulnerabilities": [
+      {
+        "package": { "ecosystem": "npm", "name": "next" },
+        "vulnerable_version_range": ">= 15.0.0, < 15.5.30",
+        "patched_versions": "15.5.30"
+      },
+      {
+        "package": { "ecosystem": "npm", "name": "next" },
+        "vulnerable_version_range": ">= 16.0.0, < 16.4.2",
+        "patched_versions": "16.4.2"
+      }
+    ]
+  }
+]
