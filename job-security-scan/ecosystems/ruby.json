@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "id": "ruby",
+  "name": "Ruby (Bundler)",
+  "detect": [
+    "Gemfile"
+  ],
+  "lockfiles": [
+    "Gemfile.lock"
+  ],
+  "osv_ecosystem": "RubyGems",
+  "semgrep": [
+    "p/ruby"
+  ],
+  "docker": {
+    "images": [
+      "ruby"
+    ]
+  },
+  "runtime": {
+    "name": "ruby",
+    "extractors": [
+      {
+        "file": ".ruby-version",
+        "regex": "^(?:ruby-)?(\\d[\\w.]*)"
+      },
+      {
+        "file": ".tool-versions",
+        "regex": "^ruby\\s+(\\S+)"
+      }
+    ],
+    "eol_product": "ruby"
+  }
+}

@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "id": "node",
+  "name": "Node.js (npm, yarn, pnpm, bun)",
+  "detect": [
+    "package.json"
+  ],
+  "lockfiles": [
+    "package-lock.json",
+    "npm-shrinkwrap.json",
+    "yarn.lock",
+    "pnpm-lock.yaml",
+    "bun.lock"
+  ],
+  "osv_ecosystem": "npm",
+  "semgrep": [
+    "p/javascript",
+    "p/typescript",
+    "p/nodejs"
+  ],
+  "docker": {
+    "images": [
+      "node"
+    ]
+  },
+  "runtime": {
+    "name": "node",
+    "extractors": [
+      {
+        "file": ".nvmrc",
+        "regex": "^v?(\\d[\\w.]*)"
+      },
+      {
+        "file": ".node-version",
+        "regex": "^v?(\\d[\\w.]*)"
+      },
+      {
+        "file": ".tool-versions",
+        "regex": "^nodejs\\s+(\\S+)"
+      },
+      {
+        "file": "package.json",
+        "json_path": "engines.node"
+      }
+    ],
+    "eol_product": "nodejs"
+  }
+}

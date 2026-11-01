@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "id": "python",
+  "name": "Python (pip, Poetry, Pipenv, uv, PDM)",
+  "detect": [
+    "requirements.txt",
+    "pyproject.toml",
+    "Pipfile",
+    "setup.py",
+    "setup.cfg",
+    "poetry.lock"
+  ],
+  "lockfiles": [
+    "requirements.txt",
+    "Pipfile.lock",
+    "poetry.lock",
+    "uv.lock",
+    "pdm.lock"
+  ],
+  "osv_ecosystem": "PyPI",
+  "semgrep": [
+    "p/python"
+  ],
+  "docker": {
+    "images": [
+      "python"
+    ]
+  },
+  "runtime": {
+    "name": "python",
+    "extractors": [
+      {
+        "file": ".python-version",
+        "regex": "^(\\d[\\w.]*)"
+      },
+      {
+        "file": "runtime.txt",
+        "regex": "^python-(\\S+)"
+      },
+      {
+        "file": ".tool-versions",
+        "regex": "^python\\s+(\\S+)"
+      }
+    ],
+    "eol_product": "python"
+  }
+}

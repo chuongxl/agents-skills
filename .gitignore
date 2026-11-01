@@ -111,3 +111,6 @@ speckit-auto/.state/
 .superpowers/
 .speckit/
 .security-scan-results/
+
+### worktree
+.worktrees/
