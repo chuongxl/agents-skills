@@ -105,7 +105,7 @@ jobs:
           S=job-security-scan/scripts
           python3 -I $S/fetch-advisories.py --out "$RUNNER_TEMP/adv" \
             || { c=$?; [ $c -eq 3 ] && echo "::warning::some sources unreachable" || { echo "::error::fetch exit $c"; exit $c; }; }
-          python3 -I $S/validate-advisories.py "$RUNNER_TEMP/adv/advisories" --strict \
+          python3 -I $S/validate-advisories.py "$RUNNER_TEMP/adv/advisories" --strict --allow-duplicate-ids \
             || { echo "::error::fetched advisories failed schema validation"; exit 1; }
           n=$(ls "$RUNNER_TEMP/adv/advisories" | wc -l)
           echo "advisory files: $n"

@@ -73,7 +73,7 @@ def run(args):
     if args.cache:
         paths.append(os.path.join(args.cache, "advisories"))
     paths = [p for p in paths if os.path.exists(p)]
-    results = advisory.validate_paths(paths, schema)
+    results = advisory.validate_paths(paths, schema, unique_ids=False)
     errors = [e for r in results for e in r["errors"]]
     if errors:
         print("ERROR: invalid advisory data - fix or remove it:\n  " + "\n  ".join(errors[:10]), file=sys.stderr)

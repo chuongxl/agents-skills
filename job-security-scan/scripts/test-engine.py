@@ -410,6 +410,20 @@ class MatchCliTests(unittest.TestCase):
         r = self.run_cli("--repo", d, "--allow-empty", "--fail-on", "none")
         self.assertEqual(r.returncode, 0, r.stderr)
 
+    def test_same_id_in_seed_and_fetched_cache_merges_instead_of_failing(self):
+        """The vendor feed catching up with a hand-written seed advisory is the normal case."""
+        cache = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, cache)
+        os.makedirs(os.path.join(cache, "advisories"))
+        data = advisory.load_json(os.path.join(SEED, "nodejs-2026-10.json"))
+        dup = [a for a in data["advisories"] if a["id"] == "CVE-2026-111497"]
+        self.assertTrue(dup)
+        json.dump({"schema_version": 1, "advisories": dup}, open(os.path.join(cache, "advisories", "feed.json"), "w"))
+        r = self.run_cli("--repo", os.path.join(FIX, "node-22-14-demo"), "--cache", cache, "--format", "json")
+        self.assertEqual(r.returncode, 1, r.stderr)
+        ids = [f["id"] for f in json.loads(r.stdout)["findings"]]
+        self.assertEqual(ids.count("CVE-2026-111497"), 1)
+
     def test_usage_and_invalid_data(self):
         self.assertEqual(self.run_cli().returncode, 2)
         d = tempfile.mkdtemp()

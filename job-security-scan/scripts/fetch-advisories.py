@@ -338,7 +338,7 @@ def run_fetch(args):
         changed.append("manifest.json")
 
     # final validation of what is on disk
-    results = advisory.validate_paths([adv_dir], schema, ctx.allowed) if os.path.isdir(adv_dir) and os.listdir(adv_dir) else []
+    results = advisory.validate_paths([adv_dir], schema, ctx.allowed, unique_ids=False) if os.path.isdir(adv_dir) and os.listdir(adv_dir) else []
     bad = [e for r in results for e in r["errors"]]
     n_adv = sum(len(r["ids"]) for r in results)
 
