@@ -355,7 +355,8 @@ run_advisories() {
 import json
 d = json.load(open('$out'))
 act = [f for f in d['findings'] if f['state'] != 'pending']
-print(sum(1 for f in act if f['severity'] in ('critical', 'high')), len(act))
+hard = ('affected', 'affected-end-of-life', 'affected-if-condition-holds', 'possibly-affected')
+print(sum(1 for f in act if f['state'] in hard and f['severity'] in ('critical', 'high')), len(act))
 " 2>/dev/null || echo "0 0")
   if [[ "${crit_high:-0}" -gt 0 ]]; then
     _fail advisories "$repo" "$crit_high critical/high of $actionable applicable advisory(ies) - see $OUTPUT_BASE/$repo/advisories.txt"

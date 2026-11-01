@@ -311,6 +311,13 @@ class FetchTests(unittest.TestCase):
         self.run_fetch()
         self.assertTrue(os.path.exists(os.path.join(self.out, "advisories", "nodejs-security-wg.json")))
 
+    def test_partial_only_run_keeps_other_bundles(self):
+        self.run_fetch()
+        with contextlib.redirect_stdout(io.StringIO()):
+            self.fetch.main(["--out", self.out, "--now", "2026-10-23T00:00:00Z", "--only", "cisa-kev"])
+        names = sorted(os.listdir(os.path.join(self.out, "advisories")))
+        self.assertEqual(names, ["nextjs-ghsa-repo.json", "nodejs-security-wg.json"])
+
     def test_match_uses_fetched_cache_with_kev(self):
         self.run_fetch()
         r = subprocess.run([sys.executable, "-I", MATCH, "--inventory", self.inv(), "--cache", self.out, "--format", "json",

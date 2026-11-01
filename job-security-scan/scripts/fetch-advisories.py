@@ -318,7 +318,7 @@ def run_fetch(args):
         if write_if_changed(os.path.join(adv_dir, name + ".json"), {"schema_version": 1, "advisories": advs}):
             changed.append(name + ".json")
     failed_keys = {k for k, _ in ctx.failures}
-    if os.path.isdir(adv_dir) and not failed_keys:
+    if os.path.isdir(adv_dir) and not failed_keys and not args.only:   # --only is a partial run: never prune the rest
         for f in os.listdir(adv_dir):
             if f.endswith(".json") and f not in live:
                 os.remove(os.path.join(adv_dir, f))
