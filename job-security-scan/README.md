@@ -30,6 +30,10 @@ All tools are free, open-source, and configurable. Security findings are organiz
 5. **Structured Output** — JSON results for easy CI/CD integration
 6. **Auto-Install** — Security tools auto-install on first run via Homebrew (macOS) or apt/curl (Linux)
 7. **Allowlist Support** — Exclude false positives and intentional secrets from scanning
+8. **Verified Findings** — Serious findings are re-checked by an independent verifier agent: confirmed (with
+   calibrated severity), needs validation (with the exact missing fact), or dismissed (with the reason)
+9. **Changes Since Last Run** — Each report marks findings new or unchanged and lists what was fixed
+10. **Profiles and Scope** — `--profile quick|standard|deep` and `--since <git-ref>` for fast PR checks
 
 ## Quick Start
 
@@ -177,6 +181,18 @@ A fast, offline answer to "were we hit by the Shai-Hulud npm/PyPI worm?":
 **Output:** `shai-hulud.json` per repo, `_host/shai-hulud.json` for this computer (report: "this machine").
 Indicator data and sources: [references/ioc-data.md](references/ioc-data.md). If affected:
 [references/remediation.md](references/remediation.md#-shai-hulud-if-affected).
+
+### 8. Independent Verification, Run-to-Run Changes, Report Schema
+
+- **Verification (agent step, Phase 9):** `scripts/triage.py queue` lists the findings to check (`standard`:
+  CRITICAL + HIGH, `deep`: also MEDIUM) with a redacted ±15-line context; each goes to a fresh verifier agent
+  that tries to disprove it from source only (no edits, no running repo code, no network). `triage.py apply`
+  merges the verdicts all-or-nothing and regenerates the reports plus `NEEDS-VALIDATION.md`. Prompt, verdict
+  format and severity anchors: [references/verification.md](references/verification.md).
+- **Changes:** every finding has a fingerprint that survives code moving within a file; reports compare with
+  the previous `security-run-*` folder (new / unchanged / fixed), and verdicts carry over while code is unchanged.
+- **Schema:** `security-report.json` is `schema_version` 2 ([assets/report.schema.json](assets/report.schema.json));
+  `python3 -I scripts/validate-report.py <run>/security-report.json` checks it (exit 0 valid, 1 invalid, 2 unreadable).
 
 ## Installation & Setup
 
@@ -335,6 +351,17 @@ In CI, add a step before `npm ci` so a compromised release fails the build befor
   run: python3 -I .github/skills/job-security-scan/scripts/shai-hulud-scan.py --repo . --format text
 ```
 
+### Example 6: Fast PR Check and Deep Audit
+
+```bash
+# Only files changed since main; Gitleaks on the working tree, OSV, Shai-Hulud; no verification queue
+bash job-security-scan/scripts/run-scan.sh --profile quick --since origin/main
+
+# Everything, Trivy down to LOW, MEDIUM findings queued for verification too
+bash job-security-scan/scripts/run-scan.sh --profile deep
+python3 -I job-security-scan/scripts/triage.py queue security-run-<datetime>
+```
+
 ## Configuration
 
 ### Environment Variables
@@ -402,7 +429,10 @@ bash job-security-scan/scripts/run-scan.sh  # Re-downloads DB
 
 ## Version History
 
-- **v2.4** (current) — Security hardening of the skill itself: pinned and checksum-verified tool installs, SHA-pinned CI actions (template moved off hijacked `trivy-action` tags), config/repo-name injection fixed, secret values stripped from raw output, opt-in sandboxed image probe, verified TruffleHog secrets fail the scan
+- **v2.5** (current) — Independent verification of findings (confirmed / needs validation / dismissed, calibrated
+  severity, `triage.py`), changes since the last run (fingerprints, fixed list, carried verdicts), `--profile`
+  and `--since`, report schema v2 with `validate-report.py`; ideas adapted from Cloudflare's security-audit skill (MIT)
+- **v2.4** — Security hardening of the skill itself: pinned and checksum-verified tool installs, SHA-pinned CI actions (template moved off hijacked `trivy-action` tags), config/repo-name injection fixed, secret values stripped from raw output, opt-in sandboxed image probe, verified TruffleHog secrets fail the scan
 - **v2.3** — Per-run `security-run-<datetime>/` folder with Markdown, JSON and HTML reports; every finding located to file, line and code; caches moved out of the workspace; report-only rule
 - **v2.2** — Shai-Hulud supply-chain worm check (`--scanner shai-hulud`, `--host` laptop mode)
 - **v2.1** — Runtime and image checks
@@ -412,3 +442,8 @@ bash job-security-scan/scripts/run-scan.sh  # Re-downloads DB
 ## License & Attribution
 
 MIT License. Maintained by the security-focused engineering team.
+
+The verification contract, verifier prompt and severity anchors in `references/verification.md` are adapted from
+Cloudflare's [security-audit skill](https://github.com/cloudflare/security-audit-skill), MIT License,
+Copyright (c) 2025-2026 Cloudflare, Inc. — notice in
+[references/third-party/cloudflare-security-audit-LICENSE](references/third-party/cloudflare-security-audit-LICENSE).

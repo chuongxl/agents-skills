@@ -726,7 +726,11 @@ def scanner_coverage(results_dir, repos, profile="standard"):
     for r in repos:
         d = Path(results_dir) / r
         ran = sorted({name for fname, name in report_model.RAW_FILES.items() if (d / fname).is_file()})
-        cov[HOST_LABEL if r == HOST_RESULTS else r] = report_model.scanner_modes(ran, profile)
+        modes = report_model.scanner_modes(ran, profile)
+        if "osv" in modes:  # lockfile scan and SBOM fallback both report as "osv" but cover different inputs
+            modes["osv"] = "+".join(m for m, f in (("lockfile", "osv.json"), ("sbom", "osv-sbom.json"))
+                                    if (d / f).is_file())
+        cov[HOST_LABEL if r == HOST_RESULTS else r] = modes
     return cov
 
 

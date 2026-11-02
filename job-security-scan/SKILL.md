@@ -1,20 +1,19 @@
 ---
 name: job-security-scan
 description: >
-  Run a comprehensive, 100% free security scan across any team's service
-  repos. Team identity, repo list, tech stack, CI runner, and allowlists
-  are all read from a single repository.md config file — no hardcoded values
-  in the skill itself. Combines Gitleaks (secrets in git history), Trivy
-  (CVE + Dockerfile misconfig), Semgrep (SAST for TypeScript/NestJS/OWASP),
-  Hadolint (Dockerfile best practices), OSV-Scanner (Google transitive CVE
-  DB), TruffleHog (live credential verification), and an offline Shai-Hulud
-  check (npm/PyPI worm: known compromised releases, payload files, planted
-  workflows, worm-like install hooks) for repos and, with --host, this
-  computer. Produces a structured security report per repo. Use when asked to scan for vulnerabilities,
-  secrets, malware, misconfigurations, supply chain issues, or to set up a
-  CI security pipeline, or to check whether a repo or laptop was hit by
-  Shai-Hulud. Supports --repo for single-repo scope and --scanner for
-  single-tool runs.
+  Run a 100% free, config-driven security scan across a team's service
+  repos (team, repos, CI runner and allowlists come from one repository.md).
+  Combines Gitleaks (secrets in git history), Trivy (CVE + Dockerfile
+  misconfig), Semgrep (SAST), Hadolint (Dockerfile lint), OSV-Scanner
+  (transitive CVEs), TruffleHog (live credential checks), vendor advisories
+  and an offline Shai-Hulud worm check for repos and, with --host, this
+  computer. Writes Markdown, JSON and HTML reports per run, compares each
+  run with the last, and has independent verifiers confirm, dismiss or flag
+  for validation the serious findings. Use when asked to scan for
+  vulnerabilities, secrets, malware, misconfigurations or supply chain
+  issues, to set up a CI security pipeline, or to check whether a repo or
+  laptop was hit by Shai-Hulud. Supports --repo, --scanner, --profile
+  quick|standard|deep and --since <git-ref>.
 compatibility: >
   Requires bash, git, Python 3.8+ (pre-installed on most systems — used
   only to parse repository.md, no pip packages needed). Security tools
@@ -24,7 +23,7 @@ compatibility: >
 license: MIT
 metadata:
   author: one-om-ddm-team
-  version: "2.4"
+  version: "2.5"
   config-file: assets/repository.md
 allowed-tools: bash glob grep view create edit
 ---
@@ -77,6 +76,8 @@ bash .github/skills/job-security-scan/scripts/run-scan.sh \
 | `--repo NAME` | `--repo om-ddm-backend` | Scan one repo only |
 | `--scanner NAME` | `--scanner trivy` | Run one scanner only |
 | `--host` | `--host` | Also check this computer for Shai-Hulud; alone, only the host check runs |
+| `--profile P` | `--profile quick` | `quick`: Gitleaks (working tree), OSV, Shai-Hulud, no verification. `standard` (default): every scanner, verify CRITICAL+HIGH. `deep`: also Trivy LOW, verify MEDIUM too |
+| `--since REF` | `--since origin/main` | Report only files changed since `REF` (plus uncommitted changes). Partial run: no "fixed" list |
 | *(none)* | | Full scan — all scanners, all active repos from config |
 
 Short aliases: `-r` for `--repo`, `-s` for `--scanner`
@@ -180,6 +181,21 @@ Benign hooks (`node-gyp rebuild`, `prebuild-install`, `husky`, esbuild's install
 Data provenance: `references/ioc-data.md`. If affected: the runbook in `references/remediation.md`.
 Standalone: `python3 -I scripts/shai-hulud-scan.py --repo PATH` or `--host` (exit 0 clean / 1 suspicious / 2 affected).
 
+## Phase 9 — Verify Findings (agent step)
+
+After `run-scan.sh`, the serious findings are checked by **independent verifiers** before you report. Follow
+`references/verification.md` exactly:
+
+1. `python3 -I scripts/triage.py queue security-run-<datetime>` (prints how many are queued; `quick` queues none).
+2. One **fresh sub-agent per queued item** with the verifier prompt, that item and the repo path — nothing else.
+   Verifiers read source only: no edits, no running repo code, no network, never open a file holding a secret.
+3. Keep only replies that are a single JSON object; collect them in `triage/verdicts.json`.
+4. `python3 -I scripts/triage.py apply security-run-<datetime> security-run-<datetime>/triage/verdicts.json`.
+
+Verdicts: **confirmed** (verified severity, never above demonstrated impact), **needs validation** (the exact
+missing fact plus a safe check, listed in `NEEDS-VALIDATION.md`), **rejected** (moved to "Dismissed (with
+reason)", out of the counts). Verdicts carry over to the next run while the code is unchanged.
+
 ## Reports — one folder per run
 
 Every run writes a new folder in the workspace folder (the folder `run-scan.sh` is run from); nothing is
@@ -188,11 +204,19 @@ overwritten:
 ```
 security-run-YYYYMMDD-HHMMSS/
 ├── security-report.md     # summary + findings by severity, each with file:line and the line of code
-├── security-report.json   # same data, machine-readable (schema_version 1)
-├── security-report.html   # interactive report (filters, VS Code links)
+├── security-report.json   # same data, machine-readable (schema_version 2, assets/report.schema.json)
+├── security-report.html   # interactive report (filters, VS Code links, NEW badges, verdicts)
+├── NEEDS-VALIDATION.md    # after Phase 9: findings a person must settle, with the blocker and a plan
+├── triage/                # Phase 9 queue.json and verdicts.json
+├── changed-files.json     # --since only: files in scope per repo
 ├── .gitignore             # "*" - the folder never gets committed
 └── <repo>/ , _host/       # raw output of every tool for this run
 ```
+
+**Changes since last run.** Each report is compared with the newest earlier `security-run-*` folder beside it:
+every finding is marked new or unchanged (by a fingerprint that survives code moving down a file), and findings
+that disappeared are listed as fixed — only for repos and scanners that ran the same way both times, and never
+for a `--since` run. Check any report with `python3 -I scripts/validate-report.py <run>/security-report.json`.
 
 Every finding is located to **file + line + one line of code**. Secrets show file and line only — never the
 value or the line. Caches (vendor advisories, refreshed indicators) live outside the workspace in
@@ -231,6 +255,12 @@ bash .github/skills/job-security-scan/scripts/run-scan.sh --repo om-ddm-backend
 # Run one scanner across all repos
 bash .github/skills/job-security-scan/scripts/run-scan.sh --scanner trivy
 
+# Fast PR check: only files changed since main, no verification queue
+bash .github/skills/job-security-scan/scripts/run-scan.sh --profile quick --since origin/main
+
+# Deepest pass (Trivy LOW, MEDIUM findings verified too)
+bash .github/skills/job-security-scan/scripts/run-scan.sh --profile deep
+
 # Was this computer hit by Shai-Hulud? (no config needed)
 bash .github/skills/job-security-scan/scripts/run-scan.sh --host
 
@@ -268,10 +298,12 @@ The scanner reads untrusted repositories, so it is built not to be an attack pat
 
 `run-scan.sh` writes the report itself; the agent does not compose one. After the run:
 
-1. Read `security-run-<datetime>/security-report.md` (the last console line names the folder).
-2. Reply with a short summary: the per-repo status table, the Critical and High findings as `file:line`
-   with their rule, and the paths of the three report files.
-3. Stop there. Do not offer, propose or ask to fix anything, and do not edit any scanned file — the
+1. Run Phase 9 (verification) unless the profile is `quick` or the user asked to skip it.
+2. Read `security-run-<datetime>/security-report.md` (the last console line names the folder).
+3. Reply with a short summary: the per-repo status table, the changes since the last run, the confirmed
+   Critical and High findings as `file:line` with their rule, how many need validation, were dismissed or are
+   still pending, and the paths of the report files.
+4. Stop there. Do not offer, propose or ask to fix anything, and do not edit any scanned file — the
    remediation guidance in the report is for the reader.
 
 Secrets: never print secret values or the code line of a secret finding, only `file:line` and the rule.
