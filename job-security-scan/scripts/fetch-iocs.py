@@ -19,21 +19,30 @@ import io
 import json
 import os
 import sys
+import urllib.parse
 import urllib.request
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent / "lib"))
 
 from shaihulud import iocs  # noqa: E402
+import netfetch  # noqa: E402
 
 TIMEOUT = 60
 MAX_BYTES = 20 * 1024 * 1024
+# Indicator lists are fetched over HTTPS from these hosts only; file:// reads a local list (tests, air-gapped).
+ALLOWED_HOSTS = ("raw.githubusercontent.com",)
 
 
 def fetch_text(url):
-    req = urllib.request.Request(url, headers={"User-Agent": "job-security-scan/fetch-iocs"})
-    with urllib.request.urlopen(req, timeout=TIMEOUT) as resp:  # nosec - URLs come from the committed sources file
-        data = resp.read(MAX_BYTES + 1)
+    if url.startswith("file://"):
+        path = urllib.request.url2pathname(urllib.parse.urlparse(url).path)
+        with open(path, "rb") as fh:
+            data = fh.read(MAX_BYTES + 1)
+    elif url.startswith("https://"):
+        data, _sha, _final = netfetch.fetch(url, ALLOWED_HOSTS, max_bytes=MAX_BYTES, timeout=TIMEOUT)
+    else:
+        raise ValueError("refused: only https:// (allowlisted hosts) and file:// sources are allowed: %s" % url)
     if len(data) > MAX_BYTES:
         raise ValueError("response larger than %d bytes" % MAX_BYTES)
     return data.decode("utf-8-sig", errors="replace")

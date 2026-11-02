@@ -262,6 +262,12 @@ def eol_cycles(payload, today):
 
 def feed_leads(xml_bytes, source_id, limit=30):
     """RSS 2.0 / Atom items that mention a CVE -> leads for human ingestion with --advisory."""
+    # Feeds come from the network: refuse DTDs and entity declarations outright (billion-laughs style
+    # expansion, external entities). Real RSS/Atom feeds never need them.
+    raw = xml_bytes if isinstance(xml_bytes, (bytes, bytearray)) else str(xml_bytes).encode("utf-8", "replace")
+    lowered = bytes(raw).lower()
+    if b"<!doctype" in lowered or b"<!entity" in lowered:
+        return None
     try:
         root = ET.fromstring(xml_bytes)
     except ET.ParseError:

@@ -9,8 +9,11 @@ tarball binary that package scanners can miss, so the version the image reports 
 source of truth. Writes a match.py --inventory file with exact runtime components. Without a
 working docker the probe is skipped (exit 0, nothing written) and says so on stderr: skipped, not clean.
 
-Only the base image named in the Dockerfile is run, with --entrypoint set to the runtime binary and
-no network, so nothing from the repository executes. Stdlib only; Python 3.8+. Run with -I.
+Only the base image named in the Dockerfile is run, with --entrypoint set to the runtime binary, so no
+repository file executes - but the image itself is chosen by the scanned repo and may be hostile. run-scan.sh
+therefore calls this only when JOB_SECURITY_SCAN_PROBE_IMAGES=1, and every container runs sandboxed: no network,
+read-only root, all capabilities dropped, no privilege escalation, nobody user, and pid/memory/CPU limits.
+Stdlib only; Python 3.8+. Run with -I.
 """
 
 import argparse
@@ -28,6 +31,8 @@ import runtimes  # noqa: E402
 
 PROBES = {"node": ("node", ["-v"]), "python": ("python", ["-V"]), "go": ("go", ["version"]),
           "java": ("java", ["-version"])}
+SANDBOX = ["--network", "none", "--read-only", "--cap-drop", "ALL", "--security-opt", "no-new-privileges",
+           "--pids-limit", "64", "--memory", "256m", "--cpus", "1", "--user", "65534:65534", "--tmpfs", "/tmp:rw,size=16m"]
 _IMAGE_RE = re.compile(r"[A-Za-z0-9][\w./:@-]*")
 _VER_RE = re.compile(r"(\d+\.\d+\.\d+)")
 
@@ -42,7 +47,7 @@ def parse_version(runtime, text):
 
 def probe(runtime, image, timeout):
     binary, args = PROBES[runtime]
-    r = subprocess.run(["docker", "run", "--rm", "--network", "none", "--entrypoint", binary, image] + args,
+    r = subprocess.run(["docker", "run", "--rm"] + SANDBOX + ["--entrypoint", binary, image] + args,
                        capture_output=True, text=True, timeout=timeout)
     return parse_version(runtime, r.stdout + r.stderr) if r.returncode == 0 else None
 

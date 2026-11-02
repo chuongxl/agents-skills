@@ -164,6 +164,20 @@ def parse_gitleaks(repo, results_dir, workspace):
     return findings
 
 
+def _semgrep_is_secret(item):
+    """Secret-detection rules (p/secrets, *.secrets.* ids, or metadata saying so) are reported like other
+    secrets: file and line, never the matched line, which holds the secret."""
+    check_id = str(item.get("check_id", "")).lower()
+    if ".secrets." in check_id or check_id.startswith("secrets.") or "hardcoded-secret" in check_id:
+        return True
+    meta = (item.get("extra") or {}).get("metadata") or {}
+    tags = []
+    for key in ("category", "subcategory", "technology", "cwe"):
+        v = meta.get(key)
+        tags += v if isinstance(v, list) else [v]
+    return any(isinstance(t, str) and ("secret" in t.lower() or "CWE-798" in t) for t in tags)
+
+
 def parse_semgrep(repo, results_dir, workspace):
     """Parse semgrep JSON output."""
     findings = []
@@ -181,7 +195,7 @@ def parse_semgrep(repo, results_dir, workspace):
         findings.append({
             "repo": repo,
             "scanner": "semgrep",
-            "type": "sast",
+            "type": "secret" if _semgrep_is_secret(item) else "sast",
             "severity": sev_map.get(raw_sev.upper(), "MEDIUM"),
             "file": item.get("path", ""),
             "line": item.get("start", {}).get("line"),
@@ -595,8 +609,8 @@ def build_html(findings, config, results_dir, output_path, org):
             title_txt = html.escape(f["title"][:100]) if f["title"] else ""
 
             rows_html += f"""
-        <tr data-sev="{sev}" data-repo="{html.escape(repo)}" data-scan="{html.escape(scan)}" data-type="{html.escape(ftype)}">
-          <td class="sev-col"><span class="badge {sev}">{sev}</span></td>
+        <tr data-sev="{html.escape(sev)}" data-repo="{html.escape(repo)}" data-scan="{html.escape(scan)}" data-type="{html.escape(ftype)}">
+          <td class="sev-col"><span class="badge {html.escape(sev)}">{html.escape(sev)}</span></td>
           <td class="repo-col"><code style="font-size:12px">{html.escape(repo)}</code></td>
           <td class="scanner-col"><span class="chip {html.escape(scan)}">{html.escape(scan)}</span></td>
           <td class="file-col">{file_html}</td>
