@@ -24,7 +24,7 @@ compatibility: >
 license: MIT
 metadata:
   author: one-om-ddm-team
-  version: "2.3"
+  version: "2.4"
   config-file: assets/repository.md
 allowed-tools: bash glob grep view create edit
 ---
@@ -87,7 +87,7 @@ Load team/repo config from `repository.md`, then install any missing tools:
 
 ```bash
 # Parse config (Python 3 std-lib only — no pip needed)
-eval "$(python3 scripts/parse-config.py assets/repository.md)"
+eval "$(python3 -I scripts/parse-config.py assets/repository.md)"   # values are shell-quoted
 
 # Install missing tools based on stack + repo config
 bash scripts/install-tools.sh
@@ -97,6 +97,11 @@ bash scripts/install-tools.sh
 - **Hadolint** only installed if any repo has `has-dockerfile: true`
 - **Semgrep** only installed if stack includes TypeScript/JavaScript
 - **OSV-Scanner** always installed (lockfiles of every supported ecosystem are detected per repo)
+
+Every tool is **pinned to an exact version** (Trivy `0.69.3`, the immutable release after the March 2026
+compromise; Gitleaks, TruffleHog, Hadolint, OSV-Scanner, Semgrep likewise) and on Linux each download is
+**checked against the release's SHA-256 sums** before it is installed. Nothing is piped into a shell.
+`INSTALL_DIR=~/.local/bin` installs without sudo. See "Security of the skill itself" below.
 
 ## Phase 1 — Secret Detection (Gitleaks)
 
@@ -148,7 +153,9 @@ Catches issues the CVE databases lag on, such as a runtime security release anno
 `run-scan.sh --scanner advisories` fetches vendor bulletins first, then GHSA/OSV, then CISA KEV and endoflife.date
 enrichment into the advisory cache (`~/.cache/job-security-scan/advisories`), and matches them against the repository's runtimes, images and dependencies
 (`scripts/fetch-advisories.py`, `scripts/match.py`). Results appear in the report as "Vendor advisories".
-It also checks the runtime itself: Dockerfile base images (probed with `node -v` and equivalents when docker is available), compose files, CI `setup-*` actions and version files; end-of-life lines and unpinned tags (`node:22-alpine`, `latest`) are reported.
+It also checks the runtime itself: Dockerfile base images (probed with `node -v` and equivalents **only when
+`JOB_SECURITY_SCAN_PROBE_IMAGES=1`** - the probe pulls and runs the image the scanned repo names, in a sandbox:
+no network, read-only, no capabilities, `nobody` user, resource limits), compose files, CI `setup-*` actions and version files; end-of-life lines and unpinned tags (`node:22-alpine`, `latest`) are reported.
 Set `ADVISORY_OFFLINE=1` to skip the fetch and use the cache. Details: `references/advisory-data.md`.
 
 To ingest a new bulletin: `python3 -I scripts/fetch-advisories.py --advisory <url> --out assets/advisories/<name>.json`,
@@ -239,6 +246,23 @@ python3 .github/skills/job-security-scan/scripts/generate-report.py \
   --results-dir security-run-20261102-153600 --out-dir security-run-20261102-153600 \
   --config .github/skills/job-security-scan/assets/repository.md
 ```
+
+## Security of the skill itself
+
+The scanner reads untrusted repositories, so it is built not to be an attack path:
+
+- **Nothing from a scanned repo runs.** Install hooks, scripts and lockfiles are only read. Docker base images
+  are probed only on opt-in (`JOB_SECURITY_SCAN_PROBE_IMAGES=1`) and then sandboxed.
+- **Config is data, not code.** Values from `repository.md` are shell-quoted before `run-scan.sh` loads them;
+  repo names may only use letters, digits, `.`, `_`, `-` (no `/`, no `..`), or the config is rejected.
+- **No secret values are kept.** Gitleaks runs with `--redact`; TruffleHog's raw values are stripped from its
+  output; secret findings (Gitleaks, TruffleHog, Trivy, Semgrep secret rules) show file and line only.
+- **Network input is constrained.** Fetchers use HTTPS to allowlisted hosts only; advisory feeds with DTDs or
+  entity declarations are refused; text copied into GitHub issues cannot @-mention people or inject HTML.
+- **Pinned supply chain.** Installer and CI pin every tool and every GitHub Action (actions by commit SHA,
+  checkouts without persisted credentials). `references/ci-workflow.md` uses `trivy-action` `0.35.0`; tags
+  `0.0.1`-`0.34.2` were hijacked in March 2026 (GHSA-69fq-xp46-6x23) — if you copied an older version of that
+  template, update it and rotate the CI secrets it could reach.
 
 ## Output Format
 
