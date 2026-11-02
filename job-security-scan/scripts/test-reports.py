@@ -93,6 +93,21 @@ class LocateTests(TempDirCase):
         self.assertEqual(self.locate(finding(file="requirements.txt", package="Django", installed_version="2.2.0")),
                          (2, "django==2.2.0"))
 
+    def test_maven_pom_artifact_and_transitive_group(self):
+        self.put("pom.xml", "<project>\n  <dependencies>\n    <dependency>\n"
+                            "      <groupId>org.apache.logging.log4j</groupId>\n"
+                            "      <artifactId>log4j-core</artifactId>\n      <version>2.14.1</version>\n"
+                            "    </dependency>\n  </dependencies>\n</project>\n")
+        core = finding(file="pom.xml", package="org.apache.logging.log4j:log4j-core", installed_version="2.14.1")
+        self.assertEqual(self.locate(core), (5, "<artifactId>log4j-core</artifactId>"))
+        api = finding(file="pom.xml", package="org.apache.logging.log4j:log4j-api", installed_version="2.14.1")
+        self.assertEqual(self.locate(api), (4, "<groupId>org.apache.logging.log4j</groupId>"))
+
+    def test_gradle_coordinates(self):
+        self.put("build.gradle", "dependencies {\n    implementation 'com.fasterxml.jackson.core:jackson-databind:2.9.8'\n}\n")
+        f = finding(file="build.gradle", package="com.fasterxml.jackson.core:jackson-databind", installed_version="2.9.8")
+        self.assertEqual(self.locate(f)[0], 2)
+
     def test_absolute_path_file(self):
         p = self.put("deep/go.mod", "module x\n\nrequire golang.org/x/text v0.3.2\n")
         self.assertEqual(self.locate(finding(file=str(p), package="golang.org/x/text", installed_version="0.3.2"))[0], 3)

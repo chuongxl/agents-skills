@@ -87,6 +87,16 @@ def _package_line(lines, name, version, filename):
     elif fn in ("poetry.lock", "uv.lock", "pdm.lock"):
         tests.append(lambda i, l: l.strip().lower().startswith("name = ") and
                      _norm_py(l.split("=", 1)[1].strip().strip('"')) == _norm_py(name))
+    if ":" in name and not name.startswith("@") and fn in ("pom.xml", "build.gradle", "build.gradle.kts"):
+        # Maven coordinates group:artifact. A declared dependency -> its artifactId (or the Gradle coordinate)
+        # line; a transitive one (not in the manifest) -> the declared dependency of the same group.
+        group, artifact = name.split(":", 1)
+        for i, l in enumerate(lines):
+            if "<artifactId>%s</artifactId>" % artifact in l or ("%s:%s" % (group, artifact)) in l:
+                return i + 1
+        for i, l in enumerate(lines):
+            if "<groupId>%s</groupId>" % group in l or ("'%s:" % group) in l or ('"%s:' % group) in l:
+                return i + 1
     for test in tests:
         hits = [i for i, l in enumerate(lines) if test(i, l)]
         for i in hits:
