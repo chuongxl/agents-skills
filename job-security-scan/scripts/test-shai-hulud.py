@@ -499,6 +499,62 @@ class HostTests(TempDirCase):
         self.assertIn(("known-package", "evil-pkg"), [(f["category"], f["package"]) for f in found])
 
 
+FETCH = SKILL_DIR / "scripts" / "fetch-iocs.py"
+
+
+class FetchTests(TempDirCase):
+    def sources(self, entries):
+        path = self.tmp / "sources.json"
+        path.write_text(json.dumps({"sources": entries}))
+        return path
+
+    def fetch(self, sources):
+        out = self.tmp / "cache"
+        r = subprocess.run([sys.executable, "-I", str(FETCH), "--out", str(out), "--sources", str(sources)],
+                           stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+        return r, out / "shai-hulud.json"
+
+    def csv_source(self, name, body, sid="t"):
+        p = self.put(name, body)
+        return {"id": sid, "wave": "sh-2.0", "ecosystem": "npm", "format": "csv-name-versions", "url": p.as_uri()}
+
+    def test_merge_adds_new_version_and_package(self):
+        src = self.csv_source("a.csv", 'package_name,package_versions,sources\n'
+                                       '@accordproject/concerto-linter,"3.24.1, 3.24.9",x\nbrand-new-evil,1.0.0,x\n')
+        r, out = self.fetch(self.sources([src]))
+        self.assertEqual(r.returncode, 0, r.stderr)
+        ioc = iocs.load(str(out))
+        self.assertEqual(ioc.packages[("npm", "@accordproject/concerto-linter")]["3.24.9"], "sh-2.0")
+        self.assertEqual(ioc.packages[("npm", "@accordproject/concerto-linter")]["3.24.1"], "sh-2.0")
+        self.assertIn(("npm", "brand-new-evil"), ioc.packages)
+
+    def test_single_version_column(self):
+        src = self.csv_source("b.csv", "package_name,package_version\nsolo-evil,2.0.0\n")
+        r, out = self.fetch(self.sources([src]))
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn("2.0.0", iocs.load(str(out)).packages[("npm", "solo-evil")])
+
+    def test_failed_source_exit_3_still_writes(self):
+        good = self.csv_source("c.csv", "package_name,package_version\nok-evil,1.0.0\n", "good")
+        bad = {"id": "bad", "wave": "sh-2.0", "ecosystem": "npm", "format": "csv-name-versions",
+               "url": (self.tmp / "missing.csv").as_uri()}
+        r, out = self.fetch(self.sources([good, bad]))
+        self.assertEqual(r.returncode, 3)
+        self.assertIn("bad", r.stderr)
+        self.assertIn(("npm", "ok-evil"), iocs.load(str(out)).packages)
+
+    def test_output_validates(self):
+        r, out = self.fetch(self.sources([]))
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(iocs.validate(json.loads(out.read_text())), [])
+
+    def test_unknown_wave_rejected(self):
+        src = self.csv_source("d.csv", "package_name,package_version\nx,1.0.0\n")
+        src["wave"] = "not-a-wave"
+        r, _ = self.fetch(self.sources([src]))
+        self.assertEqual(r.returncode, 1)
+
+
 class CliTests(TempDirCase):
     def test_exit_codes(self):
         expected = {"infected-lockfile": 2, "infected-node-modules": 2, "planted-workflow": 2, "clean": 0}
