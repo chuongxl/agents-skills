@@ -171,5 +171,155 @@ class ValidatorTests(TempDirCase):
         self.assertEqual(run(VALIDATE, big).returncode, 1)
 
 
+META = {"team": "t", "org": "o", "config": "c", "run_dir": "/w/security-run-20261102-220000",
+        "scanners": ["semgrep", "osv"], "repos": ["api"], "skipped": [], "generated_at": "x",
+        "profile": "standard", "since": None, "coverage": {"api": ["semgrep", "osv"]}}
+OSV_ROW = dict(scanner="osv", type="vulnerability", file="yarn.lock", line=3, code="x", package="lodash",
+               installed_version="4.17.15", rule_id="GHSA-x", severity="MEDIUM")
+CONFIRMED = {"verdict": "confirmed", "verified_severity": "HIGH",
+             "verdict_detail": {"evidence": "id comes from req.query", "likelihood": "high", "impact": "high"}}
+
+
+def build(findings, previous=None, **meta):
+    import report_model
+    m = dict(META)
+    m.update(meta)
+    return report_model.build_document(findings, m, previous=previous)
+
+
+class ChangesTests(unittest.TestCase):
+    def test_first_run_everything_new(self):
+        doc = build([finding()])
+        self.assertEqual(doc["findings"][0]["change"], "new")
+        self.assertIsNone(doc["run"]["previous_run"])
+
+    def test_new_unchanged_fixed(self):
+        prev = build([finding(), finding(**OSV_ROW)], run_dir="/w/security-run-1")
+        cur = build([finding(line=50), finding(code="other()", rule_id="xss")], previous=prev)
+        by = dict((f["rule_id"], f["change"]) for f in cur["findings"])
+        self.assertEqual(by, {"sqli": "unchanged", "xss": "new"})
+        self.assertEqual([f["rule_id"] for f in cur["fixed"]], ["GHSA-x"])
+        self.assertEqual(cur["run"]["previous_run"], "/w/security-run-1")
+
+    def test_edited_code_is_new(self):
+        prev = build([finding()])
+        cur = build([finding(code="db.query('SELECT ' + id + limit)")], previous=prev)
+        self.assertEqual(cur["findings"][0]["change"], "new")
+
+    def test_scanner_not_run_now_is_not_fixed(self):
+        prev = build([finding(), finding(**OSV_ROW)])
+        cur = build([finding()], previous=prev, scanners=["semgrep"], coverage={"api": ["semgrep"]})
+        self.assertEqual(cur["fixed"], [])
+
+    def test_repo_not_scanned_now_is_not_fixed(self):
+        prev = build([finding(), finding(repo="web")], repos=["api", "web"],
+                     coverage={"api": ["semgrep"], "web": ["semgrep"]})
+        cur = build([finding()], previous=prev, coverage={"api": ["semgrep"]})
+        self.assertEqual(cur["fixed"], [])
+
+    def test_partial_runs_never_mark_fixed(self):
+        prev = build([finding(), finding(**OSV_ROW)])
+        self.assertEqual(build([finding()], previous=prev, since="main")["fixed"], [])
+        self.assertEqual(build([finding()], previous=prev, partial=True)["fixed"], [])
+        partial_prev = build([finding(), finding(**OSV_ROW)], since="main")
+        self.assertEqual(build([finding()], previous=partial_prev)["fixed"], [])
+
+    def test_verdict_carried_to_unchanged_only(self):
+        import report_schema
+        prev = build([dict(finding(), **CONFIRMED)])
+        cur = build([finding(line=99), finding(code="changed()")], previous=prev)
+        moved, edited = cur["findings"]
+        self.assertEqual((moved["verdict"], moved["verified_severity"], moved["carried"]), ("confirmed", "HIGH", True))
+        self.assertIsNone(edited["verdict"])
+        self.assertFalse(edited["carried"])
+        self.assertEqual(report_schema.validate(cur), [])
+
+    def test_v1_previous_is_no_previous(self):
+        cur = build([finding()], previous={"schema_version": 1, "findings": [finding()]})
+        self.assertEqual(cur["findings"][0]["change"], "new")
+        self.assertIsNone(cur["run"]["previous_run"])
+
+    def test_find_previous_run(self):
+        import report_model
+        root = Path(tempfile.mkdtemp())
+        try:
+            def mk(name, doc):
+                d = root / name
+                d.mkdir()
+                if doc is not None:
+                    (d / "security-report.json").write_text(json.dumps(doc) if isinstance(doc, dict) else doc)
+                return d
+            mk("security-run-20261101-090000", build([finding()]))
+            mk("security-run-20261101-100000", {"schema_version": 1, "findings": []})
+            mk("security-run-20261101-110000", "{not json")
+            mk("security-run-20261101-120000", None)
+            mk("not-a-run", build([finding()]))
+            cur = mk("security-run-20261102-080000", None)
+            later = mk("security-run-20261103-080000", build([finding()]))
+            doc, path = report_model.find_previous(cur)
+            self.assertEqual(path.name, "security-run-20261101-090000")
+            self.assertEqual(doc["schema_version"], 2)
+            self.assertTrue(later.exists())
+            self.assertEqual(report_model.find_previous(root / "security-run-20261101-090000"), (None, None))
+        finally:
+            shutil.rmtree(str(root), ignore_errors=True)
+
+
+def write_results(base, semgrep_rows, repo="api"):
+    """A run folder with semgrep output for `repo` (base/repo/semgrep.json)."""
+    d = base / repo
+    d.mkdir(parents=True, exist_ok=True)
+    (d / "semgrep.json").write_text(json.dumps({"results": [
+        {"check_id": rid, "path": path, "start": {"line": line}, "extra": {"severity": "ERROR", "message": rid}}
+        for rid, path, line in semgrep_rows]}))
+
+
+class GenerateChangesTests(TempDirCase):
+    def generate(self, run, *extra):
+        cfg = self.tmp / "repository.md"
+        if not cfg.exists():
+            cfg.write_text("---\nteam: acme\norg: acme-org\nrepos:\n  - name: api\n    active: true\n---\n")
+        return run_proc(GENERATE, "--results-dir", run, "--config", cfg, "--out-dir", run,
+                        "--repos-root", self.tmp / "repos", "--home", self.tmp / "home", *extra)
+
+    def test_second_run_reports_changes(self):
+        self.put("repos/api/src/db.js", "const q = 'SELECT ' + id;\nconst r = 'DELETE ' + id;\n")
+        first = self.tmp / "ws" / "security-run-20261102-090000"
+        write_results(first, [("sqli", "src/db.js", 1), ("sqli-delete", "src/db.js", 2)])
+        r = self.generate(first)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.put("repos/api/src/db.js", "// moved\nconst q = 'SELECT ' + id;\nconst x = eval(input);\n")
+        second = self.tmp / "ws" / "security-run-20261102-100000"
+        write_results(second, [("sqli", "src/db.js", 2), ("eval", "src/db.js", 3)])
+        r = self.generate(second)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        doc = json.loads((second / "security-report.json").read_text())
+        self.assertEqual(dict((f["rule_id"], f["change"]) for f in doc["findings"]),
+                         {"sqli": "unchanged", "eval": "new"})
+        self.assertEqual([f["rule_id"] for f in doc["fixed"]], ["sqli-delete"])
+        self.assertEqual(doc["run"]["previous_run"], str(first.resolve()))
+        self.assertEqual(run_proc(VALIDATE, second / "security-report.json").returncode, 0)
+        md = (second / "security-report.md").read_text()
+        self.assertIn("## 🔁 Changes since last run", md)
+        self.assertIn("sqli-delete", md.split("## 🔁 Changes since last run")[1].split("\n## ")[0])
+        page = (second / "security-report.html").read_text()
+        self.assertIn('class="badge-new"', page)
+        self.assertEqual(page.count('class="badge-new"'), 1)
+
+    def test_previous_none_disables_comparison(self):
+        first = self.tmp / "ws" / "security-run-20261102-090000"
+        write_results(first, [("sqli", "src/db.js", 1)])
+        self.generate(first)
+        second = self.tmp / "ws" / "security-run-20261102-100000"
+        write_results(second, [("sqli", "src/db.js", 1)])
+        self.assertEqual(self.generate(second, "--previous", "none").returncode, 0)
+        doc = json.loads((second / "security-report.json").read_text())
+        self.assertEqual(doc["findings"][0]["change"], "new")
+
+
+def run_proc(*args, **kw):
+    return run(*args, **kw)
+
+
 if __name__ == "__main__":
     unittest.main()
