@@ -555,6 +555,76 @@ class FetchTests(TempDirCase):
         self.assertEqual(r.returncode, 1)
 
 
+RUN_SCAN = SKILL_DIR / "scripts" / "run-scan.sh"
+FIXTURE_REPOS = ("infected-lockfile", "infected-node-modules", "planted-workflow", "suspicious-hook",
+                 "native-build", "husky-prepare", "clean")
+
+
+@unittest.skipUnless(shutil.which("bash"), "bash required")
+class IntegrationTests(TempDirCase):
+    def config(self, repos=FIXTURE_REPOS):
+        body = "".join("  - name: %s\n    active: true\n    has-dockerfile: false\n" % n for n in repos)
+        return self.put("repository.md", '---\nteam: t\norg: o\nmonorepo-root: "%s"\nci-runner: x\n'
+                        'fail-on-severity: HIGH\noutput-dir: "%s"\nrepos:\n%s---\n' % (FIX, self.tmp / "out", body))
+
+    def run_scan(self, *args, env=None):
+        e = dict(os.environ)
+        e.update(env or {})
+        return subprocess.run(["bash", str(RUN_SCAN)] + [str(a) for a in args], stdout=subprocess.PIPE,
+                              stderr=subprocess.PIPE, universal_newlines=True, cwd=str(self.tmp), env=e)
+
+    def verdict(self, repo):
+        return json.loads((self.tmp / "out" / repo / "shai-hulud.json").read_text())["verdict"]
+
+    def test_scanner_over_fixture_repos(self):
+        r = self.run_scan("--config", self.config(), "--scanner", "shai-hulud")
+        self.assertEqual(r.returncode, 2, r.stdout + r.stderr)
+        self.assertEqual(self.verdict("infected-lockfile"), "affected")
+        self.assertEqual(self.verdict("suspicious-hook"), "suspicious")
+        self.assertEqual(self.verdict("clean"), "clean")
+        self.assertIn("AFFECTED", r.stdout)
+        html = (self.tmp / "out" / "security-report.html").read_text()
+        self.assertIn("shai-hulud", html)
+        self.assertIn("@accordproject/concerto-linter", html)
+
+    def test_single_repo_flag(self):
+        r = self.run_scan("--config", self.config(), "--scanner", "shai-hulud", "--repo", "clean")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertFalse((self.tmp / "out" / "infected-lockfile").exists())
+
+    def test_host_flag_without_config(self):
+        home = self.tmp / "home"
+        shutil.copytree(str(FIX / "infected-lockfile"), str(home / "app"))
+        r = self.run_scan("--host", env={"HOME": str(home), "NPM_CONFIG_PREFIX": ""})
+        self.assertEqual(r.returncode, 2, r.stdout + r.stderr)
+        doc = json.loads((self.tmp / ".security-scan-results" / "_host" / "shai-hulud.json").read_text())
+        self.assertEqual(doc["verdict"], "affected")
+        html = (self.tmp / ".security-scan-results" / "security-report.html").read_text()
+        self.assertIn("this machine", html)
+
+    def test_unknown_scanner_message_lists_shai_hulud(self):
+        r = self.run_scan("--config", self.config(), "--scanner", "nope")
+        self.assertIn("shai-hulud", r.stdout)
+
+    def test_report_parser_maps_fields(self):
+        sys.path.insert(0, str(SKILL_DIR / "scripts"))
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("genreport", str(SKILL_DIR / "scripts" / "generate-report.py"))
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        out = self.tmp / "res" / "r1"
+        out.mkdir(parents=True)
+        doc = scan(FIX / "infected-lockfile")
+        doc["findings"].append(dict(doc["findings"][0], tier="exposure", severity="INFO", id="x"))
+        (out / "shai-hulud.json").write_text(json.dumps(doc))
+        rows = mod.parse_shai_hulud("r1", str(self.tmp / "res"), "/w")
+        self.assertEqual([r["severity"] for r in rows], ["CRITICAL", "LOW"])
+        self.assertEqual(rows[0]["scanner"], "shai-hulud")
+        self.assertEqual(rows[0]["package"], "@accordproject/concerto-linter")
+        self.assertEqual(rows[0]["installed_version"], "3.24.1")
+        self.assertEqual(rows[0]["rule_id"], "known-package")
+
+
 class CliTests(TempDirCase):
     def test_exit_codes(self):
         expected = {"infected-lockfile": 2, "infected-node-modules": 2, "planted-workflow": 2, "clean": 0}

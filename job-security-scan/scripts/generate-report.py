@@ -354,8 +354,54 @@ def parse_advisories(repo, results_dir, workspace):
     return findings
 
 
+HOST_RESULTS = "_host"        # run-scan.sh --host writes here
+HOST_LABEL = "this machine"
+
+
+def parse_shai_hulud(repo, results_dir, workspace):
+    """Parse shai-hulud-scan.py JSON (repo mode, or host mode under _host/)."""
+    findings = []
+    json_path = Path(results_dir) / repo / "shai-hulud.json"
+    if not json_path.exists():
+        return findings
+    try:
+        data = json.loads(json_path.read_text())
+    except Exception:
+        return findings
+    tier_label = {"affected": "AFFECTED", "suspicious": "Suspicious", "exposure": "Rotate if affected"}
+    for f in data.get("findings", []):
+        sev = f.get("severity", "LOW").upper()
+        if sev == "INFO":
+            sev = "LOW"
+        parts = [tier_label.get(f.get("tier"), f.get("tier", ""))]
+        if f.get("wave"):
+            parts.append("wave " + f["wave"])
+        if f.get("evidence"):
+            parts.append("evidence: " + f["evidence"])
+        if f.get("remediation"):
+            parts.append(f["remediation"])
+        findings.append({
+            "repo": HOST_LABEL if repo == HOST_RESULTS else repo,
+            "scanner": "shai-hulud",
+            "type": "supply-chain",
+            "severity": sev,
+            "file": f.get("location", ""),
+            "line": None,
+            "package": f.get("package", ""),
+            "installed_version": f.get("version", ""),
+            "fixed_version": "",
+            "rule_id": f.get("category", ""),
+            "title": f.get("title", ""),
+            "description": " - ".join(parts)[:300],
+            "url": "",
+            "workspace": workspace,
+        })
+    return findings
+
+
 def collect_findings(results_dir, repos, workspace):
-    parsers = [parse_gitleaks, parse_trufflehog, parse_trivy, parse_semgrep, parse_hadolint, parse_osv, parse_advisories]
+    parsers = [parse_gitleaks, parse_trufflehog, parse_trivy, parse_semgrep, parse_hadolint, parse_osv,
+               parse_advisories, parse_shai_hulud]
     all_findings = []
     for repo in repos:
         for parser in parsers:

@@ -2,12 +2,14 @@
 # run-scan.sh — Generic security scanner for any team/repo workspace.
 #
 # Usage:
-#   run-scan.sh [--config path/to/repository.md] [--repo REPO_NAME] [--scanner SCANNER]
+#   run-scan.sh [--config path/to/repository.md] [--repo REPO_NAME] [--scanner SCANNER] [--host]
 #
 # Flags:
 #   --config   Path to repository.md config file (default: auto-discover)
 #   --repo     Scan one repo by name only (default: all active repos)
-#   --scanner  Run one scanner only: gitleaks|trivy|semgrep|hadolint|osv|sbom|advisories|trufflehog|all
+#   --scanner  Run one scanner only: gitleaks|trivy|semgrep|hadolint|osv|sbom|advisories|trufflehog|shai-hulud|all
+#   --host     Also check THIS computer for the Shai-Hulud worm (projects under $HOME, global installs,
+#              npm cache, credential stores). Alone (no --scanner), only the host check runs.
 #
 # Reads all team/repo config from repository.md — no hardcoded values.
 
@@ -15,6 +17,8 @@ set -uo pipefail
 
 # ─── Argument parsing ──────────────────────────────────────────────────────
 SCANNER="all"
+SCANNER_SET=0
+HOST_MODE=0
 REPO_FILTER=""
 CONFIG_PATH=""
 
@@ -22,8 +26,9 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     --config)   CONFIG_PATH="$2"; shift 2 ;;
     --repo)     REPO_FILTER="$2"; shift 2 ;;
-    --scanner)  SCANNER="$2";     shift 2 ;;
-    -s)         SCANNER="$2";     shift 2 ;;
+    --scanner)  SCANNER="$2"; SCANNER_SET=1; shift 2 ;;
+    -s)         SCANNER="$2"; SCANNER_SET=1; shift 2 ;;
+    --host)     HOST_MODE=1;      shift ;;
     -r)         REPO_FILTER="$2"; shift 2 ;;
     *)          echo "Unknown arg: $1"; exit 1 ;;
   esac
@@ -53,7 +58,9 @@ ASSET_DIR="$SKILL_DIR/assets"
 
 # ─── Determine repos to scan ───────────────────────────────────────────────
 declare -a REPOS_TO_SCAN
-if [[ -n "$REPO_FILTER" ]]; then
+if [[ $HOST_MODE -eq 1 && $SCANNER_SET -eq 0 && -z "$REPO_FILTER" ]]; then
+  REPOS_TO_SCAN=()                      # --host alone: check this computer only
+elif [[ -n "$REPO_FILTER" ]]; then
   REPOS_TO_SCAN=("$REPO_FILTER")
 else
   REPOS_TO_SCAN=("${ACTIVE_REPOS[@]}")
@@ -400,6 +407,45 @@ run_trufflehog() {
   fi
 }
 
+# Shai-Hulud worm check (offline): known indicators = affected, worm-like install hooks = suspicious.
+shai_hulud_iocs_args() {
+  local cache="$OUTPUT_BASE/.ioc-cache/shai-hulud.json"
+  [[ -s "$cache" ]] && echo "--iocs $cache"
+}
+
+_shai_hulud_result() {  # _shai_hulud_result <label> <rc> <txt>
+  local label="$1" rc="$2" txt="$3"
+  case "$rc" in
+    0) _pass shai-hulud "$label" "No Shai-Hulud indicator or worm-like install hook" ;;
+    1) _warn shai-hulud "$label" "SUSPICIOUS worm-like install behaviour - see $txt" ;;
+    2) _fail shai-hulud "$label" "AFFECTED - known Shai-Hulud indicator - see $txt (runbook: references/remediation.md)" ;;
+    *) _warn shai-hulud "$label" "scan error (exit $rc) - see $txt" ;;
+  esac
+}
+
+run_shai_hulud() {
+  local repo="$1" path="$2"
+  local out="$OUTPUT_BASE/$repo/shai-hulud.json" txt="$OUTPUT_BASE/$repo/shai-hulud.txt"
+  mkdir -p "$(dirname "$out")"
+  _log shai-hulud "$repo" "Checking for Shai-Hulud worm indicators and install-hook behaviour..."
+  # shellcheck disable=SC2046
+  python3 -I "$SKILL_DIR/scripts/shai-hulud-scan.py" --repo "$path" --output "$out" --format text \
+    $(shai_hulud_iocs_args) >"$txt" 2>&1
+  _shai_hulud_result "$repo" $? "$txt"
+}
+
+run_shai_hulud_host() {
+  local out="$OUTPUT_BASE/_host/shai-hulud.json" txt="$OUTPUT_BASE/_host/shai-hulud.txt"
+  mkdir -p "$(dirname "$out")"
+  echo ""
+  echo "  ── this machine ($HOME) ──"
+  _log shai-hulud "host" "Checking projects, global installs, npm cache and credential stores..."
+  # shellcheck disable=SC2046
+  python3 -I "$SKILL_DIR/scripts/shai-hulud-scan.py" --host --output "$out" --format text \
+    $(shai_hulud_iocs_args) >"$txt" 2>&1
+  _shai_hulud_result "host" $? "$txt"
+}
+
 # ─── DISPATCH ─────────────────────────────────────────────────────────────
 
 run_scanner_for_repo() {
@@ -420,6 +466,7 @@ run_scanner_for_repo() {
     sbom)       run_sbom       "$repo" "$path" ;;
     advisories) run_advisories "$repo" "$path" ;;
     trufflehog) run_trufflehog "$repo" "$path" ;;
+    shai-hulud) run_shai_hulud "$repo" "$path" ;;
     all)
       run_gitleaks   "$repo" "$path"
       run_trivy      "$repo" "$path"
@@ -429,10 +476,11 @@ run_scanner_for_repo() {
       run_sbom       "$repo" "$path"
       run_advisories "$repo" "$path"
       run_trufflehog "$repo" "$path"
+      run_shai_hulud "$repo" "$path"
       ;;
     *)
       echo "Unknown scanner: $SCANNER"
-      echo "Valid: gitleaks | trivy | semgrep | hadolint | osv | sbom | advisories | trufflehog | all"
+      echo "Valid: gitleaks | trivy | semgrep | hadolint | osv | sbom | advisories | trufflehog | shai-hulud | all"
       exit 1
       ;;
   esac
@@ -443,11 +491,23 @@ echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "  🔐 Security Scan — team: ${TEAM} | org: ${ORG}"
 echo "  Scanners : ${SCANNER}"
-echo "  Repos    : ${REPOS_TO_SCAN[*]}"
+echo "  Repos    : ${REPOS_TO_SCAN[*]:-(none)}"
+[[ $HOST_MODE -eq 1 ]] && echo "  Host     : this machine (Shai-Hulud check)"
 echo "  Output   : ${OUTPUT_BASE}/"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
-for repo in "${REPOS_TO_SCAN[@]}"; do
+case "$SCANNER" in
+  gitleaks|trivy|semgrep|hadolint|osv|sbom|advisories|trufflehog|shai-hulud|all) ;;
+  *)
+    echo "Unknown scanner: $SCANNER"
+    echo "Valid: gitleaks | trivy | semgrep | hadolint | osv | sbom | advisories | trufflehog | shai-hulud | all"
+    exit 1
+    ;;
+esac
+
+[[ $HOST_MODE -eq 1 ]] && run_shai_hulud_host
+
+for repo in ${REPOS_TO_SCAN[@]+"${REPOS_TO_SCAN[@]}"}; do
   echo ""
   echo "  ── $repo ──"
   run_scanner_for_repo "$repo"
