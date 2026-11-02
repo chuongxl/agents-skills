@@ -6,6 +6,7 @@ from pathlib import Path
 
 from . import MAX_SCAN_BYTES
 from .findings import make_finding
+from .heuristics import analyze_manifest
 from .hooks import hook_target, install_hooks, read_text
 from .inventory import iter_manifests, iter_packages
 
@@ -122,4 +123,5 @@ def scan_repo(root, ioc, allowlist):
     out = check_packages(root, ioc) + check_paths(root, ioc)
     for pkg_dir, manifest in iter_manifests(root):
         out.extend(check_manifest_files(root, ioc, pkg_dir, manifest))
+        out.extend(analyze_manifest(pkg_dir, manifest, allowlist, root, ioc))
     return out
