@@ -20,7 +20,8 @@
         "since": {"type": ["string", "null"]},
         "partial": {"type": "boolean"},
         "previous_run": {"type": ["string", "null"]},
-        "coverage": {"type": "object", "additionalProperties": {"type": "array", "items": {"type": "string"}}}
+        "coverage": {"type": "object", "description": "{repo: {scanner: mode}} - what ran; a finding is fixed only if its scanner ran in the same mode both times", "additionalProperties": {"type": "object", "additionalProperties": {"type": "string"}}},
+        "workspace": {"type": "string"}
       }
     },
     "scanners": {"type": "array", "items": {"type": "string"}},

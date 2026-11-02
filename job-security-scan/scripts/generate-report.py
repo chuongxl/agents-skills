@@ -720,13 +720,13 @@ def discover_repos(results_dir):
     return sorted(x.name for x in d.iterdir() if x.is_dir() and not x.name.startswith(".")) if d.exists() else []
 
 
-def scanner_coverage(results_dir, repos):
-    """{repo label: [scanners whose raw output exists]} — which scanners actually ran for each repo."""
+def scanner_coverage(results_dir, repos, profile="standard"):
+    """{repo label: {scanner: mode}} for every scanner whose raw output exists — what actually ran per repo."""
     cov = {}
     for r in repos:
         d = Path(results_dir) / r
         ran = sorted({name for fname, name in report_model.RAW_FILES.items() if (d / fname).is_file()})
-        cov[HOST_LABEL if r == HOST_RESULTS else r] = ran
+        cov[HOST_LABEL if r == HOST_RESULTS else r] = report_model.scanner_modes(ran, profile)
     return cov
 
 
@@ -783,15 +783,16 @@ def main():
         previous = dict(previous, run_dir=str(previous_dir))
         print(f"  Comparing with previous run: {previous_dir}")
 
+    coverage = scanner_coverage(args.results_dir, repos, args.profile)
     meta = {
         "team": team, "org": org, "config": os.path.abspath(args.config),
         "run_dir": str(out_dir.resolve()),
-        "scanners": sorted({f["scanner"] for f in findings} | {s for v in scanner_coverage(args.results_dir, repos).values() for s in v}),
+        "scanners": sorted({f["scanner"] for f in findings} | {s for v in coverage.values() for s in v}),
         "repos": [HOST_LABEL if r == HOST_RESULTS else r for r in repos],
         "skipped": [],
         "generated_at": datetime.now().astimezone().isoformat(timespec="seconds"),
         "profile": args.profile, "since": args.since, "partial": args.partial,
-        "coverage": scanner_coverage(args.results_dir, repos),
+        "coverage": coverage,
     }
     doc = report_model.build_document(findings, meta, previous=previous)
     doc["run"]["workspace"] = workspace

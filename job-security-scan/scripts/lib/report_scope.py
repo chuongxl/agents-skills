@@ -30,7 +30,10 @@ def load_changed(path):
 
 
 def _norm(path):
-    return os.path.normpath(str(path).replace("\\", "/")).lstrip("./") if path else ""
+    if not path:
+        return ""
+    p = os.path.normpath(str(path).replace("\\", "/"))
+    return "" if p == "." else p
 
 
 def _is_dependency_file(path):
