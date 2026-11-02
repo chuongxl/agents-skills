@@ -13,7 +13,7 @@ import stat
 from pathlib import Path
 
 from .findings import make_finding, relocate
-from .inventory import NPM_LOCKS
+from .inventory import NPM_LOCKS, prune
 from .scanner import scan_repo
 
 PROJECT_MARKERS = set(NPM_LOCKS) | {"package.json", "yarn.lock", "pnpm-lock.yaml", "poetry.lock", "uv.lock",
@@ -57,8 +57,8 @@ def find_projects(root, home, max_depth):
             yield Path(dirpath)
             dirnames[:] = []
             continue
-        dirnames[:] = [d for d in dirnames if d not in SKIP_DIRS and depth < max_depth
-                       and not os.path.islink(os.path.join(dirpath, d))]
+        prune(dirpath, dirnames, skip=SKIP_DIRS)
+        dirnames[:] = [d for d in dirnames if depth < max_depth and not os.path.islink(os.path.join(dirpath, d))]
 
 
 def _env_files(project):

@@ -43,10 +43,27 @@ def _read_json(path):
     return data if isinstance(data, dict) else None
 
 
+FIXTURE_MARKER = ".shai-hulud-test-fixtures"
+
+
+def is_skill_fixture_dir(path):
+    """True for this skill's own inert test fixtures (wherever the skill is installed): the directory
+    holds FIXTURE_MARKER *and* sits under a tests/fixtures path. Both are required, so a marker file
+    planted in an arbitrary package directory does not hide it."""
+    parts = Path(path).parts
+    under_fixtures = any(a == "tests" and b == "fixtures" for a, b in zip(parts, parts[1:]))
+    return under_fixtures and os.path.isfile(os.path.join(str(path), FIXTURE_MARKER))
+
+
+def prune(dirpath, dirnames, skip=SKIP_DIRS):
+    """Filter os.walk dirnames in place: VCS/skip dirs and the skill's own test fixtures."""
+    dirnames[:] = [d for d in dirnames if d not in skip and not is_skill_fixture_dir(os.path.join(dirpath, d))]
+
+
 def _walk(root):
-    """os.walk without following symlinks or entering VCS dirs; yields (dirpath, filenames)."""
+    """os.walk without following symlinks, entering VCS dirs, or entering this skill's test fixtures."""
     for dirpath, dirnames, filenames in os.walk(str(root), followlinks=False):
-        dirnames[:] = [d for d in dirnames if d not in SKIP_DIRS]
+        prune(dirpath, dirnames)
         yield Path(dirpath), filenames
 
 

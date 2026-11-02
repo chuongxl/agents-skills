@@ -1,0 +1,3 @@
+This directory holds inert test fixtures for the Shai-Hulud check: matching names and strings only,
+no working payload. The scanner skips any tests/fixtures directory containing this file, so an
+installed copy of the skill never reports itself.

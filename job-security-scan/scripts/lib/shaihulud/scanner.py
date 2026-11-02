@@ -8,7 +8,7 @@ from . import MAX_SCAN_BYTES
 from .findings import make_finding
 from .heuristics import analyze_manifest
 from .hooks import hook_target, install_hooks, read_text
-from .inventory import iter_manifests, iter_packages
+from .inventory import iter_manifests, iter_packages, prune
 
 PAYLOAD_DEPTH = 2
 WORKFLOW_DIR = Path(".github") / "workflows"
@@ -36,7 +36,9 @@ def _files_near(pkg_dir, depth=PAYLOAD_DEPTH):
     base = str(pkg_dir)
     for dirpath, dirnames, filenames in os.walk(base, followlinks=False):
         level = 0 if dirpath == base else os.path.relpath(dirpath, base).count(os.sep) + 1
-        dirnames[:] = [d for d in dirnames if d not in ("node_modules", ".git") and level < depth]
+        prune(dirpath, dirnames, skip={"node_modules", ".git"})
+        if level >= depth:
+            dirnames[:] = []
         for fn in filenames:
             yield Path(dirpath) / fn
 

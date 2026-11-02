@@ -625,6 +625,35 @@ class IntegrationTests(TempDirCase):
         self.assertEqual(rows[0]["rule_id"], "known-package")
 
 
+class FixtureExclusionTests(TempDirCase):
+    VENDORED = Path(".github/skills/job-security-scan/tests/fixtures/shai-hulud")
+
+    def vendor(self, base):
+        shutil.copytree(str(FIX), str(base / self.VENDORED))
+        self.put(str((base / "package.json").relative_to(self.tmp)), '{"name": "svc", "version": "1.0.0"}')
+
+    def test_repo_with_vendored_skill_is_clean(self):
+        self.vendor(self.tmp)
+        doc = scan(self.tmp)
+        self.assertEqual(doc["verdict"], "clean", doc["findings"][:3])
+
+    def test_host_with_vendored_skill_is_clean(self):
+        home = self.tmp / "home"
+        self.vendor(home / "work" / "svc")
+        from shaihulud import host, findings
+        found = host.scan_host([home], home, iocs.load(str(IOC_FILE)), iocs.load_allowlist())
+        self.assertEqual(findings.verdict(found), "clean", found[:3])
+
+    def test_marker_only_applies_below_root(self):
+        self.assertEqual(scan(FIX / "infected-lockfile")["verdict"], "affected")
+
+    def test_marker_outside_tests_fixtures_ignored(self):
+        shutil.copytree(str(FIX / "infected-node-modules" / "node_modules"), str(self.tmp / "node_modules"))
+        self.put("node_modules/@accordproject/.shai-hulud-test-fixtures", "attacker-planted\n")
+        self.put("node_modules/@accordproject/concerto-linter/.shai-hulud-test-fixtures", "attacker-planted\n")
+        self.assertEqual(scan(self.tmp)["verdict"], "affected")
+
+
 class CliTests(TempDirCase):
     def test_exit_codes(self):
         expected = {"infected-lockfile": 2, "infected-node-modules": 2, "planted-workflow": 2, "clean": 0}

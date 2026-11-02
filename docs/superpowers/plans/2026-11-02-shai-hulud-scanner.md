@@ -190,3 +190,21 @@
 - [ ] **Step 2:** Run `bash job-security-scan/tests/e2e/run-shai-hulud-e2e.sh` → `e2e: all checks passed`; open `security-report.html` and check the shai-hulud rows render with severity colours and no secret text.
 - [ ] **Step 3:** Run host mode on this real workspace (`--host --root /home/claude`) as a smoke test; expect no crash and a verdict line.
 - [ ] **Step 4:** Report results to Alex; on any failure loop back to the plan. On pass, push and open a PR closing #50 using the repo's PR template if present.
+
+### Task 11 (added during verification): Never flag the skill's own test fixtures
+
+Found in Task 10 Step 3: `--host --root /home/claude` reported AFFECTED from
+`job-security-scan/tests/fixtures/shai-hulud/`. Installed copies of the skill (`.github/skills/job-security-scan/`)
+would make every repo and laptop scan report AFFECTED — an anti-goal in the spec (false alarms).
+
+**Files:** Create `job-security-scan/tests/fixtures/shai-hulud/.shai-hulud-test-fixtures` (marker file, text explains it).
+Modify `scripts/lib/shaihulud/inventory.py` (`_walk`), `scanner.py` (`_files_near`), `host.py` (`find_projects`).
+
+**Interfaces:** `inventory.FIXTURE_MARKER = ".shai-hulud-test-fixtures"`; any directory *below the scan root* that
+contains this file is not entered. The scan root itself is never skipped (tests scan fixture dirs directly).
+
+- [ ] **Step 1: Write failing tests** `FixtureExclusionTests.test_repo_with_vendored_skill_is_clean` (copy the skill's
+  `tests/fixtures/shai-hulud` into `<tmp>/.github/skills/job-security-scan/tests/fixtures/shai-hulud`, scan `<tmp>` →
+  clean) and `test_host_with_vendored_skill_is_clean`; `test_marker_only_applies_below_root`.
+- [ ] **Step 2: Run** → FAIL. **Step 3: Implement.** **Step 4: Run** all suites + e2e → PASS.
+- [ ] **Step 5: Commit** `fix(shai-hulud): skip the skill's own test fixtures`.
