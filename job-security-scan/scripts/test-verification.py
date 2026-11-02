@@ -85,6 +85,24 @@ class FingerprintTests(unittest.TestCase):
     def test_format(self):
         self.assertRegex(self.fp(finding()), r"^[0-9a-f]{16}$")
 
+    def test_duplicates_in_real_scanner_output(self):
+        """OSV lists a package twice (nested node_modules) and scanners can repeat a row verbatim: the
+        document keeps exact repeats once and gives each distinct occurrence its own stable fingerprint."""
+        import report_model, report_schema
+        dep = finding(scanner="osv", type="vulnerability", file="package-lock.json", package="lodash",
+                      installed_version="4.17.20", rule_id="GHSA-x", severity="MEDIUM")
+        same_code = [finding(line=10), finding(line=30)]           # the identical line of code twice in a file
+        rows = [dict(dep, line=9), dict(dep, line=40), dict(dep, line=9)] + same_code
+        doc = report_model.build_document(rows, dict(META))
+        self.assertEqual(report_schema.validate(doc), [])
+        self.assertEqual(len(doc["findings"]), 4)                  # the verbatim repeat is dropped
+        fps = [f["fingerprint"] for f in doc["findings"]]
+        self.assertEqual(len(set(fps)), 4)
+        again = report_model.build_document(list(reversed(rows)), dict(META))
+        self.assertEqual(sorted(fps), sorted(f["fingerprint"] for f in again["findings"]))
+        moved = report_model.build_document([dict(dep, line=19), dict(dep, line=50)] + same_code, dict(META))
+        self.assertEqual(sorted(fps), sorted(f["fingerprint"] for f in moved["findings"]))
+
 
 def v2_doc(findings=None):
     import report_model
