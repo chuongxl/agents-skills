@@ -162,6 +162,44 @@ def build_document(findings, meta, previous=None):
     }
 
 
+RUN_PREFIX = "security-run-"
+MAX_REPORT_BYTES = 5 * 1024 * 1024
+
+
+def load_report(path):
+    """A v2 report that passes the validator, or None (missing, too big, not JSON, v1, invalid)."""
+    import json
+    import os
+    import report_schema
+    try:
+        if os.path.getsize(str(path)) > MAX_REPORT_BYTES:
+            return None
+        with open(str(path), "r", encoding="utf-8") as fh:
+            doc = json.load(fh)
+    except (OSError, ValueError):
+        return None
+    if not isinstance(doc, dict) or report_schema.validate(doc):
+        return None
+    return doc
+
+
+def find_previous(run_dir):
+    """(document, folder) of the newest earlier security-run-* sibling with a valid v2 report, else (None, None).
+    "Earlier" is by folder name, which sorts by the run's date and time."""
+    from pathlib import Path
+    run_dir = Path(run_dir).resolve()
+    try:
+        siblings = [p for p in run_dir.parent.iterdir()
+                    if p.is_dir() and p.name.startswith(RUN_PREFIX) and p.name < run_dir.name]
+    except OSError:
+        return None, None
+    for p in sorted(siblings, key=lambda x: x.name, reverse=True):
+        doc = load_report(p / "security-report.json")
+        if doc is not None:
+            return doc, p
+    return None, None
+
+
 def refresh(doc):
     """Recompute derived fields after verdicts change (counts, repo summaries, verification)."""
     doc["counts"] = counts_of(doc["findings"])
