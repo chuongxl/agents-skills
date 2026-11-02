@@ -230,6 +230,50 @@ def parse_hadolint(repo, results_dir, workspace):
     return findings
 
 
+_GHSA_LABELS = {"CRITICAL": "CRITICAL", "HIGH": "HIGH", "MODERATE": "MEDIUM", "MEDIUM": "MEDIUM", "LOW": "LOW"}
+
+
+def _score_to_severity(score):
+    if score >= 9.0:
+        return "CRITICAL"
+    if score >= 7.0:
+        return "HIGH"
+    if score >= 4.0:
+        return "MEDIUM"
+    return "LOW"
+
+
+def _osv_group_scores(groups):
+    """{vuln id or alias: numeric max_severity} from osv-scanner's groups (v1.x and v2)."""
+    out = {}
+    for g in groups if isinstance(groups, list) else []:
+        if not isinstance(g, dict):
+            continue
+        try:
+            score = float(g.get("max_severity") or "")
+        except (TypeError, ValueError):
+            continue
+        for ident in g.get("ids") or []:
+            out[ident] = score
+    return out
+
+
+def _osv_severity(vuln, group_scores):
+    """Severity from osv-scanner's numeric group score, else a numeric CVSS score, else the advisory's own
+    label (GHSA database_specific.severity), else MEDIUM. CVSS vectors ('CVSS:3.1/AV:N/...') are not scores."""
+    for ident in [vuln.get("id")] + list(vuln.get("aliases") or []):
+        if ident in group_scores:
+            return _score_to_severity(group_scores[ident])
+    for entry in vuln.get("severity") if isinstance(vuln.get("severity"), list) else []:
+        try:
+            return _score_to_severity(float(str(entry.get("score", ""))))
+        except (AttributeError, TypeError, ValueError):
+            continue
+    label = str((vuln.get("database_specific") or {}).get("severity", "")).upper() \
+        if isinstance(vuln.get("database_specific"), dict) else ""
+    return _GHSA_LABELS.get(label, "MEDIUM")
+
+
 def parse_osv(repo, results_dir, workspace):
     """Parse osv-scanner JSON output."""
     findings = []
@@ -245,15 +289,9 @@ def parse_osv(repo, results_dir, workspace):
         source = result.get("source", {}).get("path", "yarn.lock")
         for pkg in result.get("packages", []):
             pkg_info = pkg.get("package", {})
+            group_scores = _osv_group_scores(pkg.get("groups"))
             for vuln in pkg.get("vulnerabilities", []):
-                sev = "MEDIUM"
-                for severity in vuln.get("severity", []):
-                    if severity.get("type") == "CVSS_V3":
-                        score = float(severity.get("score", "0").split("/")[0] if "/" in severity.get("score","") else "0")
-                        if score >= 9.0:   sev = "CRITICAL"
-                        elif score >= 7.0: sev = "HIGH"
-                        elif score >= 4.0: sev = "MEDIUM"
-                        else:              sev = "LOW"
+                sev = _osv_severity(vuln, group_scores)
                 findings.append({
                     "repo": repo,
                     "scanner": "osv",
@@ -416,7 +454,11 @@ def collect_findings(results_dir, repos, workspace):
     all_findings = []
     for repo in repos:
         for parser in parsers:
-            all_findings.extend(parser(repo, results_dir, workspace))
+            try:
+                all_findings.extend(parser(repo, results_dir, workspace))
+            except Exception as exc:  # one unexpected tool output must not cost the whole report
+                sys.stderr.write("  warning: %s could not read %s output: %s: %s\n"
+                                 % (parser.__name__, repo, type(exc).__name__, exc))
     all_findings.sort(key=lambda f: (severity_order(f["severity"]), f["repo"], f["scanner"]))
     return all_findings
 

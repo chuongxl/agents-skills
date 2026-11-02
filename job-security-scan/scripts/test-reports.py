@@ -250,6 +250,50 @@ class GenerateTests(TempDirCase):
         self.assertIn("db.js:2", page)
         self.assertIn("SELECT", page)
 
+    def test_real_osv_v2_output_with_cvss_vectors(self):
+        """osv-scanner v2 shape: CVSS scores are vector strings; severity comes from groups[].max_severity."""
+        lock = self.put("repos/api/yarn.lock", '# yarn lockfile v1\n\nlodash@^4.17.0:\n  version "4.17.15"\n')
+        vulns = [
+            {"id": "GHSA-p6mc-m468-83gw", "aliases": ["CVE-2020-8203"], "summary": "Prototype Pollution in lodash",
+             "severity": [{"type": "CVSS_V3", "score": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:N/I:H/A:H"}],
+             "database_specific": {"severity": "HIGH"}},
+            {"id": "GHSA-29mw-wpgm-hmr9", "aliases": ["CVE-2020-28500"], "summary": "ReDoS in lodash",
+             "severity": [{"type": "CVSS_V3", "score": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:L"}],
+             "database_specific": {"severity": "MODERATE"}},
+            {"id": "GHSA-35jh-r3h4-6jhm", "summary": "Command Injection in lodash", "severity": []},
+        ]
+        osv = {"results": [{"source": {"path": str(lock), "type": "lockfile"}, "packages": [{
+            "package": {"name": "lodash", "version": "4.17.15", "ecosystem": "npm"}, "vulnerabilities": vulns,
+            "groups": [{"ids": ["GHSA-p6mc-m468-83gw", "CVE-2020-8203"], "max_severity": "7.4"},
+                       {"ids": ["GHSA-29mw-wpgm-hmr9"], "max_severity": "5.3"},
+                       {"ids": ["GHSA-35jh-r3h4-6jhm"], "max_severity": "9.8"}]}]}]}
+        self.put("run/api/osv.json", json.dumps(osv))
+        cfg = self.put("repository.md", "---\nteam: acme\norg: acme-org\n---\n")
+        r = subprocess.run([sys.executable, "-I", str(GENERATE), "--results-dir", str(self.tmp / "run"),
+                            "--config", str(cfg), "--out-dir", str(self.tmp / "run"),
+                            "--repos-root", str(self.tmp / "repos")],
+                           stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        rows = json.loads((self.tmp / "run" / "security-report.json").read_text())["findings"]
+        sev = dict((f["rule_id"], f["severity"]) for f in rows)
+        self.assertEqual(sev, {"GHSA-p6mc-m468-83gw": "HIGH", "GHSA-29mw-wpgm-hmr9": "MEDIUM",
+                               "GHSA-35jh-r3h4-6jhm": "CRITICAL"})
+        self.assertTrue(all(f["line"] == 3 for f in rows), rows)
+
+    def test_one_broken_scanner_output_does_not_kill_the_report(self):
+        self.put("run/api/osv.json", json.dumps({"results": [{"source": {"path": "x"}, "packages": [
+            {"package": {"name": "p", "version": "1"}, "vulnerabilities": [{"id": "X-1", "severity": "weird"}],
+             "groups": "also weird"}]}]}))
+        self.put("run/api/semgrep.json", json.dumps({"results": [{"check_id": "r", "path": "a.js",
+                 "start": {"line": 1}, "extra": {"severity": "ERROR", "message": "m"}}]}))
+        cfg = self.put("repository.md", "---\nteam: acme\norg: acme-org\n---\n")
+        r = subprocess.run([sys.executable, "-I", str(GENERATE), "--results-dir", str(self.tmp / "run"),
+                            "--config", str(cfg), "--out-dir", str(self.tmp / "run")],
+                           stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        rows = json.loads((self.tmp / "run" / "security-report.json").read_text())["findings"]
+        self.assertIn("semgrep", {f["scanner"] for f in rows})
+
     def test_failure_exits_non_zero(self):
         r = subprocess.run([sys.executable, "-I", str(GENERATE), "--results-dir", str(self.tmp), "--config",
                             str(self.tmp / "missing.md"), "--out-dir", str(self.tmp / "o")],

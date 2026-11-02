@@ -102,6 +102,9 @@ if [[ $FAILS -gt 0 ]]; then
   for f in "$OSV_RUN"/*/osv.stderr "$SBOM_RUN"/*/osv-sbom.stderr "$SBOM_RUN"/*/sbom.stderr; do
     [[ -s "$f" ]] && annotate "$(basename "$(dirname "$f")")/$(basename "$f"):"$'\n'"$(head -c 1500 "$f")"
   done
+  for f in "$OSV_RUN/report.log" "$SBOM_RUN/report.log"; do
+    [[ -s "$f" ]] && annotate "$(basename "$(dirname "$f")")/report.log:"$'\n'"$(tail -c 1500 "$f")"
+  done
   annotate "scan logs:"$'\n'"$(cat "$WORK/osv.log" "$WORK/sbom.log" | grep -v '^$' | head -60)"
 fi
 
