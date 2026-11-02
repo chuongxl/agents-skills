@@ -337,6 +337,11 @@ run_advisories() {
   fetch_advisories_once
 
   local args=(--repo "$path" --cache "$ADVISORY_CACHE" --output "$out" --fail-on none)
+  # What the Dockerfile base images really ship (skipped without docker; the probe says so)
+  local probed="$OUTPUT_BASE/$repo/runtime-probe.json"
+  rm -f "$probed"
+  python3 -I "$SKILL_DIR/scripts/probe-runtime.py" --repo "$path" --output "$probed" 2>&1 | sed 's/^/  /' || true
+  [[ -s "$probed" ]] && args+=(--inventory "$probed")
   if has_tool trivy; then
     local sbom="$OUTPUT_BASE/$repo/advisories-sbom.cdx.json"
     trivy fs "$path" --scanners license --format cyclonedx --output "$sbom" --no-progress --quiet 2>/dev/null || true
@@ -355,7 +360,7 @@ run_advisories() {
 import json
 d = json.load(open('$out'))
 act = [f for f in d['findings'] if f['state'] != 'pending']
-hard = ('affected', 'affected-end-of-life', 'affected-if-condition-holds', 'possibly-affected')
+hard = ('affected', 'affected-end-of-life', 'end-of-life', 'affected-if-condition-holds', 'possibly-affected')
 print(sum(1 for f in act if f['state'] in hard and f['severity'] in ('critical', 'high')), len(act))
 " 2>/dev/null || echo "0 0")
   if [[ "${crit_high:-0}" -gt 0 ]]; then

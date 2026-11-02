@@ -46,7 +46,7 @@ Create `ecosystems/<id>.json` (the file name must equal `id`). No script changes
 | `osv_ecosystem` | The ecosystem name OSV.dev uses |
 | `semgrep` | Semgrep registry rulesets for the language |
 | `docker.images` | Base-image names that signal this ecosystem (used by the image checks in a later phase) |
-| `runtime` | How to read the runtime version and which endoflife.date product applies (used by the runtime checks in a later phase) |
+| `runtime` | How to read the runtime version and which endoflife.date product applies |
 
 Check it: `python3 -I scripts/detect-ecosystems.py --validate`.
 

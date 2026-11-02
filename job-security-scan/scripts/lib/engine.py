@@ -151,6 +151,26 @@ def evaluate_conditions(conditions, env):
     return ("unknown", unknown) if unknown else ("holds", [])
 
 
+def runtime_findings(comp, eol_cycles):
+    """Findings about the runtime declaration itself: end-of-life lines and versions that are not pinned."""
+    if comp.kind != "runtime":
+        return []
+    base = {"aliases": [], "exploited": False, "component": comp.key, "installed": comp.version,
+            "location": comp.location, "conflicts": [], "merged_from": [], "kev_raised_from": None,
+            "fixed_in": None, "line": None}
+    out = []
+    if comp.version and any(versions.line_covers(c, comp.version) for c in eol_cycles or ()):
+        out.append(dict(base, id="EOL-%s-%s" % (comp.name, comp.version), state="end-of-life", severity="high",
+                        title="%s %s is end-of-life: it no longer receives security fixes" % (comp.name, comp.version),
+                        source={"tier": "lifecycle", "vendor": "endoflife.date", "url": "https://endoflife.date"}))
+    if (comp.extra.get("floating") or comp.extra.get("exact") is False) and not comp.extra.get("level"):
+        declared = comp.extra.get("declared") or comp.version
+        out.append(dict(base, id="UNPINNED-%s-%s" % (comp.name, declared), state="unpinned", severity="low",
+                        title="%s is not pinned to a patch version (%s): cannot prove it is patched" % (comp.name, declared),
+                        source={"tier": "scanner", "vendor": "job-security-scan", "url": ""}))
+    return out
+
+
 def match(components, advisories, env=None, eol=None):
     """Match inventory components against merged advisories. Returns (findings, suppressed)."""
     env = env or {}
@@ -161,6 +181,9 @@ def match(components, advisories, env=None, eol=None):
 
     findings, suppressed = [], []
     for comp in components:
+        findings += runtime_findings(comp, eol.get(comp.key))
+        if comp.extra.get("floating"):
+            continue    # no version to compare: reported once as 'unpinned', not once per advisory
         for a in by_key.get(comp.key, []):
             base = {
                 "id": a["id"], "aliases": a.get("aliases", []), "title": a["title"],

@@ -25,7 +25,7 @@ import urllib.request
 
 SKILL_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 API = "https://api.github.com"
-ACTIONABLE = ("affected", "affected-end-of-life", "affected-if-condition-holds", "possibly-affected")
+ACTIONABLE = ("affected", "affected-end-of-life", "end-of-life", "affected-if-condition-holds", "possibly-affected")
 MARK_RE = re.compile(r"<!-- jss-advisory:(.+?) -->")
 
 
