@@ -43,7 +43,10 @@ def changed(path, ref):
     inside = _git(path, "rev-parse", "--is-inside-work-tree")
     if not inside or inside[0].strip() != "true":
         raise RuntimeError("not a git work tree")
-    _git(path, "rev-parse", "--verify", "--quiet", "--end-of-options", ref + "^{commit}")
+    try:
+        _git(path, "rev-parse", "--verify", "--quiet", "--end-of-options", ref + "^{commit}")
+    except RuntimeError:
+        raise RuntimeError("no commit named %s in this repo" % ref)
     files = set()
     diff = ["diff", "--name-only", "-z", "--relative", "--no-ext-diff", "--no-textconv"]
     files.update(_git(path, *(diff + [ref + "...HEAD", "--"])))

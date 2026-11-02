@@ -91,21 +91,21 @@ into `references/verification.md` with attribution.
 
 ## Tasks
 
-- [ ] **T1 Fingerprints + schema v2 + validator** — `report_formats.fingerprint()`, `scripts/validate-report.py`,
+- [x] **T1 Fingerprints + schema v2 + validator** — `report_formats.fingerprint()`, `scripts/validate-report.py`,
   `assets/report.schema.json`. Tests: stable across line moves, changes with code, secrets never hash code;
   validator rejects each broken rule (≥8 cases); a real generated report validates.
-- [ ] **T2 Changes since last run** — previous-run discovery, `change`, `fixed[]` scoped to common repos+scanners,
+- [x] **T2 Changes since last run** — previous-run discovery, `change`, `fixed[]` scoped to common repos+scanners,
   verdict carry-over; MD/HTML sections. Tests: new/unchanged/fixed; single-scanner run marks nothing fixed;
   moved code stays unchanged; edited code is new; verdicts carried.
-- [ ] **T3 Profiles + `--since`** — run-scan flags, gitleaks `--no-git` for quick, Trivy severities for deep,
+- [x] **T3 Profiles + `--since`** — run-scan flags, gitleaks `--no-git` for quick, Trivy severities for deep,
   changed-file filter in generate-report. Tests: scanner lists per profile (stubs), `--scanner` override,
   `--since` filters to changed files + lockfile rule, non-git fallback warns, report says partial.
-- [ ] **T4 Triage queue/apply + NEEDS-VALIDATION.md** — `scripts/triage.py`, verdict validation, report regen.
+- [x] **T4 Triage queue/apply + NEEDS-VALIDATION.md** — `scripts/triage.py`, verdict validation, report regen.
   Tests: queue by profile, no context for secrets, carried verdicts skipped, each verdict rule enforced,
   rejected leaves counts, confirmed severity cannot exceed impact, apply is idempotent.
-- [ ] **T5 Agent instructions + attribution + docs** — SKILL.md Phase 9, `references/verification.md` (verifier
+- [x] **T5 Agent instructions + attribution + docs** — SKILL.md Phase 9, `references/verification.md` (verifier
   prompt + severity anchors, adapted, attributed), Cloudflare MIT notice, README, CI step for new tests, v2.5.
-- [ ] **T6 Verify end to end** — all suites on Python 3.8/3.12; e2e scripts; a real run on the sample workspace:
+- [x] **T6 Verify end to end** — all suites on Python 3.8/3.12; e2e scripts; a real run on the sample workspace:
   scan → queue → **real independent verifier agents** on the queued findings → apply → second run shows
   changes; check every report validates and no secret appears. Then PR.
 
