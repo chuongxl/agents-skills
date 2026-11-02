@@ -34,7 +34,7 @@ An indicator is only added with a reference that states it. Indicators that cann
 
 ## Updating
 
-- **Refresh from remote lists:** `python3 -I scripts/fetch-iocs.py --out .security-scan-results/.ioc-cache`
+- **Refresh from remote lists:** `python3 -I scripts/fetch-iocs.py --out ~/.cache/job-security-scan/ioc`
   merges the CSV lists in `assets/ioc/sources.json` into a cache copy. `run-scan.sh` uses the cache when present.
 - **Add a wave or indicator by hand:** edit `shai-hulud.json`, add the reference URL to the wave, then run
   `python3 -I scripts/test-shai-hulud.py IocTests`.

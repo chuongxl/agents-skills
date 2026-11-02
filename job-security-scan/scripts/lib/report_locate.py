@@ -21,6 +21,20 @@ NO_EXCERPT_RULES = {"credential-store", "credential-permissions"}
 HOST_REPO_LABELS = {"this machine", "_host"}
 
 
+DEPENDENCY_FILES = {
+    "package-lock.json", "npm-shrinkwrap.json", "yarn.lock", "pnpm-lock.yaml", "package.json", "bun.lock",
+    "poetry.lock", "uv.lock", "pdm.lock", "pipfile.lock", "pyproject.toml", "setup.py", "setup.cfg",
+    "go.mod", "go.sum", "cargo.lock", "cargo.toml", "gemfile.lock", "gemfile", "composer.lock", "composer.json",
+    "pom.xml", "build.gradle", "build.gradle.kts", "gradle.lockfile", "packages.lock.json", "dockerfile",
+}
+
+
+def is_dependency_file(name):
+    low = name.lower()
+    return (low in DEPENDENCY_FILES or (low.startswith("requirements") and low.endswith(".txt"))
+            or low.endswith((".csproj", ".cdx.json", ".spdx.json")))
+
+
 def _norm_py(name):
     return re.sub(r"[-_.]+", "-", name.strip().lower())
 
@@ -129,8 +143,8 @@ def locate(finding, repo_root, home):
         line = _package_line(lines, finding["package"], finding.get("installed_version") or "", path.name)
     if line is None:
         line = _evidence_line(lines, finding.get("evidence") or "")
-    if line is None and not finding.get("package") and lines:
-        line = 1
+    if line is None and lines and not (finding.get("package") and is_dependency_file(path.name)):
+        line = 1  # a finding about the file itself (payload, planted file): point at its start
     if finding.get("type") in NO_EXCERPT_TYPES:
         return line, ""
     return line, _excerpt(lines, line)

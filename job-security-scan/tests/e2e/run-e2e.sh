@@ -48,7 +48,6 @@ org: e2e
 monorepo-root: "$FIX"
 ci-runner: ubuntu-latest
 fail-on-severity: HIGH
-output-dir: "$WORK/out"
 repos:
   - name: maven-log4j
     active: true
@@ -72,12 +71,16 @@ repos:
 EOF
 
 echo "== real scan of fixtures (osv + sbom)"
+# Each run writes its own security-run-<datetime>/ folder under $WORK; caches stay in $WORK/cache.
+export SECURITY_RUN_ROOT="$WORK" JOB_SECURITY_SCAN_CACHE="$WORK/cache"
+newest_run() { ls -1d "$WORK"/security-run-* 2>/dev/null | tail -1; }
 for scanner in osv sbom; do
-  bash "$SKILL_DIR/scripts/run-scan.sh" --config "$CONFIG" --scanner "$scanner" >"$WORK/$scanner.log" 2>&1 || true
+  ( cd "$WORK" && bash "$SKILL_DIR/scripts/run-scan.sh" --config "$CONFIG" --scanner "$scanner" ) >"$WORK/$scanner.log" 2>&1 || true
   cat "$WORK/$scanner.log"
+  if [[ "$scanner" == osv ]]; then OSV_RUN="$(newest_run)"; else SBOM_RUN="$(newest_run)"; fi
 done
 
-OUT="$WORK/out"
+OUT="$OSV_RUN"
 A="python3 -I $HERE/assert-findings.py"
 echo "== assertions"
 check "maven:  log4j-core has Log4Shell"        $A "$OUT/maven-log4j/osv.json" org.apache.logging.log4j:log4j-core CVE-2021-44228
@@ -86,12 +89,17 @@ check "go:     x/text has CVE-2020-14040"       $A "$OUT/go-text/osv.json" golan
 check "node:   lodash has CVE-2020-8203"        $A "$OUT/node-lodash/osv.json" lodash CVE-2020-8203
 check "monorepo: Maven part found"              $A "$OUT/monorepo/osv.json" org.apache.logging.log4j:log4j-core CVE-2021-44228
 check "monorepo: Node part found"               $A "$OUT/monorepo/osv.json" lodash CVE-2020-8203
-check "unmapped: SBOM produced"                 test -s "$OUT/unmapped-swift/sbom.cdx.json"
-check "unmapped: SBOM-matched finding"          $A "$OUT/unmapped-swift/osv-sbom.json" github.com/apple/swift-nio-http2 CVE-2023-44487 GHSA-qppj-fm5r-hxr3
-check "mapped repos skip the SBOM fallback"     test ! -e "$OUT/maven-log4j/sbom.cdx.json"
+check "unmapped: SBOM produced"                 test -s "$SBOM_RUN/unmapped-swift/sbom.cdx.json"
+check "unmapped: SBOM-matched finding"          $A "$SBOM_RUN/unmapped-swift/osv-sbom.json" github.com/apple/swift-nio-http2 CVE-2023-44487 GHSA-qppj-fm5r-hxr3
+check "mapped repos skip the SBOM fallback"     test ! -e "$SBOM_RUN/maven-log4j/sbom.cdx.json"
+check "osv and sbom runs used separate folders" test "$OSV_RUN" != "$SBOM_RUN"
+for f in security-report.md security-report.json security-report.html; do
+  check "osv run wrote $f"                      test -s "$OSV_RUN/$f"
+done
+check "every OSV finding located to a line"     python3 -I "$HERE/assert-located.py" "$OSV_RUN/security-report.json" osv
 
 if [[ $FAILS -gt 0 ]]; then
-  for f in "$OUT"/*/osv.stderr "$OUT"/*/osv-sbom.stderr "$OUT"/*/sbom.stderr; do
+  for f in "$OSV_RUN"/*/osv.stderr "$SBOM_RUN"/*/osv-sbom.stderr "$SBOM_RUN"/*/sbom.stderr; do
     [[ -s "$f" ]] && annotate "$(basename "$(dirname "$f")")/$(basename "$f"):"$'\n'"$(head -c 1500 "$f")"
   done
   annotate "scan logs:"$'\n'"$(cat "$WORK/osv.log" "$WORK/sbom.log" | grep -v '^$' | head -60)"

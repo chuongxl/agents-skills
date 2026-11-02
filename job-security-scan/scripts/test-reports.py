@@ -109,6 +109,17 @@ class LocateTests(TempDirCase):
         f = finding(scanner="shai-hulud", type="supply-chain", file="node_modules/p/setup_bun.js", rule_id="payload-file")
         self.assertEqual(self.locate(f), (1, "// stand-in"))
 
+    def test_non_manifest_file_with_package_falls_back_to_line_1(self):
+        self.put("node_modules/p/bun_environment.js", "// stand-in payload\n")
+        f = finding(scanner="shai-hulud", type="supply-chain", file="node_modules/p/bun_environment.js",
+                    rule_id="payload-file", package="@scope/victim-lib", installed_version="1.0.0")
+        self.assertEqual(self.locate(f), (1, "// stand-in payload"))
+
+    def test_lockfile_without_the_package_stays_null(self):
+        self.put("package-lock.json", NPM_LOCK)
+        self.assertEqual(self.locate(finding(file="package-lock.json", package="absent", installed_version="1.0.0")),
+                         (None, ""))
+
     def test_secret_row_gets_line_but_no_code(self):
         self.put(".env", "API_KEY=%s\n" % NPM_TOKEN)
         self.assertEqual(self.locate(finding(file=".env", line=1, type="secret", scanner="gitleaks")), (1, ""))

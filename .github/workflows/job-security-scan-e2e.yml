@@ -40,6 +40,8 @@ jobs:
         run: python3 -I job-security-scan/scripts/detect-ecosystems.py --validate
       - name: Shai-Hulud detector tests
         run: python3 -I job-security-scan/scripts/test-shai-hulud.py
+      - name: Report tests (security-run folder, md/json/html, file:line)
+        run: python3 -I job-security-scan/scripts/test-reports.py
       - name: Shai-Hulud indicator data validates
         run: |
           python3 -I - <<'PY'

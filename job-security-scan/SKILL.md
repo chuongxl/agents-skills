@@ -24,7 +24,7 @@ compatibility: >
 license: MIT
 metadata:
   author: one-om-ddm-team
-  version: "2.2"
+  version: "2.3"
   config-file: assets/repository.md
 allowed-tools: bash glob grep view create edit
 ---
@@ -32,6 +32,10 @@ allowed-tools: bash glob grep view create edit
 # Job Security Scan
 
 Generic, config-driven security scanner for any multi-repo workspace.
+
+> **Report only.** This skill finds and reports problems; it never fixes them. Never modify, patch, upgrade,
+> delete or commit anything in a scanned repo, and never offer, ask or attempt to fix findings. Remediation
+> appears only as guidance text in the report (`references/remediation.md`). End after presenting the report.
 
 ## Configuration — `assets/repository.md`
 
@@ -54,7 +58,8 @@ Key fields:
 | `repos[].has-dockerfile` | Run Hadolint | `true` / `false` |
 | `fail-on-severity` | Build failure threshold | `HIGH` |
 | `secret-allowlist-paths` | Paths exempt from secret scan | `**/.env.example` |
-| `output-dir` | Where to write scan results | `.security-scan-results` |
+| `cache-dir` | Shared caches (vendor advisories, indicator refresh). Optional | `~/.cache/job-security-scan` |
+| `output-dir` | *Deprecated* - now only the cache folder; reports go to `security-run-<datetime>/` | - |
 
 To adapt this skill for a **different team**, create a new `repository.md`
 at their workspace root and pass it with `--config`:
@@ -141,7 +146,7 @@ still valid via live API calls. Reports `VERIFIED ACTIVE` vs `unverified`.
 
 Catches issues the CVE databases lag on, such as a runtime security release announced by its vendor.
 `run-scan.sh --scanner advisories` fetches vendor bulletins first, then GHSA/OSV, then CISA KEV and endoflife.date
-enrichment into `.advisory-cache`, and matches them against the repository's runtimes, images and dependencies
+enrichment into the advisory cache (`~/.cache/job-security-scan/advisories`), and matches them against the repository's runtimes, images and dependencies
 (`scripts/fetch-advisories.py`, `scripts/match.py`). Results appear in the report as "Vendor advisories".
 It also checks the runtime itself: Dockerfile base images (probed with `node -v` and equivalents when docker is available), compose files, CI `setup-*` actions and version files; end-of-life lines and unpinned tags (`node:22-alpine`, `latest`) are reported.
 Set `ADVISORY_OFFLINE=1` to skip the fetch and use the cache. Details: `references/advisory-data.md`.
@@ -164,22 +169,30 @@ never runs npm/node/pip. `run-scan.sh --scanner shai-hulud` (also part of `all`)
 
 Benign hooks (`node-gyp rebuild`, `prebuild-install`, `husky`, esbuild's installer...) are allowlisted in
 `assets/ioc/hook-allowlist.json`. Indicators live in `assets/ioc/shai-hulud.json`; refresh with
-`python3 -I scripts/fetch-iocs.py --out .security-scan-results/.ioc-cache` (used automatically when present).
+`python3 -I scripts/fetch-iocs.py --out ~/.cache/job-security-scan/ioc` (used automatically when present).
 Data provenance: `references/ioc-data.md`. If affected: the runbook in `references/remediation.md`.
 Standalone: `python3 -I scripts/shai-hulud-scan.py --repo PATH` or `--host` (exit 0 clean / 1 suspicious / 2 affected).
 
-## HTML Report
+## Reports — one folder per run
 
-After all scanners complete, `run-scan.sh` automatically calls
-`scripts/generate-report.py` to produce a self-contained HTML file:
+Every run writes a new folder in the workspace folder (the folder `run-scan.sh` is run from); nothing is
+overwritten:
 
 ```
-{output-dir}/security-report.html
+security-run-YYYYMMDD-HHMMSS/
+├── security-report.md     # summary + findings by severity, each with file:line and the line of code
+├── security-report.json   # same data, machine-readable (schema_version 1)
+├── security-report.html   # interactive report (filters, VS Code links)
+├── .gitignore             # "*" - the folder never gets committed
+└── <repo>/ , _host/       # raw output of every tool for this run
 ```
 
-On macOS the report opens in the default browser automatically.
+Every finding is located to **file + line + one line of code**. Secrets show file and line only — never the
+value or the line. Caches (vendor advisories, refreshed indicators) live outside the workspace in
+`~/.cache/job-security-scan` (`cache-dir:` or `JOB_SECURITY_SCAN_CACHE` to move them, e.g. for CI).
+`SECURITY_RUN_ROOT` puts run folders somewhere else. On macOS the HTML report opens automatically.
 
-**Report features:**
+**HTML report features:**
 - **Summary cards** — CRITICAL / HIGH / MEDIUM / LOW counts at a glance
 - **Filter bar** — filter by severity, repo, scanner, type (live, no reload)
 - **VS Code deep-links** — every `📄 file:line` entry is a `vscode://file/...` link that opens the exact line in VS Code when clicked
@@ -188,14 +201,12 @@ On macOS the report opens in the default browser automatically.
 - **Dark mode** — respects `prefers-color-scheme`
 - **Print-friendly** — safe to save as PDF
 
-You can also regenerate the report from cached JSON results without re-scanning:
+You can regenerate the three reports of a run without re-scanning:
 
 ```bash
 python3 .github/skills/job-security-scan/scripts/generate-report.py \
-  --results-dir .security-scan-results \
-  --config .github/skills/job-security-scan/assets/repository.md \
-  --output security-report.html \
-  --workspace .
+  --results-dir security-run-20261102-153600 --out-dir security-run-20261102-153600 \
+  --config .github/skills/job-security-scan/assets/repository.md --workspace .
 ```
 
 ## How to Run
@@ -204,7 +215,7 @@ python3 .github/skills/job-security-scan/scripts/generate-report.py \
 # Step 1 — install tools (once per machine)
 bash .github/skills/job-security-scan/scripts/install-tools.sh
 
-# Step 2 — full scan + HTML report (auto-opens on macOS)
+# Step 2 — full scan; reports in ./security-run-<datetime>/ (HTML auto-opens on macOS)
 bash .github/skills/job-security-scan/scripts/run-scan.sh
 
 # Scope to one repo
@@ -223,42 +234,23 @@ bash .github/skills/job-security-scan/scripts/run-scan.sh --scanner shai-hulud -
 bash .github/skills/job-security-scan/scripts/run-scan.sh \
   --config /path/to/other-team/repository.md
 
-# Regenerate HTML only (no re-scan)
+# Regenerate the reports of an earlier run (no re-scan)
 python3 .github/skills/job-security-scan/scripts/generate-report.py \
-  --results-dir .security-scan-results \
+  --results-dir security-run-20261102-153600 --out-dir security-run-20261102-153600 \
   --config .github/skills/job-security-scan/assets/repository.md
 ```
 
 ## Output Format
 
-The agent must produce this report after all phases:
+`run-scan.sh` writes the report itself; the agent does not compose one. After the run:
 
-```markdown
-# Security Scan Report — {team} / {org}
+1. Read `security-run-<datetime>/security-report.md` (the last console line names the folder).
+2. Reply with a short summary: the per-repo status table, the Critical and High findings as `file:line`
+   with their rule, and the paths of the three report files.
+3. Stop there. Do not offer, propose or ask to fix anything, and do not edit any scanned file — the
+   remediation guidance in the report is for the reader.
 
-**Date:** {date}
-**Config:** {config path}
-**Repos scanned:** {count active repos}
-**Scanners:** {list}
-
----
-
-## Summary
-
-| Repo | Secrets | CVE Critical | CVE High | SAST | Dockerfile | Status |
-|------|:-------:|:------------:|:--------:|:----:|:----------:|--------|
-| {repo} | {n} | {n} | {n} | {n} | {n} | 🔴/🟡/🟢 |
-
----
-
-## 🔴 Critical Findings
-## 🟠 High Findings
-## 🟡 Medium Findings
-## 🐳 Dockerfile Issues
-## 🔑 Secrets (values NEVER shown)
-## ⏭️ Skipped Repos
-## 📋 Remediation → see references/remediation.md
-```
+Secrets: never print secret values or the code line of a secret finding, only `file:line` and the rule.
 
 ## CI Integration
 
