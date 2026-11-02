@@ -50,6 +50,21 @@ def fingerprint(f):
     return hashlib.sha256(key.encode("utf-8")).hexdigest()[:16]
 
 
+def _number_occurrences(rows):
+    """Distinct findings that share a key (the same package@version twice in one lockfile, the same line of
+    code twice in one file) get the base fingerprint for the first occurrence by line and a numbered one for
+    the rest, so fingerprints stay unique and stable while the occurrences keep their order."""
+    groups = {}
+    for r in rows:
+        groups.setdefault(r["fingerprint"], []).append(r)
+    for base, group in groups.items():
+        if len(group) < 2:
+            continue
+        group.sort(key=lambda r: (r.get("line") or 0, str(r.get("code") or "")))
+        for n, r in enumerate(group[1:], 1):
+            r["fingerprint"] = hashlib.sha256(("%s#%d" % (base, n)).encode("ascii")).hexdigest()[:16]
+
+
 def effective_severity(f):
     if f.get("verdict") == "confirmed" and f.get("verified_severity"):
         return f["verified_severity"]
@@ -152,17 +167,22 @@ def build_document(findings, meta, previous=None):
     """v2 report document. `meta`: team, org, config, run_dir, scanners, repos, skipped, generated_at,
     profile, since, coverage ({repo: [scanners that ran]}). `previous`: the prior run's document or None."""
     profile = meta.get("profile") or "standard"
-    rows = []
+    rows, seen_rows = [], set()
     for f in findings:
         row = dict((k, f.get(k)) for k in FINDING_KEYS)
         if row.get("type") == "secret":
             row["code"] = ""
+        exact = tuple(str(row.get(k)) for k in FINDING_KEYS)
+        if exact in seen_rows:          # a scanner repeated the same row verbatim
+            continue
+        seen_rows.add(exact)
         row["fingerprint"] = f.get("fingerprint") or fingerprint(row)
         row["verdict"] = f.get("verdict")
         row["verified_severity"] = f.get("verified_severity")
         row["verdict_detail"] = f.get("verdict_detail") or {}
         row["carried"] = bool(f.get("carried"))
         rows.append(row)
+    _number_occurrences(rows)
     partial = bool(meta.get("since")) or bool(meta.get("partial"))
     fixed, prev_dir = _compare(rows, meta.get("coverage") or {}, previous, partial)
     return {
