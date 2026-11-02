@@ -534,14 +534,17 @@ class ScanIntegrationTests(unittest.TestCase):
             fh.write('---\nteam: t\norg: o\nmonorepo-root: "%s"\nci-runner: x\nfail-on-severity: HIGH\n'
                      'output-dir: "%s"\nrepos:\n  - name: node-22-14-demo\n    active: true\n    has-dockerfile: false\n---\n'
                      % (FIX, os.path.join(work, "out")))
-        env = dict(os.environ, ADVISORY_OFFLINE="1")
+        env = dict(os.environ, ADVISORY_OFFLINE="1", JOB_SECURITY_SCAN_CACHE=os.path.join(work, "cache"))
         r = subprocess.run(["bash", os.path.join(SKILL_DIR, "scripts", "run-scan.sh"), "--config", cfg, "--scanner", "advisories"],
                            capture_output=True, text=True, env=env, cwd=work)
         self.assertIn("critical/high", r.stdout)
         self.assertEqual(r.returncode, 2, r.stdout + r.stderr)
-        rep = advisory.load_json(os.path.join(work, "out", "node-22-14-demo", "advisories.json"))
+        runs = sorted(d for d in os.listdir(work) if d.startswith("security-run-"))
+        self.assertEqual(len(runs), 1, os.listdir(work))
+        run = os.path.join(work, runs[0])
+        rep = advisory.load_json(os.path.join(run, "node-22-14-demo", "advisories.json"))
         self.assertIn("CVE-2026-111497", {f["id"] for f in rep["findings"]})
-        with open(os.path.join(work, "out", "security-report.html")) as fh:
+        with open(os.path.join(run, "security-report.html")) as fh:
             html = fh.read()
         self.assertIn("CVE-2026-111497", html)
 

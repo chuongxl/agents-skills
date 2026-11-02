@@ -246,5 +246,115 @@ class GenerateTests(TempDirCase):
         self.assertNotEqual(r.returncode, 0)
 
 
+SH_FIX = FIX / "shai-hulud"
+
+
+def run_dirs(root):
+    return sorted(p for p in Path(root).glob("security-run-*") if p.is_dir())
+
+
+@unittest.skipUnless(shutil.which("bash"), "bash required")
+class RunFolderTests(TempDirCase):
+    def setUp(self):
+        super(RunFolderTests, self).setUp()
+        self.ws = self.tmp / "ws"
+        self.ws.mkdir()
+        self.bin = self.tmp / "bin"
+        self.bin.mkdir()
+        self.calls = self.tmp / "calls.log"
+        gitleaks = ('#!/usr/bin/env bash\necho "gitleaks $*" >> "%s"\nout=""; prev=""\n'
+                    'for a in "$@"; do [ "$prev" = "--report-path" ] && out="$a"; prev="$a"; done\n'
+                    '[ -n "$out" ] && echo "[]" > "$out"\nexit 0\n' % self.calls)
+        g = self.bin / "gitleaks"
+        g.write_text(gitleaks)
+        g.chmod(0o755)
+
+    def config(self, extra="", repos=("infected-lockfile", "clean"), root=SH_FIX):
+        body = "".join("  - name: %s\n    active: true\n    has-dockerfile: false\n" % n for n in repos)
+        return self.put("ws/repository.md", '---\nteam: t\norg: o\nmonorepo-root: "%s"\nci-runner: x\n'
+                        'fail-on-severity: HIGH\n%srepos:\n%s---\n' % (root, extra, body))
+
+    def run_scan(self, *args, env=None, run_root=True):
+        e = dict(os.environ, PATH=str(self.bin) + os.pathsep + os.environ["PATH"],
+                 XDG_CACHE_HOME=str(self.tmp / "xdg"), HOME=str(self.tmp / "home"), NPM_CONFIG_PREFIX="")
+        e.pop("JOB_SECURITY_SCAN_CACHE", None)
+        if run_root:
+            e["SECURITY_RUN_ROOT"] = str(self.ws)
+        e.update(env or {})
+        (self.tmp / "home").mkdir(exist_ok=True)
+        return subprocess.run(["bash", str(RUN_SCAN)] + [str(a) for a in args], stdout=subprocess.PIPE,
+                              stderr=subprocess.PIPE, universal_newlines=True, cwd=str(self.ws), env=e)
+
+    def test_run_folder_with_three_reports_and_raw(self):
+        r = self.run_scan("--config", self.config(), "--scanner", "shai-hulud")
+        self.assertEqual(r.returncode, 2, r.stdout + r.stderr)
+        runs = run_dirs(self.ws)
+        self.assertEqual(len(runs), 1)
+        self.assertRegex(runs[0].name, r"^security-run-\d{8}-\d{6}$")
+        for name in ("security-report.md", "security-report.json", "security-report.html", ".gitignore",
+                     "infected-lockfile/shai-hulud.json", "clean/shai-hulud.json"):
+            self.assertTrue((runs[0] / name).is_file(), name)
+        self.assertEqual((runs[0] / ".gitignore").read_text().strip(), "*")
+        doc = json.loads((runs[0] / "security-report.json").read_text())
+        hit = [f for f in doc["findings"] if f["rule_id"] == "known-package"][0]
+        self.assertEqual((hit["file"], hit["line"]), ("package-lock.json", 6))
+        self.assertIn("node_modules/@accordproject/concerto-linter", hit["code"])
+        self.assertIn("Run folder: %s" % runs[0], r.stdout)
+
+    def test_workspace_has_only_run_folder(self):
+        r = self.run_scan("--config", self.config(), "--scanner", "shai-hulud", run_root=False)
+        self.assertEqual(r.returncode, 2, r.stdout + r.stderr)
+        names = sorted(p.name for p in self.ws.iterdir() if p.name != "repository.md")
+        self.assertEqual(len(names), 1, names)
+        self.assertTrue(names[0].startswith("security-run-"))
+
+    def test_cache_dir_precedence(self):
+        demo = ("node-22-14-demo",)
+        cases = [
+            ({"JOB_SECURITY_SCAN_CACHE": str(self.tmp / "envcache")}, 'cache-dir: "%s"\n' % (self.tmp / "cfgcache"),
+             self.tmp / "envcache", False),
+            ({}, 'cache-dir: "%s"\n' % (self.tmp / "cfgcache"), self.tmp / "cfgcache", False),
+            ({}, 'output-dir: "%s"\n' % (self.tmp / "legacy"), self.tmp / "legacy", True),
+            ({}, "", self.tmp / "xdg" / "job-security-scan", False),
+        ]
+        for env, extra, expected, warns in cases:
+            env = dict(env, ADVISORY_OFFLINE="1")
+            r = self.run_scan("--config", self.config(extra, repos=demo, root=FIX), "--scanner", "advisories", env=env)
+            self.assertTrue((expected / "advisories").is_dir(), (expected, r.stdout + r.stderr))
+            self.assertEqual("output-dir" in r.stderr and "deprecated" in r.stderr, warns, r.stderr)
+
+    def test_same_second_gets_suffix(self):
+        date = self.bin / "date"
+        date.write_text('#!/usr/bin/env bash\nif [ "$1" = "+%Y%m%d-%H%M%S" ]; then echo 20261102-153600; '
+                        'else exec /bin/date "$@"; fi\n')
+        date.chmod(0o755)
+        (self.ws / "security-run-20261102-153600").mkdir()
+        (self.ws / "security-run-20261102-153600" / "keep.txt").write_text("first run")
+        self.run_scan("--config", self.config(repos=("clean",)), "--scanner", "shai-hulud")
+        self.assertTrue((self.ws / "security-run-20261102-153600-2" / "security-report.md").is_file())
+        self.assertEqual(sorted(p.name for p in (self.ws / "security-run-20261102-153600").iterdir()), ["keep.txt"])
+
+    def test_host_only_and_clean_run_still_write_reports(self):
+        r = self.run_scan("--host")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        r = self.run_scan("--config", self.config(repos=("clean",)), "--scanner", "shai-hulud")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        runs = run_dirs(self.ws)
+        self.assertEqual(len(runs), 2)
+        for run in runs:
+            for name in ("security-report.md", "security-report.json", "security-report.html"):
+                self.assertTrue((run / name).is_file(), (run, name))
+        self.assertIn("No findings", (runs[-1] / "security-report.md").read_text())
+
+    def test_gitleaks_called_with_redact(self):
+        self.run_scan("--config", self.config(repos=("clean",)), "--scanner", "gitleaks")
+        self.assertIn("--redact", self.calls.read_text())
+
+    def test_unknown_scanner_creates_no_folder(self):
+        r = self.run_scan("--config", self.config(), "--scanner", "nope")
+        self.assertEqual(r.returncode, 1)
+        self.assertEqual(run_dirs(self.ws), [])
+
+
 if __name__ == "__main__":
     unittest.main()
