@@ -264,5 +264,112 @@ class FindingTests(unittest.TestCase):
         self.assertIn("AFFECTED", self.f.to_text(doc))
 
 
+def scan(root, ioc_path=None):
+    from shaihulud import scanner, findings
+    ioc = iocs.load(str(ioc_path or IOC_FILE))
+    found = scanner.scan_repo(Path(root), ioc, iocs.load_allowlist())
+    return findings.to_document("repo", str(root), ioc.version, found)
+
+
+def cats(doc):
+    return sorted((f["category"], f["severity"]) for f in doc["findings"])
+
+
+def run_cli(*args, env=None):
+    e = dict(os.environ)
+    e.update(env or {})
+    return subprocess.run([sys.executable, "-I", str(CLI)] + [str(a) for a in args],
+                          stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True, env=e)
+
+
+class RepoTier1Tests(TempDirCase):
+    def test_infected_lockfile(self):
+        doc = scan(FIX / "infected-lockfile")
+        self.assertEqual(doc["verdict"], "affected")
+        self.assertEqual(cats(doc), [("known-package", "CRITICAL")])
+        f = doc["findings"][0]
+        self.assertEqual((f["package"], f["version"], f["wave"]), ("@accordproject/concerto-linter", "3.24.1", "sh-2.0"))
+
+    def test_infected_node_modules(self):
+        doc = scan(FIX / "infected-node-modules")
+        self.assertEqual(doc["verdict"], "affected")
+        got = {c for c, _ in cats(doc)}
+        self.assertTrue({"known-package", "payload-file"} <= got, got)
+        payloads = sorted(f["location"] for f in doc["findings"] if f["category"] == "payload-file")
+        self.assertEqual(payloads, ["node_modules/@accordproject/concerto-linter/bun_environment.js",
+                                    "node_modules/@accordproject/concerto-linter/setup_bun.js"])
+
+    def test_planted_workflow(self):
+        doc = scan(FIX / "planted-workflow")
+        self.assertEqual(doc["verdict"], "affected")
+        locs = {(f["category"], f["location"]) for f in doc["findings"]}
+        self.assertIn(("planted-path", ".github/workflows/discussion.yaml"), locs)
+        self.assertIn(("marker", ".github/workflows/discussion.yaml"), locs)
+        self.assertNotIn(".github/workflows/ci.yml", {f["location"] for f in doc["findings"]})
+
+    def test_clean_repo_and_own_bundle_js_ignored(self):
+        doc = scan(FIX / "clean")
+        self.assertEqual(doc["verdict"], "clean")
+        self.assertEqual(doc["findings"], [])
+
+    def test_pypi_pin_with_injected_indicator(self):
+        path = write_iocs(self.tmp, [{"ecosystem": "pypi", "name": "evil-pkg", "versions": ["9.9.9"], "wave": "mini-2026"}])
+        doc = scan(FIX / "pypi-pin", path)
+        self.assertEqual(cats(doc), [("known-package", "CRITICAL")])
+
+    def test_generic_payload_matches_only_by_hash(self):
+        import hashlib
+        body = "// inert wave-1 stand-in\n"
+        self.put("node_modules/victim/package.json", '{"name": "victim", "version": "1.0.0"}')
+        self.put("node_modules/victim/bundle.js", body)
+        self.assertEqual(scan(self.tmp)["findings"], [])  # name alone is not enough
+        data = json.loads(IOC_FILE.read_text())
+        for f in data["files"]:
+            if f["name"] == "bundle.js":
+                f["sha256"].append(hashlib.sha256(body.encode()).hexdigest())
+        path = self.tmp / "iocs-hash.json"
+        path.write_text(json.dumps(data))
+        doc = scan(self.tmp, path)
+        self.assertEqual(cats(doc), [("payload-file", "CRITICAL")])
+
+    def test_payload_name_outside_package_dir_ignored(self):
+        self.put("tools/scripts/deep/setup_bun.js", "// unrelated project file\n")
+        self.put("package.json", '{"name": "x", "version": "1.0.0"}')
+        self.assertEqual(scan(self.tmp)["findings"], [])
+
+    def test_persistence_file_requires_marker(self):
+        self.put(".vscode/tasks.json", '{"tasks": [{"label": "build", "command": "npm run build"}]}')
+        self.assertEqual(scan(self.tmp)["findings"], [])
+        self.put(".vscode/tasks.json", '{"tasks": [{"command": "node .vscode/setup.mjs", "runOn": "folderOpen"}]}')
+        self.assertEqual(cats(scan(self.tmp)), [("planted-path", "CRITICAL")])
+
+
+class CliTests(TempDirCase):
+    def test_exit_codes(self):
+        expected = {"infected-lockfile": 2, "infected-node-modules": 2, "planted-workflow": 2, "clean": 0}
+        for name, code in expected.items():
+            r = run_cli("--repo", FIX / name)
+            self.assertEqual(r.returncode, code, name + "\n" + r.stdout + r.stderr)
+
+    def test_output_json_shape_and_text(self):
+        out = self.tmp / "o" / "shai-hulud.json"
+        r = run_cli("--repo", FIX / "infected-lockfile", "--output", out, "--format", "text")
+        self.assertEqual(r.returncode, 2, r.stderr)
+        self.assertIn("Verdict: AFFECTED", r.stdout)
+        doc = json.loads(out.read_text())
+        self.assertEqual(doc["verdict"], "affected")
+        self.assertEqual(doc["mode"], "repo")
+
+    def test_json_format_to_stdout(self):
+        r = run_cli("--repo", FIX / "clean", "--format", "json")
+        self.assertEqual(json.loads(r.stdout)["verdict"], "clean")
+
+    def test_usage_errors_exit_3(self):
+        self.assertEqual(run_cli().returncode, 3)
+        self.assertEqual(run_cli("--repo", self.tmp / "missing").returncode, 3)
+        bad = self.put("bad.json", "{}")
+        self.assertEqual(run_cli("--repo", FIX / "clean", "--iocs", bad).returncode, 3)
+
+
 if __name__ == "__main__":
     unittest.main()
