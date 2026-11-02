@@ -188,5 +188,81 @@ class InventoryTests(TempDirCase):
         self.assertEqual(found, [".", "node_modules/@accordproject/concerto-linter"])
 
 
+FAKE_TOKENS = {
+    "github": "ghp_" + "A1b2C3d4E5f6G7h8I9j0K1l2M3n4O5p6Q7r8",
+    "github_pat": "github_pat_" + "11ABCDEFG0abcdefghijkl_mnopqrstuvwxyz0123456789ABCDEFGHIJKLMNOPQRSTU",
+    "npm": "npm_" + "FAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKE",
+    "aws_key": "AKIA" + "IOSFODNN7EXAMPLE",
+    "aws_secret": "wJalrXUtnFEMI/K7MDENG/bPxRfiCY" + "EXAMPLEKEY",
+    "generic": "s3cr3t" + "x" * 40,
+}
+
+
+class FindingTests(unittest.TestCase):
+    def setUp(self):
+        from shaihulud import findings
+        self.f = findings
+
+    def test_redact_masks_each_token_family(self):
+        samples = [
+            "token=%s" % FAKE_TOKENS["github"],
+            "auth %s" % FAKE_TOKENS["github_pat"],
+            "//registry.npmjs.org/:_authToken=%s" % FAKE_TOKENS["npm"],
+            "key %s" % FAKE_TOKENS["aws_key"],
+            "aws_secret_access_key = %s" % FAKE_TOKENS["aws_secret"],
+            "password: %s" % FAKE_TOKENS["generic"],
+            "-----BEGIN OPENSSH PRIVATE KEY-----\nb3BlbnNzaC1rZXktdjEAAAAA\n-----END OPENSSH PRIVATE KEY-----",
+        ]
+        for text in samples:
+            out = self.f.redact(text)
+            for tok in FAKE_TOKENS.values():
+                self.assertNotIn(tok, out, text)
+            self.assertNotIn("b3BlbnNzaC1rZXktdjEAAAAA", out)
+
+    def test_redact_keeps_harmless_text(self):
+        self.assertEqual(self.f.redact("node setup_bun.js"), "node setup_bun.js")
+        self.assertEqual(self.f.redact("process.env.NPM_TOKEN"), "process.env.NPM_TOKEN")
+
+    def test_evidence_truncated_to_120(self):
+        out = self.f.redact("x " * 200)
+        self.assertLessEqual(len(out), 120)
+
+    def make(self, tier, sev="CRITICAL", loc="a"):
+        return self.f.make_finding(tier, sev, "known-package", loc, "t", remediation_key="known-package")
+
+    def test_verdict_precedence(self):
+        self.assertEqual(self.f.verdict([]), "clean")
+        self.assertEqual(self.f.verdict([self.make("suspicious", "HIGH")]), "suspicious")
+        self.assertEqual(self.f.verdict([self.make("suspicious", "HIGH"), self.make("affected")]), "affected")
+        self.assertEqual([self.f.exit_code(v) for v in ("clean", "suspicious", "affected")], [0, 1, 2])
+
+    def test_exposure_does_not_change_verdict(self):
+        self.assertEqual(self.f.verdict([self.make("exposure", "INFO"), self.make("exposure", "MEDIUM")]), "clean")
+
+    def test_id_is_stable_and_differs_by_location(self):
+        self.assertEqual(self.make("affected")["id"], self.make("affected")["id"])
+        self.assertNotEqual(self.make("affected", loc="a")["id"], self.make("affected", loc="b")["id"])
+        self.assertRegex(self.make("affected")["id"], r"^[0-9a-f]{12}$")
+
+    def test_make_finding_redacts_evidence_and_sets_remediation(self):
+        fd = self.f.make_finding("suspicious", "HIGH", "hook-exfil", "x/setup.js", "t",
+                                 evidence="fetch(u,{body:'%s'})" % FAKE_TOKENS["npm"], remediation_key="hook-exfil")
+        self.assertNotIn(FAKE_TOKENS["npm"], fd["evidence"])
+        self.assertTrue(fd["remediation"])
+
+    def test_every_remediation_key_has_text(self):
+        for key in ("known-package", "payload-file", "planted-path", "marker", "hook-exfil", "hook-pipe-shell",
+                    "hook-obfuscated", "hook-runtime-download", "large-hook-target", "cached-package",
+                    "credential-store", "credential-permissions"):
+            self.assertTrue(self.f.REMEDIATION.get(key), key)
+
+    def test_document_and_text(self):
+        doc = self.f.to_document("repo", "/x", "2026-11-02", [self.make("affected")])
+        self.assertEqual(set(doc), {"scanner", "mode", "target", "ioc_version", "verdict", "counts", "findings"})
+        self.assertEqual(doc["scanner"], "shai-hulud")
+        self.assertEqual(doc["counts"]["CRITICAL"], 1)
+        self.assertIn("AFFECTED", self.f.to_text(doc))
+
+
 if __name__ == "__main__":
     unittest.main()
