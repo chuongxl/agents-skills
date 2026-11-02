@@ -147,5 +147,104 @@ class LocateTests(TempDirCase):
         self.assertEqual((rows[0]["line"], rows[0]["code"]), (14, '"node_modules/posthog-node": {'))
 
 
+META = {"team": "acme", "org": "acme-org", "config": "repository.md", "run_dir": "/w/security-run-20261102-153600",
+        "scanners": ["osv", "shai-hulud", "gitleaks"], "repos": ["api", "web", "worker"], "skipped": [],
+        "generated_at": "2026-11-02T15:36:00+07:00"}
+
+
+def rows():
+    return [
+        finding(repo="api", scanner="shai-hulud", type="supply-chain", severity="CRITICAL", file="package-lock.json",
+                line=14, code='"node_modules/posthog-node": {', package="posthog-node", installed_version="5.11.3",
+                rule_id="known-package", title="Known compromised npm release"),
+        finding(repo="api", scanner="gitleaks", type="secret", severity="HIGH", file=".env", line=3, code="",
+                rule_id="generic-api-key", title="Secret | in `.env`"),
+        finding(repo="web", scanner="osv", type="vulnerability", severity="MEDIUM", file="yarn.lock", line=6,
+                code="lodash@^4.17.0:", package="lodash", installed_version="4.17.20", fixed_version="4.17.21",
+                rule_id="CVE-2020-8203", title="Prototype pollution"),
+    ]
+
+
+class FormatTests(unittest.TestCase):
+    def setUp(self):
+        import report_formats
+        self.rf = report_formats
+
+    def test_json_shape_and_counts(self):
+        doc = self.rf.build_json(rows(), META)
+        self.assertEqual(doc["schema_version"], 1)
+        self.assertEqual(doc["counts"], {"CRITICAL": 1, "HIGH": 1, "MEDIUM": 1, "LOW": 0, "INFO": 0})
+        by = {r["name"]: r for r in doc["repos"]}
+        self.assertEqual((by["api"]["status"], by["web"]["status"], by["worker"]["status"]), ("red", "yellow", "green"))
+        f0 = doc["findings"][0]
+        self.assertEqual((f0["file"], f0["line"], f0["code"]), ("package-lock.json", 14, '"node_modules/posthog-node": {'))
+        self.assertNotIn("workspace", f0)
+
+    def test_markdown_sections_and_file_line(self):
+        md = self.rf.build_markdown(rows(), META)
+        for heading in ("# Security Scan Report — acme / acme-org", "## Summary", "## 🔴 Critical Findings",
+                        "## 🟡 Medium Findings", "## 🔑 Secrets (values never shown)", "## 📋 Remediation guidance"):
+            self.assertIn(heading, md)
+        self.assertIn("`package-lock.json:14`", md)
+        self.assertIn('`"node_modules/posthog-node": {`', md)
+        self.assertIn("| worker | 0 | 0 | 0 | 0 | 0 | 🟢 |", md)
+        self.assertIn("security-run-20261102-153600", md)
+
+    def test_markdown_secret_has_no_code(self):
+        md = self.rf.build_markdown(rows(), META)
+        secrets = md.split("## 🔑 Secrets (values never shown)")[1].split("\n## ")[0]
+        self.assertIn("`.env:3`", secrets)
+        self.assertNotIn("    `", secrets)
+
+    def test_markdown_never_offers_fixes(self):
+        md = self.rf.build_markdown(rows(), META).lower()
+        for phrase in ("would you like", "shall i", "i can fix", "let me fix", "apply the fix"):
+            self.assertNotIn(phrase, md)
+
+    def test_markdown_escapes_pipes_backticks(self):
+        md = self.rf.build_markdown(rows(), META)
+        self.assertIn("Secret \\| in", md)
+        self.assertNotIn("in `.env``", md)
+
+    def test_clean_run_reports(self):
+        md = self.rf.build_markdown([], META)
+        self.assertIn("No findings", md)
+        self.assertEqual(self.rf.build_json([], META)["counts"]["CRITICAL"], 0)
+
+
+class GenerateTests(TempDirCase):
+    def test_out_dir_writes_three_files(self):
+        res, src, out = self.tmp / "run", self.tmp / "repos", self.tmp / "run"
+        self.put("repos/api/src/db.js", "const a = 1;\nconst q = 'SELECT ' + id;\n")
+        lock = self.put("repos/api/yarn.lock", '# yarn lockfile v1\n\nlodash@^4.17.0:\n  version "4.17.20"\n')
+        self.put("run/api/semgrep.json", json.dumps({"results": [{"check_id": "sqli", "path": "src/db.js",
+                 "start": {"line": 2}, "extra": {"severity": "ERROR", "message": "SQL injection"}}]}))
+        self.put("run/api/osv.json", json.dumps({"results": [{"source": {"path": str(lock)}, "packages": [{
+            "package": {"name": "lodash", "version": "4.17.20"},
+            "vulnerabilities": [{"id": "GHSA-x", "aliases": ["CVE-2020-8203"], "summary": "Prototype pollution"}]}]}]}))
+        cfg = self.put("repository.md", "---\nteam: acme\norg: acme-org\nrepos:\n  - name: api\n    active: true\n---\n")
+        r = subprocess.run([sys.executable, "-I", str(GENERATE), "--results-dir", str(res), "--config", str(cfg),
+                            "--out-dir", str(out), "--repos-root", str(src), "--home", str(self.tmp / "home"),
+                            "--workspace", str(self.tmp)],
+                           stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        md = (out / "security-report.md").read_text()
+        doc = json.loads((out / "security-report.json").read_text())
+        page = (out / "security-report.html").read_text()
+        self.assertIn("`src/db.js:2`", md)
+        self.assertIn("`const q = 'SELECT ' + id;`", md)
+        self.assertIn("yarn.lock:3", md)
+        osv = [f for f in doc["findings"] if f["scanner"] == "osv"][0]
+        self.assertEqual((osv["line"], osv["code"]), (3, "lodash@^4.17.0:"))
+        self.assertIn("db.js:2", page)
+        self.assertIn("SELECT", page)
+
+    def test_failure_exits_non_zero(self):
+        r = subprocess.run([sys.executable, "-I", str(GENERATE), "--results-dir", str(self.tmp), "--config",
+                            str(self.tmp / "missing.md"), "--out-dir", str(self.tmp / "o")],
+                           stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+        self.assertNotEqual(r.returncode, 0)
+
+
 if __name__ == "__main__":
     unittest.main()
