@@ -21,7 +21,9 @@
         "partial": {"type": "boolean"},
         "previous_run": {"type": ["string", "null"]},
         "coverage": {"type": "object", "description": "{repo: {scanner: mode}} - what ran; a finding is fixed only if its scanner ran in the same mode both times", "additionalProperties": {"type": "object", "additionalProperties": {"type": "string"}}},
-        "workspace": {"type": "string"}
+        "workspace": {"type": "string"},
+        "repos_root": {"type": "string"},
+        "home": {"type": "string"}
       }
     },
     "scanners": {"type": "array", "items": {"type": "string"}},
