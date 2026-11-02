@@ -7,11 +7,14 @@ description: >
   in the skill itself. Combines Gitleaks (secrets in git history), Trivy
   (CVE + Dockerfile misconfig), Semgrep (SAST for TypeScript/NestJS/OWASP),
   Hadolint (Dockerfile best practices), OSV-Scanner (Google transitive CVE
-  DB), and TruffleHog (live credential verification). Produces a structured
-  security report per repo. Use when asked to scan for vulnerabilities,
+  DB), TruffleHog (live credential verification), and an offline Shai-Hulud
+  check (npm/PyPI worm: known compromised releases, payload files, planted
+  workflows, worm-like install hooks) for repos and, with --host, this
+  computer. Produces a structured security report per repo. Use when asked to scan for vulnerabilities,
   secrets, malware, misconfigurations, supply chain issues, or to set up a
-  CI security pipeline. Supports --repo for single-repo scope and --scanner
-  for single-tool runs.
+  CI security pipeline, or to check whether a repo or laptop was hit by
+  Shai-Hulud. Supports --repo for single-repo scope and --scanner for
+  single-tool runs.
 compatibility: >
   Requires bash, git, Python 3.8+ (pre-installed on most systems — used
   only to parse repository.md, no pip packages needed). Security tools
@@ -21,7 +24,7 @@ compatibility: >
 license: MIT
 metadata:
   author: one-om-ddm-team
-  version: "2.1"
+  version: "2.2"
   config-file: assets/repository.md
 allowed-tools: bash glob grep view create edit
 ---
@@ -68,6 +71,7 @@ bash .github/skills/job-security-scan/scripts/run-scan.sh \
 | `--config PATH` | `--config ./repo.md` | Use a custom config file |
 | `--repo NAME` | `--repo om-ddm-backend` | Scan one repo only |
 | `--scanner NAME` | `--scanner trivy` | Run one scanner only |
+| `--host` | `--host` | Also check this computer for Shai-Hulud; alone, only the host check runs |
 | *(none)* | | Full scan — all scanners, all active repos from config |
 
 Short aliases: `-r` for `--repo`, `-s` for `--scanner`
@@ -146,6 +150,24 @@ To ingest a new bulletin: `python3 -I scripts/fetch-advisories.py --advisory <ur
 complete the drafted JSON from the saved page text, and set `source.approved_by` after human review;
 unapproved LLM-assisted data is ignored by the matcher.
 
+## Phase 8 — Shai-Hulud Worm Check (repo and laptop)
+
+Answers "has this repo, or this computer, been hit by the Shai-Hulud npm/PyPI worm?" Offline, seconds,
+never runs npm/node/pip. `run-scan.sh --scanner shai-hulud` (also part of `all`) writes
+`<repo>/shai-hulud.json`; `--host` writes `_host/shai-hulud.json` and shows as "this machine" in the report.
+
+| Verdict | Means | Run exit |
+|---|---|---|
+| **AFFECTED** (CRITICAL) | Known indicator: a compromised release in a lockfile / `node_modules` / PyPI pin / global install / npm cache, a payload or stager file in a package, a planted workflow or persistence file, or a worm marker string | 🔴 |
+| **SUSPICIOUS** (HIGH/MEDIUM) | No known indicator, but an install hook reads credentials *and* sends data out, pipes a download into a shell, runs heavy obfuscated code, or downloads `bun`/TruffleHog | 🟡 |
+| clean | Neither; host mode still lists credential stores to rotate *if* affected (values never read out) | ✅ |
+
+Benign hooks (`node-gyp rebuild`, `prebuild-install`, `husky`, esbuild's installer...) are allowlisted in
+`assets/ioc/hook-allowlist.json`. Indicators live in `assets/ioc/shai-hulud.json`; refresh with
+`python3 -I scripts/fetch-iocs.py --out .security-scan-results/.ioc-cache` (used automatically when present).
+Data provenance: `references/ioc-data.md`. If affected: the runbook in `references/remediation.md`.
+Standalone: `python3 -I scripts/shai-hulud-scan.py --repo PATH` or `--host` (exit 0 clean / 1 suspicious / 2 affected).
+
 ## HTML Report
 
 After all scanners complete, `run-scan.sh` automatically calls
@@ -190,6 +212,12 @@ bash .github/skills/job-security-scan/scripts/run-scan.sh --repo om-ddm-backend
 
 # Run one scanner across all repos
 bash .github/skills/job-security-scan/scripts/run-scan.sh --scanner trivy
+
+# Was this computer hit by Shai-Hulud? (no config needed)
+bash .github/skills/job-security-scan/scripts/run-scan.sh --host
+
+# Shai-Hulud check on every repo plus this computer
+bash .github/skills/job-security-scan/scripts/run-scan.sh --scanner shai-hulud --host
 
 # Use a different team's config
 bash .github/skills/job-security-scan/scripts/run-scan.sh \

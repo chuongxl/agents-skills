@@ -106,10 +106,40 @@ If Socket Security or Semgrep flags a package:
 
 ---
 
+## 🪱 Shai-Hulud: if affected
+
+Applies when the `shai-hulud` check says **AFFECTED** for a repo or for this machine. Assume every
+credential the machine or CI runner could reach has been stolen. Work in this order:
+
+1. **Stop the spread.** Do not run `npm install` / `npm ci` / `pip install` on the affected machine or
+   runner. Disconnect self-hosted runners; disable workflows in affected repos.
+2. **Rotate credentials, most dangerous first.** npm tokens (`npm token list`, revoke all, re-create with
+   least privilege) → GitHub tokens, SSH keys and OAuth apps → cloud keys (AWS, Azure, GCP) → SSH keys
+   elsewhere → everything in `.env` files. Host mode lists the stores present on this machine.
+3. **Check your GitHub account and orgs** for what the worm creates:
+   repositories you did not create (random names, or descriptions such as `Shai-Hulud`,
+   `Shai-Hulud Migration`, `Sha1-Hulud: The Second Coming`), private repos turned public,
+   branches named `shai-hulud`, new workflows (`shai-hulud*.yml`, `discussion.yaml`, `formatter_*.yml`),
+   and self-hosted runners you did not register (e.g. `SHA1HULUD`). Review the audit log for token use.
+4. **Clean the machine.** Delete `node_modules` and lockfile-pinned worm releases, run
+   `npm cache clean --force`, remove planted files (`.claude/setup.mjs`, `.vscode/setup.mjs`, worm entries in
+   `.claude/settings.json` / `.vscode/tasks.json`), and check global installs. Reinstall from a clean lockfile
+   with `npm ci --ignore-scripts` first, then re-enable scripts once the check is clean.
+5. **If you publish packages:** check every version you published since the exposure for a `preinstall` /
+   `postinstall` you did not write; deprecate and unpublish affected versions, enable trusted publishing
+   and 2FA.
+6. **Re-run** `run-scan.sh --scanner shai-hulud --host` until the verdict is clean.
+
+For **SUSPICIOUS** findings: install with `--ignore-scripts`, read the flagged script, and report the
+package to the registry if it is malicious. Indicator sources: [ioc-data.md](ioc-data.md).
+
+---
+
 ## 📋 Priority Order
 
 | Priority | Fix When | Action |
 |----------|----------|--------|
+| P0 — Shai-Hulud AFFECTED | Immediately | Follow "Shai-Hulud: if affected" above |
 | P0 — Verified secrets | Immediately | Rotate + purge from history |
 | P1 — CRITICAL CVE | Before next release | `yarn upgrade` |
 | P2 — HIGH CVE | This sprint | `yarn upgrade` |

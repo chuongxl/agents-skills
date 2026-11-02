@@ -1,0 +1,9 @@
+{
+  "description": "Remote indicator lists merged by scripts/fetch-iocs.py. format csv-name-versions: columns package_name + package_versions (comma-separated) or package_version.",
+  "sources": [
+    {"id": "datadog-consolidated-2.0", "wave": "sh-2.0", "ecosystem": "npm", "format": "csv-name-versions",
+     "url": "https://raw.githubusercontent.com/DataDog/indicators-of-compromise/main/shai-hulud-2.0/consolidated_iocs.csv"},
+    {"id": "datadog-2.0", "wave": "sh-2.0", "ecosystem": "npm", "format": "csv-name-versions",
+     "url": "https://raw.githubusercontent.com/DataDog/indicators-of-compromise/main/shai-hulud-2.0/shai-hulud-2.0.csv"}
+  ]
+}

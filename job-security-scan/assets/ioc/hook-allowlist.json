@@ -1,0 +1,14 @@
+{
+  "description": "Install-hook commands known to be benign. A hook whose whole command matches an entry is not analysed by the tier-2 heuristics. Entries with 'packages' apply only to those package names.",
+  "entries": [
+    {"command": "^node-gyp rebuild$"},
+    {"command": "^node-gyp-build( .*)?$"},
+    {"command": "^prebuild-install( .*)?(\\|\\| ?node-gyp rebuild)?$"},
+    {"command": "^husky( install)?( .*)?$"},
+    {"command": "^patch-package( .*)?$"},
+    {"command": "^is-ci \\|\\| husky( install)?$"},
+    {"command": "^node install\\.js$", "packages": ["esbuild", "@swc/core", "sharp", "cypress", "puppeteer", "electron"]},
+    {"command": "^node install/check$", "packages": ["sharp"]},
+    {"command": "^node scripts/postinstall\\.js$", "packages": ["core-js", "core-js-pure", "@prisma/client", "prisma"]}
+  ]
+}
