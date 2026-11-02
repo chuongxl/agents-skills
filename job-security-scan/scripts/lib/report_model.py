@@ -99,6 +99,26 @@ def verification_summary(findings, profile):
     return out
 
 
+def _modes(cov):
+    """Coverage of one repo as {scanner: mode}; a plain list means every listed scanner ran in 'full' mode."""
+    if isinstance(cov, dict):
+        return dict((str(k), str(v)) for k, v in cov.items())
+    return dict((str(s), "full") for s in (cov or []))
+
+
+def scanner_modes(scanners, profile):
+    """How each scanner ran under a profile; only equal modes in both runs can mark a finding fixed."""
+    out = {}
+    for s in scanners:
+        if s == "gitleaks":
+            out[s] = "worktree" if profile == "quick" else "history"
+        elif s == "trivy":
+            out[s] = "low" if profile == "deep" else "medium"
+        else:
+            out[s] = "full"
+    return out
+
+
 def _compare(findings, coverage, previous, partial):
     """Set change/carry on findings; return (fixed list, previous run dir or None)."""
     prev_rows = {}
@@ -119,8 +139,10 @@ def _compare(findings, coverage, previous, partial):
     seen = set(f["fingerprint"] for f in findings)
     fixed = []
     for fp, p in sorted(prev_rows.items()):
-        both = set(coverage.get(p.get("repo"), [])) & set(prev_cov.get(p.get("repo"), []))
-        if fp not in seen and p.get("scanner") in both and p.get("verdict") != "rejected":
+        now, before = _modes(coverage.get(p.get("repo"))), _modes(prev_cov.get(p.get("repo")))
+        scanner = p.get("scanner")
+        same = scanner in now and now.get(scanner) == before.get(scanner)
+        if fp not in seen and same and p.get("verdict") != "rejected":
             fixed.append(dict((k, p.get(k)) for k in ("fingerprint", "repo", "scanner", "rule_id", "file",
                                                       "package", "title", "severity")))
     return fixed, previous.get("run_dir")

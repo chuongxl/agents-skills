@@ -321,5 +321,166 @@ def run_proc(*args, **kw):
     return run(*args, **kw)
 
 
+STUB = '''#!/usr/bin/env bash
+echo "%(name)s $*" >> "%(log)s"
+out=""; prev=""
+for a in "$@"; do
+  { [ "$prev" = "--report-path" ] || [ "$prev" = "--output" ]; } && out="$a"
+  prev="$a"
+done
+if [ -n "$out" ]; then
+  if [ "%(name)s" = gitleaks ] && [ -n "${GITLEAKS_FIXTURE:-}" ]; then cp "$GITLEAKS_FIXTURE" "$out"; exit 1
+  elif [ "%(name)s" = gitleaks ]; then echo "[]" > "$out"
+  else echo "{}" > "$out"; fi
+fi
+exit 0
+'''
+
+
+def git(cwd, *args):
+    env = dict(os.environ, GIT_AUTHOR_NAME="t", GIT_AUTHOR_EMAIL="t@t", GIT_COMMITTER_NAME="t",
+               GIT_COMMITTER_EMAIL="t@t", GIT_CONFIG_GLOBAL=os.devnull, GIT_CONFIG_NOSYSTEM="1")
+    return subprocess.run(["git"] + list(args), cwd=str(cwd), env=env, stdout=subprocess.PIPE,
+                          stderr=subprocess.PIPE, universal_newlines=True, check=True).stdout.strip()
+
+
+@unittest.skipUnless(shutil.which("bash") and shutil.which("git"), "bash and git required")
+class ProfileTests(TempDirCase):
+    def setUp(self):
+        super(ProfileTests, self).setUp()
+        self.ws = self.tmp / "ws"
+        self.repos = self.tmp / "repos"
+        (self.repos / "api").mkdir(parents=True)
+        self.ws.mkdir()
+        self.bin = self.tmp / "bin"
+        self.bin.mkdir()
+        self.log = self.tmp / "calls.log"
+        for name in ("gitleaks", "trivy", "semgrep", "osv-scanner", "trufflehog", "hadolint"):
+            p = self.bin / name
+            p.write_text(STUB % {"name": name, "log": self.log})
+            p.chmod(0o755)
+        self.cfg = self.put("ws/repository.md", '---\nteam: t\norg: o\nmonorepo-root: "%s"\nci-runner: x\n'
+                            'fail-on-severity: HIGH\nrepos:\n  - name: api\n    active: true\n'
+                            '    has-dockerfile: false\n---\n' % self.repos)
+
+    def scan(self, *args, **env):
+        e = dict(os.environ, PATH=str(self.bin) + os.pathsep + os.environ["PATH"], SECURITY_RUN_ROOT=str(self.ws),
+                 XDG_CACHE_HOME=str(self.tmp / "xdg"), HOME=str(self.tmp / "home"), NPM_CONFIG_PREFIX="",
+                 ADVISORY_OFFLINE="1")
+        e.pop("JOB_SECURITY_SCAN_CACHE", None)
+        e.update(env)
+        (self.tmp / "home").mkdir(exist_ok=True)
+        r = subprocess.run(["bash", str(RUN_SCAN), "--config", str(self.cfg)] + [str(a) for a in args],
+                           stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True,
+                           cwd=str(self.ws), env=e)
+        runs = sorted(self.ws.glob("security-run-*"))
+        return r, runs[-1] if runs else None
+
+    def calls(self):
+        return self.log.read_text() if self.log.exists() else ""
+
+    def report(self, run_dir):
+        return json.loads((run_dir / "security-report.json").read_text())
+
+    def test_quick_profile(self):
+        r, run_dir = self.scan("--profile", "quick")
+        out = r.stdout + r.stderr
+        self.assertIn("gitleaks detect", self.calls())
+        self.assertIn("--no-git", self.calls())
+        self.assertNotIn("trivy", self.calls())
+        self.assertIn("[osv]", out)
+        self.assertIn("[shai-hulud]", out)
+        self.assertNotIn("[semgrep]", out)
+        doc = self.report(run_dir)
+        self.assertEqual((doc["run"]["profile"], doc["verification"]["queued"]), ("quick", 0))
+        self.assertEqual(run_proc(VALIDATE, run_dir / "security-report.json").returncode, 0)
+
+    def test_standard_is_default(self):
+        r, run_dir = self.scan()
+        self.assertIn("--log-opts --all", self.calls())
+        self.assertIn("--severity MEDIUM,HIGH,CRITICAL", self.calls())
+        self.assertIn("[semgrep]", r.stdout)
+        self.assertEqual(self.report(run_dir)["run"]["profile"], "standard")
+
+    def test_deep_adds_trivy_low(self):
+        r, run_dir = self.scan("--profile", "deep")
+        self.assertIn("--severity LOW,MEDIUM,HIGH,CRITICAL", self.calls())
+        self.assertEqual(self.report(run_dir)["run"]["profile"], "deep")
+
+    def test_scanner_overrides_profile(self):
+        r, run_dir = self.scan("--profile", "quick", "--scanner", "trivy")
+        self.assertIn("trivy fs", self.calls())
+        self.assertNotIn("gitleaks", self.calls())
+
+    def test_bad_profile_and_bad_ref_make_no_folder(self):
+        for args in (("--profile", "fast"), ("--since", "--upload-pack=x"), ("--since", "a b"), ("--since",)):
+            r, run_dir = self.scan(*args)
+            self.assertEqual(r.returncode, 1, (args, r.stdout))
+            self.assertIsNone(run_dir, args)
+
+    def leaks(self, *files):
+        rows = [{"File": f, "StartLine": 1, "RuleID": "generic-api-key", "Description": "key", "Commit": "abc"}
+                for f in files]
+        return str(self.put("leaks.json", json.dumps(rows)))
+
+    def test_since_keeps_changed_files_only(self):
+        api = self.repos / "api"
+        (api / "old.js").write_text("const k = 1;\n")
+        git(api, "init", "-q")
+        git(api, "add", ".")
+        git(api, "commit", "-qm", "a")
+        base = git(api, "rev-parse", "HEAD")
+        (api / "new.js").write_text("const k = 2;\n")
+        git(api, "add", ".")
+        git(api, "commit", "-qm", "b")
+        (api / "wip.js").write_text("const k = 3;\n")   # untracked working-tree change counts too
+        r, run_dir = self.scan("--profile", "quick", "--since", base,
+                               GITLEAKS_FIXTURE=self.leaks("old.js", "new.js", "wip.js"))
+        self.assertEqual(r.returncode, 2, r.stdout + r.stderr)
+        doc = self.report(run_dir)
+        self.assertEqual(sorted(f["file"] for f in doc["findings"]), ["new.js", "wip.js"])
+        self.assertEqual((doc["run"]["since"], doc["run"]["partial"], doc["fixed"]), (base, True, []))
+        self.assertIn("partial", (run_dir / "security-report.md").read_text())
+        changed = json.loads((run_dir / "changed-files.json").read_text())
+        self.assertEqual(sorted(changed["api"]), ["new.js", "wip.js"])
+
+    def test_since_unknown_ref_or_not_git_is_full_scope(self):
+        (self.repos / "api" / "old.js").write_text("x\n")
+        r, run_dir = self.scan("--profile", "quick", "--since", "main", GITLEAKS_FIXTURE=self.leaks("old.js"))
+        self.assertIn("full scope", r.stdout)
+        self.assertEqual([f["file"] for f in self.report(run_dir)["findings"]], ["old.js"])
+        git(self.repos / "api", "init", "-q")
+        r, run_dir = self.scan("--profile", "quick", "--since", "nope", GITLEAKS_FIXTURE=self.leaks("old.js"))
+        self.assertIn("full scope", r.stdout)
+        self.assertEqual(len(self.report(run_dir)["findings"]), 1)
+
+    def test_quick_after_standard_marks_no_secret_fixed(self):
+        """Gitleaks history (standard) vs working tree (quick) are different coverage: nothing is 'fixed'."""
+        self.scan(GITLEAKS_FIXTURE=self.leaks("old.js"))
+        r, run_dir = self.scan("--profile", "quick")
+        doc = self.report(run_dir)
+        self.assertIsNotNone(doc["run"]["previous_run"])
+        self.assertEqual(doc["fixed"], [])
+        # same profile twice: the secret really is gone, so it is fixed
+        self.scan("--profile", "quick", GITLEAKS_FIXTURE=self.leaks("old.js"))
+        r, run_dir = self.scan("--profile", "quick")
+        self.assertEqual([f["file"] for f in self.report(run_dir)["fixed"]], ["old.js"])
+
+
+class ScopeTests(unittest.TestCase):
+    def test_filter_rules(self):
+        import report_scope
+        rows = [finding(file="src/a.js"), finding(file="src/b.js"), finding(file=".env", type="secret"),
+                finding(scanner="osv", type="vulnerability", file="", package="lodash", installed_version="1"),
+                finding(file="", rule_id="nofile"), finding(repo="this machine", file="/x"),
+                finding(repo="web", file="src/a.js"), finding(repo="lib", file="z.js")]
+        kept = report_scope.filter_changed(rows, {"api": {"src/a.js", ".env"}, "web": set(), "lib": None})
+        got = [(f["repo"], f["file"], f["rule_id"]) for f in kept]
+        self.assertEqual(got, [("api", "src/a.js", "sqli"), ("api", ".env", "sqli"), ("api", "", "nofile"),
+                               ("this machine", "/x", "sqli"), ("lib", "z.js", "sqli")])
+        dep = report_scope.filter_changed(rows[3:4], {"api": {"sub/package-lock.json"}})
+        self.assertEqual(len(dep), 1)
+
+
 if __name__ == "__main__":
     unittest.main()
