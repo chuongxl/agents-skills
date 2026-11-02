@@ -306,6 +306,16 @@ class GenerateChangesTests(TempDirCase):
         self.assertIn('class="badge-new"', page)
         self.assertEqual(page.count('class="badge-new"'), 1)
 
+    def test_absolute_scanner_paths_become_repo_relative(self):
+        self.put("repos/api/src/db.js", "const q = 'SELECT ' + id;\n")
+        run_dir = self.tmp / "ws" / "security-run-20261102-090000"
+        write_results(run_dir, [("sqli", str(self.tmp / "repos" / "api" / "src" / "db.js"), 1)])
+        self.assertEqual(self.generate(run_dir).returncode, 0)
+        f = json.loads((run_dir / "security-report.json").read_text())["findings"][0]
+        self.assertEqual((f["file"], f["line"], f["code"]), ("src/db.js", 1, "const q = 'SELECT ' + id;"))
+        page = (run_dir / "security-report.html").read_text()
+        self.assertIn("vscode://file%s" % (self.tmp / "repos" / "api" / "src" / "db.js"), page)
+
     def test_previous_none_disables_comparison(self):
         first = self.tmp / "ws" / "security-run-20261102-090000"
         write_results(first, [("sqli", "src/db.js", 1)])
@@ -622,6 +632,37 @@ class TriageTests(TempDirCase):
         by = dict((f["rule_id"], f) for f in doc["findings"])
         self.assertTrue(by["sqli"]["carried"])
         self.assertEqual(sorted(i["rule_id"] for i in self.queue(second)["items"]), ["github-pat"])
+
+
+CHANGED = SKILL_DIR / "scripts" / "changed-files.py"
+
+
+@unittest.skipUnless(shutil.which("git"), "git required")
+class ChangedFilesTests(TempDirCase):
+    def test_repo_config_cannot_run_commands(self):
+        repo = self.tmp / "evil"
+        repo.mkdir()
+        git(repo, "init", "-q")
+        (repo / "a.js").write_text("x\n")
+        git(repo, "add", ".")
+        git(repo, "commit", "-qm", "a")
+        marker = self.tmp / "pwned"
+        hook = self.tmp / "hook.sh"
+        hook.write_text("#!/bin/sh\ntouch '%s'\n" % marker)
+        hook.chmod(0o755)
+        with open(str(repo / ".git" / "config"), "a") as fh:
+            fh.write("[core]\n\tfsmonitor = %s\n[diff]\n\texternal = %s\n" % (hook, hook))
+        (repo / "b.js").write_text("y\n")
+        out = self.tmp / "changed.json"
+        r = run_proc(CHANGED, "--since", "HEAD", "--repos-root", self.tmp, "--out", out, "evil")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertEqual(json.loads(out.read_text()), {"evil": ["b.js"]})
+        self.assertFalse(marker.exists(), "repo-controlled command ran")
+
+    def test_invalid_refs_refused(self):
+        for ref in ("--output=x", "a b", "", "x" * 300, "a;b"):
+            r = run_proc(CHANGED, "--since=" + ref, "--repos-root", self.tmp, "--out", self.tmp / "o.json", "r")
+            self.assertEqual(r.returncode, 1, ref)
 
 
 class ScopeTests(unittest.TestCase):

@@ -700,7 +700,8 @@ def write_reports(doc, config, out_dir, results_dir=None):
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     org = config.get("org", "unknown")
-    workspace = (doc.get("run") or {}).get("workspace") or "."
+    run = doc.get("run") or {}
+    workspace = run.get("repos_root") or run.get("workspace") or "."   # file links: <repos root>/<repo>/<file>
     paths = [out_dir / "security-report.md", out_dir / "security-report.json", out_dir / "security-report.html"]
     paths[1].write_text(json.dumps(doc, indent=2) + "\n", encoding="utf-8")
     paths[0].write_text(report_formats.render_markdown(doc), encoding="utf-8")
@@ -718,6 +719,19 @@ def discover_repos(results_dir):
     """Repo result folders in a run folder (hidden folders and loose files are not repos)."""
     d = Path(results_dir)
     return sorted(x.name for x in d.iterdir() if x.is_dir() and not x.name.startswith(".")) if d.exists() else []
+
+
+def relativize(findings, repos_root):
+    """Repo findings with an absolute path inside their repo (Semgrep, OSV) get a repo-relative path, so file
+    names and fingerprints do not depend on where the workspace sits on disk."""
+    for f in findings:
+        path = f.get("file") or ""
+        if not os.path.isabs(path) or f.get("repo") in report_locate.HOST_REPO_LABELS:
+            continue
+        root = os.path.realpath(os.path.join(repos_root, f["repo"]))
+        real = os.path.realpath(path)
+        if real.startswith(root + os.sep):
+            f["file"] = os.path.relpath(real, root).replace(os.sep, "/")
 
 
 def scanner_coverage(results_dir, repos, profile="standard"):
@@ -768,6 +782,7 @@ def main():
 
     findings = collect_findings(args.results_dir, repos, workspace)
     report_locate.apply(findings, repos_root, home)
+    relativize(findings, repos_root)
     if args.changed_files:
         findings = report_scope.filter_changed(findings, report_scope.load_changed(args.changed_files))
     located = sum(1 for f in findings if f.get("line"))
@@ -805,7 +820,7 @@ def main():
     if args.out_dir:
         outputs, errors = write_reports(doc, config, out_dir, args.results_dir)
     if args.output:
-        outputs.append(Path(build_html(doc, config, args.results_dir, args.output, org, workspace)))
+        outputs.append(Path(build_html(doc, config, args.results_dir, args.output, org, repos_root)))
 
     c = doc["counts"]
     v = doc["verification"]
