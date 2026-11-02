@@ -795,7 +795,7 @@ def main():
         "coverage": coverage,
     }
     doc = report_model.build_document(findings, meta, previous=previous)
-    doc["run"]["workspace"] = workspace
+    doc["run"].update(workspace=workspace, repos_root=repos_root, home=home)
 
     outputs, errors = [], []
     if args.out_dir:

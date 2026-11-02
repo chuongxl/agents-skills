@@ -467,6 +467,163 @@ class ProfileTests(TempDirCase):
         self.assertEqual([f["file"] for f in self.report(run_dir)["fixed"]], ["old.js"])
 
 
+DB_JS = "\n".join(["// line %d" % i for i in range(1, 20)] +
+                  ["const q = 'SELECT ' + req.query.id;",          # line 20
+                   "const token = '%s';" % SECRET] +                # line 21: must come out redacted
+                  ["// tail %d" % i for i in range(22, 60)]) + "\n"
+
+
+class TriageTests(TempDirCase):
+    """triage.py queue / apply against a real generated run folder."""
+
+    def setUp(self):
+        super(TriageTests, self).setUp()
+        self.put("repos/api/src/db.js", DB_JS)
+        self.put("repos/api/src/ui.js", "el.innerHTML = name;\n")
+        self.put("repos/api/.env", "API_KEY=%s\n" % SECRET)
+        self.put("repos/api/.env.example", "x = eval(input)\n")
+        os.symlink("/etc/hostname", str(self.tmp / "repos" / "api" / "link.js"))
+        self.cfg = self.put("repository.md", "---\nteam: acme\norg: acme-org\nrepos:\n  - name: api\n"
+                            "    active: true\n---\n")
+        self.ws = self.tmp / "ws"
+
+    def make_run(self, name="security-run-20261102-090000", profile="standard"):
+        run_dir = self.ws / name
+        d = run_dir / "api"
+        d.mkdir(parents=True)
+        (d / "semgrep.json").write_text(json.dumps({"results": [
+            {"check_id": "sqli", "path": "src/db.js", "start": {"line": 20},
+             "extra": {"severity": "ERROR", "message": "SQL injection"}},
+            {"check_id": "xss", "path": "src/ui.js", "start": {"line": 1},
+             "extra": {"severity": "WARNING", "message": "XSS"}},
+            {"check_id": "eval", "path": ".env.example", "start": {"line": 1},
+             "extra": {"severity": "ERROR", "message": "eval"}},
+            {"check_id": "link", "path": "link.js", "start": {"line": 1},
+             "extra": {"severity": "ERROR", "message": "symlink"}}]}))
+        (d / "gitleaks.json").write_text(json.dumps([{"File": ".env", "StartLine": 1, "RuleID": "github-pat",
+                                                      "Description": "GitHub token", "Commit": "abc"}]))
+        r = run_proc(GENERATE, "--results-dir", run_dir, "--config", self.cfg, "--out-dir", run_dir,
+                     "--repos-root", self.tmp / "repos", "--home", self.tmp / "home", "--profile", profile)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        return run_dir
+
+    def doc(self, run_dir):
+        return json.loads((run_dir / "security-report.json").read_text())
+
+    def queue(self, run_dir):
+        r = run_proc(TRIAGE, "queue", run_dir)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        return json.loads((run_dir / "triage" / "queue.json").read_text())
+
+    def fp(self, run_dir, rule):
+        return [f["fingerprint"] for f in self.doc(run_dir)["findings"] if f["rule_id"] == rule][0]
+
+    def apply(self, run_dir, verdicts):
+        p = self.put("verdicts-%d.json" % len(list(self.tmp.glob("verdicts-*"))),
+                     verdicts if isinstance(verdicts, str) else json.dumps(verdicts))
+        return run_proc(TRIAGE, "apply", run_dir, p)
+
+    def test_queue_by_profile_and_context(self):
+        run_dir = self.make_run()
+        q = self.queue(run_dir)
+        by = dict((i["rule_id"], i) for i in q["items"])
+        self.assertEqual(sorted(by), ["eval", "github-pat", "link", "sqli"])      # HIGH+CRITICAL, not xss
+        ctx = by["sqli"]["context"]
+        self.assertEqual((ctx["start_line"], ctx["end_line"]), (5, 35))
+        text = "\n".join(ctx["lines"])
+        self.assertIn(">   20 | const q = 'SELECT ' + req.query.id;", text)
+        self.assertNotIn(SECRET, json.dumps(q))
+        self.assertIn("gh_***", text)
+
+    def test_queue_never_carries_secret_or_credential_file_content(self):
+        run_dir = self.make_run()
+        by = dict((i["rule_id"], i) for i in self.queue(run_dir)["items"])
+        self.assertEqual((by["github-pat"]["code"], by["github-pat"]["context"]), ("", None))
+        self.assertIsNone(by["eval"]["context"])      # .env* files are never opened for context
+        self.assertIsNone(by["link"]["context"])      # symlinks are not followed
+        self.assertNotIn(SECRET, (run_dir / "triage" / "queue.json").read_text())
+
+    def test_quick_profile_queues_nothing_deep_adds_medium(self):
+        self.assertEqual(self.queue(self.make_run(profile="quick"))["items"], [])
+        q = self.queue(self.make_run(name="security-run-20261102-100000", profile="deep"))
+        self.assertIn("xss", [i["rule_id"] for i in q["items"]])
+
+    def good_verdicts(self, run_dir):
+        return {"verdicts": [
+            {"fingerprint": self.fp(run_dir, "sqli"), "verdict": "confirmed", "severity": "MEDIUM",
+             "likelihood": "medium", "impact": "medium",
+             "evidence": "id flows from req.query into the SQL string at src/db.js:20 (%s)" % SECRET},
+            {"fingerprint": self.fp(run_dir, "eval"), "verdict": "rejected",
+             "reason": "example file, never loaded at runtime"},
+            {"fingerprint": self.fp(run_dir, "link"), "verdict": "needs_validation",
+             "blocker": "symlink target outside the repo", "validation_plan": "check the deployed file"}]}
+
+    def test_apply_merges_and_regenerates(self):
+        run_dir = self.make_run()
+        before = self.doc(run_dir)["counts"]
+        r = self.apply(run_dir, self.good_verdicts(run_dir))
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        doc = self.doc(run_dir)
+        self.assertEqual(run_proc(VALIDATE, run_dir / "security-report.json").returncode, 0)
+        # sqli HIGH -> MEDIUM, eval dismissed (out of counts), link needs validation (keeps the tool's HIGH)
+        self.assertEqual(doc["counts"]["HIGH"], before["HIGH"] - 2)
+        self.assertEqual(doc["counts"]["MEDIUM"], before["MEDIUM"] + 1)
+        by = dict((f["rule_id"], f) for f in doc["findings"])
+        self.assertEqual((by["sqli"]["verdict"], by["sqli"]["verified_severity"]), ("confirmed", "MEDIUM"))
+        self.assertEqual(by["eval"]["verdict_detail"]["reason"], "example file, never loaded at runtime")
+        self.assertEqual(doc["verification"]["pending"], 1)            # github-pat still waits
+        md = (run_dir / "security-report.md").read_text()
+        self.assertIn("## 🚫 Dismissed (with reason)", md)
+        self.assertIn("✅ confirmed as MEDIUM — tool said HIGH", md)
+        needs = (run_dir / "NEEDS-VALIDATION.md").read_text()
+        self.assertIn("symlink target outside the repo", needs)
+        self.assertIn("check the deployed file", needs)
+        for name in ("security-report.md", "security-report.json", "security-report.html", "NEEDS-VALIDATION.md"):
+            self.assertNotIn(SECRET, (run_dir / name).read_text(), name)
+        self.assertIn("verdict confirmed", (run_dir / "security-report.html").read_text())
+
+    def test_apply_is_idempotent(self):
+        run_dir = self.make_run()
+        v = self.good_verdicts(run_dir)
+        self.assertEqual(self.apply(run_dir, v).returncode, 0)
+        first = (run_dir / "security-report.json").read_text()
+        self.assertEqual(self.apply(run_dir, v).returncode, 0)
+        self.assertEqual((run_dir / "security-report.json").read_text(), first)
+
+    def test_apply_rejects_bad_input_and_changes_nothing(self):
+        run_dir = self.make_run()
+        fp = self.fp(run_dir, "sqli")
+        original = (run_dir / "security-report.json").read_text()
+        ok = {"fingerprint": fp, "verdict": "rejected", "reason": "r"}
+        bad_inputs = [
+            "Here are my verdicts:\n" + json.dumps({"verdicts": [ok]}),       # prose-wrapped
+            json.dumps("nope"),
+            json.dumps({"verdicts": [dict(ok, fingerprint="0" * 16)]}),        # unknown fingerprint
+            json.dumps({"verdicts": [ok, ok]}),                                # duplicate
+            json.dumps({"verdicts": [dict(ok, extra="x")]}),                   # unknown key
+            json.dumps({"verdicts": [{"fingerprint": fp, "verdict": "rejected"}]}),
+            json.dumps({"verdicts": [{"fingerprint": fp, "verdict": "confirmed", "severity": "CRITICAL",
+                                      "likelihood": "high", "impact": "low", "evidence": "e"}]}),
+            json.dumps({"verdicts": [{"fingerprint": fp, "verdict": "needs_validation", "blocker": "b"}]}),
+            json.dumps({"verdicts": [ok, {"fingerprint": self.fp(run_dir, "eval"), "verdict": "maybe"}]}),
+            json.dumps({"verdicts": [dict(ok, reason="x" * 5000)]}),
+        ]
+        for text in bad_inputs:
+            r = self.apply(run_dir, text)
+            self.assertEqual(r.returncode, 1, text[:80])
+            self.assertEqual((run_dir / "security-report.json").read_text(), original, text[:80])
+        self.assertFalse((run_dir / "NEEDS-VALIDATION.md").exists())
+
+    def test_carried_verdicts_are_not_queued_again(self):
+        first = self.make_run()
+        self.assertEqual(self.apply(first, self.good_verdicts(first)).returncode, 0)
+        second = self.make_run(name="security-run-20261102-100000")
+        doc = self.doc(second)
+        by = dict((f["rule_id"], f) for f in doc["findings"])
+        self.assertTrue(by["sqli"]["carried"])
+        self.assertEqual(sorted(i["rule_id"] for i in self.queue(second)["items"]), ["github-pat"])
+
+
 class ScopeTests(unittest.TestCase):
     def test_filter_rules(self):
         import report_scope
