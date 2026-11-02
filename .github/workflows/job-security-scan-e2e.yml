@@ -24,8 +24,10 @@ jobs:
       matrix:
         python: ["3.8", "3.12"]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: ${{ matrix.python }}
       - name: Advisory library tests
@@ -40,6 +42,8 @@ jobs:
         run: python3 -I job-security-scan/scripts/detect-ecosystems.py --validate
       - name: Shai-Hulud detector tests
         run: python3 -I job-security-scan/scripts/test-shai-hulud.py
+      - name: Hardening tests (injection, secret leaks, installer checksums, sandboxed probe)
+        run: python3 -I job-security-scan/scripts/test-hardening.py
       - name: Report tests (security-run folder, md/json/html, file:line)
         run: python3 -I job-security-scan/scripts/test-reports.py
       - name: Shai-Hulud indicator data validates
@@ -59,28 +63,37 @@ jobs:
     name: Real scanners on fixtures (osv-scanner + trivy)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: "3.12"
 
-      - name: Install osv-scanner v2 (latest; v2.0.0 cannot read trivy's CycloneDX 1.6)
+      # Pinned, checksum-verified scanner versions - the same pins as scripts/install-tools.sh.
+      # Trivy v0.69.3 is an immutable release; v0.69.4 was malicious (GHSA-69fq-xp46-6x23).
+      - name: Install osv-scanner v2.7.0 (verified)
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release download --repo google/osv-scanner --pattern 'osv-scanner_linux_amd64' --dir . \
-            || { echo "::error::could not download osv-scanner release"; exit 1; }
-          sudo install -m 0755 osv-scanner_linux_amd64 /usr/local/bin/osv-scanner
+          gh release download v2.7.0 --repo google/osv-scanner \
+            --pattern 'osv-scanner_linux_amd64' --pattern 'osv-scanner_SHA256SUMS' --dir osv \
+            || { echo "::error::could not download osv-scanner v2.7.0"; exit 1; }
+          (cd osv && grep ' osv-scanner_linux_amd64$' osv-scanner_SHA256SUMS | sha256sum --check --strict) \
+            || { echo "::error::osv-scanner checksum mismatch"; exit 1; }
+          sudo install -m 0755 osv/osv-scanner_linux_amd64 /usr/local/bin/osv-scanner
 
-      - name: Install trivy
+      - name: Install trivy v0.69.3 (verified)
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          # Latest release; pinning tool versions is tracked in the P5 hardening issue.
-          gh release download --repo aquasecurity/trivy --pattern 'trivy_*_Linux-64bit.tar.gz' --dir . \
-            || { echo "::error::could not download trivy release"; exit 1; }
-          tar -xzf trivy_*_Linux-64bit.tar.gz trivy
-          sudo install -m 0755 trivy /usr/local/bin/trivy
+          gh release download v0.69.3 --repo aquasecurity/trivy \
+            --pattern 'trivy_0.69.3_Linux-64bit.tar.gz' --pattern 'trivy_0.69.3_checksums.txt' --dir trv \
+            || { echo "::error::could not download trivy v0.69.3"; exit 1; }
+          (cd trv && grep ' trivy_0.69.3_Linux-64bit.tar.gz$' trivy_0.69.3_checksums.txt | sha256sum --check --strict) \
+            || { echo "::error::trivy checksum mismatch"; exit 1; }
+          tar -xzf trv/trivy_0.69.3_Linux-64bit.tar.gz -C trv trivy
+          sudo install -m 0755 trv/trivy /usr/local/bin/trivy
 
       - name: Tool versions
         run: |
@@ -112,8 +125,10 @@ jobs:
     name: Live advisory fetch and match
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: "3.12"
       - name: Fetch every source in sources.json
