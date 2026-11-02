@@ -94,6 +94,7 @@ check "Markdown report written"                     test -s "$OUT/security-repor
 check "JSON report written"                         test -s "$OUT/security-report.json"
 check "Markdown shows file:line for the worm release" grep -q 'package-lock.json:6' "$OUT/security-report.md"
 check "every file finding located; no code on secret/credential rows" python3 -I "$HERE/assert-located.py" "$OUT/security-report.json"
+check "report validates (schema v2)"               python3 -I "$SKILL_DIR/scripts/validate-report.py" "$OUT/security-report.json"
 check "no secret value anywhere in output"          bash -c "! grep -rq 'E2EFAKETOKEN' '$OUT' '$WORK/scan.log'"
 
 echo
