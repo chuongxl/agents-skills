@@ -411,6 +411,94 @@ class HeuristicTests(TempDirCase):
         self.assertFalse([f for f in doc["findings"] if f["tier"] == "suspicious"])
 
 
+class HostTests(TempDirCase):
+    LISTED = ("@accordproject/concerto-linter", "3.24.1")
+
+    def build_infected_home(self):
+        home = self.tmp / "home"
+        shutil.copytree(str(FIX / "infected-lockfile"), str(home / "work" / "app"))
+        self.put("home/.npm-global/lib/node_modules/@accordproject/concerto-linter/package.json",
+                 json.dumps({"name": self.LISTED[0], "version": self.LISTED[1]}))
+        self.put("home/.npm/_cacache/index-v5/ab/cd/0123", "deadbeef\t" + json.dumps({
+            "key": "make-fetch-happen:request-cache:https://registry.npmjs.org/@accordproject/concerto-linter/-/"
+                   "concerto-linter-3.24.1.tgz"}))
+        npmrc = self.put("home/.npmrc", "//registry.npmjs.org/:_authToken=%s\n" % FAKE_TOKENS["npm"])
+        os.chmod(str(npmrc), 0o600)
+        key = self.put("home/.ssh/id_ed25519", "-----BEGIN OPENSSH PRIVATE KEY-----\nAAAA\n-----END OPENSSH PRIVATE KEY-----\n")
+        os.chmod(str(key), 0o644)
+        self.put("home/.ssh/id_ed25519.pub", "ssh-ed25519 AAAA test\n")
+        return home
+
+    def host_scan(self, home, roots=None, max_depth=8):
+        from shaihulud import host, findings
+        ioc = iocs.load(str(IOC_FILE))
+        found = host.scan_host(roots or [home], home, ioc, iocs.load_allowlist(), max_depth=max_depth)
+        return findings.to_document("host", str(home), ioc.version, found)
+
+    def test_infected_home(self):
+        home = self.build_infected_home()
+        doc = self.host_scan(home)
+        self.assertEqual(doc["verdict"], "affected")
+        by_cat = {}
+        for f in doc["findings"]:
+            by_cat.setdefault(f["category"], []).append(f)
+        self.assertIn("~/work/app/package-lock.json", [f["location"] for f in by_cat["known-package"]])
+        self.assertTrue(any(f["location"].startswith("~/.npm-global/") for f in by_cat["known-package"]))
+        self.assertEqual([(f["package"], f["version"]) for f in by_cat["cached-package"]], [self.LISTED])
+        npmrc = [f for f in by_cat["credential-store"] if f["location"] == "~/.npmrc"]
+        self.assertEqual(npmrc[0]["evidence"], "has auth token: yes")
+        perms = by_cat["credential-permissions"]
+        self.assertEqual([(f["location"], f["severity"]) for f in perms], [("~/.ssh/id_ed25519", "MEDIUM")])
+        self.assertNotIn("~/.ssh/id_ed25519.pub", [f["location"] for f in by_cat["credential-store"]])
+
+    def test_token_never_in_output(self):
+        home = self.build_infected_home()
+        out = self.tmp / "host.json"
+        r = run_cli("--host", "--output", out, env={"HOME": str(home), "NPM_CONFIG_PREFIX": ""})
+        self.assertEqual(r.returncode, 2, r.stderr)
+        for blob in (r.stdout, r.stderr, out.read_text()):
+            self.assertNotIn(FAKE_TOKENS["npm"], blob)
+            self.assertNotIn("FAKEFAKE", blob)
+        self.assertIn("GitHub account", r.stdout)
+
+    def test_max_depth_respected(self):
+        home = self.tmp / "home"
+        shutil.copytree(str(FIX / "infected-lockfile"), str(home / "a" / "b" / "c" / "d" / "app"))
+        self.assertEqual(self.host_scan(home, max_depth=3)["verdict"], "clean")
+        self.assertEqual(self.host_scan(home, max_depth=8)["verdict"], "affected")
+
+    def test_clean_home_is_clean(self):
+        home = self.tmp / "home"
+        shutil.copytree(str(FIX / "clean"), str(home / "code" / "clean"))
+        self.put("home/.aws/credentials", "[default]\naws_access_key_id = %s\n" % FAKE_TOKENS["aws_key"])
+        os.chmod(str(home / ".aws" / "credentials"), 0o600)
+        self.put("home/code/clean/.env", "API_KEY=%s\n" % FAKE_TOKENS["generic"])
+        doc = self.host_scan(home)
+        self.assertEqual(doc["verdict"], "clean")
+        self.assertEqual({f["tier"] for f in doc["findings"]}, {"exposure"})
+        self.assertIn("~/code/clean/.env", [f["location"] for f in doc["findings"]])
+        self.assertNotIn(FAKE_TOKENS["aws_key"], json.dumps(doc))
+        r = run_cli("--host", env={"HOME": str(home), "NPM_CONFIG_PREFIX": ""})
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+
+    def test_extra_root_outside_home(self):
+        home = self.tmp / "home"
+        home.mkdir()
+        shutil.copytree(str(FIX / "planted-workflow"), str(self.tmp / "srv" / "repo"))
+        doc = self.host_scan(home, roots=[self.tmp / "srv"])
+        self.assertEqual(doc["verdict"], "affected")
+        self.assertTrue(any(f["location"].endswith("srv/repo/.github/workflows/discussion.yaml") for f in doc["findings"]))
+
+    def test_pypi_site_packages(self):
+        home = self.tmp / "home"
+        self.put("home/.local/lib/python3.12/site-packages/evil_pkg-9.9.9.dist-info/METADATA",
+                 "Metadata-Version: 2.1\nName: Evil_Pkg\nVersion: 9.9.9\n")
+        path = write_iocs(self.tmp, [{"ecosystem": "pypi", "name": "evil-pkg", "versions": ["9.9.9"], "wave": "mini-2026"}])
+        from shaihulud import host
+        found = host.scan_host([home], home, iocs.load(str(path)), iocs.load_allowlist())
+        self.assertIn(("known-package", "evil-pkg"), [(f["category"], f["package"]) for f in found])
+
+
 class CliTests(TempDirCase):
     def test_exit_codes(self):
         expected = {"infected-lockfile": 2, "infected-node-modules": 2, "planted-workflow": 2, "clean": 0}

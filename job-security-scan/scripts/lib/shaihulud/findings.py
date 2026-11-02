@@ -87,6 +87,16 @@ def make_finding(tier, severity, category, location, title, package="", version=
     }
 
 
+def relocate(finding, prefix):
+    """Copy of finding with location prefixed (e.g. '~/work/app') and its id recomputed."""
+    f = dict(finding)
+    loc = f["location"]
+    f["location"] = prefix if loc in ("", ".") else "%s/%s" % (prefix.rstrip("/"), loc)
+    f["id"] = hashlib.sha1("|".join((f["tier"], f["category"], f["location"], f["package"], f["version"]))
+                           .encode("utf-8")).hexdigest()[:12]
+    return f
+
+
 def verdict(findings):
     tiers = {f["tier"] for f in findings}
     if "affected" in tiers:
