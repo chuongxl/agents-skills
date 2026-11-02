@@ -1,0 +1,2 @@
+requests==2.32.3
+Evil_Pkg==9.9.9  # pinned

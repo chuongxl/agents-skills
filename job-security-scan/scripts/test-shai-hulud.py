@@ -93,5 +93,100 @@ class IocTests(unittest.TestCase):
             self.assertTrue(wave.get("references"), wid)
 
 
+class TempDirCase(unittest.TestCase):
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp())
+
+    def tearDown(self):
+        shutil.rmtree(str(self.tmp), ignore_errors=True)
+
+    def put(self, rel, text):
+        p = self.tmp / rel
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(text)
+        return p
+
+
+def pkgs(root, installed=True):
+    from shaihulud import inventory
+    return sorted(inventory.iter_packages(Path(root), installed=installed))
+
+
+class InventoryTests(TempDirCase):
+    def setUp(self):
+        super(InventoryTests, self).setUp()
+        from shaihulud import inventory
+        self.Pkg = inventory.Pkg
+
+    def test_package_lock_v3(self):
+        self.assertIn(self.Pkg("npm", "@accordproject/concerto-linter", "3.24.1", "package-lock.json"),
+                      pkgs(FIX / "infected-lockfile", installed=False))
+
+    def test_package_lock_v1(self):
+        self.put("package-lock.json", json.dumps({"lockfileVersion": 1, "dependencies": {
+            "a": {"version": "1.0.0", "dependencies": {"b": {"version": "2.0.0"}}}}}))
+        got = pkgs(self.tmp)
+        self.assertIn(self.Pkg("npm", "a", "1.0.0", "package-lock.json"), got)
+        self.assertIn(self.Pkg("npm", "b", "2.0.0", "package-lock.json"), got)
+
+    def test_npm_alias_resolves_real_name(self):
+        self.put("package-lock.json", json.dumps({"lockfileVersion": 3, "packages": {
+            "node_modules/my-alias": {"name": "@scope/real", "version": "1.2.3"}}}))
+        self.assertEqual(pkgs(self.tmp), [self.Pkg("npm", "@scope/real", "1.2.3", "package-lock.json")])
+
+    def test_yarn_v1(self):
+        self.put("yarn.lock", '# yarn lockfile v1\n\n"@scope/pkg@^1.0.0", "@scope/pkg@^1.1.0":\n'
+                              '  version "1.2.3"\n  resolved "x"\n\nlodash@^4.17.0:\n  version "4.17.21"\n')
+        self.assertEqual(pkgs(self.tmp), [self.Pkg("npm", "@scope/pkg", "1.2.3", "yarn.lock"),
+                                          self.Pkg("npm", "lodash", "4.17.21", "yarn.lock")])
+
+    def test_yarn_berry_npm_protocol(self):
+        self.put("yarn.lock", '__metadata:\n  version: 8\n\n"alias@npm:@scope/real@^1.0.0":\n'
+                              '  version: 1.2.3\n  resolution: "@scope/real@npm:1.2.3"\n\n'
+                              '"left-pad@npm:^1.3.0":\n  version: 1.3.0\n  resolution: "left-pad@npm:1.3.0"\n')
+        self.assertEqual(pkgs(self.tmp), [self.Pkg("npm", "@scope/real", "1.2.3", "yarn.lock"),
+                                          self.Pkg("npm", "left-pad", "1.3.0", "yarn.lock")])
+
+    def test_pnpm_lock_key_styles(self):
+        self.put("pnpm-lock.yaml", "lockfileVersion: '9.0'\n\npackages:\n\n  '@scope/a@1.0.0':\n    resolution: {}\n"
+                                   "  /b/2.0.0:\n    resolution: {}\n  /c@3.0.0(react@18.0.0):\n    resolution: {}\n")
+        self.assertEqual(pkgs(self.tmp), [self.Pkg("npm", "@scope/a", "1.0.0", "pnpm-lock.yaml"),
+                                          self.Pkg("npm", "b", "2.0.0", "pnpm-lock.yaml"),
+                                          self.Pkg("npm", "c", "3.0.0", "pnpm-lock.yaml")])
+
+    def test_requirements_pins(self):
+        got = pkgs(FIX / "pypi-pin")
+        self.assertIn(self.Pkg("pypi", "evil-pkg", "9.9.9", "requirements.txt"), got)
+        self.assertIn(self.Pkg("pypi", "requests", "2.32.3", "requirements.txt"), got)
+
+    def test_poetry_and_uv_lock(self):
+        body = '[[package]]\nname = "Django"\nversion = "4.2.1"\n\n[[package]]\nname = "zope.interface"\nversion = "6.0"\n'
+        self.put("poetry.lock", body)
+        self.put("sub/uv.lock", body)
+        got = pkgs(self.tmp)
+        self.assertIn(self.Pkg("pypi", "django", "4.2.1", "poetry.lock"), got)
+        self.assertIn(self.Pkg("pypi", "zope-interface", "6.0", "sub/uv.lock"), got)
+
+    def test_installed_node_modules_nested(self):
+        self.put("node_modules/a/package.json", '{"name": "a", "version": "1.0.0"}')
+        self.put("node_modules/a/node_modules/@s/b/package.json", '{"name": "@s/b", "version": "2.0.0"}')
+        got = pkgs(self.tmp)
+        self.assertIn(self.Pkg("npm", "a", "1.0.0", "node_modules/a/package.json"), got)
+        self.assertIn(self.Pkg("npm", "@s/b", "2.0.0", "node_modules/a/node_modules/@s/b/package.json"), got)
+        self.assertEqual(pkgs(self.tmp, installed=False), [])
+
+    def test_broken_lockfile_is_skipped(self):
+        self.put("package-lock.json", "{not json")
+        self.put("node_modules/x/package.json", "also not json")
+        self.put("yarn.lock", "\x00\x01 binary garbage")
+        self.assertEqual(pkgs(self.tmp), [])
+
+    def test_iter_manifests_includes_root_and_installed(self):
+        from shaihulud import inventory
+        found = sorted(str(p.relative_to(FIX / "infected-node-modules")) for p, _ in
+                       inventory.iter_manifests(FIX / "infected-node-modules"))
+        self.assertEqual(found, [".", "node_modules/@accordproject/concerto-linter"])
+
+
 if __name__ == "__main__":
     unittest.main()

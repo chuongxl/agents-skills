@@ -1,0 +1,2 @@
+{"name": "fixture-infected-node-modules", "version": "1.0.0", "private": true,
+ "dependencies": {"@accordproject/concerto-linter": "3.24.1"}}
