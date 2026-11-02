@@ -38,6 +38,20 @@ jobs:
         run: python3 -I job-security-scan/scripts/validate-advisories.py --strict
       - name: Ecosystem descriptors validate
         run: python3 -I job-security-scan/scripts/detect-ecosystems.py --validate
+      - name: Shai-Hulud detector tests
+        run: python3 -I job-security-scan/scripts/test-shai-hulud.py
+      - name: Shai-Hulud indicator data validates
+        run: |
+          python3 -I - <<'PY'
+          import sys
+          sys.path.insert(0, "job-security-scan/scripts/lib")
+          from shaihulud import iocs
+          ioc = iocs.load()
+          print("indicators %s: %d packages, %d files, %d paths, %d markers" % (
+              ioc.version, len(ioc.packages), len(ioc.files), len(ioc.paths), len(ioc.markers)))
+          PY
+      - name: Shai-Hulud end-to-end (real run-scan.sh, repo + host mode)
+        run: bash job-security-scan/tests/e2e/run-shai-hulud-e2e.sh
 
   e2e:
     name: Real scanners on fixtures (osv-scanner + trivy)

@@ -158,6 +158,22 @@ Different from Gitleaks (which scans git history), TruffleHog verifies live cred
 
 **Output:** `trufflehog.json` with verified/unverified status
 
+### 7. Shai-Hulud — Supply-Chain Worm Check (repo and laptop)
+
+A fast, offline answer to "were we hit by the Shai-Hulud npm/PyPI worm?":
+- **Affected** (CRITICAL): a known compromised release (lockfiles, `node_modules`, PyPI pins, global
+  installs, npm cache), the worm's payload/stager file in a package, a planted workflow or persistence
+  file, or a worm marker string
+- **Suspicious** (HIGH/MEDIUM): an install hook that reads credentials *and* sends data out, pipes a
+  download into a shell, runs heavily obfuscated code, or downloads `bun`/TruffleHog
+- **Laptop mode** (`--host`): projects under your home directory, global installs, the npm cache, and a
+  list of credential stores to rotate if affected (values are never read or printed)
+- Never runs npm/node/pip; benign hooks (`node-gyp`, `husky`, esbuild...) are allowlisted
+
+**Output:** `shai-hulud.json` per repo, `_host/shai-hulud.json` for this computer (report: "this machine").
+Indicator data and sources: [references/ioc-data.md](references/ioc-data.md). If affected:
+[references/remediation.md](references/remediation.md#-shai-hulud-if-affected).
+
 ## Installation & Setup
 
 ### Platform-Specific Setup
@@ -284,6 +300,29 @@ bash job-security-scan/scripts/run-scan.sh --repo backend-api
 bash job-security-scan/scripts/run-scan.sh --scanner semgrep
 ```
 
+### Example 5: Was This Repo or Laptop Hit by Shai-Hulud?
+
+```bash
+# This computer only (no repository.md needed)
+bash job-security-scan/scripts/run-scan.sh --host
+
+# Every configured repo plus this computer
+bash job-security-scan/scripts/run-scan.sh --scanner shai-hulud --host
+
+# Standalone, any folder; exit 0 clean, 1 suspicious, 2 affected
+python3 -I job-security-scan/scripts/shai-hulud-scan.py --repo ./my-service
+
+# Refresh indicators from the published lists (optional; used automatically)
+python3 -I job-security-scan/scripts/fetch-iocs.py --out .security-scan-results/.ioc-cache
+```
+
+In CI, add a step before `npm ci` so a compromised release fails the build before its install hook runs:
+
+```yaml
+- name: Shai-Hulud check
+  run: python3 -I .github/skills/job-security-scan/scripts/shai-hulud-scan.py --repo . --format text
+```
+
 ## Configuration
 
 ### Environment Variables
@@ -351,7 +390,9 @@ bash job-security-scan/scripts/run-scan.sh  # Re-downloads DB
 
 ## Version History
 
-- **v2.0** (current) — Multi-tool unified pipeline, config-driven, zero-install for free tools
+- **v2.2** (current) — Shai-Hulud supply-chain worm check (`--scanner shai-hulud`, `--host` laptop mode)
+- **v2.1** — Runtime and image checks
+- **v2.0** — Multi-tool unified pipeline, config-driven, zero-install for free tools
 - **v1.0** — Gitleaks-only security scan
 
 ## License & Attribution
