@@ -12,6 +12,12 @@
 #              npm cache, credential stores). Alone (no --scanner), only the host check runs.
 #
 # Reads all team/repo config from repository.md — no hardcoded values.
+#
+# Output: every run writes ./security-run-YYYYMMDD-HHMMSS/ in the folder it is run from, holding
+# security-report.md, security-report.json, security-report.html and each tool's raw output.
+# Caches live outside the workspace: $JOB_SECURITY_SCAN_CACHE > cache-dir: > (deprecated) output-dir:
+# > ${XDG_CACHE_HOME:-$HOME/.cache}/job-security-scan.  SECURITY_RUN_ROOT moves the run folders (CI, tests).
+# This script only reports: it never changes any scanned repo.
 
 set -uo pipefail
 
@@ -51,8 +57,10 @@ fi
 eval "$(python3 "$SKILL_DIR/scripts/parse-config.py" "$CONFIG_PATH")"
 
 WORKSPACE="${MONOREPO_ROOT:-.}"
-OUTPUT_BASE="${OUTPUT_DIR:-.security-scan-results}"
-mkdir -p "$OUTPUT_BASE"
+# Shared caches (vendor advisories, refreshed Shai-Hulud indicators) - never in the workspace by default.
+CACHE_BASE="${JOB_SECURITY_SCAN_CACHE:-${CACHE_DIR:-${OUTPUT_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/job-security-scan}}}"
+# The run folder is created in MAIN, once the arguments are known to be valid.
+OUTPUT_BASE=""
 
 ASSET_DIR="$SKILL_DIR/assets"
 
@@ -109,6 +117,7 @@ run_gitleaks() {
     --report-format json \
     --report-path "$out" \
     --no-banner \
+    --redact \
     --exit-code 1 \
     2>/dev/null
   local rc=$?
@@ -326,7 +335,7 @@ run_sbom() {
 ADVISORY_CACHE=""
 fetch_advisories_once() {
   [[ -n "$ADVISORY_CACHE" ]] && return
-  ADVISORY_CACHE="$OUTPUT_BASE/.advisory-cache"
+  ADVISORY_CACHE="$CACHE_BASE/advisories"
   mkdir -p "$ADVISORY_CACHE"
   [[ -n "${ADVISORY_OFFLINE:-}" ]] && return   # use committed advisories only (tests, air-gapped runs)
   # Network trouble must not break the scan: committed advisories (assets/advisories) still apply.
@@ -409,7 +418,7 @@ run_trufflehog() {
 
 # Shai-Hulud worm check (offline): known indicators = affected, worm-like install hooks = suspicious.
 shai_hulud_iocs_args() {
-  local cache="$OUTPUT_BASE/.ioc-cache/shai-hulud.json"
+  local cache="$CACHE_BASE/ioc/shai-hulud.json"
   [[ -s "$cache" ]] && echo "--iocs $cache"
 }
 
@@ -487,15 +496,6 @@ run_scanner_for_repo() {
 }
 
 # ─── MAIN ─────────────────────────────────────────────────────────────────
-echo ""
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "  🔐 Security Scan — team: ${TEAM} | org: ${ORG}"
-echo "  Scanners : ${SCANNER}"
-echo "  Repos    : ${REPOS_TO_SCAN[*]:-(none)}"
-[[ $HOST_MODE -eq 1 ]] && echo "  Host     : this machine (Shai-Hulud check)"
-echo "  Output   : ${OUTPUT_BASE}/"
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-
 case "$SCANNER" in
   gitleaks|trivy|semgrep|hadolint|osv|sbom|advisories|trufflehog|shai-hulud|all) ;;
   *)
@@ -504,6 +504,27 @@ case "$SCANNER" in
     exit 1
     ;;
 esac
+
+# One self-contained folder per run, in the workspace folder; never overwrite an earlier run.
+RUN_ROOT="${SECURITY_RUN_ROOT:-$PWD}"
+RUN_STAMP="$(date +%Y%m%d-%H%M%S)"
+OUTPUT_BASE="$RUN_ROOT/security-run-$RUN_STAMP"
+n=2
+while [[ -e "$OUTPUT_BASE" ]]; do OUTPUT_BASE="$RUN_ROOT/security-run-$RUN_STAMP-$n"; n=$((n+1)); done
+mkdir -p "$OUTPUT_BASE" "$CACHE_BASE"
+printf '*\n' > "$OUTPUT_BASE/.gitignore"   # keeps the run folder out of git without touching the repo's .gitignore
+RUN_DIR="$OUTPUT_BASE"
+
+echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "  🔐 Security Scan — team: ${TEAM} | org: ${ORG}"
+echo "  Scanners : ${SCANNER}"
+echo "  Repos    : ${REPOS_TO_SCAN[*]:-(none)}"
+[[ $HOST_MODE -eq 1 ]] && echo "  Host     : this machine (Shai-Hulud check)"
+echo "  Run      : ${OUTPUT_BASE}/"
+echo "  Cache    : ${CACHE_BASE}/"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
 
 [[ $HOST_MODE -eq 1 ]] && run_shai_hulud_host
 
@@ -525,26 +546,34 @@ fi
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
 
-# ─── HTML REPORT ──────────────────────────────────────────────────────────────
-generate_html_report() {
-  local report_path="$OUTPUT_BASE/security-report.html"
+# ─── REPORTS (Markdown + JSON + HTML) ─────────────────────────────────────────
+generate_reports() {
   echo ""
-  echo "  Generating HTML report..."
-  python3 "$SKILL_DIR/scripts/generate-report.py" \
-    --results-dir "$OUTPUT_BASE" \
-    --config      "$CONFIG_PATH" \
-    --output      "$report_path" \
-    --workspace   "$(pwd)" \
-    2>/dev/null
-  if [[ -f "$report_path" ]]; then
-    echo "  ✅ Report ready → $report_path"
-    # Auto-open on macOS
-    if [[ "$(uname -s)" == "Darwin" ]]; then
-      open "$report_path" 2>/dev/null || true
+  echo "  Generating reports..."
+  if python3 "$SKILL_DIR/scripts/generate-report.py" \
+      --results-dir "$RUN_DIR" \
+      --out-dir     "$RUN_DIR" \
+      --config      "$CONFIG_PATH" \
+      --workspace   "$PWD" \
+      --repos-root  "$WORKSPACE" \
+      --home        "$HOME" \
+      >"$RUN_DIR/report.log" 2>&1; then
+    echo "  ✅ Markdown → $RUN_DIR/security-report.md"
+    echo "  ✅ JSON     → $RUN_DIR/security-report.json"
+    echo "  ✅ HTML     → $RUN_DIR/security-report.html"
+    if [[ "$(uname -s)" == "Darwin" && -z "${CI:-}" ]]; then
+      open "$RUN_DIR/security-report.html" 2>/dev/null || true
     fi
+  else
+    echo "  🟡 Report generation failed - see $RUN_DIR/report.log"
+    [[ $GLOBAL_EXIT -lt 1 ]] && GLOBAL_EXIT=1
   fi
 }
 
-generate_html_report
+generate_reports
+
+echo ""
+echo "  📁 Run folder: $RUN_DIR"
+echo ""
 
 exit $GLOBAL_EXIT

@@ -81,18 +81,22 @@ bash job-security-scan/scripts/run-scan.sh --scanner trivy
 
 ### 4. Review Results
 
-Results are saved to `.security-scan-results/` by default:
+Every run creates its own folder in the workspace folder, so earlier runs are never overwritten:
 
 ```
-.security-scan-results/
-├── report.json           # Structured full report
-├── summary.txt           # Human-readable summary
-└── <repo-name>/
-    ├── gitleaks.json
-    ├── trivy.json
-    ├── semgrep.json
-    └── hadolint.json
+security-run-20261102-153600/
+├── security-report.md     # summary + findings, each with file:line and the line of code
+├── security-report.json   # same data, machine-readable
+├── security-report.html   # interactive report
+├── .gitignore             # "*" - never committed by accident
+└── <repo-name>/           # raw tool output: gitleaks.json, trivy.json, semgrep.json, osv.json, shai-hulud.json ...
 ```
+
+Secrets are reported with file and line only, never the value. The skill only reports — it never changes code.
+
+Caches (vendor advisories, refreshed indicators) live in `~/.cache/job-security-scan`, not in the workspace;
+set `cache-dir:` in `repository.md` or `JOB_SECURITY_SCAN_CACHE` to move them. An old `.security-scan-results/`
+folder from earlier versions is no longer used and can be deleted.
 
 ## Detailed Features
 
@@ -229,7 +233,7 @@ repos:
     active: false
 
 fail-on-severity: HIGH
-output-dir: .security-scan-results
+# cache-dir: .scan-cache          # optional; default ~/.cache/job-security-scan
 secret-allowlist-paths:
   - '**/.env.example'
   - '**/example/**'
@@ -261,8 +265,8 @@ secret-allowlist-paths:
 cd my-workspace
 bash job-security-scan/scripts/run-scan.sh
 
-# Results in .security-scan-results/report.json
-cat .security-scan-results/summary.txt
+# Reports in the newest security-run-<datetime>/ folder
+cat "$(ls -1d security-run-* | tail -1)/security-report.md"
 ```
 
 ### Example 2: CI/CD Integration
@@ -277,13 +281,21 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - name: Run security scan
-        run: bash .github/skills/job-security-scan/scripts/run-scan.sh
-      - name: Upload results
-        uses: actions/upload-artifact@v3
+      - uses: actions/cache@v4            # optional: reuse vendor advisories between runs
         with:
-          name: security-results
-          path: .security-scan-results/
+          path: .scan-cache
+          key: job-security-scan-${{ github.run_id }}
+          restore-keys: job-security-scan-
+      - name: Run security scan
+        env:
+          JOB_SECURITY_SCAN_CACHE: .scan-cache
+        run: bash .github/skills/job-security-scan/scripts/run-scan.sh
+      - name: Upload reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-reports
+          path: security-run-*/
 ```
 
 ### Example 3: Single-Repo Scan
@@ -313,7 +325,7 @@ bash job-security-scan/scripts/run-scan.sh --scanner shai-hulud --host
 python3 -I job-security-scan/scripts/shai-hulud-scan.py --repo ./my-service
 
 # Refresh indicators from the published lists (optional; used automatically)
-python3 -I job-security-scan/scripts/fetch-iocs.py --out .security-scan-results/.ioc-cache
+python3 -I job-security-scan/scripts/fetch-iocs.py --out ~/.cache/job-security-scan/ioc
 ```
 
 In CI, add a step before `npm ci` so a compromised release fails the build before its install hook runs:
@@ -390,7 +402,8 @@ bash job-security-scan/scripts/run-scan.sh  # Re-downloads DB
 
 ## Version History
 
-- **v2.2** (current) — Shai-Hulud supply-chain worm check (`--scanner shai-hulud`, `--host` laptop mode)
+- **v2.3** (current) — Per-run `security-run-<datetime>/` folder with Markdown, JSON and HTML reports; every finding located to file, line and code; caches moved out of the workspace; report-only rule
+- **v2.2** — Shai-Hulud supply-chain worm check (`--scanner shai-hulud`, `--host` laptop mode)
 - **v2.1** — Runtime and image checks
 - **v2.0** — Multi-tool unified pipeline, config-driven, zero-install for free tools
 - **v1.0** — Gitleaks-only security scan

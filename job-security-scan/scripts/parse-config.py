@@ -152,6 +152,10 @@ if __name__ == "__main__":
         if legacy in data:
             print("WARNING: '%s' in %s is deprecated - %s. Remove it; support will be dropped in a future release."
                   % (legacy, filepath, why), file=sys.stderr)
+    if "output-dir" in data and "cache-dir" not in data:
+        print("WARNING: 'output-dir' in %s is deprecated - reports now go to security-run-<datetime>/ in the workspace "
+              "folder and this folder is only used for caches. Rename it to 'cache-dir' (or remove it to use "
+              "~/.cache/job-security-scan)." % filepath, file=sys.stderr)
 
     # Computed keys
     data["active-repos"]       = active_repos(data)
@@ -167,7 +171,8 @@ if __name__ == "__main__":
             print(val)
     else:
         # Shell-sourceable output
-        scalar_keys = ["team", "org", "monorepo-root", "ci-runner", "package-manager", "fail-on-severity", "output-dir"]
+        scalar_keys = ["team", "org", "monorepo-root", "ci-runner", "package-manager", "fail-on-severity", "output-dir",
+                       "cache-dir"]
         list_keys   = ["active-repos", "dockerfile-repos", "semgrep-rulesets", "ci-branches", "allowlist-paths"]
 
         for k in scalar_keys:

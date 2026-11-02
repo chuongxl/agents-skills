@@ -47,8 +47,8 @@ CLEAN=(clean native-build husky-prepare)
 
 CONFIG="$WORK/repository.md"
 {
-  printf -- '---\nteam: e2e\norg: e2e\nmonorepo-root: "%s"\nci-runner: x\nfail-on-severity: HIGH\noutput-dir: "%s"\nrepos:\n' \
-    "$FIX" "$WORK/out"
+  printf -- '---\nteam: e2e\norg: e2e\nmonorepo-root: "%s"\nci-runner: x\nfail-on-severity: HIGH\nrepos:\n' \
+    "$FIX"
   for r in "${AFFECTED[@]}" "${SUSPICIOUS[@]}" "${CLEAN[@]}"; do
     printf '  - name: %s\n    active: true\n    has-dockerfile: false\n' "$r"
   done
@@ -67,12 +67,12 @@ printf -- '-----BEGIN OPENSSH PRIVATE KEY-----\nAAAA\n-----END OPENSSH PRIVATE K
 chmod 0644 "$HOME_DIR/.ssh/id_ed25519"
 
 echo "== real run-scan.sh --scanner shai-hulud --host"
-( cd "$WORK" && HOME="$HOME_DIR" NPM_CONFIG_PREFIX="" SHAI_HULUD_IOCS="$IOCS" \
+( cd "$WORK" && HOME="$HOME_DIR" NPM_CONFIG_PREFIX="" SHAI_HULUD_IOCS="$IOCS" JOB_SECURITY_SCAN_CACHE="$WORK/cache" \
     bash "$SKILL_DIR/scripts/run-scan.sh" --config "$CONFIG" --scanner shai-hulud --host ) >"$WORK/scan.log" 2>&1
 RC=$?
 cat "$WORK/scan.log"
 
-OUT="$WORK/out"
+OUT="$(ls -1d "$WORK"/security-run-* 2>/dev/null | tail -1)"
 echo "== assertions"
 check "run-scan exits 2 when anything is affected"  test "$RC" -eq 2
 for r in "${AFFECTED[@]}";   do check "repo $r: affected"   verdict_is "$OUT/$r/shai-hulud.json" affected;   done
@@ -87,6 +87,13 @@ check "HTML report written"                         test -s "$OUT/security-repor
 check "HTML report has shai-hulud rows"             grep -q 'shai-hulud' "$OUT/security-report.html"
 check "HTML report shows this machine"              grep -q 'this machine' "$OUT/security-report.html"
 check "HTML report names the worm release"          grep -q '@accordproject/concerto-linter' "$OUT/security-report.html"
+check "run folder in the workspace folder"          test -n "$OUT" -a -d "$OUT"
+check "run folder keeps itself out of git"          grep -qx '[*]' "$OUT/.gitignore"
+check "no cache folder in the workspace"            test ! -e "$WORK/.security-scan-results"
+check "Markdown report written"                     test -s "$OUT/security-report.md"
+check "JSON report written"                         test -s "$OUT/security-report.json"
+check "Markdown shows file:line for the worm release" grep -q 'package-lock.json:6' "$OUT/security-report.md"
+check "every file finding located; no code on secret/credential rows" python3 -I "$HERE/assert-located.py" "$OUT/security-report.json"
 check "no secret value anywhere in output"          bash -c "! grep -rq 'E2EFAKETOKEN' '$OUT' '$WORK/scan.log'"
 
 echo

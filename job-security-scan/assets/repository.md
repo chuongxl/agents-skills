@@ -52,8 +52,11 @@ secret-allowlist-paths:
 # Options: CRITICAL | HIGH | MEDIUM | LOW
 fail-on-severity: HIGH
 
-# Output directory for scan results (relative to workspace root)
-output-dir: ".security-scan-results"
+# Reports: every run writes security-run-<datetime>/ (Markdown + JSON + HTML + raw output)
+# in the folder run-scan.sh is run from. Nothing to configure.
+# Caches (vendor advisories, indicator refresh) default to ~/.cache/job-security-scan.
+# Uncomment to keep them elsewhere, e.g. a folder your CI saves between runs:
+# cache-dir: ".scan-cache"
 ---
 
 # Security Scan — Repository Configuration

@@ -1,9 +1,14 @@
 #!/usr/bin/env python3
 """
-generate-report.py — Generate a self-contained HTML security report.
+generate-report.py — Generate the security reports (Markdown, JSON, HTML) for one scan run.
 
 Usage:
-  python3 generate-report.py --results-dir DIR --config repository.md [--output report.html] [--workspace PATH]
+  python3 generate-report.py --results-dir DIR --config repository.md --out-dir DIR
+                             [--repos-root PATH] [--home PATH] [--workspace PATH]
+  python3 generate-report.py --results-dir DIR --config repository.md --output report.html   (HTML only)
+
+Every finding is located to file + line + one line of code (secrets: file + line only).
+The reports describe findings; they never change code.
 
 Reads JSON output from all scanners under results-dir/{repo}/ and produces
 a single self-contained HTML file with:
@@ -22,6 +27,11 @@ import argparse
 import html
 from datetime import datetime
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent / "lib"))
+
+import report_formats  # noqa: E402
+import report_locate   # noqa: E402
 
 
 # ─── Config Parser ────────────────────────────────────────────────────────────
@@ -220,6 +230,50 @@ def parse_hadolint(repo, results_dir, workspace):
     return findings
 
 
+_GHSA_LABELS = {"CRITICAL": "CRITICAL", "HIGH": "HIGH", "MODERATE": "MEDIUM", "MEDIUM": "MEDIUM", "LOW": "LOW"}
+
+
+def _score_to_severity(score):
+    if score >= 9.0:
+        return "CRITICAL"
+    if score >= 7.0:
+        return "HIGH"
+    if score >= 4.0:
+        return "MEDIUM"
+    return "LOW"
+
+
+def _osv_group_scores(groups):
+    """{vuln id or alias: numeric max_severity} from osv-scanner's groups (v1.x and v2)."""
+    out = {}
+    for g in groups if isinstance(groups, list) else []:
+        if not isinstance(g, dict):
+            continue
+        try:
+            score = float(g.get("max_severity") or "")
+        except (TypeError, ValueError):
+            continue
+        for ident in g.get("ids") or []:
+            out[ident] = score
+    return out
+
+
+def _osv_severity(vuln, group_scores):
+    """Severity from osv-scanner's numeric group score, else a numeric CVSS score, else the advisory's own
+    label (GHSA database_specific.severity), else MEDIUM. CVSS vectors ('CVSS:3.1/AV:N/...') are not scores."""
+    for ident in [vuln.get("id")] + list(vuln.get("aliases") or []):
+        if ident in group_scores:
+            return _score_to_severity(group_scores[ident])
+    for entry in vuln.get("severity") if isinstance(vuln.get("severity"), list) else []:
+        try:
+            return _score_to_severity(float(str(entry.get("score", ""))))
+        except (AttributeError, TypeError, ValueError):
+            continue
+    label = str((vuln.get("database_specific") or {}).get("severity", "")).upper() \
+        if isinstance(vuln.get("database_specific"), dict) else ""
+    return _GHSA_LABELS.get(label, "MEDIUM")
+
+
 def parse_osv(repo, results_dir, workspace):
     """Parse osv-scanner JSON output."""
     findings = []
@@ -235,15 +289,9 @@ def parse_osv(repo, results_dir, workspace):
         source = result.get("source", {}).get("path", "yarn.lock")
         for pkg in result.get("packages", []):
             pkg_info = pkg.get("package", {})
+            group_scores = _osv_group_scores(pkg.get("groups"))
             for vuln in pkg.get("vulnerabilities", []):
-                sev = "MEDIUM"
-                for severity in vuln.get("severity", []):
-                    if severity.get("type") == "CVSS_V3":
-                        score = float(severity.get("score", "0").split("/")[0] if "/" in severity.get("score","") else "0")
-                        if score >= 9.0:   sev = "CRITICAL"
-                        elif score >= 7.0: sev = "HIGH"
-                        elif score >= 4.0: sev = "MEDIUM"
-                        else:              sev = "LOW"
+                sev = _osv_severity(vuln, group_scores)
                 findings.append({
                     "repo": repo,
                     "scanner": "osv",
@@ -394,6 +442,7 @@ def parse_shai_hulud(repo, results_dir, workspace):
             "title": f.get("title", ""),
             "description": " - ".join(parts)[:300],
             "url": "",
+            "evidence": f.get("evidence", ""),
             "workspace": workspace,
         })
     return findings
@@ -405,7 +454,11 @@ def collect_findings(results_dir, repos, workspace):
     all_findings = []
     for repo in repos:
         for parser in parsers:
-            all_findings.extend(parser(repo, results_dir, workspace))
+            try:
+                all_findings.extend(parser(repo, results_dir, workspace))
+            except Exception as exc:  # one unexpected tool output must not cost the whole report
+                sys.stderr.write("  warning: %s could not read %s output: %s: %s\n"
+                                 % (parser.__name__, repo, type(exc).__name__, exc))
     all_findings.sort(key=lambda f: (severity_order(f["severity"]), f["repo"], f["scanner"]))
     return all_findings
 
@@ -531,6 +584,8 @@ def build_html(findings, config, results_dir, output_path, org):
 
             # File link cell
             file_html = file_link(f, org, repo) or '<span style="color:var(--text3)">—</span>'
+            if f.get("code"):
+                file_html += f'<div class="code-excerpt"><code>{html.escape(f["code"])}</code></div>'
 
             # CVE/Rule ID cell
             id_html = cve_link(f["rule_id"], f["url"]) or '<span style="color:var(--text3)">—</span>'
@@ -576,41 +631,75 @@ def build_html(findings, config, results_dir, output_path, org):
 
 # ─── Main ─────────────────────────────────────────────────────────────────────
 
+def discover_repos(results_dir):
+    """Repo result folders in a run folder (hidden folders and loose files are not repos)."""
+    d = Path(results_dir)
+    return sorted(x.name for x in d.iterdir() if x.is_dir() and not x.name.startswith(".")) if d.exists() else []
+
+
 def main():
-    ap = argparse.ArgumentParser(description="Generate HTML security report")
-    ap.add_argument("--results-dir", required=True,   help="Directory containing scanner JSON outputs")
+    ap = argparse.ArgumentParser(description="Generate the security reports for one scan run")
+    ap.add_argument("--results-dir", required=True,   help="Directory containing scanner outputs ({repo}/...)")
     ap.add_argument("--config",      required=True,   help="Path to repository.md config file")
-    ap.add_argument("--output",      default="security-report.html", help="Output HTML file path")
-    ap.add_argument("--workspace",   default=".",     help="Monorepo workspace root for file links")
+    ap.add_argument("--out-dir",     default=None,    help="Write security-report.{md,json,html} here")
+    ap.add_argument("--output",      default=None,    help="HTML-only output file (legacy)")
+    ap.add_argument("--workspace",   default=".",     help="Workspace root for file links")
+    ap.add_argument("--repos-root",  default=None,    help="Folder holding the scanned repos (default: --workspace)")
+    ap.add_argument("--home",        default=None,    help="Home folder for host-mode (~/...) paths (default: $HOME)")
     args = ap.parse_args()
+    if not args.out_dir and not args.output:
+        args.output = "security-report.html"
 
     config    = parse_config(args.config)
     team      = config.get("team", "unknown")
     org       = config.get("org", "unknown")
     workspace = os.path.abspath(args.workspace)
+    repos_root = os.path.abspath(args.repos_root or args.workspace)
+    home       = os.path.abspath(args.home or str(Path.home()))
 
-    # Discover repos from results dir
-    results_dir = Path(args.results_dir)
-    repos = sorted([d.name for d in results_dir.iterdir() if d.is_dir()]) if results_dir.exists() else []
-
-    print(f"\n  Generating HTML report for team [{team}] / org [{org}]")
+    repos = discover_repos(args.results_dir)
+    print(f"\n  Generating reports for team [{team}] / org [{org}]")
     print(f"  Repos found in results: {repos}")
 
     findings = collect_findings(args.results_dir, repos, workspace)
-    print(f"  Total findings parsed: {len(findings)}")
+    report_locate.apply(findings, repos_root, home)
+    located = sum(1 for f in findings if f.get("line"))
+    print(f"  Total findings parsed: {len(findings)} ({located} located to a line)")
 
-    output_path = build_html(findings, config, args.results_dir, args.output, org)
+    outputs = []
+    if args.out_dir:
+        out_dir = Path(args.out_dir)
+        out_dir.mkdir(parents=True, exist_ok=True)
+        meta = {
+            "team": team, "org": org, "config": os.path.abspath(args.config),
+            "run_dir": str(out_dir.resolve()),
+            "scanners": sorted({f["scanner"] for f in findings}),
+            "repos": [HOST_LABEL if r == HOST_RESULTS else r for r in repos],
+            "skipped": [],
+            "generated_at": datetime.now().astimezone().isoformat(timespec="seconds"),
+        }
+        (out_dir / "security-report.json").write_text(
+            json.dumps(report_formats.build_json(findings, meta), indent=2) + "\n", encoding="utf-8")
+        (out_dir / "security-report.md").write_text(report_formats.build_markdown(findings, meta), encoding="utf-8")
+        outputs += [out_dir / "security-report.md", out_dir / "security-report.json"]
+        outputs.append(Path(build_html(findings, config, args.results_dir, str(out_dir / "security-report.html"), org)))
+    if args.output:
+        outputs.append(Path(build_html(findings, config, args.results_dir, args.output, org)))
 
-    # Summary to stdout
     counts = {"CRITICAL": 0, "HIGH": 0, "MEDIUM": 0, "LOW": 0}
     for f in findings:
         sev = f["severity"].upper()
         if sev in counts:
             counts[sev] += 1
-
     print(f"\n  Summary: CRITICAL={counts['CRITICAL']} HIGH={counts['HIGH']} MEDIUM={counts['MEDIUM']} LOW={counts['LOW']}")
-    print(f"  Open:    open {output_path}\n")
+    for o in outputs:
+        print(f"  Report:  {o}")
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        sys.exit(main())
+    except Exception as exc:  # surface any failure to run-scan.sh, never a silent empty report
+        sys.stderr.write("generate-report: failed: %s: %s\n" % (type(exc).__name__, exc))
+        sys.exit(1)

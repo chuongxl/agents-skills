@@ -585,16 +585,21 @@ class IntegrationTests(TempDirCase):
     def config(self, repos=FIXTURE_REPOS):
         body = "".join("  - name: %s\n    active: true\n    has-dockerfile: false\n" % n for n in repos)
         return self.put("repository.md", '---\nteam: t\norg: o\nmonorepo-root: "%s"\nci-runner: x\n'
-                        'fail-on-severity: HIGH\noutput-dir: "%s"\nrepos:\n%s---\n' % (FIX, self.tmp / "out", body))
+                        'fail-on-severity: HIGH\nrepos:\n%s---\n' % (FIX, body))
 
     def run_scan(self, *args, env=None):
-        e = dict(os.environ)
+        e = dict(os.environ, JOB_SECURITY_SCAN_CACHE=str(self.tmp / "cache"))
         e.update(env or {})
         return subprocess.run(["bash", str(RUN_SCAN)] + [str(a) for a in args], stdout=subprocess.PIPE,
                               stderr=subprocess.PIPE, universal_newlines=True, cwd=str(self.tmp), env=e)
 
+    def run_dir(self):
+        runs = sorted(self.tmp.glob("security-run-*"))
+        self.assertTrue(runs, "no security-run-* folder")
+        return runs[-1]
+
     def verdict(self, repo):
-        return json.loads((self.tmp / "out" / repo / "shai-hulud.json").read_text())["verdict"]
+        return json.loads((self.run_dir() / repo / "shai-hulud.json").read_text())["verdict"]
 
     def test_scanner_over_fixture_repos(self):
         r = self.run_scan("--config", self.config(), "--scanner", "shai-hulud")
@@ -603,23 +608,23 @@ class IntegrationTests(TempDirCase):
         self.assertEqual(self.verdict("suspicious-hook"), "suspicious")
         self.assertEqual(self.verdict("clean"), "clean")
         self.assertIn("AFFECTED", r.stdout)
-        html = (self.tmp / "out" / "security-report.html").read_text()
+        html = (self.run_dir() / "security-report.html").read_text()
         self.assertIn("shai-hulud", html)
         self.assertIn("@accordproject/concerto-linter", html)
 
     def test_single_repo_flag(self):
         r = self.run_scan("--config", self.config(), "--scanner", "shai-hulud", "--repo", "clean")
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
-        self.assertFalse((self.tmp / "out" / "infected-lockfile").exists())
+        self.assertFalse((self.run_dir() / "infected-lockfile").exists())
 
     def test_host_flag_without_config(self):
         home = self.tmp / "home"
         shutil.copytree(str(FIX / "infected-lockfile"), str(home / "app"))
         r = self.run_scan("--host", env={"HOME": str(home), "NPM_CONFIG_PREFIX": ""})
         self.assertEqual(r.returncode, 2, r.stdout + r.stderr)
-        doc = json.loads((self.tmp / ".security-scan-results" / "_host" / "shai-hulud.json").read_text())
+        doc = json.loads((self.run_dir() / "_host" / "shai-hulud.json").read_text())
         self.assertEqual(doc["verdict"], "affected")
-        html = (self.tmp / ".security-scan-results" / "security-report.html").read_text()
+        html = (self.run_dir() / "security-report.html").read_text()
         self.assertIn("this machine", html)
 
     def test_unknown_scanner_message_lists_shai_hulud(self):
