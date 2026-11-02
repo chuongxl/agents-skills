@@ -7,7 +7,7 @@ from pathlib import Path
 from . import MAX_SCAN_BYTES
 from .findings import make_finding
 from .heuristics import analyze_manifest
-from .hooks import hook_target, install_hooks, read_text
+from .hooks import hook_targets, install_hooks, read_text
 from .inventory import iter_manifests, iter_packages, prune
 
 PAYLOAD_DEPTH = 2
@@ -87,8 +87,7 @@ def check_manifest_files(root, ioc, pkg_dir, manifest):
                                     "Shai-Hulud %s file in package" % spec["kind"],
                                     package=name, version=version, wave=spec["wave"]))
     for hook, command in install_hooks(manifest):
-        target = hook_target(pkg_dir, command)
-        if target is not None:
+        for target in hook_targets(pkg_dir, command):
             out.extend(_marker_findings(root, ioc, target, read_text(target)))
     return out
 

@@ -23,17 +23,30 @@ def install_hooks(manifest):
     return out
 
 
-def hook_target(pkg_dir, command):
-    """The script file a hook command runs, resolved inside pkg_dir only; None if none/outside."""
-    m = _TARGET.search(command)
-    if not m:
-        return None
+_REQUIRE = re.compile(r"""\b(?:require|import)\s*\(\s*['"](\.{1,2}/[^'"]+)['"]""")
+_RESOLVE_SUFFIXES = ("", ".js", ".cjs", ".mjs", "/index.js")
+
+
+def _inside(base, rel):
+    path = os.path.realpath(os.path.join(base, rel))
+    return path if path.startswith(base + os.sep) else None
+
+
+def hook_targets(pkg_dir, command):
+    """Every script file a hook command runs: *.js/.cjs/.mjs/.sh tokens and require()/import() paths
+    (node -e "require('./x')"), resolved inside pkg_dir only, de-duplicated, in order."""
     base = os.path.realpath(str(pkg_dir))
-    path = os.path.realpath(os.path.join(base, m.group(1)))
-    if path != base and not path.startswith(base + os.sep):
-        return None
-    p = Path(path)
-    return p if p.is_file() and not p.is_symlink() else None
+    found = []
+    candidates = [(m.start(), [m.group(1)]) for m in _TARGET.finditer(command)]
+    candidates += [(m.start(), [m.group(1) + sfx for sfx in _RESOLVE_SUFFIXES]) for m in _REQUIRE.finditer(command)]
+    for _pos, options in sorted(candidates, key=lambda c: c[0]):
+        for rel in options:
+            path = _inside(base, rel)
+            if path and os.path.isfile(path) and not os.path.islink(path):
+                if path not in found:
+                    found.append(path)
+                break
+    return [Path(p) for p in found]
 
 
 def read_text(path, limit=MAX_SCAN_BYTES):

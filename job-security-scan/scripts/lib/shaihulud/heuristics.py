@@ -9,7 +9,7 @@ import re
 
 from . import MAX_SCAN_BYTES
 from .findings import make_finding
-from .hooks import hook_target, install_hooks, read_text
+from .hooks import hook_targets, install_hooks, read_text
 from .iocs import is_allowed
 
 PIPE_SHELL = re.compile(r"\b(?:curl|wget)\b[^|;&]*\|\s*(?:sudo\s+)?(?:ba|z|da)?sh\b")
@@ -61,34 +61,36 @@ def analyze_manifest(pkg_dir, manifest, allowlist, repo_root, ioc=None):
         if PIPE_SHELL.search(command):
             add("HIGH", "hook-pipe-shell", manifest_loc, "Install hook '%s' pipes a download into a shell" % hook,
                 command)
-        target = hook_target(pkg_dir, command)
-        if target is None:
-            continue
-        if ioc is not None and target.name in ioc.files and not ioc.files[target.name]["sha256"]:
-            continue  # a listed payload: tier 1 already reports it
-        loc = _rel(repo_root, target)
-        try:
-            size = os.path.getsize(str(target))
-        except OSError:
-            continue
-        if size > MAX_SCAN_BYTES:
-            add("LOW", "large-hook-target", loc, "Install hook '%s' runs a file too large to scan" % hook,
-                "%s (%d MB)" % (target.name, size // (1024 * 1024)))
-            continue
-        text = read_text(target)
-        if text is None:
-            continue
-        src, sink = SECRET_SOURCES.search(text), EXFIL_SINKS.search(text)
-        if src and sink:
-            add("HIGH", "hook-exfil", loc,
-                "Install hook '%s' reads credentials and sends data out" % hook,
-                "%s ... %s" % (_snippet(text, src), _snippet(text, sink)))
-        blob = OBFUSCATED_BLOB.search(text)
-        if blob and DYNAMIC_EVAL.search(text):
-            add("MEDIUM", "hook-obfuscated", loc, "Install hook '%s' runs heavily obfuscated code" % hook,
-                "%d-char encoded blob + dynamic eval" % len(blob.group(0)))
-        dl = RUNTIME_DOWNLOAD.search(text)
-        if dl:
-            add("MEDIUM", "hook-runtime-download", loc,
-                "Install hook '%s' downloads a runtime or secret scanner" % hook, _snippet(text, dl))
+        for target in hook_targets(pkg_dir, command):
+            _analyze_target(add, hook, target, repo_root, ioc)
     return out
+
+
+def _analyze_target(add, hook, target, repo_root, ioc):
+    if ioc is not None and target.name in ioc.files and not ioc.files[target.name]["sha256"]:
+        return  # a listed payload: tier 1 already reports it
+    loc = _rel(repo_root, target)
+    try:
+        size = os.path.getsize(str(target))
+    except OSError:
+        return
+    if size > MAX_SCAN_BYTES:
+        add("LOW", "large-hook-target", loc, "Install hook '%s' runs a file too large to scan" % hook,
+            "%s (%d MB)" % (target.name, size // (1024 * 1024)))
+        return
+    text = read_text(target)
+    if text is None:
+        return
+    src, sink = SECRET_SOURCES.search(text), EXFIL_SINKS.search(text)
+    if src and sink:
+        add("HIGH", "hook-exfil", loc,
+            "Install hook '%s' reads credentials and sends data out" % hook,
+            "%s ... %s" % (_snippet(text, src), _snippet(text, sink)))
+    blob = OBFUSCATED_BLOB.search(text)
+    if blob and DYNAMIC_EVAL.search(text):
+        add("MEDIUM", "hook-obfuscated", loc, "Install hook '%s' runs heavily obfuscated code" % hook,
+            "%d-char encoded blob + dynamic eval" % len(blob.group(0)))
+    dl = RUNTIME_DOWNLOAD.search(text)
+    if dl:
+        add("MEDIUM", "hook-runtime-download", loc,
+            "Install hook '%s' downloads a runtime or secret scanner" % hook, _snippet(text, dl))

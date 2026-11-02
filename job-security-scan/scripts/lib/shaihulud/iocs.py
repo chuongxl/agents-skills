@@ -137,5 +137,11 @@ def load_allowlist(path=None):
     return [AllowRule(e["command"], e.get("packages")) for e in data.get("entries", [])]
 
 
+_SEGMENTS = re.compile(r"\s*(?:&&|\|\||;|\||&)\s*")
+
+
 def is_allowed(rules, command, package_name):
-    return any(r.matches(command, package_name) for r in rules)
+    """True only when every segment of a chained command (&&, ||, ;, |, &) is allowlisted, so
+    'husky && node evil.js' is not waved through by its benign prefix."""
+    segments = [seg for seg in _SEGMENTS.split(command.strip()) if seg]
+    return bool(segments) and all(any(r.matches(seg, package_name) for r in rules) for seg in segments)

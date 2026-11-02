@@ -208,3 +208,28 @@ contains this file is not entered. The scan root itself is never skipped (tests 
   clean) and `test_host_with_vendored_skill_is_clean`; `test_marker_only_applies_below_root`.
 - [ ] **Step 2: Run** → FAIL. **Step 3: Implement.** **Step 4: Run** all suites + e2e → PASS.
 - [ ] **Step 5: Commit** `fix(shai-hulud): skip the skill's own test fixtures`.
+
+### Task 12 (added during verification): Close two tier-2 evasion paths
+
+Found in Task 10 against a real 658-package npm tree (`esbuild sharp puppeteer @swc/core prisma electron
+cypress nx core-js undici ...`, installed with `--ignore-scripts`): zero false positives, but
+(a) the allowlist matched by command *prefix*, so `husky && node evil.js` skipped analysis (undici's real
+hook has this shape); (b) only the first script in a hook was analysed, and `node -e "require('./x')"`
+(core-js, nx) was not followed.
+
+**Files:** Modify `scripts/lib/shaihulud/iocs.py` (`is_allowed`), `hooks.py` (`hook_targets` replaces `hook_target`),
+`heuristics.py`, `scanner.py`.
+
+**Interfaces:** `iocs.is_allowed(rules, command, package_name) -> bool` is True only when *every* segment of the
+command (split on `&&`, `||`, `;`, `|`, `&`) matches a rule. `hooks.hook_targets(pkg_dir, command) -> List[Path]`:
+every `*.js|cjs|mjs|sh` token plus `require('<rel>')` / `import('<rel>')` paths (resolved with `.js`, `.cjs`,
+`.mjs`, `/index.js`), inside `pkg_dir` only, de-duplicated, in order.
+
+- [ ] **Step 1: Write failing tests** `HeuristicTests.test_chained_allowlisted_prefix_is_not_a_bypass`
+  (`husky && node setup.js` with an exfil target → `hook-exfil`), `test_every_target_in_a_hook_is_checked`
+  (`node ok.js && node setup.js`), `test_node_e_require_target_followed` (`node -e "try{require('./setup')}catch(e){}"`),
+  `IocTests.test_allowlist_requires_every_segment` (`prebuild-install -r napi || node-gyp rebuild` allowed,
+  `husky && node x.js` not).
+- [ ] **Step 2: Run** → FAIL. **Step 3: Implement.** **Step 4: Run** all suites, e2e, and the real npm tree → no
+  findings there, all green.
+- [ ] **Step 5: Commit** `fix(shai-hulud): close allowlist-prefix and multi-target evasion`.
