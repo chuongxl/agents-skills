@@ -59,22 +59,24 @@
 
 ### Task 3: run-scan.sh run folder
 
-**Files:** Modify `job-security-scan/scripts/run-scan.sh`; Modify tests that read raw output from `output-dir`: `scripts/test-ecosystems.py`, `scripts/test-engine.py`, `scripts/test-shai-hulud.py`; Test `scripts/test-reports.py` (`RunFolderTests`).
+**Files:** Modify `job-security-scan/scripts/run-scan.sh`, `job-security-scan/scripts/parse-config.py`, `job-security-scan/assets/repository.md`; Modify tests that read raw output from `output-dir`: `scripts/test-ecosystems.py`, `scripts/test-engine.py`, `scripts/test-shai-hulud.py`; Test `scripts/test-reports.py` (`RunFolderTests`).
 
 **Interfaces:**
-- `RUN_DIR` created before any scanner; all per-repo raw outputs `"$RUN_DIR/$repo/..."`, host `"$RUN_DIR/_host/..."`; caches and fetch logs stay under `"$OUTPUT_BASE"`. `RUN_DIR/.gitignore` = `*`. Gitleaks gets `--redact`.
+- `RUN_DIR` created before any scanner; all per-repo raw outputs `"$RUN_DIR/$repo/..."`, host `"$RUN_DIR/_host/..."`, logs in `"$RUN_DIR"`. `RUN_DIR/.gitignore` = `*`. Gitleaks gets `--redact`.
+- `CACHE_DIR` precedence: `$JOB_SECURITY_SCAN_CACHE` > config `cache-dir` > deprecated config `output-dir` (warning on stderr) > `${XDG_CACHE_HOME:-$HOME/.cache}/job-security-scan`. Advisories `"$CACHE_DIR/advisories"`, IOC refresh `"$CACHE_DIR/ioc/shai-hulud.json"`. `parse-config.py` exports `CACHE_DIR` and warns on `output-dir`; `assets/repository.md` drops `output-dir` (commented `cache-dir` example instead).
+- Tests set `JOB_SECURITY_SCAN_CACHE` and `SECURITY_RUN_ROOT` to temp dirs (never the real home).
 - Report step: `generate-report.py --results-dir "$RUN_DIR" --out-dir "$RUN_DIR" --config … --workspace "$PWD" --repos-root "$WORKSPACE" --home "$HOME"`; stderr kept in `$RUN_DIR/report.log`; failure → `🟡 report generation failed - see …` and exit ≥ 1.
 - Final line: `📁 Run folder: $RUN_DIR`.
 - Test helper (in each affected test): find the newest `security-run-*` under the test's `SECURITY_RUN_ROOT`.
 
-- [ ] **Step 1: Write failing tests** `RunFolderTests` (stub tools on PATH as in test-ecosystems): `test_run_folder_with_three_reports_and_raw` (`--scanner shai-hulud` over two fixtures → `security-run-*/{security-report.md,json,html,.gitignore,<repo>/shai-hulud.json}`), `test_caches_stay_in_output_dir`, `test_same_second_gets_suffix` (pre-create the folder name for the frozen `date` via a stub `date` on PATH → new run uses `-2`), `test_host_only_and_clean_run_still_write_reports`, `test_gitleaks_called_with_redact`.
+- [ ] **Step 1: Write failing tests** `RunFolderTests` (stub tools on PATH as in test-ecosystems): `test_run_folder_with_three_reports_and_raw` (`--scanner shai-hulud` over two fixtures → `security-run-*/{security-report.md,json,html,.gitignore,<repo>/shai-hulud.json}`), `test_cache_dir_precedence` (env > cache-dir > output-dir with warning > XDG default) and `test_workspace_has_only_run_folder` (no `.security-scan-results` created), `test_same_second_gets_suffix` (pre-create the folder name for the frozen `date` via a stub `date` on PATH → new run uses `-2`), `test_host_only_and_clean_run_still_write_reports`, `test_gitleaks_called_with_redact`.
 - [ ] **Step 2: Run** → FAIL. **Step 3: Implement**; update the three existing test files to read raw output from the run folder.
 - [ ] **Step 4: Run** all suites → PASS; `bash -n` run-scan.sh.
 - [ ] **Step 5: Commit** `feat(job-security-scan): self-contained security-run folder per run`.
 
 ### Task 4: Docs, report-only rule, e2e scripts, version
 
-**Files:** Modify `job-security-scan/SKILL.md` (report-only rule, Output Format, paths), `job-security-scan/README.md`, `job-security-scan/references/ci-workflow.md` (artifact path `security-run-*/`), `job-security-scan/references/ioc-data.md` (cache path unchanged — verify), `job-security-scan/tests/e2e/run-e2e.sh`, `job-security-scan/tests/e2e/run-shai-hulud-e2e.sh` (read from run folder; add checks: three reports exist, every finding in JSON has `line`, no secret excerpt, no planted value in the folder), root `README.md` badge `v2.3`, root `.gitignore` `security-run-*/`, `AGENTS.md` gitignored-state line.
+**Files:** Modify `job-security-scan/SKILL.md` (report-only rule, Output Format, paths), `job-security-scan/README.md`, `job-security-scan/references/ci-workflow.md` (artifact path `security-run-*/`), `job-security-scan/references/ioc-data.md` and `references/advisory-data.md` (new cache paths; `fetch-iocs.py --out ~/.cache/job-security-scan/ioc`), README note that an old `.security-scan-results/` can be deleted by the user, `job-security-scan/tests/e2e/run-e2e.sh`, `job-security-scan/tests/e2e/run-shai-hulud-e2e.sh` (read from run folder; add checks: three reports exist, every finding in JSON has `line`, no secret excerpt, no planted value in the folder), root `README.md` badge `v2.3`, root `.gitignore` `security-run-*/`, `AGENTS.md` gitignored-state line.
 
 - [ ] **Step 1: Update e2e scripts; Step 2: run** `run-shai-hulud-e2e.sh` → all pass; `run-e2e.sh` if osv-scanner + trivy can be installed in this session, else rely on CI.
 - [ ] **Step 3: Update docs/version.** **Step 4: Run** `python3 tools/validate_skills.py && python3 tools/test_validate_skills.py && python3 -m compileall -q tools */scripts` and `bash -n` on all `*.sh` → exit 0.

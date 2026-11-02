@@ -12,8 +12,12 @@ and never offers or asks to fix anything.
 
 - Output per run: `security-run-{datetime}/` in the **workspace folder** (the folder `run-scan.sh` is run from),
   holding `security-report.md`, `security-report.json`, `security-report.html` **plus all raw per-tool output**
-  (self-contained). `.security-scan-results/` (the `output-dir` setting) keeps only shared caches
-  (`.advisory-cache`, `.ioc-cache`, fetch logs).
+  (self-contained).
+- Caches leave the workspace (Alex, 15:40): only `security-run-*` folders appear there, so users never confuse a
+  cache folder with a report folder. Caches live in `${XDG_CACHE_HOME:-~/.cache}/job-security-scan/`
+  (`advisories/`, `ioc/`), shared by every workspace on the machine; `cache-dir:` in `repository.md` or
+  `JOB_SECURITY_SCAN_CACHE` overrides it (CI). `output-dir` is deprecated: still honoured as the cache folder,
+  with a warning. An existing `.security-scan-results/` folder is left untouched (the skill never deletes).
 - Every finding carries **file + line + one line of code** (excerpt). **Secrets get file + line only, never an
   excerpt**, so no secret value lands in a report someone might share.
 - Report-only: remove any fix-offer behaviour; `SKILL.md` states it as a hard rule.
@@ -43,8 +47,10 @@ and never offers or asks to fix anything.
 
 - `run-scan.sh` creates `RUN_DIR="${SECURITY_RUN_ROOT:-$PWD}/security-run-$(date +%Y%m%d-%H%M%S)"`.
   `SECURITY_RUN_ROOT` is an override for CI and tests only; default is the workspace folder.
-- Raw outputs move from `<output-dir>/<repo>/…` to `RUN_DIR/<repo>/…` (host mode: `RUN_DIR/_host/`).
-  Caches stay in `<output-dir>/`.
+- Raw outputs move from `<output-dir>/<repo>/…` to `RUN_DIR/<repo>/…` (host mode: `RUN_DIR/_host/`);
+  run logs (advisory fetch log, report log) go into `RUN_DIR/` too.
+- `CACHE_DIR` = `$JOB_SECURITY_SCAN_CACHE` > `cache-dir:` > deprecated `output-dir:` > `${XDG_CACHE_HOME:-$HOME/.cache}/job-security-scan`;
+  advisories in `CACHE_DIR/advisories`, refreshed Shai-Hulud indicators in `CACHE_DIR/ioc/shai-hulud.json`.
 - `RUN_DIR/.gitignore` containing `*` keeps the folder out of git with no change to the user's own
   `.gitignore`. The repo's root `.gitignore` also gets `security-run-*/`.
 - Gitleaks runs with `--redact` so its raw JSON in the run folder holds no secret values.
