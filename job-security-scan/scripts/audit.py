@@ -473,6 +473,7 @@ def cmd_collect(run_dir, results_dir=None):
         else:
             entry["status"] = "not-run"
         ledger_units.append(entry)
+    by_repo = dict((repo, consolidate(cands)) for repo, cands in by_repo.items())
     repos = {u["repo"] for u in plan["units"]}
     for repo in repos:
         out = run_dir / repo / "code-audit.json"
@@ -487,12 +488,54 @@ def cmd_collect(run_dir, results_dir=None):
     counts = {}
     for e in ledger_units:
         counts[e["status"]] = counts.get(e["status"], 0) + 1
-    print("audit: %s; %d candidate(s); %d reply(ies) refused" % (
+    print("audit: %s; %d issue(s) from %d candidate report(s); %d reply(ies) refused" % (
         ", ".join("%d %s" % (n, s) for s, n in sorted(counts.items())),
-        sum(len(v) for v in by_repo.values()), len(rejected)))
+        sum(len(v) for v in by_repo.values()), sum(e.get("candidates", 0) for e in ledger_units), len(rejected)))
     for r in rejected:
         print("  refused %s (%s): %s" % (r["file"], r.get("unit") or "?", r["reason"]))
     return rc
+
+
+SEV_RANK = {"CRITICAL": 0, "HIGH": 1, "MEDIUM": 2, "LOW": 3}
+
+
+def _sink_keys(c):
+    """Locations that identify the issue: every step marked sink, and the last step."""
+    keys = {(t["file"], t["line"]) for t in c["trace"] if t["role"] == "sink"}
+    keys.add((c["trace"][-1]["file"], c["trace"][-1]["line"]))
+    return keys
+
+
+def consolidate(cands):
+    """Several attack classes often reach the same bug. Candidates of one repo that share a sink location are
+    one issue: the strongest report (severity, then fullest trace) represents it; every class that found it and
+    every other report's title and root cause are kept with it."""
+    groups = []                     # [ [keys, [cand, ...]], ... ]
+    for c in cands:
+        keys = _sink_keys(c)
+        hits = [g for g in groups if g[0] & keys]
+        if not hits:
+            groups.append([set(keys), [c]])
+            continue
+        first = hits[0]
+        first[0] |= keys
+        first[1].append(c)
+        for g in hits[1:]:          # this candidate links two groups: merge them
+            first[0] |= g[0]
+            first[1].extend(g[1])
+            groups.remove(g)
+    out = []
+    for _keys, members in groups:
+        members.sort(key=lambda c: (SEV_RANK[c["severity"]], -len(c["trace"]), c["unit"]))
+        best = dict(members[0])
+        best["attack_classes"] = sorted({m["attack_class"] for m in members})
+        best["units"] = sorted({m["unit"] for m in members})
+        best["also_reported"] = [{"attack_class": m["attack_class"], "title": m["title"], "root_cause": m["root_cause"]}
+                                 for m in members[1:]][:10]
+        if any(m["type"] == "secret" for m in members):
+            best["type"] = "secret"
+        out.append(best)
+    return out
 
 
 def _guess_unit(path, units):

@@ -111,15 +111,20 @@ def _audit_detail(run_dir, f):
         data = {}
     for c in data.get("candidates", []) if isinstance(data, dict) else []:
         if (isinstance(c, dict) and c.get("file") == f.get("file") and c.get("line") == f.get("line")
-                and c.get("attack_class") == f.get("rule_id") and str(c.get("title"))[:160] == f.get("title")):
+                and str(c.get("title"))[:160] == f.get("title")):
             secret = f.get("type") == "secret"
             trace = [{"role": s.get("role"), "file": s.get("file"), "line": s.get("line"),
                       "note": "" if secret else redact(str(s.get("note") or ""))[:300]}
                      for s in c.get("trace", []) if isinstance(s, dict)][:30]
-            return {"boundary": redact(str(c.get("boundary") or ""))[:400],
+            also = [{"attack_class": str(a.get("attack_class"))[:40], "title": redact(str(a.get("title")))[:160],
+                     "root_cause": "" if secret else redact(str(a.get("root_cause")))[:400]}
+                    for a in c.get("also_reported", []) if isinstance(a, dict)][:10]
+            return {"attack_classes": [str(x)[:40] for x in c.get("attack_classes", [])][:10], "also_reported": also,
+                    "boundary": redact(str(c.get("boundary") or ""))[:400],
                     "root_cause": redact(str(c.get("root_cause") or ""))[:600],
                     "hunter_evidence": "" if secret else redact(str(c.get("evidence") or ""))[:1500], "trace": trace}
-    return {"boundary": "", "root_cause": "", "hunter_evidence": "", "trace": []}
+    return {"attack_classes": [], "also_reported": [], "boundary": "", "root_cause": "", "hunter_evidence": "",
+            "trace": []}
 
 
 def cmd_queue(run_dir):

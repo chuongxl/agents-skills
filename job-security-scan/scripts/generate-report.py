@@ -485,8 +485,9 @@ def parse_code_audit(repo, results_dir, workspace):
             "repo": repo, "scanner": "code-audit", "type": "secret" if c.get("type") == "secret" else "sast",
             "severity": sev, "file": str(c.get("file") or ""), "line": c.get("line") if isinstance(c.get("line"), int) else None,
             "package": "", "installed_version": "", "fixed_version": "",
-            "rule_id": str(c.get("attack_class") or ""), "title": str(c.get("title") or "")[:160],
-            "description": ("%s - %s" % (c.get("boundary") or "", c.get("root_cause") or ""))[:300],
+            "rule_id": "code-audit", "title": str(c.get("title") or "")[:160],
+            "description": ("[%s] %s - %s" % (", ".join(str(x) for x in (c.get("attack_classes") or [c.get("attack_class")]) if x),
+                                              c.get("boundary") or "", c.get("root_cause") or ""))[:300],
             "url": "", "workspace": workspace,
         })
     return out

@@ -251,7 +251,8 @@ class CollectTests(AuditCase):
         self.assertEqual(len(ca), 1)
         f = ca[0]
         self.assertEqual((f["file"], f["line"], f["rule_id"], f["severity"], f["repo"]),
-                         ("src/db.js", 2, "access-control", "HIGH", "api"))
+                         ("src/db.js", 2, "code-audit", "HIGH", "api"))
+        self.assertIn("access-control", f["description"])
         self.assertIn("findOrder", f["code"])
         self.assertIsNone(f["verdict"])
         self.assertEqual(doc["counts"], before)                      # pending: not counted yet
@@ -266,6 +267,34 @@ class CollectTests(AuditCase):
         self.assertIn("pending verification", sec.lower())
         self.assertIn("Any user can read any order", sec)
         self.assertNotIn("Any user can read any order", md.split("## 🟠 High Findings")[1].split("\n## ")[0])
+
+    def test_same_issue_from_several_classes_is_one_candidate(self):
+        """Several attack classes reach the same bug: one candidate, the strongest report, all classes kept."""
+        weaker = dict(IDOR, title="Order readable by id", severity="MEDIUM", root_cause="no ownership filter",
+                      trace=[{"role": "entrypoint", "file": "src/routes/orders.js", "line": 6, "note": "route"},
+                             {"role": "sink", "file": "src/db.js", "line": 2, "note": "by id"}])
+        two_sinks = dict(IDOR, title="IDOR via orders", severity="HIGH",
+                         trace=IDOR["trace"] + [{"role": "sink", "file": "src/routes/orders.js", "line": 8,
+                                                 "note": "returned"}])
+        other = dict(IDOR, title="Server exposes eval", severity="LOW",
+                     trace=[{"role": "sink", "file": "src/server.js", "line": 2, "note": "different sink"}])
+        self.save("a.json", result(self.ids[("api", "access-control")], "candidate", [IDOR]))
+        self.save("b.json", result(self.ids[("api", "business-logic")], "candidate", [weaker]))
+        self.save("c.json", result(self.ids[("api", "wildcard")] if ("api", "wildcard") in self.ids
+                                   else self.ids[("api", "obvious")], "candidate", [two_sinks, other]))
+        self.assertEqual(self.collect().returncode, 0)
+        ca = [f for f in self.doc(self.run_dir)["findings"] if f["scanner"] == "code-audit"]
+        # the strongest report wins: HIGH beats MEDIUM, then the fuller trace
+        self.assertEqual(sorted(f["title"] for f in ca), ["IDOR via orders", "Server exposes eval"])
+        merged = [f for f in ca if f["title"] == "IDOR via orders"][0]
+        self.assertEqual(merged["severity"], "HIGH")
+        for cls in ("access-control", "business-logic", "obvious"):
+            self.assertIn(cls, merged["description"])
+        raw = json.loads((self.run_dir / "api" / "code-audit.json").read_text())["candidates"]
+        m = [c for c in raw if c["title"] == "IDOR via orders"][0]
+        self.assertEqual(sorted(m["attack_classes"]), ["access-control", "business-logic", "obvious"])
+        self.assertEqual(len(m["also_reported"]), 2)
+        self.assertEqual(run(VALIDATE, self.run_dir / "security-report.json").returncode, 0)
 
     def test_queued_always_with_trace_and_counted_once_verified(self):
         self.save("a.json", result(self.ids[("api", "access-control")], "candidate", [IDOR]))
