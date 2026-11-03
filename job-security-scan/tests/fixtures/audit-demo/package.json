@@ -1,0 +1,10 @@
+{
+  "name": "audit-demo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Private notes service.",
+  "main": "src/server.js",
+  "scripts": {
+    "test": "node --test test/"
+  }
+}

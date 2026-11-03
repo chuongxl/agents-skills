@@ -29,6 +29,9 @@ VERDICT_KEYS = ("fingerprint", "change", "verdict", "verified_severity", "verdic
 RAW_FILES = {"gitleaks.json": "gitleaks", "trivy.json": "trivy", "semgrep.json": "semgrep",
              "hadolint.txt": "hadolint", "osv.json": "osv", "osv-sbom.json": "osv", "advisories.json": "advisory",
              "trufflehog.json": "trufflehog", "shai-hulud.json": "shai-hulud"}
+# the deep audit is a scanner only when its results validated (see audit_report.load); its coverage mode is
+# "audit:<profile>" so a quick audit never marks findings of a deep audit as fixed
+AUDIT_SCANNER = "audit"
 
 
 def _norm_code(code):
@@ -129,6 +132,8 @@ def scanner_modes(scanners, profile):
             out[s] = "worktree" if profile == "quick" else "history"
         elif s == "trivy":
             out[s] = "low" if profile == "deep" else "medium"
+        elif s == AUDIT_SCANNER:
+            out[s] = "audit:%s" % profile
         else:
             out[s] = "full"
     return out
@@ -139,7 +144,8 @@ def _compare(findings, coverage, previous, partial):
     prev_rows = {}
     prev_cov = {}
     if previous and previous.get("schema_version", 0) >= 2:
-        prev_rows = dict((p["fingerprint"], p) for p in previous.get("findings", []) if p.get("fingerprint"))
+        before = list(previous.get("findings", [])) + list((previous.get("baseline") or {}).get("accepted", []))
+        prev_rows = dict((p["fingerprint"], p) for p in before if p.get("fingerprint"))
         prev_cov = (previous.get("run") or {}).get("coverage") or {}
     for f in findings:
         p = prev_rows.get(f["fingerprint"])
@@ -185,7 +191,12 @@ def build_document(findings, meta, previous=None):
     _number_occurrences(rows)
     partial = bool(meta.get("since")) or bool(meta.get("partial"))
     fixed, prev_dir = _compare(rows, meta.get("coverage") or {}, previous, partial)
-    return {
+    baseline = None
+    if meta.get("baseline"):    # accepted findings leave the counts but stay visible (baseline.py)
+        import baseline as baseline_mod
+        rows, accepted, unused = baseline_mod.split(rows, meta["baseline"])
+        baseline = baseline_mod.section(meta["baseline"], accepted, unused)
+    doc = {
         "schema_version": SCHEMA_VERSION,
         "generated_at": meta.get("generated_at", ""),
         "team": meta.get("team", ""),
@@ -203,6 +214,13 @@ def build_document(findings, meta, previous=None):
         "verification": verification_summary(rows, profile),
         "findings": rows,
     }
+    if baseline:
+        doc["baseline"] = baseline
+    if meta.get("audit"):
+        doc["audit"] = meta["audit"]
+    if meta.get("source_refs"):
+        doc["run"]["source_refs"] = meta["source_refs"]
+    return doc
 
 
 RUN_PREFIX = "security-run-"
@@ -241,6 +259,20 @@ def find_previous(run_dir):
         if doc is not None:
             return doc, p
     return None, None
+
+
+def keep_verdicts(doc, existing):
+    """Copy verdicts of this run's earlier report onto the regenerated document (same fingerprints), then
+    recompute counts. Findings that already carry a verdict (the deep audit's) are left as they are."""
+    if not existing:
+        return doc
+    old = dict((p["fingerprint"], p) for p in existing.get("findings", []) if p.get("verdict"))
+    for f in doc["findings"]:
+        p = old.get(f["fingerprint"])
+        if p and not f.get("verdict"):
+            f["verdict"], f["verified_severity"] = p["verdict"], p.get("verified_severity")
+            f["verdict_detail"], f["carried"] = p.get("verdict_detail") or {}, bool(p.get("carried"))
+    return refresh(doc)
 
 
 def refresh(doc):

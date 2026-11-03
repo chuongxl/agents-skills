@@ -5,6 +5,8 @@ the findings, the verdict contract, severity never above demonstrated impact, an
 Stdlib only; Python 3.8+.
 """
 
+import audit_report
+import baseline
 import report_shaihulud
 from report_model import (CHANGES, IMPACTS, LIKELIHOODS, PROFILES, SCHEMA_VERSION, SEVERITIES, VERDICTS,
                           counts_of, verification_summary)
@@ -112,6 +114,8 @@ def validate(doc):
         for e in validate_verdict(f.get("verdict"), f.get("verified_severity"), f.get("verdict_detail"), where):
             err(e)
     report_shaihulud.validate(doc, err)
+    audit_report.validate(doc, err)
+    baseline.validate(doc, err)
     if not errors:
         if doc["counts"] != counts_of(findings):
             err("counts do not match the findings (rejected findings are excluded, confirmed use verified severity)")

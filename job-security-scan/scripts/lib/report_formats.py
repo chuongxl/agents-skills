@@ -6,6 +6,8 @@ The reports describe findings and point at remediation guidance; they never offe
 Stdlib only; Python 3.8+.
 """
 
+import audit_report
+import baseline
 import report_model
 import report_shaihulud
 from report_model import SEVERITIES, SCHEMA_VERSION, FINDING_KEYS, effective_severity  # noqa: F401 (re-export)
@@ -133,7 +135,7 @@ def render_markdown(doc):
         "This report lists findings only. It does not change any code.",
     ]
     if ver.get("pending"):
-        out += ["", "> %d finding(s) are waiting for independent verification (SKILL.md Phase 9). Until then "
+        out += ["", "> %d finding(s) are waiting for independent verification (SKILL.md Phase 10). Until then "
                 "their severity is the scanner's own." % ver["pending"]]
     out += [
         "",
@@ -151,6 +153,8 @@ def render_markdown(doc):
             STATUS_EMOJI[r["status"]]))
     out.append("")
     out += report_shaihulud.render_markdown(doc, _text, _code)
+    out += audit_report.render_markdown(doc, _text, _code)
+    out += baseline.render_markdown(doc, _text, _code)
     out += _changes_section(doc)
     active = [f for f in doc["findings"] if f.get("verdict") != "rejected"]
     if not active:

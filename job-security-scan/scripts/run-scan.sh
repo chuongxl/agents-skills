@@ -3,18 +3,22 @@
 #
 # Usage:
 #   run-scan.sh [--config path/to/repository.md] [--repo REPO_NAME] [--scanner SCANNER] [--host]
-#               [--profile quick|standard|deep] [--since GIT_REF]
+#               [--profile quick|standard|deep] [--since GIT_REF] [--audit] [--budget N] [--baseline FILE]
 #
 # Flags:
 #   --config   Path to repository.md config file (default: auto-discover)
 #   --repo     Scan one repo by name only (default: all active repos)
-#   --scanner  Run one scanner only: gitleaks|trivy|semgrep|hadolint|osv|sbom|advisories|trufflehog|shai-hulud|all
+#   --scanner  Run one scanner only: gitleaks|trivy|semgrep|hadolint|osv|sbom|advisories|trufflehog|shai-hulud|audit|all
+#              (`audit` prepares the agent-driven deep audit; `all` does not include it - add --audit)
 #   --host     Also check THIS computer for the Shai-Hulud worm (projects under $HOME, global installs,
 #              npm cache, credential stores). Alone (no --scanner), only the host check runs.
 #   --profile  quick    = Gitleaks (working tree only), OSV, Shai-Hulud; nothing queued for verification
 #              standard = every scanner; CRITICAL+HIGH queued for verification (default)
 #              deep     = every scanner, Trivy also reports LOW; CRITICAL+HIGH+MEDIUM queued
 #              --scanner still picks one scanner and overrides the profile's list.
+#   --audit    Also prepare the deep audit (SKILL.md Phase 10) for each repo; --profile and --since scope it too
+#   --budget   Deep audit: maximum number of agent invocations
+#   --baseline Accepted-findings file (default: security-baseline.json next to the config, if present)
 #   --since    Report only findings in files changed since GIT_REF (committed REF...HEAD plus working-tree
 #              changes). A partial run: no "fixed" list. Repos that are not git repos keep full scope.
 #
@@ -33,6 +37,9 @@ SCANNER="all"
 SCANNER_SET=0
 PROFILE="standard"
 SINCE=""
+AUDIT_MODE=0
+AUDIT_BUDGET=""
+BASELINE_PATH=""
 HOST_MODE=0
 REPO_FILTER=""
 CONFIG_PATH=""
@@ -49,6 +56,11 @@ while [[ $# -gt 0 ]]; do
                 PROFILE="$2"; shift 2 ;;
     --since)    [[ $# -ge 2 ]] || { echo "--since needs a git ref"; exit 1; }
                 SINCE="$2"; shift 2 ;;
+    --audit)    AUDIT_MODE=1;     shift ;;
+    --budget)   [[ $# -ge 2 ]] || { echo "--budget needs a positive integer"; exit 1; }
+                AUDIT_BUDGET="$2"; shift 2 ;;
+    --baseline) [[ $# -ge 2 ]] || { echo "--baseline needs a file"; exit 1; }
+                BASELINE_PATH="$2"; shift 2 ;;
     *)          echo "Unknown arg: $1"; exit 1 ;;
   esac
 done
@@ -235,14 +247,18 @@ run_semgrep() {
     "${config_args[@]}" \
     --json --output "$out" \
     --no-rewrite-rule-ids --quiet \
-    "$path" 2>/dev/null || true
+    "$path" 2>"$OUTPUT_BASE/$repo/semgrep.err" || true
 
   local count
   count=$(python3 -I -c \
     'import json, sys; d=json.load(open(sys.argv[1])); print(len(d.get("results",[])))' "$out" \
-    2>/dev/null || echo 0)
+    2>/dev/null || echo "x")
 
-  if [[ "$count" -eq 0 ]]; then
+  # No readable output means semgrep did not run (e.g. registry rulesets unreachable) - never report that as clean.
+  if [[ "$count" == "x" ]]; then
+    rm -f "$out"
+    _warn semgrep "$repo" "semgrep produced no results file (rulesets unreachable?) - NOT scanned; see $OUTPUT_BASE/$repo/semgrep.err"
+  elif [[ "$count" -eq 0 ]]; then
     _pass semgrep "$repo" "No findings"
   else
     _warn semgrep "$repo" "$count finding(s) — see $out"
@@ -483,6 +499,26 @@ run_shai_hulud_host() {
   _shai_hulud_result "host" $? "$txt"
 }
 
+# Deep audit (Phase 10): deterministic preparation only. The agent-driven method runs afterwards
+# (references/audit/WORKFLOW.md) and the reports are regenerated when it finishes.
+run_audit() {
+  local repo="$1" path="$2"
+  mkdir -p "$OUTPUT_BASE/$repo"
+  _log audit "$repo" "Preparing deep audit (profile $PROFILE)..."
+  local out rc
+  out=$(python3 -I "$SKILL_DIR/scripts/audit-prepare.py" --repo "$repo" --path "$path" \
+          --run-dir "$OUTPUT_BASE" --runs-root "$RUN_ROOT" --profile "$PROFILE" \
+          --since "$SINCE" --budget "$AUDIT_BUDGET" --config "$CONFIG_PATH" --workspace "$PWD" \
+          ${BASELINE_PATH:+--baseline "$BASELINE_PATH"} 2>&1)
+  rc=$?
+  if [[ $rc -eq 0 ]]; then
+    _log audit "$repo" "Prepared - agent phase pending: $OUTPUT_BASE/$repo/audit/AGENT-TASK.md"
+    AUDIT_PENDING+=("$OUTPUT_BASE/$repo/audit/AGENT-TASK.md")
+  else
+    _warn audit "$repo" "could not prepare deep audit: $out"
+  fi
+}
+
 # ─── DISPATCH ─────────────────────────────────────────────────────────────
 
 run_scanner_for_repo() {
@@ -504,37 +540,39 @@ run_scanner_for_repo() {
     advisories) run_advisories "$repo" "$path" ;;
     trufflehog) run_trufflehog "$repo" "$path" ;;
     shai-hulud) run_shai_hulud "$repo" "$path" ;;
+    audit)      run_audit      "$repo" "$path" ;;
     all)
       if [[ "$PROFILE" == "quick" ]]; then
         run_gitleaks    "$repo" "$path"
         run_osv         "$repo" "$path"
         run_shai_hulud  "$repo" "$path"
-        return
+      else
+        run_gitleaks   "$repo" "$path"
+        run_trivy      "$repo" "$path"
+        run_semgrep    "$repo" "$path"
+        run_hadolint   "$repo" "$path"
+        run_osv        "$repo" "$path"
+        run_sbom       "$repo" "$path"
+        run_advisories "$repo" "$path"
+        run_trufflehog "$repo" "$path"
+        run_shai_hulud "$repo" "$path"
       fi
-      run_gitleaks   "$repo" "$path"
-      run_trivy      "$repo" "$path"
-      run_semgrep    "$repo" "$path"
-      run_hadolint   "$repo" "$path"
-      run_osv        "$repo" "$path"
-      run_sbom       "$repo" "$path"
-      run_advisories "$repo" "$path"
-      run_trufflehog "$repo" "$path"
-      run_shai_hulud "$repo" "$path"
       ;;
     *)
       echo "Unknown scanner: $SCANNER"
-      echo "Valid: gitleaks | trivy | semgrep | hadolint | osv | sbom | advisories | trufflehog | shai-hulud | all"
+      echo "Valid: gitleaks | trivy | semgrep | hadolint | osv | sbom | advisories | trufflehog | shai-hulud | audit | all"
       exit 1
       ;;
   esac
+  if [[ $AUDIT_MODE -eq 1 && "$SCANNER" != "audit" ]]; then run_audit "$repo" "$path"; fi
 }
 
 # ─── MAIN ─────────────────────────────────────────────────────────────────
 case "$SCANNER" in
-  gitleaks|trivy|semgrep|hadolint|osv|sbom|advisories|trufflehog|shai-hulud|all) ;;
+  gitleaks|trivy|semgrep|hadolint|osv|sbom|advisories|trufflehog|shai-hulud|audit|all) ;;
   *)
     echo "Unknown scanner: $SCANNER"
-    echo "Valid: gitleaks | trivy | semgrep | hadolint | osv | sbom | advisories | trufflehog | shai-hulud | all"
+    echo "Valid: gitleaks | trivy | semgrep | hadolint | osv | sbom | advisories | trufflehog | shai-hulud | audit | all"
     exit 1
     ;;
 esac
@@ -543,6 +581,16 @@ case "$PROFILE" in
   quick|standard|deep) ;;
   *) echo "Unknown profile: $PROFILE (valid: quick | standard | deep)"; exit 1 ;;
 esac
+if [[ -n "$AUDIT_BUDGET" && ! "$AUDIT_BUDGET" =~ ^[1-9][0-9]*$ ]]; then
+  echo "Invalid --budget: $AUDIT_BUDGET (a positive integer)"; exit 1
+fi
+if [[ -z "$BASELINE_PATH" && -f "$(dirname "$CONFIG_PATH")/security-baseline.json" ]]; then
+  BASELINE_PATH="$(dirname "$CONFIG_PATH")/security-baseline.json"
+fi
+if [[ -n "$BASELINE_PATH" && ! -f "$BASELINE_PATH" ]]; then
+  echo "❌ Baseline not found: $BASELINE_PATH"; exit 1
+fi
+declare -a AUDIT_PENDING=()
 if [[ -n "$SINCE" ]] && ! [[ "$SINCE" =~ ^[A-Za-z0-9._/~^@{}+-]{1,200}$ && "$SINCE" != -* ]]; then
   echo "Invalid --since ref: $SINCE"
   exit 1
@@ -563,12 +611,23 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 echo "  🔐 Security Scan — team: ${TEAM} | org: ${ORG}"
 echo "  Profile  : ${PROFILE}$([[ $SCANNER_SET -eq 1 ]] && echo " (scanner: ${SCANNER})")"
 [[ -n "$SINCE" ]] && echo "  Scope    : files changed since ${SINCE} (partial run)"
+[[ $AUDIT_MODE -eq 1 || "$SCANNER" == "audit" ]] && echo "  Audit    : deep audit, profile ${PROFILE}${AUDIT_BUDGET:+, budget $AUDIT_BUDGET}"
+[[ -n "$BASELINE_PATH" ]] && echo "  Baseline : ${BASELINE_PATH}"
 echo "  Repos    : ${REPOS_TO_SCAN[*]:-(none)}"
 [[ $HOST_MODE -eq 1 ]] && echo "  Host     : this machine (Shai-Hulud check)"
 echo "  Run      : ${OUTPUT_BASE}/"
 echo "  Cache    : ${CACHE_BASE}/"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
+
+# What was scanned, at which commit (shown in the report; lets later runs be compared honestly).
+META_ARGS=()
+for repo in ${REPOS_TO_SCAN[@]+"${REPOS_TO_SCAN[@]}"}; do META_ARGS+=(--repo "$repo=$WORKSPACE/$repo"); done
+[[ $HOST_MODE -eq 1 ]] && META_ARGS+=(--host)
+[[ $AUDIT_MODE -eq 1 ]] && META_ARGS+=(--audit)
+python3 -I "$SKILL_DIR/scripts/write-run-metadata.py" --run-dir "$OUTPUT_BASE" --scanner "$SCANNER" \
+  --profile "$PROFILE" --since "$SINCE" --budget "$AUDIT_BUDGET" ${META_ARGS[@]+"${META_ARGS[@]}"} \
+  2>/dev/null || echo "  ⚠️  could not write run-metadata.json"
 
 [[ $HOST_MODE -eq 1 ]] && run_shai_hulud_host
 
@@ -601,10 +660,13 @@ generate_reports() {
       && scope=(--since "$SINCE" --changed-files "$RUN_DIR/changed-files.json") \
       || scope=(--since "$SINCE")
   fi
+  local baseline_args=()
+  [[ -n "$BASELINE_PATH" ]] && baseline_args=(--baseline "$BASELINE_PATH")
   if python3 -I "$SKILL_DIR/scripts/generate-report.py" \
       --results-dir "$RUN_DIR" \
       --profile     "$PROFILE" \
       ${scope[@]+"${scope[@]}"} \
+      ${baseline_args[@]+"${baseline_args[@]}"} \
       --out-dir     "$RUN_DIR" \
       --config      "$CONFIG_PATH" \
       --workspace   "$PWD" \
@@ -624,6 +686,22 @@ generate_reports() {
 }
 
 generate_reports
+
+# A baseline can only lower a failing exit: if every CRITICAL/HIGH finding is accepted, report a warning.
+if [[ -n "$BASELINE_PATH" && $GLOBAL_EXIT -eq 2 && -f "$RUN_DIR/security-report.json" ]]; then
+  open_ch=$(python3 -I -c 'import json,sys; c=json.load(open(sys.argv[1]))["counts"]; print(c["CRITICAL"]+c["HIGH"])' \
+            "$RUN_DIR/security-report.json" 2>/dev/null || echo "x")
+  if [[ "$open_ch" == "0" ]]; then
+    echo "  🤝 Every CRITICAL/HIGH finding is accepted in the baseline - exit downgraded to warning"
+    GLOBAL_EXIT=1
+  fi
+fi
+
+if [[ ${#AUDIT_PENDING[@]} -gt 0 ]]; then
+  echo ""
+  echo "  🧠 Deep audit prepared - the agent phase runs next (references/audit/WORKFLOW.md):"
+  for task in "${AUDIT_PENDING[@]}"; do echo "     $task"; done
+fi
 
 echo ""
 echo "  📁 Run folder: $RUN_DIR"

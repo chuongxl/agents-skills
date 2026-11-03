@@ -17,6 +17,7 @@
     {{ROWS}}         table body rows HTML
     {{RUNINFO}}      profile, scope, verification and changes-since-last-run panel HTML
     {{SHAIHULUD}}    Shai-Hulud check panel: verdict, what was checked and raw output per target
+    {{AUDIT}}        deep-audit panel (empty unless --audit ran): coverage, leads needing validation
 
   To customise look & feel: edit the <style> and <script> sections below.
   Do NOT change {{PLACEHOLDER}} tokens — they are replaced programmatically.
@@ -207,6 +208,8 @@ tr.dismissed { opacity: .55; }
 {{RUNINFO}}
 
 {{SHAIHULUD}}
+
+{{AUDIT}}
 
 {{FILTERS}}
 

@@ -96,7 +96,8 @@ def validate(doc, err):
         return
     partial = bool((doc.get("run") or {}).get("partial"))
     by_repo = {}
-    for f in doc.get("findings", []):
+    held = list(doc.get("findings", [])) + list((doc.get("baseline") or {}).get("accepted") or [])
+    for f in held:     # an accepted (baseline) finding still makes the verdict true
         if isinstance(f, dict) and f.get("scanner") == "shai-hulud" and f.get("rule_id") not in EXPOSURE_RULES:
             by_repo.setdefault(f.get("repo"), []).append(f)
     for i, t in enumerate(sh["targets"]):

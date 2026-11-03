@@ -30,6 +30,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent / "lib"))
 
+import audit_report    # noqa: E402
+import baseline        # noqa: E402
 import report_formats  # noqa: E402
 import report_locate   # noqa: E402
 import report_model    # noqa: E402
@@ -466,6 +468,22 @@ def parse_shai_hulud(repo, results_dir, workspace):
     return findings
 
 
+def collect_audit(results_dir, repos, workspace):
+    """(confirmed audit findings, {repo: audit summary}) for repos that have a deep-audit folder."""
+    findings, summaries = [], {}
+    for repo in repos:
+        try:
+            merged, summary = audit_report.load(results_dir, repo, workspace)
+        except Exception as exc:  # a broken audit folder must not cost the whole report
+            sys.stderr.write("  warning: audit results of %s could not be read: %s: %s\n"
+                             % (repo, type(exc).__name__, exc))
+            continue
+        findings.extend(merged)
+        if summary:
+            summaries[repo] = summary
+    return findings, summaries
+
+
 def collect_findings(results_dir, repos, workspace):
     parsers = [parse_gitleaks, parse_trufflehog, parse_trivy, parse_semgrep, parse_hadolint, parse_osv,
                parse_advisories, parse_shai_hulud]
@@ -688,6 +706,7 @@ def build_html(doc, config, results_dir, output_path, org, workspace="."):
             .replace("{{CARDS}}",       cards_html)
             .replace("{{RUNINFO}}",     _runinfo_html(doc))
             .replace("{{SHAIHULUD}}",   report_shaihulud.render_html(doc))
+            .replace("{{AUDIT}}",       audit_report.render_html(doc) + baseline.render_html(doc))
             .replace("{{FILTERS}}",     filters_html)
             .replace("{{ROWS}}",        rows_html))
 
@@ -750,6 +769,16 @@ def scanner_coverage(results_dir, repos, profile="standard"):
     return cov
 
 
+def load_source_refs(results_dir):
+    """{repo: {commit, dirty, branch}} from run-metadata.json (written by run-scan.sh), else None."""
+    try:
+        with open(Path(results_dir) / "run-metadata.json", encoding="utf-8") as fh:
+            refs = json.load(fh).get("source_refs")
+    except (OSError, ValueError, AttributeError):
+        return None
+    return refs if isinstance(refs, dict) and refs else None
+
+
 def main():
     ap = argparse.ArgumentParser(description="Generate the security reports for one scan run")
     ap.add_argument("--results-dir", required=True,   help="Directory containing scanner outputs ({repo}/...)")
@@ -764,6 +793,11 @@ def main():
     ap.add_argument("--changed-files", default=None,
                     help="JSON file {repo: [changed paths]} from run-scan.sh --since; findings elsewhere are dropped")
     ap.add_argument("--partial",     action="store_true", help="Scope was limited (--scanner/--repo): no 'fixed' list")
+    ap.add_argument("--baseline", default=None,
+                    help="Accepted-findings file (security-baseline.json): listed in their own section, not counted")
+    ap.add_argument("--keep-verdicts", action="store_true",
+                    help="Regenerating this run's own reports: keep the Phase 9 verdicts already in "
+                         "<out-dir>/security-report.json (used after the deep audit finishes)")
     ap.add_argument("--previous",    default="auto",
                     help="Earlier run folder to compare with: auto (newest older security-run-* beside --out-dir), "
                          "a folder, or none")
@@ -783,6 +817,8 @@ def main():
     print(f"  Repos found in results: {repos}")
 
     findings = collect_findings(args.results_dir, repos, workspace)
+    audit_findings, audit_summaries = collect_audit(args.results_dir, repos, workspace)
+    findings.extend(audit_findings)
     report_locate.apply(findings, repos_root, home)
     relativize(findings, repos_root)
     if args.changed_files:
@@ -805,6 +841,10 @@ def main():
         print(f"  Comparing with previous run: {previous_dir}")
 
     coverage = scanner_coverage(args.results_dir, repos, args.profile)
+    for repo, summary in audit_summaries.items():
+        if summary["valid"]:       # an unfinished or invalid audit did not review the code: it can fix nothing
+            coverage.setdefault(HOST_LABEL if repo == HOST_RESULTS else repo, {})["audit"] = \
+                report_model.scanner_modes(["audit"], summary.get("profile") or args.profile)["audit"]
     meta = {
         "team": team, "org": org, "config": os.path.abspath(args.config),
         "run_dir": str(out_dir.resolve()),
@@ -815,8 +855,13 @@ def main():
         "profile": args.profile, "since": args.since, "partial": args.partial,
         "coverage": coverage,
         "shai_hulud": report_shaihulud.build(args.results_dir, repos),
+        "baseline": baseline.load(args.baseline) if args.baseline else None,
+        "audit": audit_report.build(audit_summaries),
+        "source_refs": load_source_refs(args.results_dir),
     }
     doc = report_model.build_document(findings, meta, previous=previous)
+    if args.keep_verdicts and args.out_dir:
+        report_model.keep_verdicts(doc, report_model.load_report(out_dir / "security-report.json"))
     doc["run"].update(workspace=workspace, repos_root=repos_root, home=home)
 
     outputs, errors = [], []
