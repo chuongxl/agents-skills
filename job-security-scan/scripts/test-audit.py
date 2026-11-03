@@ -455,6 +455,11 @@ class SandboxAndPromotionTests(unittest.TestCase):
     @unittest.skipUnless(sys.platform.startswith("linux") and namespaces_available(), "needs Linux namespaces")
     def test_self_test_and_controls(self):
         r = self.sandbox("--self-test")
+        if r.returncode == 97 and "cannot make" in r.stderr:
+            # Fail-closed by design: some hosts (e.g. snap loop mounts on CI runners) cannot be remounted
+            # read-only, and the sandbox then refuses to run anything instead of running unconfined.
+            self.assertIn("BLOCKED", r.stderr)
+            self.skipTest("this host cannot remount every mount read-only: " + r.stderr.splitlines()[0])
         self.assertEqual(r.returncode, 0, r.stderr)
         result = json.loads(r.stdout)
         self.assertTrue(result["sandbox_ok"])
