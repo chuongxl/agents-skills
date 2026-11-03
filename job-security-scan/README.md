@@ -30,6 +30,9 @@ All tools are free, open-source, and configurable. Security findings are organiz
 5. **Structured Output** — JSON results for easy CI/CD integration
 6. **Auto-Install** — Security tools auto-install on first run via Homebrew (macOS) or apt/curl (Linux)
 7. **Allowlist Support** — Exclude false positives and intentional secrets from scanning
+8. **Deep Audit (opt-in)** — Agent-driven review for logic flaws scanners cannot see, with independent verification of every finding
+9. **Run-to-Run Diff** — Stable fingerprints; every report shows what is new, still open and fixed since earlier runs
+10. **Baseline** — Accept known findings with a reason and an expiry date
 
 ## Quick Start
 
@@ -177,6 +180,44 @@ A fast, offline answer to "were we hit by the Shai-Hulud npm/PyPI worm?":
 **Output:** `shai-hulud.json` per repo, `_host/shai-hulud.json` for this computer (report: "this machine").
 Indicator data and sources: [references/ioc-data.md](references/ioc-data.md). If affected:
 [references/remediation.md](references/remediation.md#-shai-hulud-if-affected).
+
+### 8. Deep Audit — Logic Flaws Scanners Miss (opt-in)
+
+Scanners match known-bad patterns. They cannot see that one route checks the note's owner and its
+sibling does not, that a tenant ID comes from the request body, or that a CI workflow runs pull-request code
+with a publish token. The deep audit is the method of
+[cloudflare/security-audit-skill](https://github.com/cloudflare/security-audit-skill) (MIT), adapted to
+this skill (provenance: [references/audit/NOTICE.md](references/audit/NOTICE.md)):
+
+- **Reconnaissance** maps trust boundaries and builds a deterministic **coverage ledger** of entry surface ×
+  boundary × subsystem × attack class.
+- **Hunting** assigns isolated agents to ledger units with attack-class prompts for web/auth, AI/LLM,
+  client-side, supply chain/CI, cloud, RPC/messaging, data isolation, resource exhaustion, desktop/IPC and
+  memory safety; coverage critics look for gaps.
+- **Validation**: a fresh agent tries to disprove every candidate; a second fresh agent re-checks every
+  final record.
+- **Verdicts**: *confirmed* (with severity), *needs validation* (no severity; names the missing fact and
+  the check that settles it), *rejected* (kept so later runs do not repeat it).
+- **Report**: confirmed findings join the scanner findings (🧠); coverage, gaps, leads and hardening notes
+  get their own section.
+
+```bash
+bash job-security-scan/scripts/run-scan.sh --audit                       # scanners + deep audit
+bash job-security-scan/scripts/run-scan.sh --scanner audit --profile quick --since origin/main
+```
+
+The script prepares the audit; the agent then follows
+[references/audit/WORKFLOW.md](references/audit/WORKFLOW.md). Source-only by default. Sandboxed local checks
+need `JOB_SECURITY_SCAN_AUDIT_EXEC=1` and run only through `scripts/audit-sandbox.py` (Linux namespaces:
+no network, read-only filesystem except scratch, empty environment, resource limits — it refuses to run
+if any control is missing).
+
+### 9. Changes Since Last Run and Baseline
+
+Each finding has a stable fingerprint. Reports mark findings 🆕 new or ⏳ still open and list ✅ fixed ones,
+comparing each repo × scanner with the latest earlier run where it ran. Known, accepted findings go in
+`security-baseline.json` next to `repository.md` (fingerprint, reason, optional expiry); they are listed
+separately and left out of the counts.
 
 ## Installation & Setup
 
@@ -402,7 +443,8 @@ bash job-security-scan/scripts/run-scan.sh  # Re-downloads DB
 
 ## Version History
 
-- **v2.4** (current) — Security hardening of the skill itself: pinned and checksum-verified tool installs, SHA-pinned CI actions (template moved off hijacked `trivy-action` tags), config/repo-name injection fixed, secret values stripped from raw output, opt-in sandboxed image probe, verified TruffleHog secrets fail the scan
+- **v3.0** (current) — Deep audit (Phase 9) adapted from cloudflare/security-audit-skill: coverage ledger, isolated hunters, adversarial validation, confirmed / needs-validation / rejected verdicts, Python validators, sandbox and evidence promotion; stable fingerprints with new/open/fixed diff across runs; baseline of accepted findings; commit and dirty flag per repo; report `schema_version` 2
+- **v2.4** — Security hardening of the skill itself: pinned and checksum-verified tool installs, SHA-pinned CI actions (template moved off hijacked `trivy-action` tags), config/repo-name injection fixed, secret values stripped from raw output, opt-in sandboxed image probe, verified TruffleHog secrets fail the scan
 - **v2.3** — Per-run `security-run-<datetime>/` folder with Markdown, JSON and HTML reports; every finding located to file, line and code; caches moved out of the workspace; report-only rule
 - **v2.2** — Shai-Hulud supply-chain worm check (`--scanner shai-hulud`, `--host` laptop mode)
 - **v2.1** — Runtime and image checks
@@ -412,3 +454,7 @@ bash job-security-scan/scripts/run-scan.sh  # Re-downloads DB
 ## License & Attribution
 
 MIT License. Maintained by the security-focused engineering team.
+
+The deep-audit method in `references/audit/` and `assets/audit/findings.schema.json` are copied from
+[cloudflare/security-audit-skill](https://github.com/cloudflare/security-audit-skill), Copyright (c)
+2025-2026 Cloudflare, Inc., MIT License — see [references/audit/NOTICE.md](references/audit/NOTICE.md).

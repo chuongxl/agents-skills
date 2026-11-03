@@ -1,20 +1,15 @@
 ---
 name: job-security-scan
 description: >
-  Run a comprehensive, 100% free security scan across any team's service
-  repos. Team identity, repo list, tech stack, CI runner, and allowlists
-  are all read from a single repository.md config file — no hardcoded values
-  in the skill itself. Combines Gitleaks (secrets in git history), Trivy
-  (CVE + Dockerfile misconfig), Semgrep (SAST for TypeScript/NestJS/OWASP),
-  Hadolint (Dockerfile best practices), OSV-Scanner (Google transitive CVE
-  DB), TruffleHog (live credential verification), and an offline Shai-Hulud
-  check (npm/PyPI worm: known compromised releases, payload files, planted
-  workflows, worm-like install hooks) for repos and, with --host, this
-  computer. Produces a structured security report per repo. Use when asked to scan for vulnerabilities,
-  secrets, malware, misconfigurations, supply chain issues, or to set up a
-  CI security pipeline, or to check whether a repo or laptop was hit by
-  Shai-Hulud. Supports --repo for single-repo scope and --scanner for
-  single-tool runs.
+  Free, report-only security scan of a team's repos, configured by one repository.md file. Runs Gitleaks
+  (secrets in git history), Trivy (CVEs, Dockerfile misconfig), Semgrep (SAST), Hadolint, OSV-Scanner,
+  TruffleHog (live credential check), vendor advisories and an offline Shai-Hulud worm check (repos and,
+  with --host, this computer). Optional deep audit (--audit): an agent-driven, coverage-led review for
+  logic flaws scanners miss (authorization, tenant isolation, CI trust, injection), where every finding is
+  independently re-verified and leads that need an outside fact stay "needs validation". Every run writes
+  md/json/html reports with file:line, what is new or fixed since earlier runs, and a baseline for
+  accepted findings. Use to scan for vulnerabilities, secrets, malware or misconfigurations, for a security
+  audit or pen-test of code, to set up a CI security pipeline, or to check for Shai-Hulud.
 compatibility: >
   Requires bash, git, Python 3.8+ (pre-installed on most systems — used
   only to parse repository.md, no pip packages needed). Security tools
@@ -24,7 +19,7 @@ compatibility: >
 license: MIT
 metadata:
   author: one-om-ddm-team
-  version: "2.4"
+  version: "3.0"
   config-file: assets/repository.md
 allowed-tools: bash glob grep view create edit
 ---
@@ -36,6 +31,17 @@ Generic, config-driven security scanner for any multi-repo workspace.
 > **Report only.** This skill finds and reports problems; it never fixes them. Never modify, patch, upgrade,
 > delete or commit anything in a scanned repo, and never offer, ask or attempt to fix findings. Remediation
 > appears only as guidance text in the report (`references/remediation.md`). End after presenting the report.
+
+## Modes
+
+- **Guidance** — a security question, a focused review of one file or lead, or triage: answer from the
+  references (`references/audit/ATTACK-CLASSES.md` and its companions for code-level questions). Do not run
+  the scan or write files.
+- **Scan** — "scan", "check for secrets/vulnerabilities/Shai-Hulud", CI setup: run `run-scan.sh` (Phases 1–8).
+- **Deep audit** — "audit / pen-test this code", "full / deep security review": run the scan with `--audit`
+  (or `--scanner audit` alone), then follow `references/audit/WORKFLOW.md` (Phase 9).
+
+If a request could be either guidance or a full run, ask one short question first.
 
 ## Configuration — `assets/repository.md`
 
@@ -77,6 +83,11 @@ bash .github/skills/job-security-scan/scripts/run-scan.sh \
 | `--repo NAME` | `--repo om-ddm-backend` | Scan one repo only |
 | `--scanner NAME` | `--scanner trivy` | Run one scanner only |
 | `--host` | `--host` | Also check this computer for Shai-Hulud; alone, only the host check runs |
+| `--audit` | `--audit` | Also prepare the deep audit (Phase 9) for each repo |
+| `--profile` | `--profile quick` | Deep-audit breadth: `quick`, `standard` (default), `deep` |
+| `--since REF` | `--since origin/main` | Deep audit only the files changed since a git ref |
+| `--budget N` | `--budget 40` | Deep-audit cap on agent invocations |
+| `--baseline FILE` | `--baseline ./security-baseline.json` | Accepted findings (default: `security-baseline.json` next to the config, if present) |
 | *(none)* | | Full scan — all scanners, all active repos from config |
 
 Short aliases: `-r` for `--repo`, `-s` for `--scanner`
@@ -180,6 +191,34 @@ Benign hooks (`node-gyp rebuild`, `prebuild-install`, `husky`, esbuild's install
 Data provenance: `references/ioc-data.md`. If affected: the runbook in `references/remediation.md`.
 Standalone: `python3 -I scripts/shai-hulud-scan.py --repo PATH` or `--host` (exit 0 clean / 1 suspicious / 2 affected).
 
+## Phase 9 — Deep Audit (agent-driven, opt-in)
+
+Scanners match known-bad patterns; they cannot tell that `GET /notes/:id` forgot the owner check its
+`DELETE` sibling has. The deep audit is the method of
+[cloudflare/security-audit-skill](https://github.com/cloudflare/security-audit-skill) (MIT), copied into
+`references/audit/` and adapted to this skill:
+
+1. `run-scan.sh --audit` (or `--scanner audit`) prepares `security-run-<datetime>/<repo>/audit/`: run
+   metadata with the commit and dirty flag, profile, scope (`--since`), budget, earlier audits of the repo,
+   reconnaissance hints, and `AGENT-TASK.md`.
+2. The agent then runs the six phases in `references/audit/WORKFLOW.md`: reconnaissance and a deterministic
+   coverage ledger, coverage-led hunting with isolated agents and 11 attack-class files, independent
+   validation of every candidate by a fresh agent that tries to disprove it, `findings.json`, fresh-eyes
+   verification, and reports.
+3. Verdicts: **confirmed** (complete source trace and an observed local result; only these get a severity,
+   calibrated by likelihood × demonstrated impact), **needs validation** (a specific fact outside the source
+   decides it; no severity, with the exact check that resolves it), **rejected** (disproved; kept so later
+   runs do not repeat it). Missing best practice with no affected principal is a hardening note, not a finding.
+4. `python3 -I scripts/validate-audit.py run <audit-dir>` checks the ledger and findings against
+   `assets/audit/findings.schema.json` and the method's rules; regenerating the reports then merges the
+   confirmed findings (🧠) into the run's reports, with coverage, gaps, leads and hardening notes.
+
+Safety: source-only by default — nothing from the target runs. Sandboxed local checks need
+`JOB_SECURITY_SCAN_AUDIT_EXEC=1` and go only through `scripts/audit-sandbox.py` (no network, read-only
+filesystem except the agent's scratch folder, empty environment, CPU/memory/process/time limits; it refuses
+to run if any control is missing). Evidence leaves scratch only through `scripts/audit-promote.py`.
+Additive across runs: earlier audits of the same repo are used to target gaps and re-check changed code.
+
 ## Reports — one folder per run
 
 Every run writes a new folder in the workspace folder (the folder `run-scan.sh` is run from); nothing is
@@ -190,14 +229,35 @@ security-run-YYYYMMDD-HHMMSS/
 ├── security-report.md     # summary + findings by severity, each with file:line and the line of code
 ├── security-report.json   # same data, machine-readable (schema_version 1)
 ├── security-report.html   # interactive report (filters, VS Code links)
+├── run-metadata.json      # what ran, and each repo's commit + dirty flag
 ├── .gitignore             # "*" - the folder never gets committed
-└── <repo>/ , _host/       # raw output of every tool for this run
+└── <repo>/ , _host/       # raw output of every tool for this run (+ <repo>/audit/ for the deep audit)
 ```
 
 Every finding is located to **file + line + one line of code**. Secrets show file and line only — never the
 value or the line. Caches (vendor advisories, refreshed indicators) live outside the workspace in
 `~/.cache/job-security-scan` (`cache-dir:` or `JOB_SECURITY_SCAN_CACHE` to move them, e.g. for CI).
 `SECURITY_RUN_ROOT` puts run folders somewhere else. On macOS the HTML report opens automatically.
+
+**Across runs.** Every finding has a stable `fingerprint` (scanner, repo, rule, file, package, and the code
+line for code findings — never the line number or version). Each report compares every repo × scanner pair
+with the latest earlier run in which that pair ran, and marks findings 🆕 new or ⏳ still open and lists
+✅ fixed ones; a narrower run never makes other scanners' findings look fixed.
+
+**Baseline.** Accepted findings go in `security-baseline.json` next to the config (or `--baseline`):
+
+```json
+{"version": 1, "entries": [
+  {"fingerprint": "semgrep:3f9c0a1b2c3d4e5f", "reason": "test fixture, never deployed", "expires": "2027-03-31", "owner": "alex"}
+]}
+```
+
+A reason is required; expired entries stop applying. Accepted findings are listed in their own section and
+left out of the counts; if every CRITICAL/HIGH finding is accepted, the run exits with a warning (1)
+instead of a failure (2). Copy fingerprints from `security-report.json`.
+
+`security-report.json` is `schema_version` 2: v1 fields plus `fingerprint`, `diff_status`, `first_seen`,
+`verdict` and `details` per finding, and top-level `diff`, `baseline`, `audit` and `run_options`.
 
 **HTML report features:**
 - **Summary cards** — CRITICAL / HIGH / MEDIUM / LOW counts at a glance
@@ -234,6 +294,9 @@ bash .github/skills/job-security-scan/scripts/run-scan.sh --scanner trivy
 # Was this computer hit by Shai-Hulud? (no config needed)
 bash .github/skills/job-security-scan/scripts/run-scan.sh --host
 
+# Scanners plus the deep audit of one repo, only code changed since main
+bash .github/skills/job-security-scan/scripts/run-scan.sh --repo om-ddm-backend --audit --since origin/main
+
 # Shai-Hulud check on every repo plus this computer
 bash .github/skills/job-security-scan/scripts/run-scan.sh --scanner shai-hulud --host
 
@@ -259,6 +322,8 @@ The scanner reads untrusted repositories, so it is built not to be an attack pat
   output; secret findings (Gitleaks, TruffleHog, Trivy, Semgrep secret rules) show file and line only.
 - **Network input is constrained.** Fetchers use HTTPS to allowlisted hosts only; advisory feeds with DTDs or
   entity declarations are refused; text copied into GitHub issues cannot @-mention people or inject HTML.
+- **Deep audit is source-only by default.** Target code runs only with `JOB_SECURITY_SCAN_AUDIT_EXEC=1`,
+  only via `scripts/audit-sandbox.py`, and only when every sandbox control can be enforced.
 - **Pinned supply chain.** Installer and CI pin every tool and every GitHub Action (actions by commit SHA,
   checkouts without persisted credentials). `references/ci-workflow.md` uses `trivy-action` `0.35.0`; tags
   `0.0.1`-`0.34.2` were hijacked in March 2026 (GHSA-69fq-xp46-6x23) — if you copied an older version of that
@@ -269,8 +334,10 @@ The scanner reads untrusted repositories, so it is built not to be an attack pat
 `run-scan.sh` writes the report itself; the agent does not compose one. After the run:
 
 1. Read `security-run-<datetime>/security-report.md` (the last console line names the folder).
-2. Reply with a short summary: the per-repo status table, the Critical and High findings as `file:line`
-   with their rule, and the paths of the three report files.
+2. Reply with a short summary: the per-repo status table, how many findings are new and fixed since the
+   last run, the Critical and High findings as `file:line` with their rule, and the paths of the three
+   report files. If a deep audit was prepared, run it now (Phase 9) before replying, and add its confirmed
+   findings and the number of needs-validation leads.
 3. Stop there. Do not offer, propose or ask to fix anything, and do not edit any scanned file — the
    remediation guidance in the report is for the reader.
 

@@ -198,7 +198,7 @@ class FormatTests(unittest.TestCase):
 
     def test_json_shape_and_counts(self):
         doc = self.rf.build_json(rows(), META)
-        self.assertEqual(doc["schema_version"], 1)
+        self.assertEqual(doc["schema_version"], 2)
         self.assertEqual(doc["counts"], {"CRITICAL": 1, "HIGH": 1, "MEDIUM": 1, "LOW": 0, "INFO": 0})
         by = {r["name"]: r for r in doc["repos"]}
         self.assertEqual((by["api"]["status"], by["web"]["status"], by["worker"]["status"]), ("red", "yellow", "green"))
@@ -213,7 +213,7 @@ class FormatTests(unittest.TestCase):
             self.assertIn(heading, md)
         self.assertIn("`package-lock.json:14`", md)
         self.assertIn('`"node_modules/posthog-node": {`', md)
-        self.assertIn("| worker | 0 | 0 | 0 | 0 | 0 | 🟢 |", md)
+        self.assertIn("| worker | — | 0 | 0 | 0 | 0 | 0 | 0 | 🟢 |", md)
         self.assertIn("security-run-20261102-153600", md)
 
     def test_markdown_secret_has_no_code(self):

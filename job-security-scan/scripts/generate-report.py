@@ -5,6 +5,7 @@ generate-report.py — Generate the security reports (Markdown, JSON, HTML) for 
 Usage:
   python3 generate-report.py --results-dir DIR --config repository.md --out-dir DIR
                              [--repos-root PATH] [--home PATH] [--workspace PATH]
+                             [--baseline FILE] [--previous RUN_DIR | --no-diff]
   python3 generate-report.py --results-dir DIR --config repository.md --output report.html   (HTML only)
 
 Every finding is located to file + line + one line of code (secrets: file + line only).
@@ -30,6 +31,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent / "lib"))
 
+import audit_report    # noqa: E402
+import history         # noqa: E402
 import report_formats  # noqa: E402
 import report_locate   # noqa: E402
 
@@ -522,7 +525,7 @@ SCRIPT_DIR    = Path(__file__).parent.resolve()
 TEMPLATE_PATH = SCRIPT_DIR.parent / "assets" / "report-template.html"
 
 
-def build_html(findings, config, results_dir, output_path, org):
+def build_html(findings, config, results_dir, output_path, org, meta=None):
     team = config.get("team", "unknown")
     scan_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
@@ -560,6 +563,7 @@ def build_html(findings, config, results_dir, output_path, org):
         return opts
 
     sev_order_list = [s for s in ["CRITICAL","HIGH","MEDIUM","LOW","INFO"] if s in set(f["severity"] for f in findings)]
+    diffs = sorted(set(f.get("diff_status") or "" for f in findings) - {""})
 
     filters_html = f"""
     <div class="filters">
@@ -571,6 +575,8 @@ def build_html(findings, config, results_dir, output_path, org):
       <select id="f-scan">{options(scanners, "All scanners")}</select>
       <label>Type</label>
       <select id="f-type">{options(types, "All types")}</select>
+      <label>Change</label>
+      <select id="f-diff">{options(diffs, "Any")}</select>
       <button class="btn-reset" onclick="resetFilters()">Reset</button>
       <span class="filter-count" id="visible-count">{total} findings</span>
     </div>"""
@@ -608,15 +614,23 @@ def build_html(findings, config, results_dir, output_path, org):
             desc = html.escape(f["description"][:200]) if f["description"] else ""
             title_txt = html.escape(f["title"][:100]) if f["title"] else ""
 
+            diff_status = f.get("diff_status") or ""
+            marks = ('<span class="mark new">🆕 new</span> ' if diff_status == "new" else "") + \
+                    ('<span class="mark audit">🧠 agent-verified</span> ' if f.get("verdict") == "confirmed" else "")
+            details = f.get("details") or {}
+            if details:
+                desc += ("<br><small><b>Observed:</b> " + html.escape(str(details.get("observed_result", ""))[:300])
+                         + "<br><b>Fix (guidance):</b> " + html.escape(str(details.get("remediation", ""))[:300])
+                         + "</small>")
             rows_html += f"""
-        <tr data-sev="{html.escape(sev)}" data-repo="{html.escape(repo)}" data-scan="{html.escape(scan)}" data-type="{html.escape(ftype)}">
+        <tr data-sev="{html.escape(sev)}" data-repo="{html.escape(repo)}" data-scan="{html.escape(scan)}" data-type="{html.escape(ftype)}" data-diff="{html.escape(diff_status)}">
           <td class="sev-col"><span class="badge {html.escape(sev)}">{html.escape(sev)}</span></td>
           <td class="repo-col"><code style="font-size:12px">{html.escape(repo)}</code></td>
           <td class="scanner-col"><span class="chip {html.escape(scan)}">{html.escape(scan)}</span></td>
           <td class="file-col">{file_html}</td>
           <td class="pkg-col">{pkg_html}</td>
           <td class="id-col">{id_html}</td>
-          <td class="desc-col"><strong style="color:var(--text)">{title_txt}</strong><br><small>{desc}</small></td>
+          <td class="desc-col">{marks}<strong style="color:var(--text)">{title_txt}</strong><br><small>{desc}</small></td>
         </tr>"""
 
     # ── Render template ────────────────────────────────────────────────────────
@@ -636,11 +650,72 @@ def build_html(findings, config, results_dir, output_path, org):
            .replace("{{TOTAL}}",       str(total))
            .replace("{{CARDS}}",       cards_html)
            .replace("{{FILTERS}}",     filters_html)
-           .replace("{{ROWS}}",        rows_html))
+           .replace("{{ROWS}}",        rows_html)
+           .replace("{{SECTIONS}}",    html_sections(meta or {})))
 
     Path(output_path).write_text(doc, encoding="utf-8")
     print(f"  📄 HTML report → {output_path}")
     return output_path
+
+
+def _h(value):
+    return html.escape(str(value if value is not None else ""))
+
+
+def html_sections(meta):
+    """Changes since last run, deep-audit coverage and leads, accepted findings."""
+    parts = []
+    diff = meta.get("diff")
+    if diff and diff.get("compared_runs"):
+        items = "".join(
+            f'<li><s>{_h(f.get("title"))}</s> <small>({_h(f.get("repo"))} · {_h(f.get("severity"))} · '
+            f'{_h(f.get("scanner"))} · {_h(f.get("file"))}{":" + _h(f["line"]) if f.get("line") else ""})</small></li>'
+            for f in diff.get("fixed_findings", []))
+        parts.append(
+            f'<section class="panel"><h2>🔁 Changes since last run</h2><p>🆕 new <b>{diff["new"]}</b> · '
+            f'⏳ still open <b>{diff["open"]}</b> · ✅ fixed <b>{diff["fixed"]}</b>'
+            + (f' · not re-checked <b>{diff["not_rechecked"]}</b>' if diff.get("not_rechecked") else "")
+            + f'</p><p><small>Compared with: {_h(", ".join(diff["compared_runs"]))}</small></p>'
+            + (f'<h3>✅ Fixed</h3><ul>{items}</ul>' if items else "") + '</section>')
+    for repo, a in sorted((meta.get("audits") or {}).items()):
+        cov = " · ".join(f"{_h(k)} {v}" for k, v in sorted((a.get("coverage") or {}).items())) or "—"
+        rows = "".join(
+            f'<tr><td>{_h(n["title"])}</td><td><code>{_h(n.get("file"))}:{_h(n.get("line"))}</code></td>'
+            f'<td>{_h("; ".join(n["blockers"]))}</td><td>{_h(" / ".join(x for x in (n.get("local"), n.get("deployment")) if x))}</td></tr>'
+            for n in a.get("needs_validation") or [])
+        hard = "".join(f"<li>{_h(h)}</li>" for h in (a.get("hardening") or [])[:30])
+        gaps = "".join(f'<li>{_h(d["status"])}: {_h(d["surface"])} × {_h(d["attack_class"])} — {_h(d["reason"])}</li>'
+                       for d in (a.get("deferred") or [])[:30])
+        warn = ""
+        if a.get("errors"):
+            warn += f'<p class="warn">⚠️ Audit output not merged: {_h("; ".join(a["errors"][:3]))}</p>'
+        if a.get("incomplete_reason"):
+            warn += f'<p class="warn">⚠️ Incomplete: {_h(a["incomplete_reason"])} — a partial pass</p>'
+        parts.append(
+            f'<section class="panel"><h2>🧠 Deep audit — {_h(repo)}</h2>'
+            f'<p>Profile <b>{_h(a.get("profile") or "—")}</b> · status <b>{_h(a.get("run_status") or "—")}</b> · '
+            f'execution <b>{_h(a.get("execution_policy") or "—")}</b></p><p>Coverage: {cov}</p>'
+            f'<p>Confirmed <b>{a.get("confirmed", 0)}</b> (in the table, marked 🧠) · needs validation '
+            f'<b>{len(a.get("needs_validation") or [])}</b> · rejected <b>{a.get("rejected", 0)}</b></p>{warn}'
+            + (f'<h3>Needs validation (no severity)</h3><table class="mini"><tr><th>Lead</th><th>Where</th>'
+               f'<th>Blocker</th><th>How to resolve</th></tr>{rows}</table>' if rows else "")
+            + (f'<h3>Not covered this run</h3><ul>{gaps}</ul>' if gaps else "")
+            + (f'<h3>Hardening notes (not vulnerabilities)</h3><ul>{hard}</ul>' if hard else "")
+            + '</section>')
+    baseline = meta.get("baseline") or {}
+    if baseline.get("accepted") or baseline.get("expired") or baseline.get("unused"):
+        items = "".join(
+            f'<li>{_h(f.get("title"))} <small>({_h(f.get("repo"))} · {_h(f.get("severity"))} · '
+            f'<code>{_h(f.get("fingerprint"))}</code>)</small> — {_h(f.get("baseline_reason"))}</li>'
+            for f in baseline.get("accepted", []))
+        parts.append(
+            f'<section class="panel"><h2>🤝 Accepted findings (baseline)</h2><ul>{items}</ul>'
+            + (f'<p><small>Expired: {_h(", ".join(e.get("fingerprint", "") for e in baseline["expired"]))}</small></p>'
+               if baseline.get("expired") else "")
+            + (f'<p><small>Matched nothing this run: {_h(", ".join(baseline["unused"]))}</small></p>'
+               if baseline.get("unused") else "")
+            + '</section>')
+    return "\n".join(parts)
 
 
 # ─── Main ─────────────────────────────────────────────────────────────────────
@@ -660,6 +735,9 @@ def main():
     ap.add_argument("--workspace",   default=".",     help="Workspace root for file links")
     ap.add_argument("--repos-root",  default=None,    help="Folder holding the scanned repos (default: --workspace)")
     ap.add_argument("--home",        default=None,    help="Home folder for host-mode (~/...) paths (default: $HOME)")
+    ap.add_argument("--baseline",    default=None,    help="Accepted-findings file (fingerprint + reason)")
+    ap.add_argument("--previous",    default=None,    help="Compare with this run folder only (default: earlier runs)")
+    ap.add_argument("--no-diff",     action="store_true", help="Do not compare with earlier runs")
     args = ap.parse_args()
     if not args.out_dir and not args.output:
         args.output = "security-report.html"
@@ -676,9 +754,36 @@ def main():
     print(f"  Repos found in results: {repos}")
 
     findings = collect_findings(args.results_dir, repos, workspace)
+    audits = {}
+    for repo in repos:
+        try:
+            merged, summary = audit_report.load(args.results_dir, repo, workspace)
+        except Exception as exc:  # a broken audit folder must not cost the scanner report
+            merged, summary = [], {"valid": False, "errors": ["%s: %s" % (type(exc).__name__, exc)]}
+        if summary is not None:
+            audits[repo] = summary
+            findings.extend(merged)
+    findings.sort(key=lambda f: (severity_order(f["severity"]), f["repo"], f["scanner"]))
     report_locate.apply(findings, repos_root, home)
     located = sum(1 for f in findings if f.get("line"))
     print(f"  Total findings parsed: {len(findings)} ({located} located to a line)")
+
+    history.assign_fingerprints(findings)
+    current_pairs = history.scanners_ran(args.results_dir)
+    if args.no_diff:
+        diff = None
+    else:
+        diff = history.diff(findings, args.results_dir, current_pairs, previous=args.previous)
+        print(f"  Since earlier runs: {diff['new']} new, {diff['open']} still open, {diff['fixed']} fixed")
+    baseline = history.load_baseline(args.baseline)
+    findings, accepted, unused = history.apply_baseline(findings, baseline)
+    if args.baseline:
+        print(f"  Baseline: {len(accepted)} accepted finding(s) hidden from the counts")
+    run_meta = {}
+    try:
+        run_meta = json.loads((Path(args.results_dir) / "run-metadata.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        pass
 
     outputs = []
     if args.out_dir:
@@ -691,12 +796,21 @@ def main():
             "repos": [HOST_LABEL if r == HOST_RESULTS else r for r in repos],
             "skipped": [],
             "generated_at": datetime.now().astimezone().isoformat(timespec="seconds"),
+            "diff": diff,
+            "baseline": {"path": os.path.abspath(args.baseline) if args.baseline else None,
+                         "accepted": accepted, "unused": unused, "expired": baseline["expired"],
+                         "invalid": baseline["invalid"]},
+            "audits": dict((HOST_LABEL if r == HOST_RESULTS else r, a) for r, a in audits.items()),
+            "source_refs": run_meta.get("source_refs", {}),
+            "run_options": dict((k, run_meta.get(k)) for k in ("scanner", "profile", "since", "budget")
+                                if run_meta.get(k) not in (None, "")),
         }
         (out_dir / "security-report.json").write_text(
             json.dumps(report_formats.build_json(findings, meta), indent=2) + "\n", encoding="utf-8")
         (out_dir / "security-report.md").write_text(report_formats.build_markdown(findings, meta), encoding="utf-8")
         outputs += [out_dir / "security-report.md", out_dir / "security-report.json"]
-        outputs.append(Path(build_html(findings, config, args.results_dir, str(out_dir / "security-report.html"), org)))
+        outputs.append(Path(build_html(findings, config, args.results_dir, str(out_dir / "security-report.html"), org,
+                                       meta)))
     if args.output:
         outputs.append(Path(build_html(findings, config, args.results_dir, args.output, org)))
 
