@@ -5,6 +5,11 @@ Usage:
   python3 -I validate-audit.py findings <run>/<repo>/audit/findings.json
   python3 -I validate-audit.py ledger   <run>/<repo>/audit/coverage-ledger.json
   python3 -I validate-audit.py run      <run>/<repo>/audit        # both files, plus run-metadata.json
+  python3 -I validate-audit.py hunter   result.json [--assigned ID ...]   # one hunter's structured result
+  python3 -I validate-audit.py verifier result.json [--fingerprint FP]    # one verifier's decision
+
+Check every agent result before it touches the ledger or findings.json; a malformed result is discarded
+and its unit reassigned (or its candidate re-verified by a fresh agent), never repaired.
 
 Exit 0 valid, 1 invalid, 2 unreadable. Validator success proves format and ledger consistency only, not
 that a finding is true. Stdlib only; Python 3.8+.
@@ -46,7 +51,30 @@ def check_metadata(path):
     return 0
 
 
+def check_agent_result(kind, path, extra):
+    try:
+        data = audit.load_json(path)
+    except audit.AuditInputError as exc:
+        print("INVALID %s\n  %s" % (path, exc))
+        return 2
+    if kind == "hunter":
+        assigned = extra[extra.index("--assigned") + 1:] if "--assigned" in extra else None
+        errors = audit.validate_hunter_result(data, assigned)
+    else:
+        fp = extra[extra.index("--fingerprint") + 1] if "--fingerprint" in extra else None
+        errors = audit.validate_verifier_result(data, fp)
+    if errors:
+        print("INVALID %s (%d error(s))" % (path, len(errors)))
+        for e in errors:
+            print("  " + e)
+        return 1
+    print("OK %s" % path)
+    return 0
+
+
 def main(argv):
+    if len(argv) >= 3 and argv[1] in ("hunter", "verifier"):
+        return check_agent_result(argv[1], argv[2], argv[3:])
     if len(argv) != 3 or argv[1] not in ("findings", "ledger", "run"):
         sys.stderr.write(__doc__)
         return 2

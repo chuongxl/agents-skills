@@ -12,5 +12,10 @@ Kept outside `audit-demo/` on purpose: the fixture must not tell an auditing age
 | needs_validation | `.github/workflows/ci.yml` | `pull_request_target` checks out the PR head and runs `npm test` with `NPM_TOKEN` in the environment. Whether fork PRs can trigger it without approval is a repository setting outside the source. |
 | rejected or not a candidate | `src/app.js` `GET /version` | `execFileSync` with a fixed argument list and no request data; not an injection sink. |
 
-Semgrep (p/javascript, p/nodejs, p/owasp-top-ten) reports nothing for this fixture; the flaws above are the
-kind only the deep audit finds.
+These are logic and trust-boundary flaws (a missing owner comparison, an inherited-key lookup, a privileged
+CI trigger), the kind pattern-based scanners are not designed to establish end to end.
+
+First end-to-end run of the method (quick profile, 12 agent invocations, sandboxed local checks): both
+confirmed findings and both needs-validation leads above were produced, each re-verified by a fresh agent;
+the `/version` exec was correctly not reported as injection (its crash on git failure stayed
+needs-validation). The final critic added the listener crash paths and the hardcoded tokens as deferred units.

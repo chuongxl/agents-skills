@@ -681,7 +681,7 @@ def html_sections(meta):
         cov = " · ".join(f"{_h(k)} {v}" for k, v in sorted((a.get("coverage") or {}).items())) or "—"
         rows = "".join(
             f'<tr><td>{_h(n["title"])}</td><td><code>{_h(n.get("file"))}:{_h(n.get("line"))}</code></td>'
-            f'<td>{_h("; ".join(n["blockers"]))}</td><td>{_h(" / ".join(x for x in (n.get("local"), n.get("deployment")) if x))}</td></tr>'
+            f'<td>{_h(report_formats.first_blocker(n))}</td><td>{_h(report_formats.short_plan(n))}</td></tr>'
             for n in a.get("needs_validation") or [])
         hard = "".join(f"<li>{_h(h)}</li>" for h in (a.get("hardening") or [])[:30])
         gaps = "".join(f'<li>{_h(d["status"])}: {_h(d["surface"])} × {_h(d["attack_class"])} — {_h(d["reason"])}</li>'
@@ -792,7 +792,7 @@ def main():
         meta = {
             "team": team, "org": org, "config": os.path.abspath(args.config),
             "run_dir": str(out_dir.resolve()),
-            "scanners": sorted({f["scanner"] for f in findings}),
+            "scanners": sorted({f["scanner"] for f in findings} | {sc for _, sc in current_pairs}),
             "repos": [HOST_LABEL if r == HOST_RESULTS else r for r in repos],
             "skipped": [],
             "generated_at": datetime.now().astimezone().isoformat(timespec="seconds"),

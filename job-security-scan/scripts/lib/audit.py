@@ -733,3 +733,130 @@ def main_validate(kind, path, out=sys.stdout):
         counts = dict((k, v) for k, v in ledger_counts(data).items() if v)
         out.write("OK %s: %d unit(s) %s\n" % (path, len(data), json.dumps(counts, sort_keys=True)))
     return 0
+
+
+# ── agent results (structured hunter / verifier output) ───────────────────────
+
+DISPOSITIONS = {"covered", "candidate", "blocked"}
+
+
+def validate_hunter_result(result, assigned=None, schema=None):
+    """Errors for one hunter's structured result (HUNTING.md "Structured hunter result").
+
+    `assigned` is the list of coverage IDs the parent assigned; when given, each must appear exactly once.
+    Candidates must use `proposed_verdict` (not `verdict`) and otherwise match their schema branch.
+    """
+    schema = schema or load_schema()
+    errors = []
+    if not isinstance(result, dict):
+        return ["$: expected one JSON object"]
+    for key in ("units", "candidates", "hardening", "uncovered"):
+        if not isinstance(result.get(key), list):
+            errors.append("$.%s: expected array" % key)
+    if errors:
+        return errors
+    seen = {}
+    linked = set()
+    for i, unit in enumerate(result["units"]):
+        base = "$.units[%d]" % i
+        if not isinstance(unit, dict):
+            errors.append("%s: expected object" % base)
+            continue
+        cid = unit.get("coverage_id")
+        if not isinstance(cid, str):
+            errors.append("%s.coverage_id: expected string" % base)
+        elif cid in seen:
+            errors.append("%s.coverage_id: duplicate of $.units[%d]" % (base, seen[cid]))
+        else:
+            seen[cid] = i
+        disposition = unit.get("disposition")
+        if not _in(disposition, DISPOSITIONS):
+            errors.append('%s.disposition: expected "covered", "candidate" or "blocked"' % base)
+        _string_list(unit.get("reviewed_paths"), base + ".reviewed_paths", errors, allow_empty=False, path_value=True)
+        _checks(unit.get("checks"), base + ".checks", errors)
+        if not _list(unit.get("checks")):
+            errors.append("%s.checks: requires entries" % base)
+        _path_ownership({"reviewed_paths": unit.get("reviewed_paths"), "local_checks": unit.get("checks")}, base, errors)
+        _string_list(unit.get("candidate_fingerprints"), base + ".candidate_fingerprints", errors, fingerprint=True)
+        _string_list(unit.get("unresolved"), base + ".unresolved", errors)
+        fps = _list(unit.get("candidate_fingerprints"))
+        if disposition == "candidate" and not fps:
+            errors.append("%s: candidate unit requires candidate_fingerprints" % base)
+        if disposition != "candidate" and fps:
+            errors.append("%s: only a candidate unit carries fingerprints" % base)
+        if disposition == "covered" and _list(unit.get("unresolved")):
+            errors.append("%s: covered unit must have no unresolved facts" % base)
+        if disposition == "blocked" and not _list(unit.get("unresolved")):
+            errors.append("%s: blocked unit requires unresolved facts" % base)
+        linked.update(f for f in fps if isinstance(f, str))
+    if assigned is not None:
+        for cid in sorted(set(assigned) - set(seen)):
+            errors.append("$.units: assigned coverage ID missing: %r" % cid)
+        for cid in sorted(set(seen) - set(assigned)):
+            errors.append("$.units: coverage ID was not assigned: %r" % cid)
+    candidate_fps = set()
+    for i, cand in enumerate(result["candidates"]):
+        base = "$.candidates[%d]" % i
+        if not isinstance(cand, dict):
+            errors.append("%s: expected object" % base)
+            continue
+        if "verdict" in cand:
+            errors.append('%s: use "proposed_verdict", not "verdict" (verifiers decide the verdict)' % base)
+        proposed = cand.get("proposed_verdict")
+        if not _in(proposed, ("confirmed", "needs_validation")):
+            errors.append('%s.proposed_verdict: expected "confirmed" or "needs_validation"' % base)
+            continue
+        record = dict((k, v) for k, v in cand.items() if k != "proposed_verdict")
+        record["verdict"] = proposed
+        errors += [e.replace("$data[0]", base).replace("$[0]", base) for e in validate_findings([record], schema)]
+        if isinstance(cand.get("fingerprint"), str):
+            candidate_fps.add(cand["fingerprint"])
+    for fp in sorted(linked - candidate_fps):
+        errors.append("$.units: fingerprint %r has no candidate entry" % fp)
+    for fp in sorted(candidate_fps - linked):
+        errors.append("$.candidates: fingerprint %r is not linked from any candidate unit" % fp)
+    for i, h in enumerate(result["hardening"]):
+        if not visible_text(h):
+            errors.append("$.hardening[%d]: invalid text" % i)
+    for i, u in enumerate(result["uncovered"]):
+        base = "$.uncovered[%d]" % i
+        if not isinstance(u, dict):
+            errors.append("%s: expected object" % base)
+            continue
+        for f in ("surface", "boundary", "subsystem", "attack_class", "reason"):
+            if not visible_text(u.get(f)):
+                errors.append("%s.%s: invalid text" % (base, f))
+        _string_list(u.get("starting_paths"), base + ".starting_paths", errors, allow_empty=False, path_value=True)
+    return errors[:LIMITS["errors"]]
+
+
+def validate_verifier_result(result, expected_fingerprint=None, schema=None):
+    """Errors for a Phase 3 verifier result {"decision": ..., "record": {...}} (or a Phase 5
+    {"decision": "verified", "fingerprint": ...} / {"decision": "replace", "reason": ..., "record": {...}})."""
+    schema = schema or load_schema()
+    if not isinstance(result, dict):
+        return ["$: expected one JSON object"]
+    decision = result.get("decision")
+    if decision == "verified":
+        extra = set(result) - {"decision", "fingerprint"}
+        errors = ["$: unexpected field %r" % k for k in sorted(extra)]
+        if not safe_fingerprint(result.get("fingerprint")):
+            errors.append("$.fingerprint: invalid fingerprint")
+        return errors
+    if not _in(decision, ("confirmed", "needs_validation", "rejected", "replace")):
+        return ['$.decision: expected confirmed, needs_validation, rejected, verified or replace']
+    allowed = {"decision", "record"} | ({"reason"} if decision == "replace" else set())
+    errors = ["$: unexpected field %r" % k for k in sorted(set(result) - allowed)]
+    if decision == "replace" and not visible_text(result.get("reason")):
+        errors.append("$.reason: invalid text")
+    record = result.get("record")
+    if not isinstance(record, dict):
+        return errors + ["$.record: expected object"]
+    if decision != "replace" and record.get("verdict") != decision:
+        errors.append("$.record.verdict: must equal decision %r" % decision)
+    errors += [e.replace("$data[0]", "$.record").replace("$[0]", "$.record")
+               for e in validate_findings([record], schema)]
+    if expected_fingerprint is not None and record.get("fingerprint") != expected_fingerprint:
+        errors.append("$.record.fingerprint: %r differs from the candidate %r (new root cause needs its own "
+                      "validation)" % (record.get("fingerprint"), expected_fingerprint))
+    return errors[:LIMITS["errors"]]

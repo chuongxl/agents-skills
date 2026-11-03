@@ -183,6 +183,28 @@ def build_markdown(findings, meta):
     return "\n".join(out)
 
 
+def _clip(text, limit=220):
+    text = " ".join(str(text or "").split())
+    return text if len(text) <= limit else text[:limit - 1].rstrip() + "…"
+
+
+def first_blocker(lead):
+    blockers = lead.get("blockers") or []
+    if not blockers:
+        return "—"
+    more = len(blockers) - 1
+    return _clip(blockers[0]) + (" (+%d more)" % more if more else "")
+
+
+def short_plan(lead):
+    parts = []
+    if lead.get("deployment"):
+        parts.append("Owner: " + _clip(lead["deployment"], 200))
+    if lead.get("local"):
+        parts.append("Local: " + _clip(lead["local"], 160))
+    return " · ".join(parts) or "—"
+
+
 def _commit(ref):
     if not isinstance(ref, dict) or not ref.get("commit"):
         return "—"
@@ -237,10 +259,10 @@ def _audit_markdown(audits):
                     "| Lead | Where | Blocker | How to resolve |", "|---|---|---|---|"]
             for n in a["needs_validation"]:
                 where = _code("%s:%s" % (n["file"], n["line"])) if n.get("file") else "—"
-                plan = " / ".join(_text(x) for x in (n.get("local"), n.get("deployment")) if x)
-                out.append("| %s | %s | %s | %s |" % (_text(n["title"]), where, _text("; ".join(n["blockers"])),
-                                                     plan))
-            out.append("")
+                out.append("| %s | %s | %s | %s |" % (_text(n["title"]), where, _text(first_blocker(n)),
+                                                     _text(short_plan(n))))
+            out += ["", "Full blockers and resolution plans: %s in the repo's audit folder." % _code("NEEDS-VALIDATION.md"),
+                    ""]
         if a.get("deferred"):
             out += ["#### Not covered this run", ""]
             out += ["- %s — %s × %s: %s" % (_text(d["status"]), _text(d["surface"]), _text(d["attack_class"]),

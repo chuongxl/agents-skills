@@ -230,6 +230,46 @@ class LedgerTests(unittest.TestCase):
         self.assertTrue(any("expected canonical ID" in e for e in audit.validate_ledger([tampered])))
 
 
+class AgentResultTests(unittest.TestCase):
+    def hunter_result(self):
+        cand = confirmed()
+        cand.pop("verdict")
+        cand["proposed_verdict"] = "confirmed"
+        return {"units": [{"coverage_id": "u1", "disposition": "candidate", "reviewed_paths": ["src/app.js"],
+                           "checks": [check()], "candidate_fingerprints": [cand["fingerprint"]], "unresolved": []},
+                          {"coverage_id": "u2", "disposition": "covered", "reviewed_paths": ["src/app.js"],
+                           "checks": [check()], "candidate_fingerprints": [], "unresolved": []}],
+                "candidates": [cand], "hardening": ["add a regression test"], "uncovered": []}
+
+    def test_valid_hunter_result(self):
+        self.assertEqual(audit.validate_hunter_result(self.hunter_result(), ["u1", "u2"]), [])
+
+    def test_hunter_contract_slips_seen_in_practice(self):
+        r = self.hunter_result()
+        r["candidates"][0]["verdict"] = r["candidates"][0].pop("proposed_verdict")     # wrong wrapper field
+        self.assertTrue(any("proposed_verdict" in e for e in audit.validate_hunter_result(r)))
+        r = self.hunter_result()
+        r["units"][0]["reviewed_paths"].append("src/server.js")                       # path no check owns
+        self.assertTrue(any("no check owner" in e for e in audit.validate_hunter_result(r)))
+        r = self.hunter_result()
+        r["candidates"][0]["severity"]["overall_severity"] = "critical"                  # above impact
+        self.assertTrue(any("cannot exceed" in e for e in audit.validate_hunter_result(r)))
+        r = self.hunter_result()
+        self.assertTrue(any("missing" in e for e in audit.validate_hunter_result(r, ["u1", "u2", "u3"])))
+        r["units"][1]["candidate_fingerprints"] = ["x"]
+        self.assertTrue(audit.validate_hunter_result(r))
+
+    def test_verifier_result(self):
+        ok = {"decision": "confirmed", "record": confirmed()}
+        self.assertEqual(audit.validate_verifier_result(ok, "notes-get-missing-owner-check"), [])
+        self.assertEqual(audit.validate_verifier_result({"decision": "rejected", "record": rejected()}), [])
+        self.assertEqual(audit.validate_verifier_result({"decision": "verified", "fingerprint": "a"}), [])
+        self.assertTrue(audit.validate_verifier_result({"decision": "needs_validation", "record": confirmed()}))
+        self.assertTrue(audit.validate_verifier_result(ok, "other-fp"))
+        self.assertTrue(audit.validate_verifier_result(dict(ok, note="x")))
+        self.assertTrue(audit.validate_verifier_result("```json {} ```"))
+
+
 class CliTests(unittest.TestCase):
     def setUp(self):
         self.tmp = Path(tempfile.mkdtemp())

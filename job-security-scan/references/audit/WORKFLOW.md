@@ -58,6 +58,7 @@ sits inside the scanned repository. That satisfies the upstream rule for an in-t
 | The artifact promotion procedure (trusted parent-side code) | `python3 -I <skill-dir>/scripts/audit-promote.py --agent-dir <audit>/agents/<id> --file <scratch-relative> ...` |
 | Prior `coverage-ledger.json` / `findings.json` | listed in `run-metadata.json` → `prior_runs` |
 | Hunter `hardening` notes kept in ledger bookkeeping | store them as a `hardening` array of strings on the relevant ledger unit — the unified report shows them |
+| "Reject malformed hunter results" / "discard a malformed or prose-wrapped verifier result" | `python3 -I <skill-dir>/scripts/validate-audit.py hunter <result.json> --assigned <id> ...` and `validate-audit.py verifier <result.json> --fingerprint <fp>` — save the agent's final message unmodified first; anything that is not exactly one JSON object is discarded, never repaired |
 | Task tool, `research` / `general` agents | the platform's sub-agent tool (for Claude Code: the Agent tool). Each hunter and verifier is a fresh agent |
 
 `run_status` values are `awaiting_agent` (set by the script), `in_progress`, `complete` and `incomplete`.
@@ -99,11 +100,14 @@ sits inside the scanned repository. That satisfies the upstream rule for an in-t
    ledger with `audit-ledger.py seed`. Respect `profile`, `scope_paths` (from `--since`) and `budget`
    exactly as [METHOD.md](METHOD.md) describes. Validate the ledger.
 3. **Phase 2 — Hunting waves** ([HUNTING.md](HUNTING.md)): build every hunter prompt as specified, with the
-   attack-class blocks copied verbatim. Add rules 1–5 above to each prompt. Update and validate the ledger
-   after each wave; run the coverage critics.
+   attack-class blocks copied verbatim. Add rules 1–5 above to each prompt. Check each result with
+   `validate-audit.py hunter` before it touches the ledger (observed slips: `verdict` instead of
+   `proposed_verdict`, unit paths no check owns, overall severity above impact). Update and validate the
+   ledger after each wave; run the coverage critics.
 4. **Phase 3 — Candidate validation**, **Phase 4 — `findings.json`**, **Phase 5 — fresh-eyes
-   verification** ([VALIDATION-AND-REPORTING.md](VALIDATION-AND-REPORTING.md)). Validate both files after
-   every change: `python3 -I <skill-dir>/scripts/validate-audit.py run <audit-dir>`.
+   verification** ([VALIDATION-AND-REPORTING.md](VALIDATION-AND-REPORTING.md)). Check each verifier result with
+   `validate-audit.py verifier`; a fenced or prose-wrapped answer is discarded and re-run with a fresh
+   verifier while the budget allows. Validate both files after every change: `python3 -I <skill-dir>/scripts/validate-audit.py run <audit-dir>`.
 5. **Phase 6 — Reports**: write `REPORT.md`, `FINDINGS-DETAIL.md` and `NEEDS-VALIDATION.md` in the audit
    folder, then set `run_status` to `complete` (or `incomplete` with `incomplete_reason`) and validate
    again.

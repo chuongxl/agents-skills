@@ -443,7 +443,7 @@ bash job-security-scan/scripts/run-scan.sh  # Re-downloads DB
 
 ## Version History
 
-- **v3.0** (current) — Deep audit (Phase 9) adapted from cloudflare/security-audit-skill: coverage ledger, isolated hunters, adversarial validation, confirmed / needs-validation / rejected verdicts, Python validators, sandbox and evidence promotion; stable fingerprints with new/open/fixed diff across runs; baseline of accepted findings; commit and dirty flag per repo; report `schema_version` 2
+- **v3.0** (current) — Deep audit (Phase 9) adapted from cloudflare/security-audit-skill: coverage ledger, isolated hunters, adversarial validation, confirmed / needs-validation / rejected verdicts, Python validators, sandbox and evidence promotion; stable fingerprints with new/open/fixed diff across runs; baseline of accepted findings; commit and dirty flag per repo; report `schema_version` 2; a semgrep run that writes no output is now reported as not scanned instead of clean
 - **v2.4** — Security hardening of the skill itself: pinned and checksum-verified tool installs, SHA-pinned CI actions (template moved off hijacked `trivy-action` tags), config/repo-name injection fixed, secret values stripped from raw output, opt-in sandboxed image probe, verified TruffleHog secrets fail the scan
 - **v2.3** — Per-run `security-run-<datetime>/` folder with Markdown, JSON and HTML reports; every finding located to file, line and code; caches moved out of the workspace; report-only rule
 - **v2.2** — Shai-Hulud supply-chain worm check (`--scanner shai-hulud`, `--host` laptop mode)

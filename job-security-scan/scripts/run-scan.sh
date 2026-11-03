@@ -232,14 +232,18 @@ run_semgrep() {
     "${config_args[@]}" \
     --json --output "$out" \
     --no-rewrite-rule-ids --quiet \
-    "$path" 2>/dev/null || true
+    "$path" 2>"$OUTPUT_BASE/$repo/semgrep.err" || true
 
   local count
   count=$(python3 -I -c \
     'import json, sys; d=json.load(open(sys.argv[1])); print(len(d.get("results",[])))' "$out" \
-    2>/dev/null || echo 0)
+    2>/dev/null || echo "x")
 
-  if [[ "$count" -eq 0 ]]; then
+  # No readable output means semgrep did not run (e.g. registry rulesets unreachable) - never report that as clean.
+  if [[ "$count" == "x" ]]; then
+    rm -f "$out"
+    _warn semgrep "$repo" "semgrep produced no results file (rulesets unreachable?) - NOT scanned; see $OUTPUT_BASE/$repo/semgrep.err"
+  elif [[ "$count" -eq 0 ]]; then
     _pass semgrep "$repo" "No findings"
   else
     _warn semgrep "$repo" "$count finding(s) — see $out"
