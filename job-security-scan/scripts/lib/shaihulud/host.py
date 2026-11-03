@@ -107,7 +107,7 @@ def _package_dirs(modules_dir):
             yield child
 
 
-def scan_global_modules(home, ioc, allowlist):
+def scan_global_modules(home, ioc, allowlist, checked=None):
     """Each globally installed package: its own release, its files and hooks, and its dependencies."""
     out = []
     for nm in global_module_dirs(home):
@@ -116,6 +116,8 @@ def scan_global_modules(home, ioc, allowlist):
         except OSError:
             continue
         for pkg_dir in pkg_dirs:
+            if checked is not None:
+                checked.host["global_packages"] += 1
             shown = _display(pkg_dir, home)
             try:
                 manifest = json.loads((pkg_dir / "package.json").read_text(encoding="utf-8"))
@@ -131,9 +133,11 @@ def scan_global_modules(home, ioc, allowlist):
     return out
 
 
-def scan_site_packages(home, ioc):
+def scan_site_packages(home, ioc, checked=None):
     out = []
     for meta in glob.glob(str(home / ".local" / "lib" / "python3*" / "site-packages" / "*.dist-info" / "METADATA")):
+        if checked is not None:
+            checked.host["python_packages"] += 1
         name = version = None
         try:
             with open(meta, "r", encoding="utf-8", errors="replace") as fh:
@@ -155,13 +159,15 @@ def scan_site_packages(home, ioc):
     return out
 
 
-def scan_npm_cache(home, ioc):
+def scan_npm_cache(home, ioc, checked=None):
     cache = Path(os.environ.get("npm_config_cache") or (home / ".npm")) / "_cacache" / "index-v5"
     out = []
     if not cache.is_dir():
         return out
     for dirpath, _dirs, files in os.walk(str(cache), followlinks=False):
         for fn in files:
+            if checked is not None:
+                checked.host["npm_cache_entries"] += 1
             try:
                 with open(os.path.join(dirpath, fn), "r", encoding="utf-8", errors="replace") as fh:
                     text = fh.read(1 << 20)
@@ -215,18 +221,27 @@ def credential_inventory(home, projects):
     return out
 
 
-def scan_host(roots, home, ioc, allowlist, max_depth=8):
+def scan_host(roots, home, ioc, allowlist, max_depth=8, checked=None):
     home = Path(home)
     out, projects = [], []
+    if checked is not None:
+        checked.host = {"projects": 0, "global_packages": 0, "python_packages": 0, "npm_cache_entries": 0,
+                        "credential_stores": 0}
     for root in roots:
         for project in find_projects(root, home, max_depth):
             projects.append(project)
-            out.extend(relocate(f, _display(project, home)) for f in scan_repo(project, ioc, allowlist))
+            shown = _display(project, home)
+            if checked is not None:
+                checked.host["projects"] += 1
+            out.extend(relocate(f, shown) for f in scan_repo(project, ioc, allowlist, checked, shown + "/"))
     # persistence files the worm drops in the home directory itself (.claude/, .vscode/)
     from .scanner import check_paths
     out.extend(relocate(f, "~") for f in check_paths(home, ioc))
-    out.extend(scan_global_modules(home, ioc, allowlist))
-    out.extend(scan_site_packages(home, ioc))
-    out.extend(scan_npm_cache(home, ioc))
-    out.extend(credential_inventory(home, projects))
+    out.extend(scan_global_modules(home, ioc, allowlist, checked))
+    out.extend(scan_site_packages(home, ioc, checked))
+    out.extend(scan_npm_cache(home, ioc, checked))
+    creds = credential_inventory(home, projects)
+    if checked is not None:
+        checked.host["credential_stores"] = sum(1 for f in creds if f["category"] == "credential-store")
+    out.extend(creds)
     return out

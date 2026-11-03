@@ -35,6 +35,7 @@ import report_locate   # noqa: E402
 import report_model    # noqa: E402
 import report_schema   # noqa: E402
 import report_scope    # noqa: E402
+import report_shaihulud  # noqa: E402
 
 
 # ─── Config Parser ────────────────────────────────────────────────────────────
@@ -686,6 +687,7 @@ def build_html(doc, config, results_dir, output_path, org, workspace="."):
             .replace("{{TOTAL}}",       str(total))
             .replace("{{CARDS}}",       cards_html)
             .replace("{{RUNINFO}}",     _runinfo_html(doc))
+            .replace("{{SHAIHULUD}}",   report_shaihulud.render_html(doc))
             .replace("{{FILTERS}}",     filters_html)
             .replace("{{ROWS}}",        rows_html))
 
@@ -812,6 +814,7 @@ def main():
         "generated_at": datetime.now().astimezone().isoformat(timespec="seconds"),
         "profile": args.profile, "since": args.since, "partial": args.partial,
         "coverage": coverage,
+        "shai_hulud": report_shaihulud.build(args.results_dir, repos),
     }
     doc = report_model.build_document(findings, meta, previous=previous)
     doc["run"].update(workspace=workspace, repos_root=repos_root, home=home)

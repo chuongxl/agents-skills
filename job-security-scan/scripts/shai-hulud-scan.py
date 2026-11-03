@@ -57,14 +57,17 @@ def run(args):
         for r in roots:
             if not r.is_dir():
                 raise IOError("root is not a directory: %s" % r)
-        found = host.scan_host(roots, home, ioc, allowlist, max_depth=args.max_depth)
-        doc = findings.to_document("host", ", ".join(str(r) for r in roots), ioc.version, found)
+        checked = scanner.Checked()
+        found = host.scan_host(roots, home, ioc, allowlist, max_depth=args.max_depth, checked=checked)
+        doc = findings.to_document("host", ", ".join(str(r) for r in roots), ioc.version, found,
+                                   checked.as_dict(ioc))
     else:
         root = Path(args.repo)
         if not root.is_dir():
             raise IOError("not a directory: %s" % root)
-        found = scanner.scan_repo(root, ioc, allowlist)
-        doc = findings.to_document("repo", str(root), ioc.version, found)
+        checked = scanner.Checked()
+        found = scanner.scan_repo(root, ioc, allowlist, checked)
+        doc = findings.to_document("repo", str(root), ioc.version, found, checked.as_dict(ioc))
     return doc
 
 

@@ -5,13 +5,14 @@ the findings, the verdict contract, severity never above demonstrated impact, an
 Stdlib only; Python 3.8+.
 """
 
+import report_shaihulud
 from report_model import (CHANGES, IMPACTS, LIKELIHOODS, PROFILES, SCHEMA_VERSION, SEVERITIES, VERDICTS,
                           counts_of, verification_summary)
 
 MAX_FINDINGS = 20000
 MAX_ERRORS = 100
 TOP_KEYS = ("schema_version", "generated_at", "team", "org", "run_dir", "run", "scanners", "counts", "repos",
-            "fixed", "verification", "findings")
+            "fixed", "shai_hulud", "verification", "findings")
 FINDING_REQUIRED = ("repo", "scanner", "type", "severity", "file", "line", "code", "rule_id", "title",
                     "fingerprint", "change", "verdict", "verified_severity", "verdict_detail")
 _IMPACT_RANK = dict((v, i) for i, v in enumerate(IMPACTS))
@@ -110,6 +111,7 @@ def validate(doc):
             err("%s: a secret finding must not carry a code excerpt" % where)
         for e in validate_verdict(f.get("verdict"), f.get("verified_severity"), f.get("verdict_detail"), where):
             err(e)
+    report_shaihulud.validate(doc, err)
     if not errors:
         if doc["counts"] != counts_of(findings):
             err("counts do not match the findings (rejected findings are excluded, confirmed use verified severity)")

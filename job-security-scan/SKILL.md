@@ -23,7 +23,7 @@ compatibility: >
 license: MIT
 metadata:
   author: one-om-ddm-team
-  version: "2.5"
+  version: "2.6"
   config-file: assets/repository.md
 allowed-tools: bash glob grep view create edit
 ---
@@ -181,6 +181,13 @@ Benign hooks (`node-gyp rebuild`, `prebuild-install`, `husky`, esbuild's install
 Data provenance: `references/ioc-data.md`. If affected: the runbook in `references/remediation.md`.
 Standalone: `python3 -I scripts/shai-hulud-scan.py --repo PATH` or `--host` (exit 0 clean / 1 suspicious / 2 affected).
 
+**In the reports:** every report has a "🪱 Shai-Hulud check" section with one row per repo (and "this machine"
+with `--host`): the verdict (AFFECTED / SUSPICIOUS / CLEAN / ERROR / not run), what the check looked at
+(dependency files, packages compared, `package.json` files, install hooks, workflows; for the host: projects,
+global installs, Python packages, npm cache entries, credential stores), the indicator data version and a link to
+the raw output. A CLEAN row with "nothing to check" means the repo had no lockfile, requirements file or
+`package.json`. A failed check shows as ERROR with its message and never marks earlier findings fixed.
+
 ## Phase 9 — Verify Findings (agent step)
 
 After `run-scan.sh`, the serious findings are checked by **independent verifiers** before you report. Follow
@@ -204,7 +211,8 @@ overwritten:
 ```
 security-run-YYYYMMDD-HHMMSS/
 ├── security-report.md     # summary + findings by severity, each with file:line and the line of code
-├── security-report.json   # same data, machine-readable (schema_version 2, assets/report.schema.json)
+├── security-report.json   # same data, machine-readable (schema_version 2, assets/report.schema.json;
+│                          #   shai_hulud block = per-target Shai-Hulud verdict and what was checked)
 ├── security-report.html   # interactive report (filters, VS Code links, NEW badges, verdicts)
 ├── NEEDS-VALIDATION.md    # after Phase 9: findings a person must settle, with the blocker and a plan
 ├── triage/                # Phase 9 queue.json and verdicts.json
@@ -300,7 +308,8 @@ The scanner reads untrusted repositories, so it is built not to be an attack pat
 
 1. Run Phase 9 (verification) unless the profile is `quick` or the user asked to skip it.
 2. Read `security-run-<datetime>/security-report.md` (the last console line names the folder).
-3. Reply with a short summary: the per-repo status table, the changes since the last run, the confirmed
+3. Reply with a short summary: the per-repo status table, the Shai-Hulud check row for every target (verdict
+   and what was checked; say plainly if it errored or did not run), the changes since the last run, the confirmed
    Critical and High findings as `file:line` with their rule, how many need validation, were dismissed or are
    still pending, and the paths of the report files.
 4. Stop there. Do not offer, propose or ask to fix anything, and do not edit any scanned file — the

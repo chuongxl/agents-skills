@@ -48,6 +48,8 @@ jobs:
         run: python3 -I job-security-scan/scripts/test-reports.py
       - name: Verification tests (fingerprints, schema v2, changes since last run, profiles, --since, triage)
         run: python3 -I job-security-scan/scripts/test-verification.py
+      - name: Shai-Hulud report section tests (per-target verdict, what was checked, error / not run)
+        run: python3 -I job-security-scan/scripts/test-shai-hulud-report.py
       - name: Shai-Hulud indicator data validates
         run: |
           python3 -I - <<'PY'

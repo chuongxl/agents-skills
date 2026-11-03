@@ -14,6 +14,34 @@ PAYLOAD_DEPTH = 2
 WORKFLOW_DIR = Path(".github") / "workflows"
 
 
+class Checked(object):
+    """What a scan looked at, so a CLEAN verdict can be checked: counts and repo-relative paths only."""
+
+    def __init__(self):
+        self.dependency_files = set()
+        self.packages = 0
+        self.installed_packages = 0
+        self.manifests = 0
+        self.install_hooks = 0
+        self.workflows = 0
+        self.host = None          # host mode: {projects, global_packages, python_packages, npm_cache_entries}
+
+    def as_dict(self, ioc):
+        out = {
+            "ioc_version": ioc.version,
+            "ioc_packages": sum(len(v) for v in ioc.packages.values()),
+            "dependency_files": sorted(self.dependency_files),
+            "packages": self.packages,
+            "installed_packages": self.installed_packages,
+            "manifests": self.manifests,
+            "install_hooks": self.install_hooks,
+            "workflows": self.workflows,
+        }
+        if self.host is not None:
+            out.update(self.host)
+        return out
+
+
 def _rel(root, path):
     return os.path.relpath(str(path), str(root)).replace(os.sep, "/")
 
@@ -64,9 +92,15 @@ def _marker_findings(root, ioc, path, text):
     return out
 
 
-def check_packages(root, ioc):
+def check_packages(root, ioc, checked=None, prefix=""):
     out = []
     for pkg in iter_packages(root):
+        if checked is not None:
+            checked.packages += 1
+            if "node_modules/" in pkg.location:
+                checked.installed_packages += 1
+            else:
+                checked.dependency_files.add(prefix + pkg.location)
         wave = ioc.package_wave(pkg.ecosystem, pkg.name, pkg.version)
         if wave:
             out.append(make_finding("affected", "CRITICAL", "known-package", pkg.location,
@@ -92,7 +126,7 @@ def check_manifest_files(root, ioc, pkg_dir, manifest):
     return out
 
 
-def check_paths(root, ioc):
+def check_paths(root, ioc, checked=None):
     out = []
     for spec in ioc.paths:
         for path in sorted(root.glob(spec["pattern"])):
@@ -108,6 +142,8 @@ def check_paths(root, ioc):
     if workflows.is_dir():
         for path in sorted(workflows.iterdir()):
             if path.is_file() and not path.is_symlink() and path.suffix in (".yml", ".yaml"):
+                if checked is not None:
+                    checked.workflows += 1
                 out.extend(_marker_findings(root, ioc, path, read_text(path)))
     for spec in ioc.paths:
         if spec["pattern"].startswith(str(WORKFLOW_DIR)):
@@ -118,11 +154,15 @@ def check_paths(root, ioc):
     return out
 
 
-def scan_repo(root, ioc, allowlist):
-    """All findings for one directory tree (a repo or a project found on the host)."""
+def scan_repo(root, ioc, allowlist, checked=None, prefix=""):
+    """All findings for one directory tree (a repo or a project found on the host). `checked`, when given,
+    is updated with what was looked at; `prefix` is prepended to its paths (host mode: ~/project/)."""
     root = Path(root)
-    out = check_packages(root, ioc) + check_paths(root, ioc)
+    out = check_packages(root, ioc, checked, prefix) + check_paths(root, ioc, checked)
     for pkg_dir, manifest in iter_manifests(root):
+        if checked is not None:
+            checked.manifests += 1
+            checked.install_hooks += len(list(install_hooks(manifest)))
         out.extend(check_manifest_files(root, ioc, pkg_dir, manifest))
         out.extend(analyze_manifest(pkg_dir, manifest, allowlist, root, ioc))
     return out

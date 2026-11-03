@@ -265,7 +265,7 @@ class FindingTests(unittest.TestCase):
 
     def test_document_and_text(self):
         doc = self.f.to_document("repo", "/x", "2026-11-02", [self.make("affected")])
-        self.assertEqual(set(doc), {"scanner", "mode", "target", "ioc_version", "verdict", "counts", "findings"})
+        self.assertEqual(set(doc), {"scanner", "mode", "target", "ioc_version", "verdict", "counts", "checked", "findings"})
         self.assertEqual(doc["scanner"], "shai-hulud")
         self.assertEqual(doc["counts"]["CRITICAL"], 1)
         self.assertIn("AFFECTED", self.f.to_text(doc))

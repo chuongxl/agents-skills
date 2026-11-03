@@ -119,7 +119,7 @@ def dedupe(findings):
     return out
 
 
-def to_document(mode, target, ioc_version, findings):
+def to_document(mode, target, ioc_version, findings, checked=None):
     findings = sorted(dedupe(findings), key=lambda f: (SEVERITIES.index(f["severity"]), f["location"], f["category"]))
     counts = dict((s, 0) for s in SEVERITIES)
     for f in findings:
@@ -131,6 +131,7 @@ def to_document(mode, target, ioc_version, findings):
         "ioc_version": ioc_version,
         "verdict": verdict(findings),
         "counts": counts,
+        "checked": checked or {},
         "findings": findings,
     }
 
@@ -147,6 +148,10 @@ def to_text(doc):
              "Verdict: %s" % _HEADLINE[doc["verdict"]],
              "Indicators: %s   Counts: %s" % (doc["ioc_version"],
                                                " ".join("%s=%d" % (s, n) for s, n in doc["counts"].items() if n))]
+    c = doc.get("checked") or {}
+    if c:
+        lines.append("Checked: %s" % ", ".join("%s=%s" % (k, len(v) if isinstance(v, list) else v)
+                                               for k, v in c.items() if k != "ioc_version"))
     for f in doc["findings"]:
         what = "%s@%s" % (f["package"], f["version"]) if f["package"] else ""
         wave = " [%s]" % f["wave"] if f["wave"] else ""

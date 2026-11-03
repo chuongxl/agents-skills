@@ -199,6 +199,7 @@ def build_document(findings, meta, previous=None):
         "repos": repo_summaries(rows, meta.get("repos", [])),
         "skipped": list(meta.get("skipped", [])),
         "fixed": fixed,
+        "shai_hulud": meta.get("shai_hulud") or {"ran": False, "ioc_version": None, "targets": []},
         "verification": verification_summary(rows, profile),
         "findings": rows,
     }
