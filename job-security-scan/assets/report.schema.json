@@ -4,7 +4,7 @@
   "title": "job-security-scan security-report.json (schema v2)",
   "description": "Documentation mirror of scripts/validate-report.py, which is the enforced contract. Rules a JSON Schema cannot express are enforced there only: unique fingerprints, counts and verification summary match the findings, verified_severity never above demonstrated impact, no code excerpt on secret rows.",
   "type": "object",
-  "required": ["schema_version", "generated_at", "team", "org", "run_dir", "run", "scanners", "counts", "repos", "fixed", "verification", "findings"],
+  "required": ["schema_version", "generated_at", "team", "org", "run_dir", "run", "scanners", "counts", "repos", "fixed", "shai_hulud", "verification", "findings"],
   "properties": {
     "schema_version": {"const": 2},
     "generated_at": {"type": "string"},
@@ -43,6 +43,35 @@
     },
     "skipped": {"type": "array"},
     "fixed": {"type": "array", "items": {"type": "object", "required": ["fingerprint"]}},
+    "shai_hulud": {
+      "type": "object",
+      "description": "One row per target (repo, or 'this machine' for --host). A clean verdict with Shai-Hulud findings, or affected/suspicious without any (outside a partial run), is invalid.",
+      "required": ["ran", "ioc_version", "targets"],
+      "properties": {
+        "ran": {"type": "boolean"},
+        "ioc_version": {"type": ["string", "null"]},
+        "targets": {"type": "array", "items": {
+          "type": "object",
+          "required": ["repo", "mode", "verdict", "checked", "counts", "raw", "error", "credential_stores"],
+          "properties": {
+            "repo": {"type": "string"},
+            "mode": {"enum": ["repo", "host"]},
+            "verdict": {"enum": ["affected", "suspicious", "clean", "error", "not-run"]},
+            "checked": {"type": "object", "properties": {
+              "ioc_version": {"type": "string"}, "ioc_packages": {"type": "integer"},
+              "dependency_files": {"type": "array", "items": {"type": "string"}},
+              "packages": {"type": "integer"}, "installed_packages": {"type": "integer"},
+              "manifests": {"type": "integer"}, "install_hooks": {"type": "integer"}, "workflows": {"type": "integer"},
+              "projects": {"type": "integer"}, "global_packages": {"type": "integer"},
+              "python_packages": {"type": "integer"}, "npm_cache_entries": {"type": "integer"},
+              "credential_stores": {"type": "integer"}}},
+            "counts": {"type": "object", "additionalProperties": {"type": "integer"}},
+            "raw": {"type": ["string", "null"]},
+            "error": {"type": ["string", "null"]},
+            "credential_stores": {"type": "array", "items": {"type": "string"}}
+          }}}
+      }
+    },
     "verification": {
       "type": "object",
       "required": ["profile", "queued", "pending", "confirmed", "needs_validation", "rejected"],

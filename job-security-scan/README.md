@@ -179,6 +179,10 @@ A fast, offline answer to "were we hit by the Shai-Hulud npm/PyPI worm?":
 - Never runs npm/node/pip; benign hooks (`node-gyp`, `husky`, esbuild...) are allowlisted
 
 **Output:** `shai-hulud.json` per repo, `_host/shai-hulud.json` for this computer (report: "this machine").
+Every report has a **🪱 Shai-Hulud check** section: one row per repo and for this machine with the verdict
+(AFFECTED / SUSPICIOUS / CLEAN / ERROR / not run), what was checked (dependency files, packages, install hooks,
+workflows; projects, global installs and npm cache for the host), the indicator data version and a link to the raw
+output, so a clean result can be checked and a failed check is never silent.
 Indicator data and sources: [references/ioc-data.md](references/ioc-data.md). If affected:
 [references/remediation.md](references/remediation.md#-shai-hulud-if-affected).
 
@@ -429,7 +433,9 @@ bash job-security-scan/scripts/run-scan.sh  # Re-downloads DB
 
 ## Version History
 
-- **v2.5** (current) — Independent verification of findings (confirmed / needs validation / dismissed, calibrated
+- **v2.6** (current) — Shai-Hulud check section in every report (per-target verdict, what was checked,
+  indicator version, raw-output link, error / not-run states); the scanner records what it checked
+- **v2.5** — Independent verification of findings (confirmed / needs validation / dismissed, calibrated
   severity, `triage.py`), changes since the last run (fingerprints, fixed list, carried verdicts), `--profile`
   and `--since`, report schema v2 with `validate-report.py`; ideas adapted from Cloudflare's security-audit skill (MIT)
 - **v2.4** — Security hardening of the skill itself: pinned and checksum-verified tool installs, SHA-pinned CI actions (template moved off hijacked `trivy-action` tags), config/repo-name injection fixed, secret values stripped from raw output, opt-in sandboxed image probe, verified TruffleHog secrets fail the scan
