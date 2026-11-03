@@ -72,8 +72,29 @@ def finding_issue(f, target):
     if f.get("conflicts"):
         lines += ["", "Sources disagree on the fixed version: " + "; ".join(
             "%s says %s, %s says %s" % (c["winner"], c["winner_fixed"], c["other"], c["other_fixed"]) for c in f["conflicts"]) + " (vendor value shown above)."]
-    lines += ["", "Target: `%s`" % target, "", "<!-- jss-advisory:%s -->" % marker]
-    return marker, "[security-advisory] %s affects %s %s (%s)" % (f["id"], f["component"], f["installed"], f["severity"]), "\n".join(lines)
+    lines += ["", "Target: `%s`" % target]
+    return _issue(marker, "[security-advisory] %s affects %s %s (%s)" % (f["id"], f["component"], f["installed"], f["severity"]), lines)
+
+
+_MENTION = re.compile(r"@(?=[A-Za-z0-9])")
+
+
+def neutralize(text):
+    """Text from fetched advisories/feeds goes into GitHub issues: no @-mentions (notification spam),
+    no raw HTML, no javascript:/data: links."""
+    zwsp = "\u200b"
+    text = _MENTION.sub("@" + zwsp, str(text))
+    text = text.replace("<", "&lt;").replace(">", "&gt;")
+    return re.sub(r"\]\(\s*(javascript|data|vbscript):", lambda m: "]" + zwsp + "(" + m.group(1) + ":", text, flags=re.I)
+
+
+def _marker(text):
+    """The dedupe marker lives in an HTML comment: it must not be able to close it."""
+    return str(text).replace("--", "- -").replace(">", "")
+
+
+def _issue(marker, title, lines):
+    return marker, neutralize(title), "\n".join(neutralize(l) for l in lines) + "\n\n<!-- jss-advisory:%s -->" % _marker(marker)
 
 
 def lead_issue(lead):
@@ -83,9 +104,8 @@ def lead_issue(lead):
             "- CVEs mentioned: %s" % (", ".join(lead["cves"]) or "none"), "",
             "Ingest it so the matcher can use it:", "",
             "    python3 -I scripts/fetch-advisories.py --advisory %s --out assets/advisories/<name>.json" % (lead["link"] or "<url>"),
-            "", "Fill in the advisory from the page text and set `source.approved_by` after review.", "",
-            "<!-- jss-advisory:%s -->" % marker]
-    return marker, "[security-advisory] New %s bulletin: %s" % (lead["source"], lead["title"][:80]), "\n".join(body)
+            "", "Fill in the advisory from the page text and set `source.approved_by` after review."]
+    return _issue(marker, "[security-advisory] New %s bulletin: %s" % (lead["source"], lead["title"][:80]), body)
 
 
 def main(argv=None):

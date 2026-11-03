@@ -58,8 +58,10 @@ def build_json(findings, meta):
 # ── Markdown ─────────────────────────────────────────────────────────────────
 
 def _text(value):
-    """Inline text safe inside a Markdown table cell or list item."""
-    return str(value or "").replace("\n", " ").replace("|", "\\|").replace("`", "'")
+    """Inline text safe inside a Markdown table cell or list item. Scanner output can carry text from the
+    scanned repo, so raw HTML is neutralised (Markdown viewers render it)."""
+    return (str(value or "").replace("\n", " ").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+            .replace("|", "\\|").replace("`", "'"))
 
 
 def _code(value):

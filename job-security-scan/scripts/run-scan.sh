@@ -54,7 +54,8 @@ if [[ ! -f "$CONFIG_PATH" ]]; then
 fi
 
 # ─── Load config ──────────────────────────────────────────────────────────
-eval "$(python3 "$SKILL_DIR/scripts/parse-config.py" "$CONFIG_PATH")"
+CONFIG_SH="$(python3 -I "$SKILL_DIR/scripts/parse-config.py" "$CONFIG_PATH")" || { echo "❌ Invalid config: $CONFIG_PATH"; exit 1; }
+eval "$CONFIG_SH"   # values are shell-quoted by parse-config.py
 
 WORKSPACE="${MONOREPO_ROOT:-.}"
 # Shared caches (vendor advisories, refreshed Shai-Hulud indicators) - never in the workspace by default.
@@ -125,7 +126,7 @@ run_gitleaks() {
     _pass gitleaks "$repo" "No secrets found"
   else
     local count
-    count=$(python3 -c "import json; print(len(json.load(open('$out'))))" 2>/dev/null || echo "?")
+    count=$(python3 -I -c 'import json, sys; print(len(json.load(open(sys.argv[1]))))' "$out" 2>/dev/null || echo "?")
     _fail gitleaks "$repo" "$count secret(s) — see $out (values masked in report)"
   fi
 }
@@ -217,8 +218,8 @@ run_semgrep() {
     "$path" 2>/dev/null || true
 
   local count
-  count=$(python3 -c \
-    "import json; d=json.load(open('$out')); print(len(d.get('results',[])))" \
+  count=$(python3 -I -c \
+    'import json, sys; d=json.load(open(sys.argv[1])); print(len(d.get("results",[])))' "$out" \
     2>/dev/null || echo 0)
 
   if [[ "$count" -eq 0 ]]; then
@@ -239,7 +240,7 @@ run_hadolint() {
   mkdir -p "$(dirname "$out")"
 
   _log hadolint "$repo" "Linting Dockerfile..."
-  hadolint --config "$ASSET_DIR/hadolint.yaml" --format tty "$dockerfile" 2>&1 > "$out" || true
+  hadolint --config "$ASSET_DIR/hadolint.yaml" --format tty "$dockerfile" > "$out" 2>&1 || true
 
   local count
   count=$(wc -l < "$out" 2>/dev/null | tr -d '[:space:]')
@@ -277,8 +278,8 @@ run_osv() {
   fi
 
   local count
-  count=$(python3 -c \
-    "import json; d=json.load(open('$out')); print(sum(len(r.get('packages',[])) for r in d.get('results',[])))" \
+  count=$(python3 -I -c \
+    'import json, sys; d=json.load(open(sys.argv[1])); print(sum(len(r.get("packages",[])) for r in d.get("results",[])))' "$out" \
     2>/dev/null || echo 0)
 
   if [[ "$count" -eq 0 ]]; then
@@ -305,7 +306,7 @@ run_sbom() {
   if [[ ! -s "$sbom" ]]; then _warn sbom "$repo" "could not generate SBOM - see $OUTPUT_BASE/$repo/sbom.stderr"; return; fi
 
   local comps
-  comps=$(python3 -c "import json; print(len(json.load(open('$sbom')).get('components',[])))" 2>/dev/null || echo 0)
+  comps=$(python3 -I -c 'import json, sys; print(len(json.load(open(sys.argv[1])).get("components",[])))' "$sbom" 2>/dev/null || echo 0)
   if [[ "$comps" -eq 0 ]]; then _skip sbom "$repo" "SBOM has no components"; return; fi
 
   if ! has_tool osv-scanner; then _pass sbom "$repo" "SBOM written ($comps components) - osv-scanner missing, not matched"; return; fi
@@ -321,8 +322,8 @@ run_sbom() {
     _warn sbom "$repo" "SBOM match failed (exit $rc) - see $OUTPUT_BASE/$repo/osv-sbom.stderr"; return
   fi
   local count
-  count=$(python3 -c \
-    "import json; d=json.load(open('$out')); print(sum(len(r.get('packages',[])) for r in d.get('results',[])))" \
+  count=$(python3 -I -c \
+    'import json, sys; d=json.load(open(sys.argv[1])); print(sum(len(r.get("packages",[])) for r in d.get("results",[])))' "$out" \
     2>/dev/null || echo 0)
   if [[ "$count" -eq 0 ]]; then
     _pass sbom "$repo" "SBOM ($comps components) - no OSV vulnerabilities"
@@ -353,10 +354,15 @@ run_advisories() {
   fetch_advisories_once
 
   local args=(--repo "$path" --cache "$ADVISORY_CACHE" --output "$out" --fail-on none)
-  # What the Dockerfile base images really ship (skipped without docker; the probe says so)
+  # What the Dockerfile base images really ship. Opt-in: it pulls and runs the image a scanned repo names,
+  # so it only runs when JOB_SECURITY_SCAN_PROBE_IMAGES=1 (sandboxed: no network, read-only, no caps).
   local probed="$OUTPUT_BASE/$repo/runtime-probe.json"
   rm -f "$probed"
-  python3 -I "$SKILL_DIR/scripts/probe-runtime.py" --repo "$path" --output "$probed" 2>&1 | sed 's/^/  /' || true
+  if [[ "${JOB_SECURITY_SCAN_PROBE_IMAGES:-}" == "1" ]]; then
+    python3 -I "$SKILL_DIR/scripts/probe-runtime.py" --repo "$path" --output "$probed" 2>&1 | sed 's/^/  /' || true
+  else
+    echo "  [advisories] $repo: Dockerfile base images not probed (set JOB_SECURITY_SCAN_PROBE_IMAGES=1 to run them, sandboxed)"
+  fi
   [[ -s "$probed" ]] && args+=(--inventory "$probed")
   if has_tool trivy; then
     local sbom="$OUTPUT_BASE/$repo/advisories-sbom.cdx.json"
@@ -372,13 +378,13 @@ run_advisories() {
   fi
 
   local crit_high actionable
-  read -r crit_high actionable < <(python3 -c "
-import json
-d = json.load(open('$out'))
-act = [f for f in d['findings'] if f['state'] != 'pending']
-hard = ('affected', 'affected-end-of-life', 'end-of-life', 'affected-if-condition-holds', 'possibly-affected')
-print(sum(1 for f in act if f['state'] in hard and f['severity'] in ('critical', 'high')), len(act))
-" 2>/dev/null || echo "0 0")
+  read -r crit_high actionable < <(python3 -I -c '
+import json, sys
+d = json.load(open(sys.argv[1]))
+act = [f for f in d["findings"] if f["state"] != "pending"]
+hard = ("affected", "affected-end-of-life", "end-of-life", "affected-if-condition-holds", "possibly-affected")
+print(sum(1 for f in act if f["state"] in hard and f["severity"] in ("critical", "high")), len(act))
+' "$out" 2>/dev/null || echo "0 0")
   if [[ "${crit_high:-0}" -gt 0 ]]; then
     _fail advisories "$repo" "$crit_high critical/high of $actionable applicable advisory(ies) - see $OUTPUT_BASE/$repo/advisories.txt"
   elif [[ "${actionable:-0}" -gt 0 ]]; then
@@ -399,12 +405,14 @@ run_trufflehog() {
   trufflehog git "file://$path" \
     --json --no-update \
     2>/dev/null | grep -v "^$" > "$out" || true
+  # TruffleHog has no redact flag: drop the secret values before the raw file stays in the run folder.
+  python3 -I "$SKILL_DIR/scripts/lib/sanitize.py" trufflehog "$out" >/dev/null 2>&1 || : > "$out"
 
   local count verified
   # Use wc for total line count and tolerate grep's non-zero exit on zero matches.
   count=$(wc -l < "$out" 2>/dev/null | tr -d '[:space:]')
   count=${count:-0}
-  verified=$(grep -c '"verified":true' "$out" 2>/dev/null || true)
+  verified=$(grep -ci '"verified": *true' "$out" 2>/dev/null || true)
   verified=${verified:-0}
 
   if [[ "$count" -eq 0 ]]; then

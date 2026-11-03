@@ -71,7 +71,7 @@ def make_finding(tier, severity, category, location, title, package="", version=
     if severity not in SEVERITIES:
         raise ValueError("unknown severity %r" % severity)
     key = remediation_key or category
-    ident = hashlib.sha1("|".join((tier, category, location, package, version)).encode("utf-8")).hexdigest()[:12]
+    ident = hashlib.sha256("|".join((tier, category, location, package, version)).encode("utf-8")).hexdigest()[:12]
     return {
         "id": ident,
         "tier": tier,
@@ -92,7 +92,7 @@ def relocate(finding, prefix):
     f = dict(finding)
     loc = f["location"]
     f["location"] = prefix if loc in ("", ".") else "%s/%s" % (prefix.rstrip("/"), loc)
-    f["id"] = hashlib.sha1("|".join((f["tier"], f["category"], f["location"], f["package"], f["version"]))
+    f["id"] = hashlib.sha256("|".join((f["tier"], f["category"], f["location"], f["package"], f["version"]))
                            .encode("utf-8")).hexdigest()[:12]
     return f
 

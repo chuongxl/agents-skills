@@ -402,7 +402,8 @@ bash job-security-scan/scripts/run-scan.sh  # Re-downloads DB
 
 ## Version History
 
-- **v2.3** (current) — Per-run `security-run-<datetime>/` folder with Markdown, JSON and HTML reports; every finding located to file, line and code; caches moved out of the workspace; report-only rule
+- **v2.4** (current) — Security hardening of the skill itself: pinned and checksum-verified tool installs, SHA-pinned CI actions (template moved off hijacked `trivy-action` tags), config/repo-name injection fixed, secret values stripped from raw output, opt-in sandboxed image probe, verified TruffleHog secrets fail the scan
+- **v2.3** — Per-run `security-run-<datetime>/` folder with Markdown, JSON and HTML reports; every finding located to file, line and code; caches moved out of the workspace; report-only rule
 - **v2.2** — Shai-Hulud supply-chain worm check (`--scanner shai-hulud`, `--host` laptop mode)
 - **v2.1** — Runtime and image checks
 - **v2.0** — Multi-tool unified pipeline, config-driven, zero-install for free tools
