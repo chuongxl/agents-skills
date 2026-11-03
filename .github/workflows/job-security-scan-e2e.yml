@@ -48,6 +48,10 @@ jobs:
         run: python3 -I job-security-scan/scripts/test-reports.py
       - name: Verification tests (fingerprints, schema v2, changes since last run, profiles, --since, triage)
         run: python3 -I job-security-scan/scripts/test-verification.py
+      - name: Deep audit tests (validators, ledger, preparation, sandbox, evidence promotion)
+        run: python3 -I job-security-scan/scripts/test-audit.py
+      - name: Deep audit in the report (merge, fixed-only-after-a-valid-audit, baseline, run-scan flags)
+        run: python3 -I job-security-scan/scripts/test-audit-report.py
       - name: Shai-Hulud report section tests (per-target verdict, what was checked, error / not run)
         run: python3 -I job-security-scan/scripts/test-shai-hulud-report.py
       - name: Shai-Hulud indicator data validates

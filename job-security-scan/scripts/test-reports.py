@@ -420,6 +420,17 @@ class RunFolderTests(TempDirCase):
         self.run_scan("--config", self.config(repos=("clean",)), "--scanner", "gitleaks")
         self.assertIn("--redact", self.calls.read_text())
 
+    def test_semgrep_without_output_is_not_reported_clean(self):
+        fake = self.bin / "semgrep"
+        fake.write_text("#!/usr/bin/env bash\necho 'registry unreachable' >&2\nexit 2\n")
+        fake.chmod(0o755)
+        r = self.run_scan("--config", self.config(repos=("clean",)), "--scanner", "semgrep")
+        self.assertIn("NOT scanned", r.stdout)
+        self.assertNotIn("No findings", r.stdout)
+        self.assertEqual(r.returncode, 1, r.stdout)
+        run = run_dirs(self.ws)[-1]
+        self.assertFalse((run / "clean" / "semgrep.json").exists())   # so the diff never treats it as re-checked
+
     def test_unknown_scanner_creates_no_folder(self):
         r = self.run_scan("--config", self.config(), "--scanner", "nope")
         self.assertEqual(r.returncode, 1)

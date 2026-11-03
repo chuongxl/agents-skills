@@ -23,9 +23,12 @@
         "coverage": {"type": "object", "description": "{repo: {scanner: mode}} - what ran; a finding is fixed only if its scanner ran in the same mode both times", "additionalProperties": {"type": "object", "additionalProperties": {"type": "string"}}},
         "workspace": {"type": "string"},
         "repos_root": {"type": "string"},
-        "home": {"type": "string"}
+        "home": {"type": "string"},
+        "source_refs": {"type": "object", "description": "{repo: {commit, dirty, branch, vcs}} from run-metadata.json", "additionalProperties": {"type": "object"}}
       }
     },
+    "audit": {"type": "object", "description": "Deep audit (--audit) per repo: {repo: summary}. Confirmed audit findings are ordinary findings (scanner 'audit', verdict confirmed); leads that could not be confirmed are listed here with no severity. A summary with valid=false contributed no finding.", "additionalProperties": {"type": "object", "required": ["valid", "confirmed", "needs_validation", "rejected", "errors"], "properties": {"valid": {"type": "boolean"}, "run_status": {"type": ["string", "null"]}, "profile": {"type": ["string", "null"]}, "execution_policy": {"type": ["string", "null"]}, "source_ref": {"type": ["object", "null"]}, "confirmed": {"type": "integer", "minimum": 0}, "rejected": {"type": "integer", "minimum": 0}, "coverage": {"type": ["object", "null"], "additionalProperties": {"type": "integer"}}, "needs_validation": {"type": "array", "items": {"type": "object"}}, "deferred": {"type": "array", "items": {"type": "object"}}, "hardening": {"type": "array", "items": {"type": "string"}}, "errors": {"type": "array", "items": {"type": "string"}}, "incomplete_reason": {"type": ["string", "null"]}}}},
+    "baseline": {"type": "object", "description": "Accepted findings from security-baseline.json: removed from counts and findings, listed with the reason. An accepted fingerprint must not also be a reported finding.", "required": ["accepted", "unused"], "properties": {"path": {"type": ["string", "null"]}, "accepted": {"type": "array", "items": {"type": "object", "required": ["fingerprint", "accepted_reason"]}}, "unused": {"type": "array", "items": {"type": "string"}}, "expired": {"type": "array"}, "invalid": {"type": "array"}}},
     "scanners": {"type": "array", "items": {"type": "string"}},
     "counts": {"$ref": "#/$defs/counts"},
     "repos": {

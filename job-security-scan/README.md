@@ -34,6 +34,8 @@ All tools are free, open-source, and configurable. Security findings are organiz
    calibrated severity), needs validation (with the exact missing fact), or dismissed (with the reason)
 9. **Changes Since Last Run** — Each report marks findings new or unchanged and lists what was fixed
 10. **Profiles and Scope** — `--profile quick|standard|deep` and `--since <git-ref>` for fast PR checks
+11. **Deep Audit (opt-in)** — `--audit`: agent-driven, coverage-led review for logic flaws scanners cannot see, every finding independently re-verified
+12. **Baseline** — Accept known findings with a reason and an expiry date
 
 ## Quick Start
 
@@ -198,6 +200,46 @@ Indicator data and sources: [references/ioc-data.md](references/ioc-data.md). If
 - **Schema:** `security-report.json` is `schema_version` 2 ([assets/report.schema.json](assets/report.schema.json));
   `python3 -I scripts/validate-report.py <run>/security-report.json` checks it (exit 0 valid, 1 invalid, 2 unreadable).
 
+### 9. Deep Audit — Logic Flaws Scanners Miss (opt-in, Phase 10)
+
+Scanners match known-bad patterns. They cannot see that one route checks the note's owner and its
+sibling does not, that a tenant ID comes from the request body, or that a CI workflow runs pull-request code
+with a publish token. The deep audit is the method of
+[cloudflare/security-audit-skill](https://github.com/cloudflare/security-audit-skill) (MIT), adapted to
+this skill (provenance: [references/audit/NOTICE.md](references/audit/NOTICE.md)):
+
+- **Reconnaissance** maps trust boundaries and builds a deterministic **coverage ledger** of entry surface ×
+  boundary × subsystem × attack class.
+- **Hunting** assigns isolated agents to ledger units with attack-class prompts (web/auth, AI/LLM,
+  client-side, supply chain/CI, cloud, RPC/messaging, data isolation, resource exhaustion, desktop/IPC,
+  memory safety); coverage critics look for gaps.
+- **Validation**: a fresh agent tries to disprove every candidate; a second fresh agent re-checks every
+  final record.
+- **Verdicts**: *confirmed* (with severity), *needs validation* (no severity; names the missing fact and
+  the check that settles it), *rejected* (kept so later runs do not repeat it).
+- **Report**: confirmed findings join the scanner findings as ordinary findings (scanner `audit`, already
+  verified); a Deep audit section lists coverage, gaps, leads and hardening notes. An unfinished audit merges
+  nothing.
+
+```bash
+bash job-security-scan/scripts/run-scan.sh --audit                       # scanners + deep audit
+bash job-security-scan/scripts/run-scan.sh --scanner audit --profile quick --since origin/main
+```
+
+The script prepares the audit; the agent then follows
+[references/audit/WORKFLOW.md](references/audit/WORKFLOW.md). Source-only by default. Sandboxed local checks
+need `JOB_SECURITY_SCAN_AUDIT_EXEC=1` and run only through `scripts/audit-sandbox.py` (Linux namespaces:
+no network, read-only filesystem except scratch, empty environment, resource limits — it refuses to run
+if any control is missing).
+
+### 10. Baseline (accepted findings)
+
+Known, accepted findings go in `security-baseline.json` next to `repository.md` (or `--baseline FILE`):
+`{"version": 1, "entries": [{"fingerprint": "<16 hex from security-report.json>", "reason": "...",
+"expires": "YYYY-MM-DD", "owner": "..."}]}`. They are listed in their own report section with the reason and
+left out of the counts; expired entries stop applying; entries matching nothing are flagged. If every
+CRITICAL/HIGH finding is accepted, the run exits 1 (warning) instead of 2.
+
 ## Installation & Setup
 
 ### Platform-Specific Setup
@@ -361,6 +403,9 @@ In CI, add a step before `npm ci` so a compromised release fails the build befor
 # Only files changed since main; Gitleaks on the working tree, OSV, Shai-Hulud; no verification queue
 bash job-security-scan/scripts/run-scan.sh --profile quick --since origin/main
 
+# Scanners plus the deep audit of changed code only
+bash job-security-scan/scripts/run-scan.sh --audit --since origin/main
+
 # Everything, Trivy down to LOW, MEDIUM findings queued for verification too
 bash job-security-scan/scripts/run-scan.sh --profile deep
 python3 -I job-security-scan/scripts/triage.py queue security-run-<datetime>
@@ -433,7 +478,12 @@ bash job-security-scan/scripts/run-scan.sh  # Re-downloads DB
 
 ## Version History
 
-- **v2.6** (current) — Shai-Hulud check section in every report (per-target verdict, what was checked,
+- **v3.0** (current) — Deep audit (Phase 10, `--audit`) adapted from cloudflare/security-audit-skill: coverage
+  ledger, isolated hunters, adversarial validation, confirmed / needs-validation / rejected verdicts, Python
+  validators, optional sandbox and evidence promotion; confirmed audit findings join the report as verified
+  findings; baseline of accepted findings (`security-baseline.json`); commit and dirty flag per repo
+  (`run-metadata.json`); a semgrep run that writes no output is reported as not scanned instead of clean
+- **v2.6** — Shai-Hulud check section in every report (per-target verdict, what was checked,
   indicator version, raw-output link, error / not-run states); the scanner records what it checked
 - **v2.5** — Independent verification of findings (confirmed / needs validation / dismissed, calibrated
   severity, `triage.py`), changes since the last run (fingerprints, fixed list, carried verdicts), `--profile`
@@ -451,5 +501,7 @@ MIT License. Maintained by the security-focused engineering team.
 
 The verification contract, verifier prompt and severity anchors in `references/verification.md` are adapted from
 Cloudflare's [security-audit skill](https://github.com/cloudflare/security-audit-skill), MIT License,
-Copyright (c) 2025-2026 Cloudflare, Inc. — notice in
+Copyright (c) 2025-2026 Cloudflare, Inc. The deep-audit method in `references/audit/` and
+`assets/audit/findings.schema.json` is copied from the same project (provenance:
+[references/audit/NOTICE.md](references/audit/NOTICE.md)). License text in
 [references/third-party/cloudflare-security-audit-LICENSE](references/third-party/cloudflare-security-audit-LICENSE).
