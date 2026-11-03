@@ -71,10 +71,16 @@ def effective_severity(f):
     return (f.get("severity") or "").upper()
 
 
+def is_pending_audit(f):
+    """A code-audit candidate counts only once an independent verifier confirmed it or marked it needs
+    validation; until then it is listed as pending verification."""
+    return f.get("scanner") == "code-audit" and not f.get("verdict")
+
+
 def counts_of(findings):
     counts = dict((s, 0) for s in SEVERITIES)
     for f in findings:
-        if f.get("verdict") == "rejected":
+        if f.get("verdict") == "rejected" or is_pending_audit(f):
             continue
         sev = effective_severity(f)
         if sev in counts:
@@ -97,12 +103,15 @@ def repo_summaries(findings, repos):
         mine = [f for f in findings if f["repo"] == name]
         counts = counts_of(mine)
         out.append({"name": name, "status": _status(counts), "counts": counts,
-                    "secrets": sum(1 for f in mine if f.get("type") == "secret" and f.get("verdict") != "rejected")})
+                    "secrets": sum(1 for f in mine if f.get("type") == "secret" and f.get("verdict") != "rejected"
+                                   and not is_pending_audit(f))})
     return out
 
 
 def is_queued(f, profile):
-    """Does this profile ask for independent verification of this finding?"""
+    """Does this profile ask for independent verification of this finding? Code-audit candidates always."""
+    if f.get("scanner") == "code-audit":
+        return True
     return (f.get("severity") or "").upper() in QUEUE_SEVERITIES.get(profile or "standard", ())
 
 
@@ -163,7 +172,7 @@ def _compare(findings, coverage, previous, partial):
     return fixed, previous.get("run_dir")
 
 
-def build_document(findings, meta, previous=None):
+def build_document(findings, meta, previous=None, same_run=None):
     """v2 report document. `meta`: team, org, config, run_dir, scanners, repos, skipped, generated_at,
     profile, since, coverage ({repo: [scanners that ran]}). `previous`: the prior run's document or None."""
     profile = meta.get("profile") or "standard"
@@ -184,6 +193,14 @@ def build_document(findings, meta, previous=None):
         rows.append(row)
     _number_occurrences(rows)
     partial = bool(meta.get("since")) or bool(meta.get("partial"))
+    if same_run and same_run.get("schema_version", 0) >= 2:
+        # regenerating this run's reports (audit.py collect, a re-run of generate-report.py): keep its verdicts
+        kept = dict((p["fingerprint"], p) for p in same_run.get("findings", []) if p.get("verdict"))
+        for r in rows:
+            p = kept.get(r["fingerprint"])
+            if p and not r.get("verdict"):
+                r.update(verdict=p["verdict"], verified_severity=p.get("verified_severity"),
+                         verdict_detail=p.get("verdict_detail") or {}, carried=bool(p.get("carried")))
     fixed, prev_dir = _compare(rows, meta.get("coverage") or {}, previous, partial)
     return {
         "schema_version": SCHEMA_VERSION,
@@ -200,6 +217,8 @@ def build_document(findings, meta, previous=None):
         "skipped": list(meta.get("skipped", [])),
         "fixed": fixed,
         "shai_hulud": meta.get("shai_hulud") or {"ran": False, "ioc_version": None, "targets": []},
+        "code_audit": meta.get("code_audit") or {"ran": False, "profile": None, "budget": 0, "classes": [],
+                                                 "units": [], "rejected_results": []},
         "verification": verification_summary(rows, profile),
         "findings": rows,
     }

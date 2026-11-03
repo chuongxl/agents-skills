@@ -4,7 +4,7 @@
   "title": "job-security-scan security-report.json (schema v2)",
   "description": "Documentation mirror of scripts/validate-report.py, which is the enforced contract. Rules a JSON Schema cannot express are enforced there only: unique fingerprints, counts and verification summary match the findings, verified_severity never above demonstrated impact, no code excerpt on secret rows.",
   "type": "object",
-  "required": ["schema_version", "generated_at", "team", "org", "run_dir", "run", "scanners", "counts", "repos", "fixed", "shai_hulud", "verification", "findings"],
+  "required": ["schema_version", "generated_at", "team", "org", "run_dir", "run", "scanners", "counts", "repos", "fixed", "shai_hulud", "code_audit", "verification", "findings"],
   "properties": {
     "schema_version": {"const": 2},
     "generated_at": {"type": "string"},
@@ -43,6 +43,29 @@
     },
     "skipped": {"type": "array"},
     "fixed": {"type": "array", "items": {"type": "object", "required": ["fingerprint"]}},
+    "code_audit": {
+      "type": "object",
+      "description": "Agent-driven code audit (Phase 10). Code-audit findings with no verdict are pending verification and not counted. A candidate unit needs at least one candidate; other statuses none.",
+      "required": ["ran", "profile", "budget", "classes", "units", "rejected_results"],
+      "properties": {
+        "ran": {"type": "boolean"},
+        "profile": {"type": ["string", "null"]},
+        "budget": {"type": "integer", "minimum": 0},
+        "classes": {"type": "array", "items": {"type": "string"}},
+        "units": {"type": "array", "items": {
+          "type": "object",
+          "required": ["id", "repo", "area", "attack_class", "status", "candidates"],
+          "properties": {
+            "id": {"type": "string"}, "repo": {"type": "string"}, "area": {"type": "string"},
+            "attack_class": {"type": "string"}, "wave": {"type": "integer"},
+            "status": {"enum": ["covered", "candidate", "blocked", "deferred", "failed", "not-run"]},
+            "reason": {"type": "string"}, "reviewed": {"type": "integer"}, "candidates": {"type": "integer"},
+            "hardening": {"type": "array", "items": {"type": "string"}},
+            "unresolved": {"type": "array", "items": {"type": "string"}}
+          }}},
+        "rejected_results": {"type": "array", "items": {"type": "object", "required": ["file", "reason"]}}
+      }
+    },
     "shai_hulud": {
       "type": "object",
       "description": "One row per target (repo, or 'this machine' for --host). A clean verdict with Shai-Hulud findings, or affected/suspicious without any (outside a partial run), is invalid.",

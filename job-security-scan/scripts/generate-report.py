@@ -36,6 +36,7 @@ import report_model    # noqa: E402
 import report_schema   # noqa: E402
 import report_scope    # noqa: E402
 import report_shaihulud  # noqa: E402
+import report_audit    # noqa: E402
 
 
 # ─── Config Parser ────────────────────────────────────────────────────────────
@@ -466,9 +467,34 @@ def parse_shai_hulud(repo, results_dir, workspace):
     return findings
 
 
+def parse_code_audit(repo, results_dir, workspace):
+    """Candidates from the agent-driven code audit (audit.py collect writes <repo>/code-audit.json)."""
+    path = Path(results_dir) / repo / "code-audit.json"
+    if not path.is_file() or path.stat().st_size > 5 * 1024 * 1024:
+        return []
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return []
+    out = []
+    for c in data.get("candidates", []) if isinstance(data, dict) else []:
+        if not isinstance(c, dict):
+            continue
+        sev = c.get("severity") if c.get("severity") in ("CRITICAL", "HIGH", "MEDIUM", "LOW") else "MEDIUM"
+        out.append({
+            "repo": repo, "scanner": "code-audit", "type": "secret" if c.get("type") == "secret" else "sast",
+            "severity": sev, "file": str(c.get("file") or ""), "line": c.get("line") if isinstance(c.get("line"), int) else None,
+            "package": "", "installed_version": "", "fixed_version": "",
+            "rule_id": str(c.get("attack_class") or ""), "title": str(c.get("title") or "")[:160],
+            "description": ("%s - %s" % (c.get("boundary") or "", c.get("root_cause") or ""))[:300],
+            "url": "", "workspace": workspace,
+        })
+    return out
+
+
 def collect_findings(results_dir, repos, workspace):
     parsers = [parse_gitleaks, parse_trufflehog, parse_trivy, parse_semgrep, parse_hadolint, parse_osv,
-               parse_advisories, parse_shai_hulud]
+               parse_advisories, parse_shai_hulud, parse_code_audit]
     all_findings = []
     for repo in repos:
         for parser in parsers:
@@ -569,7 +595,7 @@ def build_html(doc, config, results_dir, output_path, org, workspace="."):
     """Render the HTML report from the v2 document (the same data as security-report.json)."""
     team = config.get("team", "unknown")
     scan_time = doc.get("generated_at") or datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    findings = doc["findings"]
+    findings = [f for f in doc["findings"] if not report_model.is_pending_audit(f)]   # pending: Code audit panel
     active = [f for f in findings if f.get("verdict") != "rejected"]
 
     counts = doc["counts"]
@@ -688,6 +714,7 @@ def build_html(doc, config, results_dir, output_path, org, workspace="."):
             .replace("{{CARDS}}",       cards_html)
             .replace("{{RUNINFO}}",     _runinfo_html(doc))
             .replace("{{SHAIHULUD}}",   report_shaihulud.render_html(doc))
+            .replace("{{CODEAUDIT}}",   report_audit.render_html(doc))
             .replace("{{FILTERS}}",     filters_html)
             .replace("{{ROWS}}",        rows_html))
 
@@ -815,8 +842,10 @@ def main():
         "profile": args.profile, "since": args.since, "partial": args.partial,
         "coverage": coverage,
         "shai_hulud": report_shaihulud.build(args.results_dir, repos),
+        "code_audit": report_audit.build(out_dir),
     }
-    doc = report_model.build_document(findings, meta, previous=previous)
+    same_run = report_model.load_report(out_dir / "security-report.json")
+    doc = report_model.build_document(findings, meta, previous=previous, same_run=same_run)
     doc["run"].update(workspace=workspace, repos_root=repos_root, home=home)
 
     outputs, errors = [], []

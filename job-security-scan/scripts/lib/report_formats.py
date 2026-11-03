@@ -8,6 +8,7 @@ Stdlib only; Python 3.8+.
 
 import report_model
 import report_shaihulud
+import report_audit
 from report_model import SEVERITIES, SCHEMA_VERSION, FINDING_KEYS, effective_severity  # noqa: F401 (re-export)
 
 STATUS_EMOJI = {"red": "🔴", "yellow": "🟡", "green": "🟢"}
@@ -152,7 +153,8 @@ def render_markdown(doc):
     out.append("")
     out += report_shaihulud.render_markdown(doc, _text, _code)
     out += _changes_section(doc)
-    active = [f for f in doc["findings"] if f.get("verdict") != "rejected"]
+    out += report_audit.render_markdown(doc, _text, _code)
+    active = [f for f in doc["findings"] if f.get("verdict") != "rejected" and not report_model.is_pending_audit(f)]
     if not active:
         out += ["", "**No findings** — every scanned repo is clean.", ""]
     non_secret = [f for f in active if f.get("type") != "secret"]

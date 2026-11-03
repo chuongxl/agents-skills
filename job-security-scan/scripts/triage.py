@@ -101,6 +101,27 @@ def context_for(f, run):
     return {"file": f["file"], "start_line": start, "end_line": end, "lines": out}
 
 
+def _audit_detail(run_dir, f):
+    """The hunter's boundary, root cause and entry-to-sink trace for a code-audit candidate (from
+    <repo>/code-audit.json), so the verifier can follow the whole path."""
+    path = Path(run_dir) / f["repo"] / "code-audit.json"
+    try:
+        data = json.loads(path.read_text(encoding="utf-8")) if path.stat().st_size < 5 * 1024 * 1024 else {}
+    except (OSError, ValueError):
+        data = {}
+    for c in data.get("candidates", []) if isinstance(data, dict) else []:
+        if (isinstance(c, dict) and c.get("file") == f.get("file") and c.get("line") == f.get("line")
+                and c.get("attack_class") == f.get("rule_id") and str(c.get("title"))[:160] == f.get("title")):
+            secret = f.get("type") == "secret"
+            trace = [{"role": s.get("role"), "file": s.get("file"), "line": s.get("line"),
+                      "note": "" if secret else redact(str(s.get("note") or ""))[:300]}
+                     for s in c.get("trace", []) if isinstance(s, dict)][:30]
+            return {"boundary": redact(str(c.get("boundary") or ""))[:400],
+                    "root_cause": redact(str(c.get("root_cause") or ""))[:600],
+                    "hunter_evidence": "" if secret else redact(str(c.get("evidence") or ""))[:1500], "trace": trace}
+    return {"boundary": "", "root_cause": "", "hunter_evidence": "", "trace": []}
+
+
 def cmd_queue(run_dir):
     doc = load_run(run_dir)
     run = doc.get("run") or {}
@@ -113,6 +134,8 @@ def cmd_queue(run_dir):
         if f.get("type") == "secret":
             item["code"] = ""
         item["context"] = context_for(f, run)
+        if f.get("scanner") == "code-audit":
+            item.update(_audit_detail(run_dir, f))
         items.append(item)
     out_dir = Path(run_dir) / "triage"
     out_dir.mkdir(exist_ok=True)
