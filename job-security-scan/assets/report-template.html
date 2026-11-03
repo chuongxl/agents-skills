@@ -15,6 +15,7 @@
     {{CARDS}}        severity summary cards HTML
     {{FILTERS}}      filter dropdowns HTML
     {{ROWS}}         table body rows HTML
+    {{RUNINFO}}      profile, scope, verification and changes-since-last-run panel HTML
 
   To customise look & feel: edit the <style> and <script> sections below.
   Do NOT change {{PLACEHOLDER}} tokens — they are replaced programmatically.
@@ -147,6 +148,16 @@ td.desc-col    { min-width: 220px; color: var(--text2); }
                 white-space: pre-wrap; word-break: break-all; }
 .cve-link  { font-family: var(--mono); font-size: 12px; }
 .rule-id   { font-family: var(--mono); font-size: 12px; color: var(--text2); }
+/* ── Changes and verification ─────────────────────────────────────────────── */
+.badge-new { display: inline-block; margin-top: 4px; padding: 1px 6px; border-radius: 4px; font-size: 10px;
+             font-weight: 700; letter-spacing: .04em; color: #fff; background: #2563eb; }
+.verdict { display: block; margin-top: 6px; font-size: 11px; color: var(--text2); }
+.verdict.confirmed { color: #16a34a; } .verdict.needs_validation { color: #d97706; }
+.tool-sev { display: block; margin-top: 4px; font-size: 10px; color: var(--text3); }
+tr.dismissed { opacity: .55; }
+.runinfo { margin: 0 24px 16px; padding: 12px 16px; border: 1px solid var(--border, rgba(127,127,127,.3));
+           border-radius: 8px; font-size: 13px; color: var(--text2); }
+.runinfo strong { color: var(--text); } .runinfo ul { margin: 6px 0 0 18px; }
 
 /* ── Empty state ─────────────────────────────────────────────────────────── */
 .empty { text-align: center; padding: 64px 32px; color: var(--text3); }
@@ -184,6 +195,8 @@ td.desc-col    { min-width: 220px; color: var(--text2); }
 <div class="summary">
   {{CARDS}}
 </div>
+
+{{RUNINFO}}
 
 {{FILTERS}}
 

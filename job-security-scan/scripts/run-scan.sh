@@ -3,6 +3,7 @@
 #
 # Usage:
 #   run-scan.sh [--config path/to/repository.md] [--repo REPO_NAME] [--scanner SCANNER] [--host]
+#               [--profile quick|standard|deep] [--since GIT_REF]
 #
 # Flags:
 #   --config   Path to repository.md config file (default: auto-discover)
@@ -10,6 +11,12 @@
 #   --scanner  Run one scanner only: gitleaks|trivy|semgrep|hadolint|osv|sbom|advisories|trufflehog|shai-hulud|all
 #   --host     Also check THIS computer for the Shai-Hulud worm (projects under $HOME, global installs,
 #              npm cache, credential stores). Alone (no --scanner), only the host check runs.
+#   --profile  quick    = Gitleaks (working tree only), OSV, Shai-Hulud; nothing queued for verification
+#              standard = every scanner; CRITICAL+HIGH queued for verification (default)
+#              deep     = every scanner, Trivy also reports LOW; CRITICAL+HIGH+MEDIUM queued
+#              --scanner still picks one scanner and overrides the profile's list.
+#   --since    Report only findings in files changed since GIT_REF (committed REF...HEAD plus working-tree
+#              changes). A partial run: no "fixed" list. Repos that are not git repos keep full scope.
 #
 # Reads all team/repo config from repository.md — no hardcoded values.
 #
@@ -24,6 +31,8 @@ set -uo pipefail
 # ─── Argument parsing ──────────────────────────────────────────────────────
 SCANNER="all"
 SCANNER_SET=0
+PROFILE="standard"
+SINCE=""
 HOST_MODE=0
 REPO_FILTER=""
 CONFIG_PATH=""
@@ -36,6 +45,10 @@ while [[ $# -gt 0 ]]; do
     -s)         SCANNER="$2"; SCANNER_SET=1; shift 2 ;;
     --host)     HOST_MODE=1;      shift ;;
     -r)         REPO_FILTER="$2"; shift 2 ;;
+    --profile)  [[ $# -ge 2 ]] || { echo "--profile needs quick, standard or deep"; exit 1; }
+                PROFILE="$2"; shift 2 ;;
+    --since)    [[ $# -ge 2 ]] || { echo "--since needs a git ref"; exit 1; }
+                SINCE="$2"; shift 2 ;;
     *)          echo "Unknown arg: $1"; exit 1 ;;
   esac
 done
@@ -110,10 +123,16 @@ run_gitleaks() {
 
   if ! has_tool gitleaks; then _skip gitleaks "$repo" "tool not installed"; return; fi
 
-  _log gitleaks "$repo" "Scanning full git history for secrets..."
+  local scope=(--log-opts "--all")
+  if [[ "$PROFILE" == "quick" ]]; then
+    scope=(--no-git)
+    _log gitleaks "$repo" "Scanning the working tree for secrets (quick profile: no git history)..."
+  else
+    _log gitleaks "$repo" "Scanning full git history for secrets..."
+  fi
   gitleaks detect \
     --source "$path" \
-    --log-opts "--all" \
+    "${scope[@]}" \
     --config "$ASSET_DIR/gitleaks.toml" \
     --report-format json \
     --report-path "$out" \
@@ -150,6 +169,7 @@ run_trivy() {
 
   local sev="${FAIL_ON_SEVERITY:-HIGH},CRITICAL"
   [[ "$sev" != *"MEDIUM"* ]] && sev="MEDIUM,$sev"
+  [[ "$PROFILE" == "deep" && "$sev" != *"LOW"* ]] && sev="LOW,$sev"
 
   trivy fs "$path" \
     --scanners vuln,secret,misconfig \
@@ -485,6 +505,12 @@ run_scanner_for_repo() {
     trufflehog) run_trufflehog "$repo" "$path" ;;
     shai-hulud) run_shai_hulud "$repo" "$path" ;;
     all)
+      if [[ "$PROFILE" == "quick" ]]; then
+        run_gitleaks    "$repo" "$path"
+        run_osv         "$repo" "$path"
+        run_shai_hulud  "$repo" "$path"
+        return
+      fi
       run_gitleaks   "$repo" "$path"
       run_trivy      "$repo" "$path"
       run_semgrep    "$repo" "$path"
@@ -513,6 +539,15 @@ case "$SCANNER" in
     ;;
 esac
 
+case "$PROFILE" in
+  quick|standard|deep) ;;
+  *) echo "Unknown profile: $PROFILE (valid: quick | standard | deep)"; exit 1 ;;
+esac
+if [[ -n "$SINCE" ]] && ! [[ "$SINCE" =~ ^[A-Za-z0-9._/~^@{}+-]{1,200}$ && "$SINCE" != -* ]]; then
+  echo "Invalid --since ref: $SINCE"
+  exit 1
+fi
+
 # One self-contained folder per run, in the workspace folder; never overwrite an earlier run.
 RUN_ROOT="${SECURITY_RUN_ROOT:-$PWD}"
 RUN_STAMP="$(date +%Y%m%d-%H%M%S)"
@@ -526,7 +561,8 @@ RUN_DIR="$OUTPUT_BASE"
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "  🔐 Security Scan — team: ${TEAM} | org: ${ORG}"
-echo "  Scanners : ${SCANNER}"
+echo "  Profile  : ${PROFILE}$([[ $SCANNER_SET -eq 1 ]] && echo " (scanner: ${SCANNER})")"
+[[ -n "$SINCE" ]] && echo "  Scope    : files changed since ${SINCE} (partial run)"
 echo "  Repos    : ${REPOS_TO_SCAN[*]:-(none)}"
 [[ $HOST_MODE -eq 1 ]] && echo "  Host     : this machine (Shai-Hulud check)"
 echo "  Run      : ${OUTPUT_BASE}/"
@@ -558,8 +594,17 @@ echo ""
 generate_reports() {
   echo ""
   echo "  Generating reports..."
-  if python3 "$SKILL_DIR/scripts/generate-report.py" \
+  local scope=()
+  if [[ -n "$SINCE" ]]; then
+    python3 -I "$SKILL_DIR/scripts/changed-files.py" --since "$SINCE" --repos-root "$WORKSPACE" \
+      --out "$RUN_DIR/changed-files.json" ${REPOS_TO_SCAN[@]+"${REPOS_TO_SCAN[@]}"} \
+      && scope=(--since "$SINCE" --changed-files "$RUN_DIR/changed-files.json") \
+      || scope=(--since "$SINCE")
+  fi
+  if python3 -I "$SKILL_DIR/scripts/generate-report.py" \
       --results-dir "$RUN_DIR" \
+      --profile     "$PROFILE" \
+      ${scope[@]+"${scope[@]}"} \
       --out-dir     "$RUN_DIR" \
       --config      "$CONFIG_PATH" \
       --workspace   "$PWD" \

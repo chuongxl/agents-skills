@@ -97,6 +97,10 @@ for f in security-report.md security-report.json security-report.html; do
   check "osv run wrote $f"                      test -s "$OSV_RUN/$f"
 done
 check "every OSV finding located to a line"     python3 -I "$HERE/assert-located.py" "$OSV_RUN/security-report.json" osv
+check "osv report validates (schema v2)"       python3 -I "$SKILL_DIR/scripts/validate-report.py" "$OSV_RUN/security-report.json"
+check "sbom report validates (schema v2)"      python3 -I "$SKILL_DIR/scripts/validate-report.py" "$SBOM_RUN/security-report.json"
+check "sbom run compared with the osv run"     python3 -I -c 'import json,sys; d=json.load(open(sys.argv[1])); sys.exit(0 if d["run"]["previous_run"] else 1)' "$SBOM_RUN/security-report.json"
+check "osv findings queued for verification"   python3 -I "$SKILL_DIR/scripts/triage.py" queue "$OSV_RUN"
 
 if [[ $FAILS -gt 0 ]]; then
   for f in "$OSV_RUN"/*/osv.stderr "$SBOM_RUN"/*/osv-sbom.stderr "$SBOM_RUN"/*/sbom.stderr; do
