@@ -8,8 +8,9 @@ description: >
   (transitive CVEs), TruffleHog (live credential checks), vendor advisories
   and an offline Shai-Hulud worm check for repos and, with --host, this
   computer. Writes Markdown, JSON and HTML reports per run, compares each
-  run with the last, and has independent verifiers confirm, dismiss or flag
-  for validation the serious findings. Use when asked to scan for
+  run with the last, has independent verifiers confirm, dismiss or flag
+  for validation the serious findings, and (deep or on request) audits the
+  code by attack class with read-only agents. Use when asked to scan for
   vulnerabilities, secrets, malware, misconfigurations or supply chain
   issues, to set up a CI security pipeline, or to check whether a repo or
   laptop was hit by Shai-Hulud. Supports --repo, --scanner, --profile
@@ -23,7 +24,7 @@ compatibility: >
 license: MIT
 metadata:
   author: one-om-ddm-team
-  version: "2.6"
+  version: "2.7"
   config-file: assets/repository.md
 allowed-tools: bash glob grep view create edit
 ---
@@ -203,6 +204,25 @@ Verdicts: **confirmed** (verified severity, never above demonstrated impact), **
 missing fact plus a safe check, listed in `NEEDS-VALIDATION.md`), **rejected** (moved to "Dismissed (with
 reason)", out of the counts). Verdicts carry over to the next run while the code is unchanged.
 
+## Phase 10 — Code Audit by Attack Class (agent step, deep or on request)
+
+Runs with `--profile deep`, or when the user asks for a code audit; never by default in `quick` or `standard`.
+Read-only agents audit the code one attack class at a time and find what pattern scanners miss (missing
+authorization, one user reading another's data, path traversal, logic errors). Run it **before** Phase 9 so its
+candidates get verified. Follow `references/code-audit.md` exactly:
+
+1. `python3 -I scripts/audit.py plan security-run-<datetime>` (budget 12 units on request, 24 in deep; the rest
+   are recorded as deferred).
+2. For each planned unit, `python3 -I scripts/audit.py prompt security-run-<datetime> UNIT_ID` → one **fresh
+   read-only sub-agent** with exactly that prompt. Save each reply unchanged in `triage/audit-results/`.
+3. `audit.py critic-prompt` → one fresh coverage critic → `audit.py add-units RUN REPLY.json` → hunt the new units.
+4. `python3 -I scripts/audit.py collect security-run-<datetime>` (refuses malformed replies whole; regenerates
+   the reports). Then run Phase 9: code-audit candidates are always queued and count only once verified.
+
+Agents never run repository code, never change files and never print secret values. Classes: injection, access
+control, files & resources, crypto & secrets, business logic, obvious exposures; deep adds feature abuse, chained
+trust gaps and wildcard.
+
 ## Reports — one folder per run
 
 Every run writes a new folder in the workspace folder (the folder `run-scan.sh` is run from); nothing is
@@ -306,10 +326,12 @@ The scanner reads untrusted repositories, so it is built not to be an attack pat
 
 `run-scan.sh` writes the report itself; the agent does not compose one. After the run:
 
-1. Run Phase 9 (verification) unless the profile is `quick` or the user asked to skip it.
+1. With `--profile deep` or when the user asked for a code audit, run Phase 10 (code audit) first. Then run
+   Phase 9 (verification) unless the profile is `quick` or the user asked to skip it.
 2. Read `security-run-<datetime>/security-report.md` (the last console line names the folder).
 3. Reply with a short summary: the per-repo status table, the Shai-Hulud check row for every target (verdict
-   and what was checked; say plainly if it errored or did not run), the changes since the last run, the confirmed
+   and what was checked; say plainly if it errored or did not run), the code audit result when it ran (units
+   covered / deferred, confirmed candidates), the changes since the last run, the confirmed
    Critical and High findings as `file:line` with their rule, how many need validation, were dismissed or are
    still pending, and the paths of the report files.
 4. Stop there. Do not offer, propose or ask to fix anything, and do not edit any scanned file — the

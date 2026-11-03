@@ -198,6 +198,15 @@ Indicator data and sources: [references/ioc-data.md](references/ioc-data.md). If
 - **Schema:** `security-report.json` is `schema_version` 2 ([assets/report.schema.json](assets/report.schema.json));
   `python3 -I scripts/validate-report.py <run>/security-report.json` checks it (exit 0 valid, 1 invalid, 2 unreadable).
 
+### 9. Code Audit by Attack Class (deep or on request)
+
+Pattern scanners miss logic flaws. With `--profile deep`, or when you ask for a code audit, read-only agents audit
+each repo one attack class at a time (injection, access control, files & resources, crypto & secrets, business
+logic, obvious exposures; deep adds feature abuse, chained trust gaps, wildcard). `scripts/audit.py` plans the
+units (budget 12 / 24, the rest shown as deferred), prints each agent's exact prompt, takes one coverage-critic
+wave and checks every reply before it counts. Candidates go to the independent verifiers and count only once
+confirmed. Details: [references/code-audit.md](references/code-audit.md).
+
 ## Installation & Setup
 
 ### Platform-Specific Setup
@@ -433,7 +442,11 @@ bash job-security-scan/scripts/run-scan.sh  # Re-downloads DB
 
 ## Version History
 
-- **v2.6** (current) — Shai-Hulud check section in every report (per-target verdict, what was checked,
+- **v2.7** (current) — Agent-driven code audit by attack class (`scripts/audit.py`, Phase 10, deep or on
+  request): coverage plan with budget and deferred units, read-only hunters, a coverage critic, whole-reply
+  checks, candidates verified before they count, "Code audit" report section; adapted from Cloudflare's
+  security-audit skill (MIT)
+- **v2.6** — Shai-Hulud check section in every report (per-target verdict, what was checked,
   indicator version, raw-output link, error / not-run states); the scanner records what it checked
 - **v2.5** — Independent verification of findings (confirmed / needs validation / dismissed, calibrated
   severity, `triage.py`), changes since the last run (fingerprints, fixed list, carried verdicts), `--profile`
@@ -449,7 +462,8 @@ bash job-security-scan/scripts/run-scan.sh  # Re-downloads DB
 
 MIT License. Maintained by the security-focused engineering team.
 
-The verification contract, verifier prompt and severity anchors in `references/verification.md` are adapted from
+The verification contract, verifier prompt and severity anchors in `references/verification.md`, and the hunter
+method, attack-class checklists and critic step in `references/code-audit.md`, are adapted from
 Cloudflare's [security-audit skill](https://github.com/cloudflare/security-audit-skill), MIT License,
 Copyright (c) 2025-2026 Cloudflare, Inc. — notice in
 [references/third-party/cloudflare-security-audit-LICENSE](references/third-party/cloudflare-security-audit-LICENSE).
