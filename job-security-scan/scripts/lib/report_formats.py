@@ -63,7 +63,8 @@ def _verdict_line(f):
 
 
 def _finding_item(f, with_code=True):
-    parts = [p for p in (_location(f), _text(f.get("scanner")), _text(f.get("rule_id"))) if p]
+    rule = f.get("rule_id") if f.get("rule_id") != f.get("scanner") else ""
+    parts = [p for p in (_location(f), _text(f.get("scanner")), _text(rule)) if p]
     if f.get("package"):
         pkg = _text(f["package"]) + ("@" + _text(f["installed_version"]) if f.get("installed_version") else "")
         if f.get("fixed_version"):

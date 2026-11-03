@@ -27,8 +27,8 @@ exposures; deep adds — feature abuse & data leakage, chained trust gaps, wildc
 Cloudflare's sandboxed execution of target code are out of scope.
 
 ## Tasks
-- [ ] T1 `audit.py plan` / `prompt` / `critic-prompt` / `add-units` + `references/code-audit.md` (prompts, classes)
-- [ ] T2 `audit.py collect`, `report_audit.py`, pending-verification counting, triage queue with trace
-- [ ] T3 report section (MD/HTML/JSON), schema + validator, generate-report regeneration
-- [ ] T4 SKILL.md phase, README, CI step, v2.7, attribution
-- [ ] T5 verify: tests on 3.8 / 3.13, real run with seeded bugs (real hunters, critic, verifiers), PR
+- [x] T1 `audit.py plan` / `prompt` / `critic-prompt` / `add-units` + `references/code-audit.md` (prompts, classes)
+- [x] T2 `audit.py collect`, `report_audit.py`, pending-verification counting, triage queue with trace
+- [x] T3 report section (MD/HTML/JSON), schema + validator, generate-report regeneration
+- [x] T4 SKILL.md phase, README, CI step, v2.7, attribution
+- [x] T5 verify: tests on 3.8 / 3.13, real run with seeded bugs (real hunters, critic, verifiers), PR
