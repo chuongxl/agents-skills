@@ -130,7 +130,7 @@ detect_cached() {  # detect_cached <path> <format>  -> prints detection output
 
 run_gitleaks() {
   local repo="$1" path="$2"
-  local out="$OUTPUT_BASE/$repo/gitleaks.json"
+  local out="$OUTPUT_BASE/$repo/gitleaks.json" err="$OUTPUT_BASE/$repo/gitleaks.err"
   mkdir -p "$(dirname "$out")"
 
   if ! has_tool gitleaks; then _skip gitleaks "$repo" "tool not installed"; return; fi
@@ -151,13 +151,18 @@ run_gitleaks() {
     --no-banner \
     --redact \
     --exit-code 1 \
-    2>/dev/null
+    2>"$err"
   local rc=$?
   if [[ $rc -eq 0 ]]; then
     _pass gitleaks "$repo" "No secrets found"
+    return
+  fi
+  local count
+  count=$(python3 -I -c 'import json, sys; print(len(json.load(open(sys.argv[1]))))' "$out" 2>/dev/null)
+  if [[ -z "$count" ]]; then
+    rm -f "$out"
+    _fail gitleaks "$repo" "scanner error (exit $rc), no report written: $(sed -e 's/\x1b\[[0-9;]*m//g' "$err" | grep -m1 -E 'FTL|ERR|fatal' | cut -c1-200) - see $err"
   else
-    local count
-    count=$(python3 -I -c 'import json, sys; print(len(json.load(open(sys.argv[1]))))' "$out" 2>/dev/null || echo "?")
     _fail gitleaks "$repo" "$count secret(s) — see $out (values masked in report)"
   fi
 }
