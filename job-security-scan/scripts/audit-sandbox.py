@@ -223,6 +223,7 @@ def main():
     if not cmd:
         sys.stderr.write("error: no command given after --\n")
         return BAD_ARGS
+    # nosemgrep: dangerous-subprocess-use-tainted-env-args (running this command is the wrapper's purpose; gated by JOB_SECURITY_SCAN_AUDIT_EXEC=1)
     proc = subprocess.run(build_argv(args, scratch, cmd))
     if args.record:
         record = {
