@@ -48,37 +48,59 @@ the drive against the same still-launched instance).
 **Hard failure** (launch fails, doctor fails, the drive step cannot complete) → follow "Hard
 Failure Handling" below, same philosophy as step 2.
 
-## 4. Present evidence and confirm
+## 4. Assess evidence against the spec, then confirm
 
-Present the captured evidence (screenshots, transcripts, response bodies — whatever
-`features/<feature-slug>.md` named) as a concise summary.
+### 4a. Assess (both modes)
 
-### Default Mode
+Capturing evidence is not proof. Before anything is presented or approved, compare the evidence
+from step 3 with the feature's acceptance criteria — the spec's acceptance scenarios and `FR-*`
+requirements that this feature's `features/<feature-slug>.md` exercises. For each criterion record
+one verdict with a pointer to the evidence (file path, transcript line, response field):
 
-Ask via the host ask tool: `Verification passed, proceed to finish` / `Investigate further`.
-Immediately before asking emit `gate_waiting` with `stage: "05-verification"` and
-`gate: "verification-confirm"`; immediately after either response emit `gate_answered` with the
-same stage/gate and no answer text.
+- `met` — the evidence shows the expected behavior.
+- `not met` — the evidence shows different behavior, an error, or the expected effect absent.
+- `unverifiable` — the drive did not exercise it (say why). This never fails the stage by itself,
+  but it is listed in the report and the evidence summary, never counted as `met`.
 
-### YOLO Path
+Judge only what the evidence shows; never infer `met` from "the drive completed". Any `not met`
+makes the assessment a **mismatch**. No `not met` → **clean**.
 
-Skip the ask-tool confirmation entirely (no `gate_waiting`/`gate_answered`) — the verification itself already ran in step 3; only the
-human confirmation is skipped. Auto-record `verification: passed` and note in the final report
-that this result was auto-approved (not skipped).
+### 4b. Default Mode
 
-### If Investigate Further (default mode only)
+Present the criteria table (criterion, verdict, evidence pointer) with the captured evidence as a
+concise summary; a mismatch is flagged at the top and `Investigate further` is recommended.
+The human still decides: ask via the host ask tool `Verification passed, proceed to finish` /
+`Investigate further`. Immediately before asking emit `gate_waiting` with
+`stage: "05-verification"` and `gate: "verification-confirm"`; immediately after either response
+emit `gate_answered` with the same stage/gate and no answer text.
 
-YOLO has no human to answer this gate, so it never loops here.
+### 4c. YOLO Path
 
-"Investigate further" is an answered gate, not a `run_failed`. Route back exactly like Stage 04's
-"Request changes" path: collect the feedback, restart through
+No ask-tool confirmation (no `gate_waiting`/`gate_answered`) — the assessment itself is the gate:
+
+- **Clean** → auto-record `verification: passed`; the final report says it was auto-assessed
+  (not human-confirmed), lists any `unverifiable` criteria, and continues to Stage 06.
+- **Mismatch** → do not continue. Run `verify-<app>`'s Cleanup step (the code is about to
+  change), then route back like "Investigate Further" below, using the `not met` criteria and
+  their evidence as the feedback (no human to collect it from). Each pass increments
+  `investigate_loops`. After **3** mismatching passes with no `not met` criterion newly fixed,
+  stop: emit `run_failed` with `reason.code: "review_loop_stuck"` (composed one-line message, no
+  raw output), report the remaining `not met` criteria, and do not mark the spec completed or open
+  a PR. The implementation is already pushed (Stage 04).
+
+### If Investigate Further
+
+"Investigate further" (default mode) and a YOLO mismatch are not a `run_failed` by themselves.
+Run `verify-<app>`'s Cleanup first if you will change code. Route back exactly like Stage 04's
+"Request changes" path: collect the feedback (YOLO: use the `not met` findings), restart through
 the earliest affected step (requirement/architecture/task/code-level), re-run every downstream
 Stage 02 step and its self-review gate if regenerated, re-enter the full Stage 03 flow if code
-changed, re-enter Stage 04's approval gate, then re-enter this stage (Stage 05) from the top —
-including a fresh `create-verification-skill` update-mode call, since the feature's behavior may
-have changed.
+changed (this is the fix step: implementation plus the `speckit-code-review` loop until `pass`),
+re-enter Stage 04 (human approval gate in default mode; auto-commit in YOLO), then re-enter this
+stage (Stage 05) from the top — including a fresh `create-verification-skill` update-mode call,
+since the feature's behavior may have changed.
 
-### If Approved
+### If Approved (or YOLO clean)
 
 Continue to Stage 06 with `verification: passed`.
 

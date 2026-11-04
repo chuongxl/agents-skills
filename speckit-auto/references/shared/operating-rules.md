@@ -97,7 +97,7 @@ it asks on behalf of the pipeline.
 
 YOLO emits no waiting events for skipped human gates and stays non-interactive in Stage 02/04 —
 including the Stage 06 `pr-publish` gate, which YOLO authorizes up front, and the Stage 05
-confirmation, which YOLO auto-approves.
+confirmation, which YOLO replaces with an automatic evidence-vs-spec assessment.
 Existing install-recovery or genuinely missing-required-input asks, if needed, are still
 instrumented when initialized; instrumentation does not bypass an existing hard prerequisite.
 Stage 03 remains a no-question zone. Waiting for input/approval is not a failed run.

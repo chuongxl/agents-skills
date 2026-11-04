@@ -38,8 +38,9 @@ The pipeline:
    Stage 05.
 5. **Stage 05 — Verification** (conditional): only runs when verification was enabled at
    `--integration` setup time. Updates the project's generated `verify-<app>` skill for the
-   just-implemented feature, runs it, and asks for a pass/investigate confirmation (auto-approved
-   in YOLO). A hard failure cleans up what it launched and stops the run. Skipped entirely (with a
+   just-implemented feature, runs it, and assesses the captured evidence against the spec's acceptance criteria, then asks
+   for a pass/investigate confirmation (default mode). In YOLO the assessment is the gate: a
+   mismatch loops back through Stage 03 (max 3 passes), a clean result continues. A hard failure cleans up what it launched and stops the run. Skipped entirely (with a
    report line saying so) when verification was not opted into.
 6. **Stage 06 — Clean / Commit / Push / PR / Complete**: tears down anything Stage 05 launched,
    commits verification artifacts (if any), marks the spec `completed` and pushes it. Opening a

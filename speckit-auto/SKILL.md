@@ -108,7 +108,8 @@ one, also drop its `loaded_guidelines` cache entry so a later stage knows to re-
   `pr-publish` gate — no pull request is opened until that gate is approved.
 - **YOLO** (`--yolo`): no human checkpoints; Stage 02 interactions, Stage 04 human review, the
   Stage 05 confirmation, and the Stage 06 `pr-publish` gate are skipped, with an auto-generated
-  commit message and an auto-approved verification result. YOLO authorizes opening a draft pull
+  commit message and a verification result auto-assessed against the spec (a mismatch loops back
+  to Stage 03 instead of continuing). YOLO authorizes opening a draft pull
   request on its own.
 
 Stages 04 and 06 run in both modes — Stage 06 (commit verification artifacts, mark spec completed,

@@ -41,6 +41,8 @@ all three host agents (GitHub Copilot, Claude Code, OpenCode).
 | T34 | PR creation skipped on non-GitHub or missing `gh` | Origin is not `github.com`, or `gh` unavailable | Reach Stage 06 PR step | Reports "PR not created for `<repo>`: `<reason>`" and continues; does not stop the stage | Both |
 | T35 | Submodule PR fan-out | Repo has submodules with local commits ahead of base | Reach Stage 06 PR step | Attempts a PR for the parent and for each such submodule independently; one failing does not block another | Both |
 | T36 | Stage 05 hard failure | Verification enabled; `verify-<app>` launch or drive fails | Reach Stage 05 step 3 | Cleanup of what was launched runs; `run_failed` (`crashed`) emitted; reports the error; Stage 06 does not run (no spec completion, no PR); implementation already pushed | Both |
+| T37 | Evidence vs spec assessment | Verification enabled; drive completes but evidence contradicts one acceptance criterion | Reach Stage 05 step 4 | Criteria table with `met` / `not met` / `unverifiable` verdicts and evidence pointers; default mode flags the mismatch and recommends Investigate further; `unverifiable` is listed, never counted as met | Both |
+| T38 | YOLO mismatch loops back | `--yolo`; verification enabled; a criterion is `not met` | Reach Stage 05 step 4 | No auto-approve; cleanup runs; routes through Stage 03 fix loop, Stage 04 auto-commit, then Stage 05 again with `investigate_loops` incremented; after 3 passes with no progress emits `run_failed` (`review_loop_stuck`), no spec completion, no PR | Both |
 
 ## Host-specific checks
 

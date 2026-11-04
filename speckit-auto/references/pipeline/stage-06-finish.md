@@ -111,7 +111,8 @@ ask). One repo's failure never stops another's attempt. Record the outcome per r
 
 At completion report: resolved provider, `speckit-code-review` final status (`pass`),
 verification outcome (`verification: skipped` or `verification: passed`, plus
-`investigate_loops: N` if Stage 05 looped at least once; in YOLO, `passed` means auto-approved),
+`investigate_loops: N` if Stage 05 looped at least once; in YOLO, `passed` means auto-assessed clean against the spec, not human-confirmed; list any
+`unverifiable` criteria),
 the implementation commit(s) (from Stage 04), the verification-artifact commit (if any), the spec
 completion commit hash, pushed branches, and per-repo PR outcomes (URL, "already existed", or "no
 PR opened" when the human skipped the `pr-publish` gate or creation failed). In YOLO mode, state
