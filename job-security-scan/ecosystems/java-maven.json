@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "id": "java-maven",
+  "name": "Java (Maven)",
+  "detect": [
+    "pom.xml"
+  ],
+  "lockfiles": [
+    "pom.xml"
+  ],
+  "osv_ecosystem": "Maven",
+  "semgrep": [
+    "p/java"
+  ],
+  "docker": {
+    "images": [
+      "maven",
+      "eclipse-temurin",
+      "openjdk",
+      "amazoncorretto",
+      "tomcat"
+    ]
+  },
+  "runtime": {
+    "name": "java",
+    "extractors": [
+      {
+        "file": "pom.xml",
+        "regex": "<(?:java\\.version|maven\\.compiler\\.(?:release|source))>\\s*([\\d.]+)"
+      },
+      {
+        "file": ".java-version",
+        "regex": "^(\\d[\\w.]*)"
+      },
+      {
+        "file": ".sdkmanrc",
+        "regex": "^java=(\\S+)"
+      }
+    ],
+    "eol_product": "eclipse-temurin"
+  }
+}

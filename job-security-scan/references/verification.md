@@ -1,0 +1,99 @@
+# Independent verification of findings (Phase 9)
+
+Scanners are noisy. Phase 9 sends each high-value finding to a **fresh verifier** that tries to disprove it from
+the repository source, then records one of three verdicts in the report. The verdict contract, the verifier prompt
+and the severity anchors below are adapted from Cloudflare's
+[security-audit skill](https://github.com/cloudflare/security-audit-skill) (commit `c1c8a8c`, MIT;
+notice in [third-party/cloudflare-security-audit-LICENSE](third-party/cloudflare-security-audit-LICENSE)).
+
+Verification is **report content only**. A verifier never edits, patches or commits anything, never runs code
+from the scanned repository, and never contacts a network service.
+
+## Steps (the parent agent)
+
+1. `python3 -I scripts/triage.py queue security-run-<datetime>` — writes `triage/queue.json`. The run's profile
+   decides what is queued: `standard` CRITICAL + HIGH, `deep` also MEDIUM, `quick` nothing. Findings that already
+   have a verdict (also verdicts carried over from the previous run for unchanged code) are not queued again.
+2. For each queued item, most severe first, start **one fresh sub-agent that has not seen the scan summary or any
+   other verdict**. Give it only: the verifier prompt below, that one queue item (finding + context), and the
+   repository path. Default budget: 25 items per run; the rest stay pending and the summary says how many.
+   If the agent cannot start sub-agents, do one separate pass per item from the queue item alone, and say in the
+   summary that verification was done in-session, not independently.
+3. Keep a reply only if it is exactly one JSON object in the format below. Do not repair a malformed or
+   prose-wrapped reply: discard it, retry once with a new verifier, otherwise leave that finding pending.
+4. Collect the kept objects as `{"verdicts": [ ... ]}` in `triage/verdicts.json` and run
+   `python3 -I scripts/triage.py apply security-run-<datetime> security-run-<datetime>/triage/verdicts.json`.
+   `apply` is all or nothing: if it lists errors, fix the collection (drop the bad record) and apply again.
+   It regenerates the three reports and writes `NEEDS-VALIDATION.md`.
+
+## Verifier prompt
+
+```text
+You did not find this issue and you have not seen any other result. Your job is to try to
+REFUTE one scanner finding using only the repository source and the context you are given.
+
+Rules:
+- Read files in the repository; do not change, create or delete any file.
+- Do not run any code, script, test, build or package manager from the repository.
+- Do not contact any network service, deployed endpoint or registry.
+- Secret findings: never open the file that holds the secret and never write any part of a
+  credential in your answer. Judge only from the path, the rule and the repository layout.
+
+Check, in order:
+1. The location: does the file and line exist, and is the cited code really what the rule claims?
+2. Reachability: is the code shipped and reachable from a lower-trust input (HTTP request, CLI
+   argument, message, file, dependency install), or is it a test, fixture, example, docs,
+   dead code or a dev-only dependency?
+3. Controls: name the strongest validation, authorisation, escaping, framework or configuration
+   control on the path. Does it already prevent the issue?
+4. For dependency findings: is the vulnerable function or package feature actually used, and is
+   the installed version really in the affected range?
+5. Severity: state the realistic likelihood and the concrete impact you can show from source.
+   Use the anchors you were given; overall severity can never exceed the impact.
+
+Decide:
+- "confirmed"        the issue is real and reachable; give evidence, likelihood, impact, severity.
+- "needs_validation" a specific fact you cannot see from source decides it (runtime config, which
+                     image is deployed, whether a credential is live); name that blocker exactly and
+                     give a safe plan for a person to check it. Never a parking place for a hunch.
+- "rejected"         the source refutes it (test fixture, unreachable, mitigated, not affected
+                     version, false match); give the reason.
+
+Return exactly one JSON object and nothing else:
+{"fingerprint": "<from the item>", "verdict": "confirmed",
+ "severity": "CRITICAL|HIGH|MEDIUM|LOW|INFO", "likelihood": "high|medium|low",
+ "impact": "critical|high|medium|low|informational", "evidence": "<file:line facts>"}
+{"fingerprint": "...", "verdict": "needs_validation", "blocker": "...", "validation_plan": "..."}
+{"fingerprint": "...", "verdict": "rejected", "reason": "..."}
+```
+
+## Verdict format
+
+| Verdict | Required fields | Not allowed | Effect in the report |
+|---|---|---|---|
+| `confirmed` | `evidence`, `likelihood`, `impact`, `severity` (≤ impact) | `blocker`, `reason` | verified severity replaces the tool's (both shown) |
+| `needs_validation` | `blocker`, `validation_plan` | `severity` | keeps the tool's severity, listed in `NEEDS-VALIDATION.md` |
+| `rejected` | `reason` | `severity` | moved to "Dismissed (with reason)", out of all counts |
+
+Text fields are capped at 2,000 characters and pass through secret redaction. Unknown fields, unknown or
+duplicate fingerprints and non-JSON files are refused.
+
+## Severity anchors
+
+- **critical** — an unauthenticated actor gains code execution, full data-store access, or takeover of
+  arbitrary accounts.
+- **high** — an actor fully defeats an explicit security control with real consequences: authentication bypass,
+  cross-tenant read or write, stored script execution affecting other users, authenticated code execution, or an
+  unauthenticated remote stop of a shared service.
+- **medium** — a real boundary violation with limited blast radius, uncommon preconditions, or consequences
+  confined to a narrow resource set.
+- **low** — disclosure of non-secret internals, or an effect requiring sustained effort for minimal gain.
+- **informational** — a confirmed but minimal-impact observation, useful mainly as a prerequisite inside a
+  larger finding.
+
+The high/medium discriminator: does the demonstrated result fully defeat an explicit control for an action with
+real consequences, or only weaken it? If you cannot state the concrete damage, the severity is lower than it
+feels.
+
+For this skill: a secret that is live and grants access stays CRITICAL; a known-compromised package (Shai-Hulud
+AFFECTED) is not downgraded by reachability — installing it is the attack.

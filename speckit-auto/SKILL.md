@@ -5,15 +5,16 @@ description: |
   pluggable provider: github-speckit (repo-installed GitHub Spec Kit agents) or superpowers
   (obra/superpowers skills library). Handles provider setup and auto-install, Jira intake via
   jira-to-speckit, spec/design, implementation, a speckit-code-review remediation loop until
-  pass, human review (default) or YOLO commit, optional Stage 05 verification, and Stage 06
-  PR creation. Use when a feature must go from requirement to committed, PR-ready implementation
-  in one run.
-compatibility: "Runs on GitHub Copilot, Claude Code, and OpenCode. Discovered from ~/.agents/skills/, ~/.claude/skills/, or ~/.config/opencode/skills/. Requires git and bash; network access for Jira intake via --issue."
+  pass, human review (default) or YOLO commit and push, optional Stage 05 verification, and a
+  Stage 06 that completes the spec and opens a draft pull request behind its own approval gate
+  (default mode) or authorized by --yolo. Use when a feature must go from requirement to
+  committed, PR-ready implementation in one run.
+compatibility: "Runs on GitHub Copilot, Claude Code, OpenCode, and Hermes Agent. Discovered from ~/.agents/skills/, ~/.claude/skills/, ~/.config/opencode/skills/, or ~/.hermes/skills/ (/opt/data/skills/ in Docker). Requires git, bash, and Node.js >=22.13; network access for Jira intake via --issue. Default mode also needs the host's ask/question tool (Copilot ask_user, Claude AskUser, OpenCode question; Hermes uses a plain chat message) for the Stage 02, 04, 05 and 06 checkpoints; see references/shared/host-adaptation.md."
 license: MIT
-allowed-tools: bash glob grep view create edit skill
+allowed-tools: bash glob grep view create edit skill ask_user
 metadata:
   author: Alex Nguyen
-  version: "0.4.0"
+  version: "0.7.0"
 ---
 
 # Speckit Auto
@@ -27,15 +28,20 @@ recovery file on a healthy run, or a file already in context. See the loading ma
 ## Entry Dispatch (every invocation)
 
 1. **Parse the invocation text** (slash-command body on Copilot/Claude Code; the natural-language
-   trigger message on OpenCode — flags may be embedded anywhere):
+   trigger message on OpenCode and Hermes Agent — flags may be embedded anywhere):
    - `--integration <value>` → setup intent (setup ONLY, no pipeline)
    - `--issue <url>` → Jira pipeline intent
    - `--yolo` → mode = yolo (else default)
+   - `--run-id <uuid>` / `--run-id=<uuid>` → optional attempt identity, not requirement text.
+     Missing/invalid UUID → explicit invocation error. Preserve it across resumes; never
+     replace it mid-run. Without it, generate once with Node's `crypto.randomUUID()`.
+     A fresh retry after a terminal run needs a new UUID, even in a reused worktree.
    - free text → requirement pipeline intent
 
 2. **Note the host** from the directory this file was loaded from: `~/.copilot/skills/`,
    `.github/skills/`, `~/.agents/skills/` → Copilot; `~/.claude/skills/` → Claude Code;
-   `~/.config/opencode/skills/`, `.opencode/skills/` → OpenCode. Directories that overlap
+   `~/.config/opencode/skills/`, `.opencode/skills/` → OpenCode; `~/.hermes/skills/`,
+   `/opt/data/skills/` → Hermes Agent. Directories that overlap
    (`.claude/skills/`, `.agents/skills/`) or any other ambiguity → resolve via the tie-break in
    [references/shared/host-adaptation.md](references/shared/host-adaptation.md). The host is fixed
    for the run; look up host-specific values (ask tool, skill dirs, install host key) from that
@@ -52,6 +58,11 @@ recovery file on a healthy run, or a file already in context. See the loading ma
    success, record it as `integration` in run state; never re-read or change it mid-run, and never
    infer the provider from repo contents.
 
+   Before a new pipeline begins, check the runtime, not just `node --version`:
+   `node -e 'const [a,b]=process.versions.node.split(".").map(Number); if(a<22||(a===22&&b<13)){console.error("speckit-auto requires Node.js >=22.13");process.exit(1)}'`.
+   Missing/old Node → stop explicitly before worktree creation. Setup-only invocations do
+   not require event initialization.
+
 5. Load **exactly three files**, then enter Stage 01 in this same turn:
    [references/shared/operating-rules.md](references/shared/operating-rules.md), the adapter for
    the resolved provider, and
@@ -59,7 +70,8 @@ recovery file on a healthy run, or a file already in context. See the loading ma
 
 Never return an acknowledgement-only response. If the skill is already loaded mid-run (resume
 marker: `<skill-context name="speckit-auto">` on Claude Code, `<available_skills>` on OpenCode,
-the skill tool list on Copilot), resume from the current stage using available run context and
+the skill tool list on Copilot; Hermes Agent sessions never rotate, so the running session itself
+is the resume marker), resume from the current stage using available run context and
 load only that stage's file — never block asking the user to re-run the skill.
 
 ## Loading Map
@@ -69,6 +81,7 @@ load only that stage's file — never block asking the user to re-run the skill.
 | `references/shared/operating-rules.md` | every pipeline run, at entry (the only eager load) |
 | `references/providers/<provider>.md` | every pipeline run, at entry — resolved provider only |
 | `references/pipeline/stage-01-intake.md` | entering Stage 01 |
+| `references/shared/run-events.md` | first event initialization after the worktree gate; retain for later emits |
 | `references/pipeline/stage-02-spec-design.md` | entering Stage 02 |
 | `references/pipeline/stage-03-implement-review.md` | entering Stage 03 |
 | `references/pipeline/stage-04-finish.md` | `speckit-code-review` returns `pass` |
@@ -90,14 +103,18 @@ one, also drop its `loaded_guidelines` cache entry so a later stage knows to re-
 ## Modes
 
 - **Default**: human-in-the-loop. Mandatory checkpoints: the Stage 02 approval interactions, the
-  Stage 02 → Stage 03 start-implementation confirmation, Stage 04's human review, and (when
-  verification is enabled) Stage 05's verification confirmation.
-- **YOLO** (`--yolo`): no human checkpoints; Stage 02 interactions, Stage 04 human review, and (when
-  verification is enabled) Stage 05's confirmation are all skipped, with an auto-generated commit
-  message and an auto-approved verification result.
+  Stage 02 → Stage 03 start-implementation confirmation, the Stage 04 implementation approval,
+  (when verification is enabled) the Stage 05 verification confirmation, and the Stage 06
+  `pr-publish` gate — no pull request is opened until that gate is approved.
+- **YOLO** (`--yolo`): no human checkpoints; Stage 02 interactions, Stage 04 human review, the
+  Stage 05 confirmation, and the Stage 06 `pr-publish` gate are skipped, with an auto-generated
+  commit message and an auto-approved verification result. YOLO authorizes opening a draft pull
+  request on its own.
 
-Both Stage 04 and Stage 06 always run in both modes — Stage 06 (commit verification artifacts,
-mark spec completed, push, open PRs) is never optional. Stage 05 itself is conditional on the
+Stages 04 and 06 run in both modes — Stage 06 (commit verification artifacts, mark spec completed,
+push, offer the PR) is never skipped by mode — unless an earlier stage hard-fails and stops the
+run (a Stage 05 hard failure cleans up what it launched, emits `run_failed`, and does not reach
+Stage 06). Stage 05 itself is conditional on the
 `--integration`-time verification opt-in, independent of default/YOLO mode. Stage 03 is a NO-STOP
 ZONE in both modes.
 
@@ -133,4 +150,9 @@ report: resolved provider, verification opt-in result, file written, scope, and 
 
 `allowed-tools` uses Copilot-style tool names; Claude Code and OpenCode expose the same
 capabilities under their own names (`Bash`, `Read`, `Edit`, `Write`, `Glob`, `Grep`, `Skill`).
+Hermes Agent exposes the same capabilities as `terminal`, `read_file`, `write_file`, `patch`,
+`search_files`, `skill_view` (see references/shared/host-adaptation.md).
 Never refuse to act because a tool is named differently.
+Resolve `scripts/run-events.mjs` relative to this loaded skill's folder, not the project cwd.
+Structured events use only Node builtins on every host; invoke the emitter with JSON stdin,
+never shell-interpolated JSON.

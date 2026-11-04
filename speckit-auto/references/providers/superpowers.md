@@ -75,8 +75,10 @@ Companion read them for progress.
 - `subagent-driven-development`'s terminal handoff ("finish the branch") is suspended: returning
   means "continue Stage 03". No PR, merge, branch deletion, or workspace deletion inside Stage 03;
   its per-task commits are expected and must not be suppressed.
-- `finishing-a-development-branch` is not called anywhere in this pipeline; PR creation is Stage
-  06's job via a direct, provider-agnostic `gh pr create` step, not a superpowers-specific call.
+- `finishing-a-development-branch` is **never** called by the pipeline. Its menu offers a local
+  merge into the base branch and a non-draft PR, both of which Stage 06 forbids, and it asks a
+  branch-lifecycle question that default mode has no answer for. The shared Stage 06 draft-PR
+  step owns PR creation for both providers.
 
 ## Artifacts
 

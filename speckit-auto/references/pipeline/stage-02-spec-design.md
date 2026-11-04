@@ -13,6 +13,37 @@ the adapter's Step Completion Protocol — never proceed until the current step'
 confirmed on disk. An unresolvable skill is a provider validation failure → adapter install
 recovery, not a stop.
 
+## Structured boundaries and approvals
+
+At actual entry emit `{type: "stage_started", stage: "02-spec-design"}` using the retained
+helper and JSON stdin invocation. A context-only resume does not replay it.
+
+Default mode retains every existing provider approval, not fewer and not extra:
+
+| Existing approval | Stable `gate` |
+|---|---|
+| github-speckit `specify`, `clarify`; superpowers design/spec approval in `brainstorming` | `spec-approval` |
+| github-speckit `plan`, `checklist`, `tasks`; any existing superpowers plan approval | `plan-approval` |
+| Stage 03 Entry confirmation, both providers | `implementation-start` |
+
+Immediately before the actual approval ask emit `gate_waiting` with `stage: "02-spec-design"`,
+the mapped gate, and optional composed question/options. Immediately after either response emit
+`gate_answered` with the same stage/gate, no answer text. For superpowers, pass this instrumentation
+rule into the invoked skill so its native design approval is bracketed at the actual ask,
+not around the entire `brainstorming` call. Do not fabricate a separate plan approval or resurrect
+`writing-plans`' suppressed Execution Handoff. In github-speckit, repeated approvals use the same
+mapped gate identifiers, each with a fresh sequence.
+
+All other interviews, concern checks, forward-constraint asks, and feedback-detail asks emit
+`question_waiting` just before asking, then `stage_started` for `02-spec-design` after the response.
+Questions/options are short composed labels. Never record raw answers or captured feedback.
+Request changes is an answered gate, not a `run_failed`; emit `stage_started` for the restarted
+stage before re-running its steps. Do not emit `stage_finished` for abandoned work.
+
+YOLO retains autonomous checks and mandatory self-approval but emits no `gate_waiting`,
+`gate_answered`, or `question_waiting` for skipped human interactions. Stage 03 remains a
+no-question zone even when it regenerates Stage 02 artifacts.
+
 ## Project Context Wiring (mandatory)
 
 Pass the Stage 01 Project Context into every step as its starting basis: `summary` prefixes the
@@ -139,6 +170,17 @@ skip per the conditional-commit rule (success path). A failed commit/push here i
 — stop with the exact error; never enter Stage 03 without this succeeding (or being a legitimate
 no-op).
 
+After the required spec/plan commit and push succeed, emit
+`{type: "stage_finished", stage: "02-spec-design"}`.
 Then discard Stage 02 interview context, drop the loaded guideline files that Stage 03 will not
 need, and load [stage-03-implement-review.md](stage-03-implement-review.md) **immediately, in the
 same turn** — no summary, no other questions, no waiting for another user message.
+
+## Terminal events
+
+Only when retries are exhausted or the same self-review check fails three times, emit
+`run_failed` with `reason.code: "review_loop_stuck"` and a composed one-line summary, then stop.
+The exhausted YOLO Entry Gate also uses `review_loop_stuck`. Unrecoverable provider/policy
+failures use `policy_blocked`, terminal tool/runtime failures use `crashed`, and required
+commit/push errors use `git_error` per shared/commit.md. Do not classify ordinary feedback,
+autonomous refinement, or a recoverable provider install as a terminal failure.

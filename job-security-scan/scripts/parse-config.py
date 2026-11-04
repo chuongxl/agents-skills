@@ -15,6 +15,11 @@ Examples:
 
 import sys
 import re
+import shlex
+
+# A repo name becomes a directory under monorepo-root and under the run folder: no separators, no '..',
+# no leading '-' or '.', nothing a shell or Python string could misread.
+REPO_NAME_RE = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9._-]{0,99}$")
 
 def parse_frontmatter(filepath):
     with open(filepath, "r") as f:
@@ -111,7 +116,11 @@ def dockerfile_repos(data):
 
 
 def semgrep_rulesets(data):
-    """Map stack entries to Semgrep ruleset IDs."""
+    """Base rulesets plus any from the deprecated 'stack' field.
+
+    Rulesets for the languages actually present in each repo are added at scan time by
+    scripts/detect-ecosystems.py, so a repo needs no 'stack' entry.
+    """
     stack_map = {
         "typescript": "p/typescript",
         "nodejs": "p/nodejs",
@@ -141,6 +150,24 @@ if __name__ == "__main__":
 
     data = parse_frontmatter(filepath)
 
+    bad = [r.get("name", "") for r in data.get("_repos", []) if not REPO_NAME_RE.match(r.get("name", ""))]
+    if bad:
+        print("ERROR: unsafe repo name(s) in %s: %s - a repo name may only use letters, digits, '.', '_' and '-', "
+              "and may not start with '.' or '-'." % (filepath, ", ".join(repr(b) for b in bad)), file=sys.stderr)
+        sys.exit(2)
+
+    # package-manager and stack are replaced by automatic ecosystem detection
+    # (ecosystems/*.json). They keep working, but are deprecated.
+    for legacy, why in (("package-manager", "lockfiles are now detected automatically"),
+                        ("stack", "Semgrep rulesets now follow the languages detected in each repo")):
+        if legacy in data:
+            print("WARNING: '%s' in %s is deprecated - %s. Remove it; support will be dropped in a future release."
+                  % (legacy, filepath, why), file=sys.stderr)
+    if "output-dir" in data and "cache-dir" not in data:
+        print("WARNING: 'output-dir' in %s is deprecated - reports now go to security-run-<datetime>/ in the workspace "
+              "folder and this folder is only used for caches. Rename it to 'cache-dir' (or remove it to use "
+              "~/.cache/job-security-scan)." % filepath, file=sys.stderr)
+
     # Computed keys
     data["active-repos"]       = active_repos(data)
     data["dockerfile-repos"]   = dockerfile_repos(data)
@@ -154,18 +181,20 @@ if __name__ == "__main__":
         else:
             print(val)
     else:
-        # Shell-sourceable output
-        scalar_keys = ["team", "org", "monorepo-root", "ci-runner", "package-manager", "fail-on-severity", "output-dir"]
+        # Shell-sourceable output. Every value is shell-quoted: run-scan.sh and install-tools.sh eval this, and a
+        # config from another team must never be able to run commands.
+        scalar_keys = ["team", "org", "monorepo-root", "ci-runner", "package-manager", "fail-on-severity", "output-dir",
+                       "cache-dir"]
         list_keys   = ["active-repos", "dockerfile-repos", "semgrep-rulesets", "ci-branches", "allowlist-paths"]
 
         for k in scalar_keys:
             v = data.get(k, "")
             shell_key = k.replace("-", "_").upper()
-            print(f'export {shell_key}="{v}"')
+            print("export %s=%s" % (shell_key, shlex.quote(str(v))))
 
         for k in list_keys:
             v = data.get(k, [])
             shell_key = k.replace("-", "_").upper()
             if isinstance(v, list):
-                arr = " ".join(f'"{x}"' for x in v)
-                print(f'export {shell_key}=({arr})')
+                arr = " ".join(shlex.quote(str(x)) for x in v)
+                print("%s=(%s)" % (shell_key, arr))

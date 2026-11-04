@@ -3,6 +3,11 @@
 Load right after Stage 04's implementation commit succeeds (or was skipped because nothing needed
 committing). Runs only when this repo opted in to verification at `--integration` setup time.
 
+At actual entry or re-entry emit `{type: "stage_started", stage: "05-verification"}` using the
+shared JSON stdin invocation, not on context-only resume. Emit
+`{type: "stage_finished", stage: "05-verification"}` at the handoff (step 5), including when the
+stage is skipped.
+
 ## 1. Read the opt-in
 
 Read `verification` from the mirrored `<worktree>/.speckit/integration.json` (the same file Stage
@@ -30,9 +35,7 @@ instance Stage 06 still expects to clean up.
 
 **Hard failure** (skill unavailable, or it reports it could not complete the update) → stop and
 report the exact error. Verification was explicitly opted into; a silent skip here would be
-misleading. Tell the user the implementation is already committed and pushed (per Stage
-04), and that they can re-run Stage 05 manually or disable verification via
-`/speckit-auto --integration <value>` and re-run.
+misleading. Follow "Hard Failure Handling" below.
 
 ## 3. Execute the verification skill for this feature
 
@@ -42,8 +45,8 @@ evidence, per its own Evidence section — but do **not** run cleanup yet; that 
 Stage 06, after the human confirms verification passed (a failed confirmation may mean rerunning
 the drive against the same still-launched instance).
 
-**Hard failure** (launch fails, doctor fails, the drive step cannot complete) → stop and report
-the exact error, same failure philosophy as step 2.
+**Hard failure** (launch fails, doctor fails, the drive step cannot complete) → follow "Hard
+Failure Handling" below, same philosophy as step 2.
 
 ## 4. Present evidence and confirm
 
@@ -53,16 +56,22 @@ Present the captured evidence (screenshots, transcripts, response bodies — wha
 ### Default Mode
 
 Ask via the host ask tool: `Verification passed, proceed to finish` / `Investigate further`.
+Immediately before asking emit `gate_waiting` with `stage: "05-verification"` and
+`gate: "verification-confirm"`; immediately after either response emit `gate_answered` with the
+same stage/gate and no answer text.
 
 ### YOLO Path
 
-Skip the ask-tool confirmation entirely — the verification itself already ran in step 3; only the
+Skip the ask-tool confirmation entirely (no `gate_waiting`/`gate_answered`) — the verification itself already ran in step 3; only the
 human confirmation is skipped. Auto-record `verification: passed` and note in the final report
 that this result was auto-approved (not skipped).
 
-### If Investigate Further
+### If Investigate Further (default mode only)
 
-Route back exactly like Stage 04's "Request changes" path: collect the feedback, restart through
+YOLO has no human to answer this gate, so it never loops here.
+
+"Investigate further" is an answered gate, not a `run_failed`. Route back exactly like Stage 04's
+"Request changes" path: collect the feedback, restart through
 the earliest affected step (requirement/architecture/task/code-level), re-run every downstream
 Stage 02 step and its self-review gate if regenerated, re-enter the full Stage 03 flow if code
 changed, re-enter Stage 04's approval gate, then re-enter this stage (Stage 05) from the top —
@@ -73,8 +82,23 @@ have changed.
 
 Continue to Stage 06 with `verification: passed`.
 
+## Hard Failure Handling
+
+A hard failure at step 2 or 3 does **not** end the run silently, and Stage 06 does not run:
+
+1. **Clean up first.** If anything was launched, run `verify-<app>`'s Cleanup step now (tracked
+   PID/handle only). Stage 06 will not get the chance, so a failed stage must not leave the app
+   running. Cleanup trouble is a warning.
+2. Emit `run_failed` with `reason.code: "crashed"` (a one-line, composed message — never raw tool
+   output) before reporting. On an event write error, stop and never emit `run_completed`.
+3. Report the exact error, and tell the user: the implementation is already committed and pushed
+   (Stage 04), but the spec is not marked completed and no PR was opened. They can fix the
+   problem and re-run, or disable verification via `/speckit-auto --integration <value>` and
+   re-run.
+
 ## 5. Handoff
 
-Load [stage-06-finish.md](stage-06-finish.md) and enter Stage 06 in the same turn, carrying
+Emit `stage_finished` for `05-verification`, then load [stage-06-finish.md](stage-06-finish.md)
+and enter Stage 06 in the same turn, carrying
 forward whether this stage ran (`skipped` or `passed`) and, if it ran, a reference to what
 `verify-<app>` launched so Stage 06 can run its Cleanup step.

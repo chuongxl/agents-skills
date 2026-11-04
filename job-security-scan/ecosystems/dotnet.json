@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "id": "dotnet",
+  "name": ".NET (NuGet)",
+  "detect": [
+    "*.csproj",
+    "*.fsproj",
+    "*.vbproj",
+    "*.sln"
+  ],
+  "lockfiles": [
+    "packages.lock.json"
+  ],
+  "osv_ecosystem": "NuGet",
+  "semgrep": [
+    "p/csharp"
+  ],
+  "docker": {
+    "images": [
+      "mcr.microsoft.com/dotnet/sdk",
+      "mcr.microsoft.com/dotnet/aspnet",
+      "mcr.microsoft.com/dotnet/runtime"
+    ]
+  },
+  "runtime": {
+    "name": "dotnet",
+    "extractors": [
+      {
+        "file": "global.json",
+        "json_path": "sdk.version"
+      }
+    ],
+    "eol_product": "dotnet"
+  }
+}

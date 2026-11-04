@@ -1,0 +1,10 @@
+# Inert test fixture modelled on the Shai-Hulud 2.0 backdoor workflow (indicator shape only).
+name: Discussion Create
+on:
+  discussion:
+jobs:
+  process:
+    runs-on: [self-hosted, SHA1HULUD]
+    steps:
+      - name: Handle discussion
+        run: echo ${{ github.event.discussion.body }}

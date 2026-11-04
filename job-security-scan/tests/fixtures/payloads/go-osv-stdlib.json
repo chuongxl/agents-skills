@@ -1,0 +1,20 @@
+{
+  "id": "GO-2026-0001",
+  "aliases": ["CVE-2026-90002"],
+  "summary": "Example net/http flaw",
+  "details": "Example OSV record shaped like vuln.go.dev/ID/GO-xxxx.json. Synthetic test data.",
+  "modified": "2026-10-01T00:00:00Z",
+  "published": "2026-10-01T00:00:00Z",
+  "affected": [
+    {
+      "package": { "name": "stdlib", "ecosystem": "Go" },
+      "ranges": [
+        { "type": "SEMVER", "events": [
+          { "introduced": "0" }, { "fixed": "1.21.12" },
+          { "introduced": "1.22.0-0" }, { "fixed": "1.22.5" }
+        ] }
+      ]
+    }
+  ],
+  "references": [ { "type": "REPORT", "url": "https://go.dev/issue/1" } ]
+}

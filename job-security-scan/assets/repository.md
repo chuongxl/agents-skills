@@ -9,15 +9,10 @@ team: your-team
 org: your-org
 monorepo-root: "."        # relative to workspace root; "." means repos are subdirs here
 ci-runner: your-runner  # GitHub Actions runner label
-package-manager: yarn     # yarn | npm | pnpm
 
-# Tech stack — controls which Semgrep rulesets are applied
-stack:
-  - typescript
-  - nodejs
-  - nestjs
-  - nextjs
-  - docker
+# Languages, lockfiles and Semgrep rulesets are detected automatically per repo
+# (see ecosystems/*.json). The old `package-manager:` and `stack:` fields are
+# deprecated: they still work but print a warning. Remove them.
 
 # CI branches — security scan triggers on push to these
 ci-branches:
@@ -30,7 +25,7 @@ ci-branches:
 #   name           — directory name (also used as display name)
 #   active         — true = include in scan; false = skip (not yet designed)
 #   has-dockerfile — true = run Hadolint on Dockerfile
-#   semgrep-extra  — additional Semgrep rulesets beyond stack defaults (optional)
+#   semgrep-extra  — additional Semgrep rulesets beyond the detected languages (optional)
 repos:
   - name: your-backend
     active: true
@@ -57,8 +52,11 @@ secret-allowlist-paths:
 # Options: CRITICAL | HIGH | MEDIUM | LOW
 fail-on-severity: HIGH
 
-# Output directory for scan results (relative to workspace root)
-output-dir: ".security-scan-results"
+# Reports: every run writes security-run-<datetime>/ (Markdown + JSON + HTML + raw output)
+# in the folder run-scan.sh is run from. Nothing to configure.
+# Caches (vendor advisories, indicator refresh) default to ~/.cache/job-security-scan.
+# Uncomment to keep them elsewhere, e.g. a folder your CI saves between runs:
+# cache-dir: ".scan-cache"
 ---
 
 # Security Scan — Repository Configuration
@@ -85,14 +83,14 @@ semgrep-extra:
   - p/jwt
 ```
 
-## Stacks and their default Semgrep rulesets
+## Languages and Semgrep rulesets
 
-| Stack | Semgrep Ruleset |
-|-------|----------------|
-| typescript | p/typescript |
-| nodejs | p/nodejs |
-| nestjs | p/nestjs |
-| nextjs | p/typescript |
-| docker | (Hadolint handles this) |
+Each repo is inspected for manifests and lockfiles; the languages found decide the
+Semgrep rulesets and which lockfiles OSV-Scanner reads. Run
+`python3 -I scripts/detect-ecosystems.py <repo-dir>` to see what is detected, and see
+`references/ecosystems.md` to add a language.
 
 All repos additionally get: `p/owasp-top-ten`, `p/secrets`
+
+The deprecated `stack:` field, if still present, adds its rulesets
+(typescript, nodejs, nestjs, nextjs) on top of the detected ones.

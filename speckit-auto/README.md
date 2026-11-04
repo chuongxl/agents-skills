@@ -1,13 +1,15 @@
 # Speckit Auto — Spec-Driven Delivery Pipeline
 
-**Version**: 0.3.0
+![Version](https://img.shields.io/badge/version-0.7.0-blue)
+
+**Version**: 0.7.0
 **Author**: Alex Nguyen
 
 ## Overview
 
 Speckit Auto runs a complete spec-driven delivery pipeline from a requirement or Jira issue:
 intake, spec/design, implementation, an automatic `speckit-code-review` remediation loop until
-pass, then human review (default mode) or fully automated (YOLO mode) commit and push.
+pass, then human review (default mode) or fully automated (YOLO mode) commit and push, optional verification, and a gated draft PR.
 
 It is a **provider factory**: the same pipeline runs on either of two pluggable providers,
 selected once and fixed for the run:
@@ -32,23 +34,28 @@ The pipeline:
 3. **Stage 03 — Implement + Code Review Loop** (NO-STOP ZONE): implement → converge/verify → run
    `speckit-code-review` → fix → repeat until `pass`. No human gates in either mode.
 4. **Stage 04 — Human Review / Implementation Commit**: default mode asks for human approval
-   before committing; YOLO mode auto-commits. Both modes hand off to Stage 05.
+   before committing; YOLO mode auto-commits. Both modes push the implementation and hand off to
+   Stage 05.
 5. **Stage 05 — Verification** (conditional): only runs when verification was enabled at
    `--integration` setup time. Updates the project's generated `verify-<app>` skill for the
-   just-implemented feature, runs it, and asks for a pass/investigate confirmation before
-   continuing. Skipped entirely (with a report line saying so) when verification was not opted
-   into.
+   just-implemented feature, runs it, and asks for a pass/investigate confirmation (auto-approved
+   in YOLO). A hard failure cleans up what it launched and stops the run. Skipped entirely (with a
+   report line saying so) when verification was not opted into.
 6. **Stage 06 — Clean / Commit / Push / PR / Complete**: tears down anything Stage 05 launched,
-   commits verification artifacts (if any), marks the spec completed, pushes every repo/submodule
-   with local commits, and opens a pull request per repo (parent + each submodule) via `gh pr
-   create` where the remote is GitHub — non-blocking per repo.
+   commits verification artifacts (if any), marks the spec `completed` and pushes it. Opening a
+   pull request sits behind its own gate: default mode asks (`pr-publish`) and skips the PR when
+   declined; YOLO opens the draft PR on its own. An existing PR for the branch is reused, never
+   duplicated; submodules with local commits get their own PR where the remote is GitHub —
+   non-blocking per repo.
 
 ## Install
 
 Copy the `speckit-auto` folder (with `speckit-code-review` and `jira-to-speckit`) into the host's
-skill directory: `~/.agents/skills/` (Copilot), `~/.claude/skills/` (Claude Code), or
-`~/.config/opencode/skills/` (OpenCode). The skill is auto-discovered from those locations. Also
-copy `create-verification-skill` if this repo opts into Stage 05 verification — it's a conditional
+skill directory: `~/.agents/skills/` (Copilot), `~/.claude/skills/` (Claude Code),
+`~/.config/opencode/skills/` (OpenCode), or `~/.hermes/skills/` (Hermes Agent; `/opt/data/skills/`
+inside its Docker container). The skill is auto-discovered from those locations.
+Requires git, bash, and Node.js >=22.13 for the built-in structured event producer. Also copy
+`create-verification-skill` if this repo opts into Stage 05 verification — it's a conditional
 dependency, only invoked when verification was enabled at `--integration` setup time.
 
 **Key rule**: Stage 03 is a **NO-STOP ZONE** in both default and YOLO modes; code review loops continue automatically until the spec is satisfied.
@@ -59,11 +66,10 @@ dependency, only invoked when verification was enabled at `--integration` setup 
 
 ### Provider System
 
-Speckit Auto resolves a **provider** from a single source: `.speckit/integration.json` in the
-repository root, written once by `speckit-auto --integration <provider>`. There is no global/
-user-home state and no first-run ask mid-pipeline — a missing or unparseable file stops the run
-and tells you to run `--integration` first. The same file's `verification` field (also set at
-`--integration` setup time) gates Stage 05.
+Speckit Auto resolves its provider only from repo-local `.speckit/integration.json`.
+Missing or invalid config stops the pipeline and directs you to `--integration <provider>`.
+There is no global fallback or first-run provider prompt. The same file's `verification` field
+(also set at `--integration` setup time) gates Stage 05.
 
 Supported providers:
 
@@ -77,16 +83,17 @@ Each provider includes stage-specific reference files that implement the pipelin
 ### YOLO vs Default Mode
 
 **Default Mode** (recommended for critical features):
-- Runs Stages 01–06, with mandatory human checkpoints at Stage 04 and (when verification is
-  enabled) Stage 05
-- Requires explicit human approval before code is merged, and — if verification is enabled —
-  explicit confirmation that verification passed
+- Runs Stages 01–06 with Stage 02 approvals, implementation-start confirmation, Stage 04 review,
+  and (when verification is enabled) the Stage 05 verification confirmation
+- Requires explicit human approval before implementation commit/push
+- Requires explicit human approval before a pull request is opened — the implementation approval
+  alone does not authorize publishing the branch
 - Best for production, regulatory, or high-stakes work
 
 **YOLO Mode** (`--yolo` flag):
-- Still routes through every stage, but skips the human checkpoints at Stage 04 and (when
-  verification is enabled) Stage 05
-- Zero human checkpoints; fully automated merge, verification confirmation, and commit/push/PR
+- Runs the same six stages, skipping human approvals and using autonomous checks
+- Stage 04 auto-commits; Stage 06 marks the spec completed and pushes the completion commit
+- Opens the draft pull request without a human wait — `--yolo` is the authorization to publish
 - Ideal for internal tools, experiments, or when continuous delivery is the goal
 - All code still passes speckit-code-review before merge; if verification is enabled, it still
   runs — YOLO only skips asking a human to confirm the result
@@ -120,10 +127,13 @@ skill speckit-auto --issue https://jira.example.com/browse/PROJ-123
 
 # Fully automated: no human checkpoints
 skill speckit-auto --yolo --issue https://jira.example.com/browse/PROJ-456
+
+# Optional caller-supplied attempt UUID, retained on resume
+skill speckit-auto --run-id 123e4567-e89b-42d3-a456-426614174000 --issue https://jira.example.com/browse/PROJ-123
 ```
 
-On Copilot/Claude Code invoke as `/speckit-auto <flags>`; on OpenCode embed the flags in the
-trigger message.
+On Copilot/Claude Code invoke as `/speckit-auto <flags>`; on OpenCode and Hermes Agent embed the
+flags in the trigger message (e.g. a Slack thread `@hermes start DEMO-42 --issue <url>`).
 
 ### Provider setup (one-time)
 
@@ -163,6 +173,7 @@ other file loads at the exact moment its step runs:
 | `references/shared/operating-rules.md` | pipeline entry (run contract) |
 | `references/providers/<provider>.md` | pipeline entry — resolved provider only |
 | `references/pipeline/stage-0N-*.md` | entering that stage |
+| `references/shared/run-events.md` | after the worktree gate, at first event initialization |
 | `references/shared/commit.md` | first commit gate (Stage 02 → 03) |
 | `references/shared/host-adaptation.md` | a step needs an ask tool, skill dir, or install host key |
 | `references/shared/integration-setup.md` | `--integration` runs (no stage file loads at all) |
@@ -173,6 +184,40 @@ Rules enforced by the skill: never load the unselected provider, never load a st
 in, never re-read a file already in context, and drop stage-local context (interviews, failed
 review bodies, unused guideline files) when leaving a stage.
 
+## Structured run events
+
+Version 0.5.0 writes append-only contract-v1 JSONL to the actual worktree's
+`.speckit/events.jsonl`. After the worktree gate, `scripts/run-events.mjs init` records the
+run/stage start and atomic discovery at the source repo's `.speckit/runs/<run_id>.json`.
+Discovery is refreshed when a provisional worktree moves. Both locations are git-ignored.
+
+`--run-id <uuid>` is optional on every host. Without it, the pipeline generates a UUID once.
+Resume retains the ID and sequence; a fresh retry gets a new ID without truncating history.
+The helper path is resolved from the installed skill folder, never the project cwd.
+Setup-only invocations do not initialize events.
+
+Stages emit boundaries, default-mode named approvals, other input waits, confirmed PR URLs,
+and terminal completion/failure. Request changes answers the gate and restarts work, not a
+failed run. YOLO emits no waits for skipped gates. Completion follows required implementation
+and spec completion pushes, not just a passing review. PR events require a real HTTPS URL.
+The Stage 04 `pr-publish` decision is a named approval (`gate_waiting` / `gate_answered`),
+not a free-form question; declining it skips the PR and the run still completes.
+
+The standalone helper uses Node builtins and JSON stdin via an argument-vector invocation,
+never interpolated shell JSON. An event validation/write error stops the pipeline explicitly
+without a success claim. No raw answers, credentials, file contents, or tool output are emitted.
+See [references/shared/run-events.md](references/shared/run-events.md) for the exact invocation,
+schema, bounds, resume, and failure behavior.
+
+For Agent Ops, deploy the monitor and migrations first, then client 0.5.0, then this skill
+0.5.0. Old agents remain accepted by the monitor; new clients with old skills retain log
+fallback until this producer is installed. This release does not automatically install a
+package or replace an installed skill. Copy the reviewed bundle explicitly after deployment.
+
+Manual host/provider approval cases are listed in `test-case/speckit-auto/test-cases.md` in
+the source repository. The automated helper and instruction tests do not execute those cases
+or prove compliance by a live host. Record manual results separately.
+
 ## Troubleshooting
 
 | Symptom | Fix |
@@ -180,7 +225,9 @@ review bodies, unused guideline files) when leaving a stage.
 | "Which provider?" on every run | Run `--integration <provider>` once to persist |
 | Jira intake fails | Ensure root `.env` has all three `JIRA_*` keys; test with `jira-to-speckit` directly |
 | Stage 03 review loop doesn't converge | Simplify the spec's acceptance criteria; avoid vague language ("elegant", "performant") |
-| Missing framework | At startup and any later step, failed provider validation triggers install recovery; if still failing after install, stop and ask the user to restart Copilot / Claude Code / OpenCode, then re-run |
+| Missing framework | At startup and any later step, failed provider validation triggers install recovery; if still failing after install, stop and ask the user to restart Copilot / Claude Code / OpenCode / Hermes Agent, then re-run |
+| Event initialization/write error | Repair the reported cause and validate existing history before resume; never delete/truncate events to continue |
+| Missing/old Node | Install Node.js >=22.13 before a pipeline run; no third-party emitter packages are needed |
 
 ## Notes
 

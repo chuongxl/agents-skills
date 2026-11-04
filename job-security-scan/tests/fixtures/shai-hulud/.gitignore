@@ -1,0 +1,3 @@
+# Fixture node_modules trees are test data (inert), not installed dependencies.
+!node_modules/
+!.env

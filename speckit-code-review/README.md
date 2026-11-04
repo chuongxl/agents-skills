@@ -89,6 +89,9 @@ cp -r speckit-code-review ~/.claude/skills/
 
 # OpenCode
 cp -r speckit-code-review ~/.config/opencode/skills/
+
+# Hermes Agent
+cp -r speckit-code-review ~/.hermes/skills/
 ```
 
 ### Standalone Use
@@ -121,7 +124,7 @@ Reviewers iterate on fixes via `speckit-auto` without re-invoking `speckit-code-
 
 1. **Parse Requirements** — Extract or synthesize the requirement checklist from `specs/<feature>/spec.md`. If no requirement IDs exist, generate FR-*/NFR-* identifiers synthetically (see Requirement ID Synthesis above).
 
-2. **Define Scope** — Identify changed files from git (staged + unstaged). This defines which code paths require review.
+2. **Define Scope** — Identify changed files from git (staged + unstaged), expanding any changed git submodule gitlink into its own file-level diff so submodule changes are actually reviewed, not skipped. This defines which code paths require review.
 
 3. **Load Guidelines** — Optionally load project-specific reference files (architecture.md, code-style.md, etc.) to incorporate team-defined standards. Each reference file is discarded after use to avoid context bloat.
 
@@ -268,6 +271,7 @@ Copy-Item -Recurse speckit-code-review $skillPath
 | GitHub Copilot CLI | ✅ Full | Auto-discovered from `~/.agents/skills/` |
 | Claude Code | ✅ Full | Install to `~/.claude/skills/`; invoked via the Skill tool |
 | OpenCode | ✅ Full | Install to `~/.config/opencode/skills/`; invoked via the skill tool |
+| Hermes Agent | ✅ Full | Install to `~/.hermes/skills/`; invoked via the `skill_view` tool |
 | Superpowers | ✅ Full | Invoked by speckit-auto skill |
 | GitHub Spec Kit | ✅ Full | Specs with pre-numbered FR-*/NFR-* requirements |
 | Superpowers Brainstorming | ✅ Full | Narrative specs; requires synthesis |

@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "id": "php",
+  "name": "PHP (Composer)",
+  "detect": [
+    "composer.json"
+  ],
+  "lockfiles": [
+    "composer.lock"
+  ],
+  "osv_ecosystem": "Packagist",
+  "semgrep": [
+    "p/php"
+  ],
+  "docker": {
+    "images": [
+      "php"
+    ]
+  },
+  "runtime": {
+    "name": "php",
+    "extractors": [
+      {
+        "file": "composer.json",
+        "json_path": "require.php"
+      }
+    ],
+    "eol_product": "php"
+  }
+}

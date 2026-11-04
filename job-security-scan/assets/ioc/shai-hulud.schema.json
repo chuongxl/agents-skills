@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Shai-Hulud indicator file",
+  "description": "Mirrors scripts/lib/shaihulud/iocs.py validate(); that function is the enforced contract.",
+  "type": "object",
+  "required": ["version", "waves", "packages", "files", "paths", "markers"],
+  "properties": {
+    "version": {"type": "string"},
+    "waves": {"type": "object", "additionalProperties": {
+      "type": "object", "required": ["name", "references"],
+      "properties": {"name": {"type": "string"}, "first_seen": {"type": "string"},
+                     "references": {"type": "array", "minItems": 1, "items": {"type": "string"}}}}},
+    "packages": {"type": "array", "items": {
+      "type": "object", "required": ["ecosystem", "name", "versions", "wave"],
+      "properties": {"ecosystem": {"enum": ["npm", "pypi"]}, "name": {"type": "string", "minLength": 1},
+                     "versions": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+                     "wave": {"type": "string"}, "sources": {"type": "array", "items": {"type": "string"}}}}},
+    "files": {"type": "array", "items": {
+      "type": "object", "required": ["name", "kind", "wave", "sha256"],
+      "properties": {"name": {"type": "string"}, "kind": {"enum": ["payload", "stager"]}, "wave": {"type": "string"},
+                     "sha256": {"type": "array", "items": {"type": "string", "pattern": "^[0-9a-f]{64}$"}}}}},
+    "paths": {"type": "array", "items": {
+      "type": "object", "required": ["pattern", "wave"],
+      "properties": {"pattern": {"type": "string"}, "requires_marker": {"type": "string"}, "wave": {"type": "string"}}}},
+    "markers": {"type": "array", "items": {
+      "type": "object", "required": ["text", "wave"],
+      "properties": {"text": {"type": "string", "minLength": 6}, "wave": {"type": "string"}}}}
+  }
+}

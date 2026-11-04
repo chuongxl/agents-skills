@@ -30,6 +30,12 @@ All tools are free, open-source, and configurable. Security findings are organiz
 5. **Structured Output** — JSON results for easy CI/CD integration
 6. **Auto-Install** — Security tools auto-install on first run via Homebrew (macOS) or apt/curl (Linux)
 7. **Allowlist Support** — Exclude false positives and intentional secrets from scanning
+8. **Verified Findings** — Serious findings are re-checked by an independent verifier agent: confirmed (with
+   calibrated severity), needs validation (with the exact missing fact), or dismissed (with the reason)
+9. **Changes Since Last Run** — Each report marks findings new or unchanged and lists what was fixed
+10. **Profiles and Scope** — `--profile quick|standard|deep` and `--since <git-ref>` for fast PR checks
+11. **Deep Audit (opt-in)** — `--audit`: agent-driven, coverage-led review for logic flaws scanners cannot see, every finding independently re-verified
+12. **Baseline** — Accept known findings with a reason and an expiry date
 
 ## Quick Start
 
@@ -61,7 +67,7 @@ Key configuration:
 - `team` — Team identifier for reporting
 - `org` — GitHub organization name
 - `repos[]` — List of repositories to scan (with `active: true/false`)
-- `stack` — Tech stack (typescript, nodejs, python, go, java, etc.)
+- Languages and lockfiles are detected automatically (`ecosystems/*.json`); `stack` and `package-manager` are deprecated
 - `fail-on-severity` — Build failure threshold (CRITICAL, HIGH, MEDIUM, LOW)
 
 ### 3. Run Scan
@@ -81,18 +87,22 @@ bash job-security-scan/scripts/run-scan.sh --scanner trivy
 
 ### 4. Review Results
 
-Results are saved to `.security-scan-results/` by default:
+Every run creates its own folder in the workspace folder, so earlier runs are never overwritten:
 
 ```
-.security-scan-results/
-├── report.json           # Structured full report
-├── summary.txt           # Human-readable summary
-└── <repo-name>/
-    ├── gitleaks.json
-    ├── trivy.json
-    ├── semgrep.json
-    └── hadolint.json
+security-run-20261102-153600/
+├── security-report.md     # summary + findings, each with file:line and the line of code
+├── security-report.json   # same data, machine-readable
+├── security-report.html   # interactive report
+├── .gitignore             # "*" - never committed by accident
+└── <repo-name>/           # raw tool output: gitleaks.json, trivy.json, semgrep.json, osv.json, shai-hulud.json ...
 ```
+
+Secrets are reported with file and line only, never the value. The skill only reports — it never changes code.
+
+Caches (vendor advisories, refreshed indicators) live in `~/.cache/job-security-scan`, not in the workspace;
+set `cache-dir:` in `repository.md` or `JOB_SECURITY_SCAN_CACHE` to move them. An old `.security-scan-results/`
+folder from earlier versions is no longer used and can be deleted.
 
 ## Detailed Features
 
@@ -125,7 +135,7 @@ Language-specific code analysis (SAST) for security and quality issues:
 - NestJS: Authentication, validation, injection vulnerabilities
 - General: OWASP Top 10 patterns (SQL injection, XSS, etc.)
 
-Rulesets are controlled by the `stack` field in `repository.md`.
+Rulesets follow the languages detected in each repo (see `references/ecosystems.md`).
 
 **Output:** `semgrep.json` with issue type, severity, code snippet, and fix guidance
 
@@ -157,6 +167,78 @@ Different from Gitleaks (which scans git history), TruffleHog verifies live cred
 - Supports multiple credential types
 
 **Output:** `trufflehog.json` with verified/unverified status
+
+### 7. Shai-Hulud — Supply-Chain Worm Check (repo and laptop)
+
+A fast, offline answer to "were we hit by the Shai-Hulud npm/PyPI worm?":
+- **Affected** (CRITICAL): a known compromised release (lockfiles, `node_modules`, PyPI pins, global
+  installs, npm cache), the worm's payload/stager file in a package, a planted workflow or persistence
+  file, or a worm marker string
+- **Suspicious** (HIGH/MEDIUM): an install hook that reads credentials *and* sends data out, pipes a
+  download into a shell, runs heavily obfuscated code, or downloads `bun`/TruffleHog
+- **Laptop mode** (`--host`): projects under your home directory, global installs, the npm cache, and a
+  list of credential stores to rotate if affected (values are never read or printed)
+- Never runs npm/node/pip; benign hooks (`node-gyp`, `husky`, esbuild...) are allowlisted
+
+**Output:** `shai-hulud.json` per repo, `_host/shai-hulud.json` for this computer (report: "this machine").
+Every report has a **🪱 Shai-Hulud check** section: one row per repo and for this machine with the verdict
+(AFFECTED / SUSPICIOUS / CLEAN / ERROR / not run), what was checked (dependency files, packages, install hooks,
+workflows; projects, global installs and npm cache for the host), the indicator data version and a link to the raw
+output, so a clean result can be checked and a failed check is never silent.
+Indicator data and sources: [references/ioc-data.md](references/ioc-data.md). If affected:
+[references/remediation.md](references/remediation.md#-shai-hulud-if-affected).
+
+### 8. Independent Verification, Run-to-Run Changes, Report Schema
+
+- **Verification (agent step, Phase 9):** `scripts/triage.py queue` lists the findings to check (`standard`:
+  CRITICAL + HIGH, `deep`: also MEDIUM) with a redacted ±15-line context; each goes to a fresh verifier agent
+  that tries to disprove it from source only (no edits, no running repo code, no network). `triage.py apply`
+  merges the verdicts all-or-nothing and regenerates the reports plus `NEEDS-VALIDATION.md`. Prompt, verdict
+  format and severity anchors: [references/verification.md](references/verification.md).
+- **Changes:** every finding has a fingerprint that survives code moving within a file; reports compare with
+  the previous `security-run-*` folder (new / unchanged / fixed), and verdicts carry over while code is unchanged.
+- **Schema:** `security-report.json` is `schema_version` 2 ([assets/report.schema.json](assets/report.schema.json));
+  `python3 -I scripts/validate-report.py <run>/security-report.json` checks it (exit 0 valid, 1 invalid, 2 unreadable).
+
+### 9. Deep Audit — Logic Flaws Scanners Miss (opt-in, Phase 10)
+
+Scanners match known-bad patterns. They cannot see that one route checks the note's owner and its
+sibling does not, that a tenant ID comes from the request body, or that a CI workflow runs pull-request code
+with a publish token. The deep audit is the method of
+[cloudflare/security-audit-skill](https://github.com/cloudflare/security-audit-skill) (MIT), adapted to
+this skill (provenance: [references/audit/NOTICE.md](references/audit/NOTICE.md)):
+
+- **Reconnaissance** maps trust boundaries and builds a deterministic **coverage ledger** of entry surface ×
+  boundary × subsystem × attack class.
+- **Hunting** assigns isolated agents to ledger units with attack-class prompts (web/auth, AI/LLM,
+  client-side, supply chain/CI, cloud, RPC/messaging, data isolation, resource exhaustion, desktop/IPC,
+  memory safety); coverage critics look for gaps.
+- **Validation**: a fresh agent tries to disprove every candidate; a second fresh agent re-checks every
+  final record.
+- **Verdicts**: *confirmed* (with severity), *needs validation* (no severity; names the missing fact and
+  the check that settles it), *rejected* (kept so later runs do not repeat it).
+- **Report**: confirmed findings join the scanner findings as ordinary findings (scanner `audit`, already
+  verified); a Deep audit section lists coverage, gaps, leads and hardening notes. An unfinished audit merges
+  nothing.
+
+```bash
+bash job-security-scan/scripts/run-scan.sh --audit                       # scanners + deep audit
+bash job-security-scan/scripts/run-scan.sh --scanner audit --profile quick --since origin/main
+```
+
+The script prepares the audit; the agent then follows
+[references/audit/WORKFLOW.md](references/audit/WORKFLOW.md). Source-only by default. Sandboxed local checks
+need `JOB_SECURITY_SCAN_AUDIT_EXEC=1` and run only through `scripts/audit-sandbox.py` (Linux namespaces:
+no network, read-only filesystem except scratch, empty environment, resource limits — it refuses to run
+if any control is missing).
+
+### 10. Baseline (accepted findings)
+
+Known, accepted findings go in `security-baseline.json` next to `repository.md` (or `--baseline FILE`):
+`{"version": 1, "entries": [{"fingerprint": "<16 hex from security-report.json>", "reason": "...",
+"expires": "YYYY-MM-DD", "owner": "..."}]}`. They are listed in their own report section with the reason and
+left out of the counts; expired entries stop applying; entries matching nothing are flagged. If every
+CRITICAL/HIGH finding is accepted, the run exits 1 (warning) instead of 2.
 
 ## Installation & Setup
 
@@ -202,12 +284,6 @@ team: my-team
 org: my-github-org
 monorepo-root: .
 ci-runner: ubuntu-latest
-package-manager: yarn
-stack:
-  - typescript
-  - nodejs
-  - docker
-
 repos:
   - name: api-backend
     active: true
@@ -219,7 +295,7 @@ repos:
     active: false
 
 fail-on-severity: HIGH
-output-dir: .security-scan-results
+# cache-dir: .scan-cache          # optional; default ~/.cache/job-security-scan
 secret-allowlist-paths:
   - '**/.env.example'
   - '**/example/**'
@@ -251,8 +327,8 @@ secret-allowlist-paths:
 cd my-workspace
 bash job-security-scan/scripts/run-scan.sh
 
-# Results in .security-scan-results/report.json
-cat .security-scan-results/summary.txt
+# Reports in the newest security-run-<datetime>/ folder
+cat "$(ls -1d security-run-* | tail -1)/security-report.md"
 ```
 
 ### Example 2: CI/CD Integration
@@ -267,13 +343,21 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - name: Run security scan
-        run: bash .github/skills/job-security-scan/scripts/run-scan.sh
-      - name: Upload results
-        uses: actions/upload-artifact@v3
+      - uses: actions/cache@v4            # optional: reuse vendor advisories between runs
         with:
-          name: security-results
-          path: .security-scan-results/
+          path: .scan-cache
+          key: job-security-scan-${{ github.run_id }}
+          restore-keys: job-security-scan-
+      - name: Run security scan
+        env:
+          JOB_SECURITY_SCAN_CACHE: .scan-cache
+        run: bash .github/skills/job-security-scan/scripts/run-scan.sh
+      - name: Upload reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-reports
+          path: security-run-*/
 ```
 
 ### Example 3: Single-Repo Scan
@@ -288,6 +372,43 @@ bash job-security-scan/scripts/run-scan.sh --repo backend-api
 ```bash
 # Run only Semgrep (fast SAST) without full dependency scan
 bash job-security-scan/scripts/run-scan.sh --scanner semgrep
+```
+
+### Example 5: Was This Repo or Laptop Hit by Shai-Hulud?
+
+```bash
+# This computer only (no repository.md needed)
+bash job-security-scan/scripts/run-scan.sh --host
+
+# Every configured repo plus this computer
+bash job-security-scan/scripts/run-scan.sh --scanner shai-hulud --host
+
+# Standalone, any folder; exit 0 clean, 1 suspicious, 2 affected
+python3 -I job-security-scan/scripts/shai-hulud-scan.py --repo ./my-service
+
+# Refresh indicators from the published lists (optional; used automatically)
+python3 -I job-security-scan/scripts/fetch-iocs.py --out ~/.cache/job-security-scan/ioc
+```
+
+In CI, add a step before `npm ci` so a compromised release fails the build before its install hook runs:
+
+```yaml
+- name: Shai-Hulud check
+  run: python3 -I .github/skills/job-security-scan/scripts/shai-hulud-scan.py --repo . --format text
+```
+
+### Example 6: Fast PR Check and Deep Audit
+
+```bash
+# Only files changed since main; Gitleaks on the working tree, OSV, Shai-Hulud; no verification queue
+bash job-security-scan/scripts/run-scan.sh --profile quick --since origin/main
+
+# Scanners plus the deep audit of changed code only
+bash job-security-scan/scripts/run-scan.sh --audit --since origin/main
+
+# Everything, Trivy down to LOW, MEDIUM findings queued for verification too
+bash job-security-scan/scripts/run-scan.sh --profile deep
+python3 -I job-security-scan/scripts/triage.py queue security-run-<datetime>
 ```
 
 ## Configuration
@@ -357,9 +478,30 @@ bash job-security-scan/scripts/run-scan.sh  # Re-downloads DB
 
 ## Version History
 
-- **v2.0** (current) — Multi-tool unified pipeline, config-driven, zero-install for free tools
+- **v3.0** (current) — Deep audit (Phase 10, `--audit`) adapted from cloudflare/security-audit-skill: coverage
+  ledger, isolated hunters, adversarial validation, confirmed / needs-validation / rejected verdicts, Python
+  validators, optional sandbox and evidence promotion; confirmed audit findings join the report as verified
+  findings; baseline of accepted findings (`security-baseline.json`); commit and dirty flag per repo
+  (`run-metadata.json`); a semgrep run that writes no output is reported as not scanned instead of clean
+- **v2.6** — Shai-Hulud check section in every report (per-target verdict, what was checked,
+  indicator version, raw-output link, error / not-run states); the scanner records what it checked
+- **v2.5** — Independent verification of findings (confirmed / needs validation / dismissed, calibrated
+  severity, `triage.py`), changes since the last run (fingerprints, fixed list, carried verdicts), `--profile`
+  and `--since`, report schema v2 with `validate-report.py`; ideas adapted from Cloudflare's security-audit skill (MIT)
+- **v2.4** — Security hardening of the skill itself: pinned and checksum-verified tool installs, SHA-pinned CI actions (template moved off hijacked `trivy-action` tags), config/repo-name injection fixed, secret values stripped from raw output, opt-in sandboxed image probe, verified TruffleHog secrets fail the scan
+- **v2.3** — Per-run `security-run-<datetime>/` folder with Markdown, JSON and HTML reports; every finding located to file, line and code; caches moved out of the workspace; report-only rule
+- **v2.2** — Shai-Hulud supply-chain worm check (`--scanner shai-hulud`, `--host` laptop mode)
+- **v2.1** — Runtime and image checks
+- **v2.0** — Multi-tool unified pipeline, config-driven, zero-install for free tools
 - **v1.0** — Gitleaks-only security scan
 
 ## License & Attribution
 
 MIT License. Maintained by the security-focused engineering team.
+
+The verification contract, verifier prompt and severity anchors in `references/verification.md` are adapted from
+Cloudflare's [security-audit skill](https://github.com/cloudflare/security-audit-skill), MIT License,
+Copyright (c) 2025-2026 Cloudflare, Inc. The deep-audit method in `references/audit/` and
+`assets/audit/findings.schema.json` is copied from the same project (provenance:
+[references/audit/NOTICE.md](references/audit/NOTICE.md)). License text in
+[references/third-party/cloudflare-security-audit-LICENSE](references/third-party/cloudflare-security-audit-LICENSE).
