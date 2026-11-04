@@ -5,7 +5,7 @@ unit-testable offline. Payloads are parsed as JSON/XML data and never executed.
 """
 
 import re
-import xml.etree.ElementTree as ET
+import xml.etree.ElementTree as ET  # nosemgrep: use-defused-xml (stdlib-only; feed_leads rejects DOCTYPE/ENTITY before parsing)
 from urllib.parse import quote
 
 import versions
