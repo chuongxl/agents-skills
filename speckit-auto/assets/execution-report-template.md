@@ -18,7 +18,9 @@
 | Stage 01 — Jira Intake | {{S1_STATUS}} | {{S1_PROGRESS}} | {{S1_ISSUE}} |
 | Stage 02 — Spec / Design | {{S2_STATUS}} | {{S2_PROGRESS}} | {{S2_ISSUE}} |
 | Stage 03 — Implement + Review Loop | {{S3_STATUS}} | {{S3_PROGRESS}} | {{S3_ISSUE}} |
-| Stage 04 — Commit / Completion | {{S4_STATUS}} | {{S4_PROGRESS}} | {{S4_ISSUE}} |
+| Stage 04 — Review / Implementation Commit | {{S4_STATUS}} | {{S4_PROGRESS}} | {{S4_ISSUE}} |
+| Stage 05 — Verification | {{S5_STATUS}} | {{S5_PROGRESS}} | {{S5_ISSUE}} |
+| Stage 06 — Finish / Pull Request | {{S6_STATUS}} | {{S6_PROGRESS}} | {{S6_ISSUE}} |
 
 Update this table in place after every stage of the run; optionally append granular per-step rows
 (e.g. per Stage 02 stage step) as the run progresses.

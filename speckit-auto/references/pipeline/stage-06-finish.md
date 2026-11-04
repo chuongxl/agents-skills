@@ -63,17 +63,28 @@ only — it is not an authorization to publish.
 
 ### Procedure (both providers, both modes)
 
-1. Resolve the repository default branch (`gh repo view --json defaultBranchRef`). It is not
-   necessarily the Stage 01 base branch and not necessarily `main`.
+1. Resolve the PR base: the Stage 01 `base_branch` when it exists on `origin`
+   (`git ls-remote --exit-code --heads origin <base_branch>`), because the feature branch was cut
+   from it and a different base would pull unrelated commits into the PR. Otherwise fall back to
+   the repository default branch (`gh repo view --json defaultBranchRef`).
 2. Skip, and log why, when `gh` is missing or unauthenticated, the branch has no remote, or the
-   branch is the repository default branch.
+   branch equals the resolved base.
 3. Look up an existing PR for the pushed branch (`gh pr list --head <branch> --state open
-   --json url`). If one exists, reuse its URL and do not create another.
-4. Otherwise create a **draft** PR against the resolved default branch with
-   `gh pr create --draft --base <default> --head <branch> --title <t> --body-file <f>`. Title:
-   the implementation commit subject. Body: a short summary from the spec (what changed and why),
-   the `speckit-code-review` status, the Jira issue link in `--issue` mode, and any known
-   limits the spec or plan records. Write the body to a file under the run's temp directory.
+   --json url`). If one exists, reuse its URL, refresh its body from the file built in step 4
+   (`gh pr edit <url> --body-file <f>`; failure is a warning), and do not create another.
+4. Otherwise create a **draft** PR against the resolved base with
+   `gh pr create --draft --base <base> --head <branch> --title <t> --body-file <f>`. Title:
+   the implementation commit subject, or `feat(<artifact_id>): <spec summary>` when that subject
+   is not a conventional-commit line. Body, written to a file under the run's temp directory:
+   - **Why**: the requirement or Jira summary, with the Jira link in `--issue` mode.
+   - **What changed**: a short summary from the spec, and the spec path.
+   - **Quality evidence**: `speckit-code-review` status; the Stage 03 `checks` list (name and
+     result, `pre-existing` and `skipped` ones marked); the verification outcome with the Stage 05
+     criteria table (criterion, verdict, evidence pointer) and any `unverifiable` criteria. When
+     verification is `unavailable`, open the body with "UNVERIFIED: <reason>"; when skipped, say
+     so.
+   - **Authorization**: in YOLO, "opened under `--yolo` authorization".
+   - Known limits the spec or plan records.
    Never merge, never push to the default branch, never force-push.
    - Draft is deliberate, and its limits are narrow: it blocks auto-merge and keeps the PR out of
      the ready-for-review queue. It does **not** prevent publication — `pull_request` workflows
@@ -110,7 +121,7 @@ ask). One repo's failure never stops another's attempt. Record the outcome per r
 ## Final Report
 
 At completion report: resolved provider, `speckit-code-review` final status (`pass`),
-verification outcome (`verification: skipped` or `verification: passed`, plus
+verification outcome (`verification: skipped`, `passed` or `unavailable`, plus
 `investigate_loops: N` if Stage 05 looped at least once; in YOLO, `passed` means auto-assessed clean against the spec, not human-confirmed; list any
 `unverifiable` criteria),
 the implementation commit(s) (from Stage 04), the verification-artifact commit (if any), the spec
