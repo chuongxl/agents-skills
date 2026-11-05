@@ -89,6 +89,21 @@ SECTIONS = [
     ("## 🟡 Medium Findings", ("MEDIUM",)),
     ("## 🔵 Low / Info", ("LOW", "INFO")),
 ]
+LISTED = ("CRITICAL", "HIGH")   # listed one by one; lower severities are counted per repo and rule
+
+
+def _count_table(rows):
+    """MEDIUM and below as `| repo | rule | severity | count |`, so the Markdown stays small on big runs."""
+    counts = {}
+    for f in rows:
+        key = (f.get("repo") or "", f.get("rule_id") or "", effective_severity(f))
+        counts[key] = counts.get(key, 0) + 1
+    order = dict((s, i) for i, s in enumerate(SEVERITIES))
+    out = ["Counted per repo and rule; every finding with its location is in `security-report.html`.", "",
+           "| repo | rule | severity | count |", "|---|---|---|---:|"]
+    for (repo, rule, sev), n in sorted(counts.items(), key=lambda kv: (order[kv[0][2]], kv[0][0], kv[0][1])):
+        out.append("| %s | %s | %s | %d |" % (_text(repo), _text(rule), sev, n))
+    return out
 
 
 def _changes_section(doc):
@@ -166,7 +181,16 @@ def render_markdown(doc):
     for heading, sevs in SECTIONS:
         rows = [f for f in non_secret if effective_severity(f) in sevs]
         out += ["", heading, ""]
-        out += [_finding_item(f) for f in rows] or ["_None._"]
+        if not rows:
+            out.append("_None._")
+        elif sevs[0] in LISTED:
+            out += [_finding_item(f) for f in rows]
+        else:
+            # A verifier's evidence is kept; findings with no verdict yet are only counted.
+            out += [_finding_item(f) for f in rows if f.get("verdict")]
+            rest = [f for f in rows if not f.get("verdict")]
+            if rest:
+                out += ([""] if len(rest) < len(rows) else []) + _count_table(rest)
     secrets = [f for f in active if f.get("type") == "secret"]
     out += ["", "## 🔑 Secrets (values never shown)", ""]
     out += [_finding_item(f, with_code=False) for f in secrets] or ["_None._"]
@@ -181,6 +205,77 @@ def render_markdown(doc):
             "Guidance for each finding category is in `references/remediation.md` of the job-security-scan skill.",
             ""]
     return "\n".join(out)
+
+
+def _summary_finding(f):
+    """One line, never code: `file:line` rule (verdict)."""
+    verdict = f.get("verdict") or "pending"
+    return "- %s %s %s — %s (%s)" % (effective_severity(f), _location(f) or _text(f.get("repo")), _text(f.get("rule_id")),
+                                    _text(f.get("repo")), verdict)
+
+
+def render_summary(doc, max_bytes=20 * 1024):
+    """SUMMARY.md: what an agent reads first. Always at most max_bytes UTF-8 bytes; the full detail is in
+    security-report.html and the sharded JSON."""
+    counts = doc["counts"]
+    run = doc.get("run") or {}
+    ver = doc.get("verification") or {}
+    rows = doc["findings"]
+    head = ["# Security scan summary — %s / %s" % (_text(doc.get("team")), _text(doc.get("org"))), "",
+            "Run folder: %s · profile %s · generated %s" % (_code(doc.get("run_dir", "")), _text(run.get("profile")),
+                                                          _text(doc.get("generated_at"))), "",
+            "**Findings:** %s" % " · ".join("%s %d" % (s, counts[s]) for s in SEVERITIES), "",
+            "| Repo | Critical | High | Medium | Low | Secrets | Status |",
+            "|------|:--------:|:----:|:------:|:---:|:-------:|:------:|"]
+    for r in doc["repos"]:
+        c = r["counts"]
+        head.append("| %s | %d | %d | %d | %d | %d | %s |" % (
+            _text(r["name"]), c["CRITICAL"], c["HIGH"], c["MEDIUM"], c["LOW"] + c["INFO"], r["secrets"],
+            STATUS_EMOJI[r["status"]]))
+    head += report_shaihulud.render_markdown(doc, _text, _code)
+    head += ["", "## Changes", ""]
+    if run.get("previous_error"):
+        head.append("Change tracking unavailable: %s" % _text(run["previous_error"]))
+    elif not run.get("previous_run"):
+        head.append("No earlier run to compare with.")
+    else:
+        new = [f for f in rows if f.get("change") == "new"]
+        head.append("Compared with %s: %d new · %d unchanged · %d fixed" % (
+            _code(run["previous_run"]), len(new), len(rows) - len(new), len(doc.get("fixed", []))))
+        head += [_summary_finding(f) for f in new if effective_severity(f) in LISTED][:20]
+    head += ["", "## Verification", "",
+             "%d queued · %d pending · %d confirmed · %d need validation · %d dismissed" % (
+                 ver.get("queued", 0), ver.get("pending", 0), ver.get("confirmed", 0),
+                 ver.get("needs_validation", 0), ver.get("rejected", 0))]
+    for repo, s in sorted((doc.get("audit") or {}).items()):
+        head.append("Deep audit %s: %s · confirmed %d · need validation %d · rejected %d" % (
+            _text(repo), "complete" if s.get("run_status") == "complete" and s.get("valid") else "incomplete",
+            s.get("confirmed", 0), len(s.get("needs_validation") or []), s.get("rejected", 0)))
+    top = [f for f in rows if f.get("verdict") != "rejected" and effective_severity(f) in LISTED]
+    body = ["", "## Critical and high findings", ""] + [_summary_finding(f) for f in top[:50]]
+    if not top:
+        body.append("_None._")
+    tail = ["", "## Reports", "", "- `security-report.html` — every finding, with code and verdicts",
+            "- `security-report.md` — CRITICAL and HIGH in full, lower severities counted",
+            "- `security-report.json` + `findings/` — machine-readable, sharded (read with triage.py, not whole)", ""]
+
+    def size(lines):
+        return len("\n".join(lines).encode("utf-8"))
+
+    hidden = len(top) - min(len(top), 50)
+    while True:
+        more = ["", "… %d more in security-report.html" % hidden] if hidden else []
+        out = head + body + more + tail
+        if size(out) <= max_bytes or len(body) <= 3:
+            break
+        body.pop()
+        hidden += 1
+    text = "\n".join(out)
+    if len(text.encode("utf-8")) > max_bytes:
+        note = "\n… cut to %d bytes; more in security-report.html\n" % max_bytes
+        cut = text.encode("utf-8")[:max_bytes - len(note.encode("utf-8"))].decode("utf-8", "ignore")
+        text = cut[:cut.rfind("\n")] + note if "\n" in cut else cut + note
+    return text
 
 
 def build_markdown(findings, meta, previous=None):

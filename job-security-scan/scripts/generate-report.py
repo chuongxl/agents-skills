@@ -719,17 +719,19 @@ def build_html(doc, config, results_dir, output_path, org, workspace="."):
 
 
 def write_reports(doc, config, out_dir, results_dir=None):
-    """Write security-report.{json,md,html} for a v2 document, validate the JSON and return the paths.
+    """Write SUMMARY.md and security-report.{json (+ findings/ shards),md,html} for a report document, validate the JSON and return the paths.
     Used by this script and by triage.py apply (which regenerates the reports after verification)."""
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     org = config.get("org", "unknown")
     run = doc.get("run") or {}
     workspace = run.get("repos_root") or run.get("workspace") or "."   # file links: <repos root>/<repo>/<file>
-    paths = [out_dir / "security-report.md", out_dir / "security-report.json", out_dir / "security-report.html"]
+    paths = [out_dir / "security-report.md", out_dir / "security-report.json", out_dir / "security-report.html",
+             out_dir / "SUMMARY.md"]
     report_store.save(doc, out_dir)
     paths[0].write_text(report_formats.render_markdown(doc), encoding="utf-8")
     build_html(doc, config, results_dir or out_dir, str(paths[2]), org, workspace)
+    paths[3].write_text(report_formats.render_summary(doc), encoding="utf-8")
     errors = report_schema.validate(doc)
     if errors:
         sys.stderr.write("  warning: security-report.json failed validation:\n%s\n"

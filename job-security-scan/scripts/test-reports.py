@@ -237,6 +237,36 @@ class FormatTests(unittest.TestCase):
         self.assertIn("Secret \\| in", md)
         self.assertNotIn("in `.env``", md)
 
+    def test_summary_is_bounded(self):
+        out = self.rf.render_summary(big_doc())
+        self.assertLessEqual(len(out.encode("utf-8")), 20 * 1024)
+        self.assertIn("more in security-report.html", out)
+        self.assertIn("| api |", out)
+        small = self.rf.render_summary(big_doc(), max_bytes=4096)
+        self.assertLessEqual(len(small.encode("utf-8")), 4096)
+
+    def test_summary_never_contains_secret_code(self):
+        import report_model
+        doc = report_model.build_document([finding(repo="api", scanner="gitleaks", type="secret", severity="CRITICAL",
+                                                   file=".env", line=3, code="AKIA_SECRET_VALUE", rule_id="aws")],
+                                          dict(META, repos=["api"]))
+        out = self.rf.render_summary(doc)
+        self.assertIn("`.env:3`", out)
+        self.assertNotIn("AKIA_SECRET_VALUE", out)
+
+    def test_markdown_lists_all_high_and_tables_low(self):
+        import report_model
+        rows_ = [finding(repo="api", scanner="semgrep", type="sast", severity="HIGH", file="src/h%d.js" % i, line=1,
+                         code="h()", rule_id="H", title="High") for i in range(300)]
+        rows_ += [finding(repo="api", scanner="semgrep", type="sast", severity="LOW", file="src/l%d.js" % i, line=1,
+                          code="l()", rule_id="L%d" % (i % 7), title="Low") for i in range(20000)]
+        md = self.rf.render_markdown(report_model.build_document(rows_, dict(META, repos=["api"])))
+        for i in range(300):
+            self.assertIn("`src/h%d.js:1`" % i, md)
+        self.assertNotIn("src/l0.js", md)
+        self.assertIn("| api | L0 | LOW | 2858 |", md)
+        self.assertLess(len(md.encode("utf-8")), 2 * 1024 * 1024)
+
     def test_clean_run_reports(self):
         md = self.rf.build_markdown([], META)
         self.assertIn("No findings", md)
@@ -264,11 +294,12 @@ class GenerateTests(TempDirCase):
         page = (out / "security-report.html").read_text()
         self.assertIn("`src/db.js:2`", md)
         self.assertIn("`const q = 'SELECT ' + id;`", md)
-        self.assertIn("yarn.lock:3", md)
+        self.assertIn("| api | GHSA-x | MEDIUM | 1 |", md)
         osv = [f for f in doc["findings"] if f["scanner"] == "osv"][0]
         self.assertEqual((osv["line"], osv["code"]), (3, "lodash@^4.17.0:"))
         self.assertIn("db.js:2", page)
         self.assertIn("SELECT", page)
+        self.assertIn("# Security scan summary", (out / "SUMMARY.md").read_text())
 
     def test_real_osv_v2_output_with_cvss_vectors(self):
         """osv-scanner v2 shape: CVSS scores are vector strings; severity comes from groups[].max_severity."""
