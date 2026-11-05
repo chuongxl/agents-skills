@@ -224,41 +224,35 @@ def build_document(findings, meta, previous=None):
 
 
 RUN_PREFIX = "security-run-"
-MAX_REPORT_BYTES = 5 * 1024 * 1024
 
 
-def load_report(path):
-    """A v2 report that passes the validator, or None (missing, too big, not JSON, v1, invalid)."""
-    import json
-    import os
-    import report_schema
-    try:
-        if os.path.getsize(str(path)) > MAX_REPORT_BYTES:
-            return None
-        with open(str(path), "r", encoding="utf-8") as fh:
-            doc = json.load(fh)
-    except (OSError, ValueError):
-        return None
-    if not isinstance(doc, dict) or report_schema.validate(doc):
-        return None
-    return doc
+def load_report(run_dir):
+    """The whole report of a run folder (v2 or v3); raises report_store.ReportError when it cannot be read."""
+    import report_store
+    return report_store.load_full(run_dir)
 
 
 def find_previous(run_dir):
-    """(document, folder) of the newest earlier security-run-* sibling with a valid v2 report, else (None, None).
-    "Earlier" is by folder name, which sorts by the run's date and time."""
+    """(document, folder, error) for the newest earlier security-run-* sibling that has a report.
+    Folders without a report (aborted runs) are skipped; if the newest report cannot be read the result is
+    (None, folder, message) - never an older run, which would mark findings fixed against stale data.
+    "Earlier" is by folder name, which sorts by the run's date and time. (None, None, None): nothing earlier."""
     from pathlib import Path
+    import report_store
     run_dir = Path(run_dir).resolve()
     try:
         siblings = [p for p in run_dir.parent.iterdir()
                     if p.is_dir() and p.name.startswith(RUN_PREFIX) and p.name < run_dir.name]
     except OSError:
-        return None, None
+        return None, None, None
     for p in sorted(siblings, key=lambda x: x.name, reverse=True):
-        doc = load_report(p / "security-report.json")
-        if doc is not None:
-            return doc, p
-    return None, None
+        try:
+            return report_store.load_full(p), p, None
+        except report_store.ReportMissing:
+            continue
+        except report_store.ReportError as exc:
+            return None, p, str(exc)
+    return None, None, None
 
 
 def keep_verdicts(doc, existing):

@@ -29,6 +29,7 @@ sys.path.insert(0, str(SCRIPT_DIR / "lib"))
 import report_formats  # noqa: E402
 import report_locate   # noqa: E402
 import report_model    # noqa: E402
+import report_store    # noqa: E402
 import report_schema   # noqa: E402
 from shaihulud.findings import redact  # noqa: E402
 
@@ -53,17 +54,10 @@ def fail(msg):
 
 
 def load_run(run_dir):
-    path = Path(run_dir) / "security-report.json"
-    doc = report_model.load_report(path)
-    if doc is None:
-        errors = []
-        try:
-            errors = report_schema.validate(json.loads(path.read_text(encoding="utf-8")))
-        except (OSError, ValueError) as exc:
-            errors = [str(exc)]
-        raise SystemExit(fail("%s is not a valid v2 report (%s) - run run-scan.sh again"
-                              % (path, "; ".join(errors[:3]) or "unreadable")))
-    return doc
+    try:
+        return report_model.load_report(run_dir)
+    except report_store.ReportError as exc:
+        raise SystemExit(fail(str(exc)))
 
 
 def _inside(path, root):

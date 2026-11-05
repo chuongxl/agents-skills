@@ -95,8 +95,11 @@ def _changes_section(doc):
     run = doc.get("run") or {}
     rows = doc["findings"]
     out = ["", "## 🔁 Changes since last run", ""]
+    if run.get("previous_error"):
+        return out + ["_Change tracking unavailable: %s. Nothing is marked fixed in this run._"
+                      % _text(run["previous_error"])]
     if not run.get("previous_run"):
-        return out + ["_No earlier run to compare with (no older `security-run-*` folder with a v2 report)._"]
+        return out + ["_No earlier run to compare with (no older `security-run-*` folder with a readable report)._"]
     new = sum(1 for f in rows if f.get("change") == "new")
     out.append("Compared with %s: **%d new** · %d unchanged · %d fixed" % (
         _code(run["previous_run"]), new, len(rows) - new, len(doc.get("fixed", []))))

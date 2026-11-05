@@ -27,6 +27,11 @@ FIX = SKILL_DIR / "tests" / "fixtures"
 SECRET = "ghp_" + "VERIFYTESTVERIFYTESTVERIFYTEST123456"
 
 
+
+def load_doc(run_dir):
+    import report_store
+    return report_store.load_full(run_dir)
+
 class TempDirCase(unittest.TestCase):
     def setUp(self):
         self.tmp = Path(tempfile.mkdtemp())
@@ -259,26 +264,37 @@ class ChangesTests(unittest.TestCase):
 
     def test_find_previous_run(self):
         import report_model
+        import report_store
         root = Path(tempfile.mkdtemp())
         try:
             def mk(name, doc):
                 d = root / name
                 d.mkdir()
-                if doc is not None:
-                    (d / "security-report.json").write_text(json.dumps(doc) if isinstance(doc, dict) else doc)
+                if isinstance(doc, dict):
+                    report_store.save(doc, d)
+                elif doc is not None:
+                    (d / "security-report.json").write_text(doc)
                 return d
             mk("security-run-20261101-090000", build([finding()]))
-            mk("security-run-20261101-100000", {"schema_version": 1, "findings": []})
-            mk("security-run-20261101-110000", "{not json")
-            mk("security-run-20261101-120000", None)
+            v1 = mk("security-run-20261101-100000", json.dumps({"schema_version": 1, "findings": []}))
+            bad = mk("security-run-20261101-110000", "{not json")
+            mk("security-run-20261101-120000", None)                 # aborted run: no report, skipped
             mk("not-a-run", build([finding()]))
             cur = mk("security-run-20261102-080000", None)
             later = mk("security-run-20261103-080000", build([finding()]))
-            doc, path = report_model.find_previous(cur)
-            self.assertEqual(path.name, "security-run-20261101-090000")
+            doc, path, error = report_model.find_previous(cur)       # newest report is broken: say so, no fallback
+            self.assertEqual((doc, path.name), (None, bad.name))
+            self.assertIn("not valid JSON", error)
+            shutil.rmtree(str(bad))
+            doc, path, error = report_model.find_previous(cur)
+            self.assertEqual((doc, path.name), (None, v1.name))
+            self.assertIn("schema_version", error)
+            shutil.rmtree(str(v1))
+            doc, path, error = report_model.find_previous(cur)
+            self.assertEqual((path.name, error), ("security-run-20261101-090000", None))
             self.assertEqual(doc["schema_version"], 3)
             self.assertTrue(later.exists())
-            self.assertEqual(report_model.find_previous(root / "security-run-20261101-090000"), (None, None))
+            self.assertEqual(report_model.find_previous(root / "security-run-20261101-090000"), (None, None, None))
         finally:
             shutil.rmtree(str(root), ignore_errors=True)
 
@@ -311,7 +327,7 @@ class GenerateChangesTests(TempDirCase):
         write_results(second, [("sqli", "src/db.js", 2), ("eval", "src/db.js", 3)])
         r = self.generate(second)
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
-        doc = json.loads((second / "security-report.json").read_text())
+        doc = load_doc(second)
         self.assertEqual(dict((f["rule_id"], f["change"]) for f in doc["findings"]),
                          {"sqli": "unchanged", "eval": "new"})
         self.assertEqual([f["rule_id"] for f in doc["fixed"]], ["sqli-delete"])
@@ -329,7 +345,7 @@ class GenerateChangesTests(TempDirCase):
         run_dir = self.tmp / "ws" / "security-run-20261102-090000"
         write_results(run_dir, [("sqli", str(self.tmp / "repos" / "api" / "src" / "db.js"), 1)])
         self.assertEqual(self.generate(run_dir).returncode, 0)
-        f = json.loads((run_dir / "security-report.json").read_text())["findings"][0]
+        f = load_doc(run_dir)["findings"][0]
         self.assertEqual((f["file"], f["line"], f["code"]), ("src/db.js", 1, "const q = 'SELECT ' + id;"))
         page = (run_dir / "security-report.html").read_text()
         self.assertIn("vscode://file%s" % (self.tmp / "repos" / "api" / "src" / "db.js"), page)
@@ -341,8 +357,66 @@ class GenerateChangesTests(TempDirCase):
         second = self.tmp / "ws" / "security-run-20261102-100000"
         write_results(second, [("sqli", "src/db.js", 1)])
         self.assertEqual(self.generate(second, "--previous", "none").returncode, 0)
-        doc = json.loads((second / "security-report.json").read_text())
+        doc = load_doc(second)
         self.assertEqual(doc["findings"][0]["change"], "new")
+
+    def two_runs(self):
+        self.put("repos/api/src/db.js", "const q = 'SELECT ' + id;\nconst r = 'DELETE ' + id;\n")
+        first = self.tmp / "ws" / "security-run-20261102-090000"
+        write_results(first, [("sqli", "src/db.js", 1), ("sqli-delete", "src/db.js", 2)])
+        self.assertEqual(self.generate(first).returncode, 0)
+        second = self.tmp / "ws" / "security-run-20261102-100000"
+        write_results(second, [("sqli", "src/db.js", 1)])
+        return first, second
+
+    def test_previous_v2_over_5mb_is_compared(self):
+        import report_store
+        first, second = self.two_runs()
+        doc = report_store.load_full(first)
+        doc["schema_version"] = 2
+        doc["skipped"] = ["padding " * 125] * 6000        # ~6 MB: today's silent-skip case
+        shutil.rmtree(str(first / "findings"), ignore_errors=True)
+        (first / "security-report.json").write_text(json.dumps(doc, indent=2))
+        self.assertGreater((first / "security-report.json").stat().st_size, 5 * 1024 * 1024)
+        r = self.generate(second)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        now = report_store.load_full(second)
+        self.assertEqual(now["run"]["previous_run"], str(first.resolve()))
+        self.assertEqual([f["change"] for f in now["findings"]], ["unchanged"])
+        self.assertEqual([f["rule_id"] for f in now["fixed"]], ["sqli-delete"])
+
+    def test_unreadable_previous_sets_error_and_fixes_nothing(self):
+        import report_store
+        first, second = self.two_runs()
+        shards = sorted((first / "findings").glob("*.json"))
+        self.assertTrue(shards)
+        shards[0].unlink()
+        r = self.generate(second)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        now = report_store.load_full(second)
+        self.assertIn("missing", now["run"]["previous_error"])
+        self.assertEqual(now["fixed"], [])
+        self.assertIn("Change tracking unavailable", (second / "security-report.md").read_text())
+
+    def test_keep_verdicts_with_unreadable_report_exits_1(self):
+        first, _ = self.two_runs()
+        shard = sorted((first / "findings").glob("*.json"))[0]
+        shard.write_text(shard.read_text().replace('"line":', '"line": ', 1))
+        index = (first / "security-report.json").read_bytes()
+        r = self.generate(first, "--keep-verdicts", "--previous", "none")
+        self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
+        self.assertIn("cannot keep verdicts", r.stderr)
+        self.assertEqual((first / "security-report.json").read_bytes(), index)
+
+    def test_explicit_previous_unreadable_is_reported(self):
+        import report_store
+        _, second = self.two_runs()
+        empty = self.tmp / "ws" / "security-run-20261101-000000"
+        empty.mkdir()
+        r = self.generate(second, "--previous", empty)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn(str(empty), r.stderr)
+        self.assertIn("does not exist", report_store.load_full(second)["run"]["previous_error"])
 
 
 def run_proc(*args, **kw):
@@ -408,7 +482,7 @@ class ProfileTests(TempDirCase):
         return self.log.read_text() if self.log.exists() else ""
 
     def report(self, run_dir):
-        return json.loads((run_dir / "security-report.json").read_text())
+        return load_doc(run_dir)
 
     def test_quick_profile(self):
         r, run_dir = self.scan("--profile", "quick")
@@ -536,7 +610,7 @@ class TriageTests(TempDirCase):
         return run_dir
 
     def doc(self, run_dir):
-        return json.loads((run_dir / "security-report.json").read_text())
+        return load_doc(run_dir)
 
     def queue(self, run_dir):
         r = run_proc(TRIAGE, "queue", run_dir)

@@ -24,6 +24,11 @@ GENERATE = SKILL_DIR / "scripts" / "generate-report.py"
 NPM_TOKEN = "npm_" + "REPORTTESTTOKENREPORTTESTTOKEN0000"
 
 
+
+def load_doc(run_dir):
+    import report_store
+    return report_store.load_full(run_dir)
+
 class TempDirCase(unittest.TestCase):
     def setUp(self):
         self.tmp = Path(tempfile.mkdtemp())
@@ -255,7 +260,7 @@ class GenerateTests(TempDirCase):
                            stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
         self.assertEqual(r.returncode, 0, r.stderr)
         md = (out / "security-report.md").read_text()
-        doc = json.loads((out / "security-report.json").read_text())
+        doc = load_doc(out)
         page = (out / "security-report.html").read_text()
         self.assertIn("`src/db.js:2`", md)
         self.assertIn("`const q = 'SELECT ' + id;`", md)
@@ -289,7 +294,7 @@ class GenerateTests(TempDirCase):
                             "--repos-root", str(self.tmp / "repos")],
                            stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
-        rows = json.loads((self.tmp / "run" / "security-report.json").read_text())["findings"]
+        rows = load_doc(self.tmp / "run")["findings"]
         sev = dict((f["rule_id"], f["severity"]) for f in rows)
         self.assertEqual(sev, {"GHSA-p6mc-m468-83gw": "HIGH", "GHSA-29mw-wpgm-hmr9": "MEDIUM",
                                "GHSA-35jh-r3h4-6jhm": "CRITICAL"})
@@ -306,7 +311,7 @@ class GenerateTests(TempDirCase):
                             "--config", str(cfg), "--out-dir", str(self.tmp / "run")],
                            stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
-        rows = json.loads((self.tmp / "run" / "security-report.json").read_text())["findings"]
+        rows = load_doc(self.tmp / "run")["findings"]
         self.assertIn("semgrep", {f["scanner"] for f in rows})
 
     def test_failure_exits_non_zero(self):
@@ -365,7 +370,7 @@ class RunFolderTests(TempDirCase):
                      "infected-lockfile/shai-hulud.json", "clean/shai-hulud.json"):
             self.assertTrue((runs[0] / name).is_file(), name)
         self.assertEqual((runs[0] / ".gitignore").read_text().strip(), "*")
-        doc = json.loads((runs[0] / "security-report.json").read_text())
+        doc = load_doc(runs[0])
         hit = [f for f in doc["findings"] if f["rule_id"] == "known-package"][0]
         self.assertEqual((hit["file"], hit["line"]), ("package-lock.json", 6))
         self.assertIn("node_modules/@accordproject/concerto-linter", hit["code"])
