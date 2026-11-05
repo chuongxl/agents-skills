@@ -37,6 +37,9 @@ All tools are free, open-source, and configurable. Security findings are organiz
 11. **Deep Audit (opt-in)** — `--audit`: agent-driven, coverage-led review for logic flaws scanners cannot see, every finding independently re-verified
 12. **Baseline** — Accept known findings with a reason and an expiry date
 
+Diagrams (open in a browser): [architecture](docs/diagrams/job-security-scan-architecture.html) ·
+[run flow](docs/diagrams/job-security-scan-run-flow.html).
+
 ## Quick Start
 
 ### 1. Install
