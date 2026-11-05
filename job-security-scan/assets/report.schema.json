@@ -711,7 +711,7 @@
       }
     },
     "shard": {
-      "title": "findings/<repo>-NNN.json shard",
+      "title": "findings/<repo>-NNN-<sha256 prefix>.json shard",
       "type": "object",
       "description": "Compact JSON, at most 2,000 rows and 4 MB. A row whose title/description/url equal its rule's entry in `rules` omits them; the reader restores them. Rows are otherwise $defs/finding.",
       "required": [

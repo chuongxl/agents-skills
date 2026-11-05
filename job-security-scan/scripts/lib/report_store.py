@@ -4,8 +4,11 @@ Schema v3 splits a run's report in two so no file grows with the number of findi
 
   <run>/security-report.json      index: every v2 top-level key except `findings`, plus `shards`,
                                   `findings_total`, `fixed_total` and `fixed_shards`
-  <run>/findings/<repo>-NNN.json  {"schema_version": 3, "repo", "rules", "findings": [...]}, compact JSON,
-                                  at most SHARD_ROWS rows and SHARD_BYTES bytes each
+  <run>/findings/<repo>-NNN-<sha12>.json  {"schema_version": 3, "repo", "rules", "findings": [...]}, compact
+                                  JSON, at most SHARD_ROWS rows and SHARD_BYTES bytes each
+
+Shard names end in the first 12 hex of their own sha256, so a save never overwrites a shard the current index
+lists: if the process stops before the new index is in place, the previous report is still whole.
 
 A shard's `rules` table holds title/description/url once per rule_id; rows that match it drop those fields and
 get them back on load. Every shard is checked against the size and sha256 recorded in the index.
@@ -149,8 +152,18 @@ def _write(path, text):
 
 def _entry(name, repo, count, text):
     data = text.encode("utf-8")
-    return {"file": "%s/%s" % (SHARD_DIR, name), "repo": repo, "count": count, "bytes": len(data),
-            "sha256": hashlib.sha256(data).hexdigest()}
+    digest = hashlib.sha256(data).hexdigest()
+    return {"file": "%s/%s-%s.json" % (SHARD_DIR, name[:-len(".json")], digest[:12]), "repo": repo,
+            "count": count, "bytes": len(data), "sha256": digest}
+
+
+def _shard_dir(run_dir):
+    """<run>/findings, refused when it is a symlink or resolves outside the run folder."""
+    d = Path(run_dir) / SHARD_DIR
+    if d.is_symlink() or (d.exists() and os.path.realpath(str(d)) != os.path.join(
+            os.path.realpath(str(run_dir)), SHARD_DIR)):
+        raise ReportCorrupt("%s is a link or leaves the run folder - remove it and regenerate the report" % d)
+    return d
 
 
 def save(doc, run_dir):
@@ -181,14 +194,19 @@ def save(doc, run_dir):
     index["findings_total"] = len(findings)
     index["shards"] = [_entry(*s) for s in planned]
     index["fixed_shards"] = [_entry(*s) for s in fixed_planned]
-    shard_dir = run_dir / SHARD_DIR
+    total = sum(e["bytes"] for e in index["shards"] + index["fixed_shards"])
+    if total > MAX_TOTAL:
+        raise ReportTooLarge("the report would be %d bytes of shards, more than the %d allowed - narrow the run "
+                             "with --profile standard, --repo or --scanner" % (total, MAX_TOTAL))
+    shard_dir = _shard_dir(run_dir)
     shard_dir.mkdir(parents=True, exist_ok=True)
-    for name, _repo, _count, text in planned + fixed_planned:
-        _write(shard_dir / name, text)
+    texts = [s[3] for s in planned + fixed_planned]
+    for entry, text in zip(index["shards"] + index["fixed_shards"], texts):
+        _write(run_dir / entry["file"], text)
     path = run_dir / INDEX_NAME
     _write(path, json.dumps(index, indent=2, ensure_ascii=False) + "\n")
-    keep = set(s[0] for s in planned + fixed_planned)
-    for p in shard_dir.glob("*.json"):
+    keep = set(Path(e["file"]).name for e in index["shards"] + index["fixed_shards"])
+    for p in list(shard_dir.glob("*.json")) + list(shard_dir.glob("*.tmp")):
         if p.name not in keep:
             p.unlink()
     return path
@@ -232,6 +250,7 @@ def load_index(run_dir):
 def _read_shard(run_dir, entry, budget):
     rel = entry.get("file") or ""
     path = Path(run_dir) / rel
+    _shard_dir(run_dir)
     if not SHARD_FILE.match(rel) or not path.is_file() or path.is_symlink():
         raise ReportCorrupt("shard %s listed in %s is missing - regenerate the report"
                             % (path, Path(run_dir) / INDEX_NAME))
@@ -252,13 +271,14 @@ def _read_shard(run_dir, entry, budget):
     return shard, rows
 
 
-def iter_findings(run_dir, index):
-    """Yield every finding, one shard at a time, with rule fields restored. v2: the inline list."""
+def iter_findings(run_dir, index, budget=None):
+    """Yield every finding, one shard at a time, with rule fields restored. v2: the inline list.
+    budget is a one-item list of bytes read so far, shared with other shard reads of the same run."""
     if index.get("schema_version") != 3:
         for f in index.get("findings") or []:
             yield f
         return
-    budget = [0]
+    budget = [0] if budget is None else budget
     for entry in index.get("shards") or []:
         shard, rows = _read_shard(run_dir, entry, budget)
         rules = shard.get("rules") or {}
@@ -277,9 +297,9 @@ def load_full(run_dir):
     index = load_index(run_dir)
     if index.get("schema_version") == 3:
         doc = dict((k, v) for k, v in index.items() if k not in INDEX_ONLY)
-        doc["findings"] = list(iter_findings(run_dir, index))
-        fixed = list(index.get("fixed") or [])
         budget = [0]
+        doc["findings"] = list(iter_findings(run_dir, index, budget))
+        fixed = list(index.get("fixed") or [])
         for entry in index.get("fixed_shards") or []:
             fixed.extend(_read_shard(run_dir, entry, budget)[1])
         doc["fixed"] = fixed

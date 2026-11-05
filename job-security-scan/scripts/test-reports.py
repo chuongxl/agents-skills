@@ -554,6 +554,63 @@ class StoreTests(TempDirCase):
         self.assertEqual(set("findings/" + p.name for p in self.shards()), listed)
         self.assertEqual(len(self.rs.load_full(self.tmp)["findings"]), 100)
 
+    def test_interrupted_save_keeps_previous_report_readable(self):
+        self.rs.save(big_doc(3000), self.tmp)
+        real = self.rs._write
+
+        def die_at_index(path, text):
+            if path.name == "security-report.json":
+                raise KeyboardInterrupt
+            real(path, text)
+        self.rs._write = die_at_index
+        try:
+            with self.assertRaises(KeyboardInterrupt):
+                self.rs.save(big_doc(2000, repos=("api", "web")), self.tmp)
+        finally:
+            self.rs._write = real
+        self.assertEqual(len(self.rs.load_full(self.tmp)["findings"]), 3000)
+
+    def test_symlinked_findings_dir_is_refused(self):
+        outside = self.tmp / "outside"
+        outside.mkdir()
+        (outside / "keep.json").write_text("{}")
+        run = self.tmp / "run"
+        run.mkdir()
+        os.symlink(str(outside), str(run / "findings"))
+        with self.assertRaises(self.rs.ReportError):
+            self.rs.save(big_doc(100), run)
+        self.assertEqual(sorted(p.name for p in outside.iterdir()), ["keep.json"])
+        self.assertFalse((run / "security-report.json").exists())
+
+    def test_symlinked_findings_dir_is_not_read(self):
+        self.rs.save(big_doc(100), self.tmp / "a")
+        run = self.tmp / "b"
+        run.mkdir()
+        (run / "security-report.json").write_text((self.tmp / "a" / "security-report.json").read_text())
+        os.symlink(str(self.tmp / "a" / "findings"), str(run / "findings"))
+        with self.assertRaises(self.rs.ReportCorrupt):
+            self.rs.load_full(run)
+
+    def test_total_size_cap_is_checked_on_save_and_shared_on_load(self):
+        doc = big_doc(3000)
+        doc["fixed"] = [{"fingerprint": "%016x" % i, "repo": "api", "scanner": "semgrep", "rule_id": "R",
+                         "title": "t", "file": "f.js"} for i in range(2500)]
+        self.rs.save(doc, self.tmp)
+        index = self.rs.load_index(self.tmp)
+        findings_bytes = sum(e["bytes"] for e in index["shards"])
+        self.assertTrue(index["fixed_shards"])
+        old = self.rs.MAX_TOTAL
+        try:
+            self.rs.MAX_TOTAL = findings_bytes + 1
+            with self.assertRaises(self.rs.ReportTooLarge):
+                self.rs.load_full(self.tmp)
+            other = self.tmp / "other"
+            with self.assertRaises(self.rs.ReportTooLarge):
+                self.rs.save(doc, other)
+            self.assertFalse((other / "security-report.json").exists())
+        finally:
+            self.rs.MAX_TOTAL = old
+
     def test_shard_names_are_safe(self):
         self.assertEqual(self.rs.shard_name("this machine", 1), "this_machine-001.json")
         self.assertEqual(self.rs.shard_name("../x", 12), "_._x-012.json")
