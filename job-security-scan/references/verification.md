@@ -11,20 +11,31 @@ from the scanned repository, and never contacts a network service.
 
 ## Steps (the parent agent)
 
-1. `python3 -I scripts/triage.py queue security-run-<datetime>` — writes `triage/queue.json`. The run's profile
+1. `python3 -I scripts/triage.py queue security-run-<datetime>` — prints how many findings are queued and writes
+   `triage/queue-index.json` plus `triage/batch-NNN.json` (10 items each, most severe first). The run's profile
    decides what is queued: `standard` CRITICAL + HIGH, `deep` also MEDIUM, `quick` nothing. Findings that already
    have a verdict (also verdicts carried over from the previous run for unchanged code) are not queued again.
-2. For each queued item, most severe first, start **one fresh sub-agent that has not seen the scan summary or any
-   other verdict**. Give it only: the verifier prompt below, that one queue item (finding + context), and the
-   repository path. Default budget: 25 items per run; the rest stay pending and the summary says how many.
-   If the agent cannot start sub-agents, do one separate pass per item from the queue item alone, and say in the
-   summary that verification was done in-session, not independently.
-3. Keep a reply only if it is exactly one JSON object in the format below. Do not repair a malformed or
-   prose-wrapped reply: discard it, retry once with a new verifier, otherwise leave that finding pending.
-4. Collect the kept objects as `{"verdicts": [ ... ]}` in `triage/verdicts.json` and run
-   `python3 -I scripts/triage.py apply security-run-<datetime> security-run-<datetime>/triage/verdicts.json`.
-   `apply` is all or nothing: if it lists errors, fix the collection (drop the bad record) and apply again.
-   It regenerates the three reports and writes `NEEDS-VALIDATION.md`.
+2. Loop, one finding at a time:
+   1. `python3 -I scripts/triage.py next security-run-<datetime>` prints one queue item as JSON (finding +
+      context), or `{"done": true}` when every queued finding has a recorded verdict.
+   2. Start **one fresh sub-agent that has not seen the scan summary or any other verdict**. Give it only: the
+      verifier prompt below, that one item and the repository path. If the agent cannot start sub-agents, do one
+      separate pass per item from the item alone, and say in the summary that verification was done in-session,
+      not independently.
+   3. Keep the reply only if it is exactly one JSON object in the format below. Do not repair a malformed or
+      prose-wrapped reply: discard it, retry once with a new verifier, otherwise leave that finding pending and
+      stop the loop for it (record nothing).
+   4. Save the kept object: `python3 -I scripts/triage.py record security-run-<datetime> -` with the object on
+      stdin (or a file path instead of `-`). It is checked and stored as `triage/verdicts/<fingerprint>.json`;
+      a rejected object stores nothing. A second verdict for the same finding needs `--replace`.
+
+   Default budget: 25 items per run; the rest stay pending and the summary says how many. Never open
+   `queue-index.json`, the batch files, `findings/` shards or `security-report.json` yourself — on a large run
+   they do not fit in context; `next` hands you exactly one item.
+3. `python3 -I scripts/triage.py apply security-run-<datetime>` merges every recorded verdict. `apply` is all or
+   nothing: if it lists errors, fix or delete the named file in `triage/verdicts/` and apply again. It
+   regenerates `SUMMARY.md` and the three reports and writes `NEEDS-VALIDATION.md`. (A whole
+   `{"verdicts": [ ... ]}` file still works: `triage.py apply <run> VERDICTS.json`.)
 
 ## Verifier prompt
 

@@ -1,4 +1,5 @@
-"""Validator for security-report.json v2 — the enforced contract (assets/report.schema.json mirrors it).
+"""Validator for the security report (a v2 file, a v3 index, or a whole v3 report in memory) — the enforced
+contract (assets/report.schema.json mirrors it).
 
 Structural checks plus the semantic rules a JSON Schema cannot express: unique fingerprints, counts that match
 the findings, the verdict contract, severity never above demonstrated impact, and no code on secret rows.
