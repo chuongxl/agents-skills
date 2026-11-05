@@ -33,7 +33,8 @@ jobs:
       - name: Watch
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          DRY_RUN: ${{ (github.event_name == 'workflow_dispatch' && inputs.dry_run) && '--dry-run' || '' }}
         run: |
           python3 -I job-security-scan/scripts/advisory-watch.py \
-            --github-repo "${{ github.repository }}" --cache .advisory-cache --target . \
-            ${{ (github.event_name == 'workflow_dispatch' && inputs.dry_run) && '--dry-run' || '' }}
+            --github-repo "$GH_REPO" --cache .advisory-cache --target . $DRY_RUN

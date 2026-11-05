@@ -589,10 +589,12 @@ class TriageTests(TempDirCase):
                             "    active: true\n---\n")
         self.ws = self.tmp / "ws"
 
-    def make_run(self, name="security-run-20261102-090000", profile="standard"):
+    def make_run(self, name="security-run-20261102-090000", profile="standard", trivy=None):
         run_dir = self.ws / name
         d = run_dir / "api"
         d.mkdir(parents=True)
+        if trivy:
+            (d / "trivy.json").write_text(json.dumps(trivy))
         (d / "semgrep.json").write_text(json.dumps({"results": [
             {"check_id": "sqli", "path": "src/db.js", "start": {"line": 20},
              "extra": {"severity": "ERROR", "message": "SQL injection"}},
@@ -612,9 +614,9 @@ class TriageTests(TempDirCase):
     def doc(self, run_dir):
         return load_doc(run_dir)
 
-    def queue(self, run_dir):
+    def queue(self, run_dir, *opts):
         """Every queued item, read from queue-index.json and its batch files, in index order."""
-        r = run_proc(TRIAGE, "queue", run_dir)
+        r = run_proc(TRIAGE, "queue", run_dir, *opts)
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         index = json.loads((run_dir / "triage" / "queue-index.json").read_text())
         items = {}
@@ -728,6 +730,70 @@ class TriageTests(TempDirCase):
             self.assertEqual((run_dir / "security-report.json").read_text(), original, text[:80])
         self.assertFalse((run_dir / "NEEDS-VALIDATION.md").exists())
 
+    def grouped_run(self):
+        misconfig = {"ID": "KSV-0012", "Severity": "HIGH", "Title": "Runs as root", "Message": "m",
+                     "CauseMetadata": {"StartLine": 3}}
+        vuln = {"VulnerabilityID": "CVE-2026-0001", "PkgName": "lodash", "InstalledVersion": "4.0.0",
+                "Severity": "CRITICAL"}
+        return self.make_run(trivy={"Results": [
+            {"Target": "k8s/a.yaml", "Misconfigurations": [misconfig]},
+            {"Target": "k8s/b.yaml", "Misconfigurations": [misconfig]},
+            {"Target": "package-lock.json", "Vulnerabilities": [vuln]},
+            {"Target": "web/package-lock.json", "Vulnerabilities": [vuln]},
+            {"Target": "web/package-lock.json", "Vulnerabilities": [dict(vuln, InstalledVersion="4.1.0")]}]})
+
+    def test_queue_groups_one_root_cause_into_one_item(self):
+        q = self.queue(self.grouped_run(), "--all")
+        sizes = sorted((i["rule_id"], i["installed_version"], i.get("group", {}).get("size", 1)) for i in q["items"])
+        self.assertIn(("CVE-2026-0001", "4.0.0", 2), sizes)      # same advisory + version, two lockfiles
+        self.assertIn(("CVE-2026-0001", "4.1.0", 1), sizes)      # another version is another root cause
+        self.assertIn(("KSV-0012", "", 2), sizes)
+        self.assertEqual((q["summary"]["eligible_findings"], q["summary"]["queued_items"]), (9, 7))
+        self.assertEqual(q["items"][0]["severity"], "CRITICAL")
+        ungrouped = self.queue(self.ws / "security-run-20261102-090000", "--all", "--no-group")
+        self.assertEqual(len(ungrouped["items"]), 9)
+
+    def test_queue_limit_and_repo_filter(self):
+        run_dir = self.grouped_run()
+        q = self.queue(run_dir, "--limit", "2")
+        self.assertEqual([i["severity"] for i in q["items"]], ["CRITICAL"] * 2)
+        s = q["summary"]
+        self.assertEqual((s["queued_items"], s["remaining_items"], s["queued_findings"] + s["remaining_findings"]),
+                         (2, 5, 9))
+        self.assertEqual(len(self.queue(run_dir, "--repo", "api")["items"]), 7)
+        self.assertEqual(run_proc(TRIAGE, "queue", run_dir, "--repo", "web").returncode, 1)
+        self.assertEqual(run_proc(TRIAGE, "queue", run_dir, "--limit", "0").returncode, 2)
+
+    def test_apply_shares_a_group_verdict_but_not_over_explicit_ones(self):
+        run_dir = self.grouped_run()
+        items = dict((i["rule_id"] + i["installed_version"], i) for i in self.queue(run_dir, "--all")["items"])
+        dep, cfg = items["CVE-2026-00014.0.0"], items["KSV-0012"]
+        other = [fp for fp in cfg["group"]["fingerprints"] if fp != cfg["fingerprint"]][0]
+        r = self.apply(run_dir, {"verdicts": [
+            {"fingerprint": dep["fingerprint"], "verdict": "rejected", "reason": "dev-only dependency"},
+            {"fingerprint": cfg["fingerprint"], "verdict": "rejected", "reason": "pod runs as non-root via PSA"},
+            {"fingerprint": other, "verdict": "needs_validation", "blocker": "b", "validation_plan": "p"}]})
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn("+1 grouped finding", r.stdout)
+        by = dict((f["fingerprint"], f) for f in self.doc(run_dir)["findings"])
+        self.assertEqual([by[fp]["verdict"] for fp in dep["group"]["fingerprints"]], ["rejected", "rejected"])
+        self.assertEqual(by[other]["verdict"], "needs_validation")
+        self.assertEqual(run_proc(VALIDATE, run_dir / "security-report.json").returncode, 0)
+
+    def test_recorded_group_verdict_is_shared_by_directory_apply(self):
+        run_dir = self.grouped_run()
+        q = self.queue(run_dir, "--all")
+        cfg = [i for i in q["items"] if i["rule_id"] == "KSV-0012"][0]
+        self.assertEqual([i["group_size"] for i in json.loads((run_dir / "triage" / "queue-index.json").read_text())
+                          ["items"] if i["fingerprint"] == cfg["fingerprint"]], [2])
+        r = self.record(run_dir, {"fingerprint": cfg["fingerprint"], "verdict": "rejected", "reason": "non-root PSA"})
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        r = run_proc(TRIAGE, "apply", run_dir)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn("+1 grouped finding", r.stdout)
+        by = dict((f["fingerprint"], f) for f in self.doc(run_dir)["findings"])
+        self.assertEqual([by[fp]["verdict"] for fp in cfg["group"]["fingerprints"]], ["rejected", "rejected"])
+
     def test_carried_verdicts_are_not_queued_again(self):
         first = self.make_run()
         self.assertEqual(self.apply(first, self.good_verdicts(first)).returncode, 0)
@@ -762,7 +828,9 @@ class TriageTests(TempDirCase):
                      "--repos-root", self.tmp / "repos", "--home", self.tmp / "home")
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         self.assertGreater(sum(p.stat().st_size for p in (run_dir / "findings").glob("*.json")), 5 * 1024 * 1024)
-        r = run_proc(TRIAGE, "queue", run_dir)
+        r = run_proc(VALIDATE, run_dir)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        r = run_proc(TRIAGE, "queue", run_dir, "--all")
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         self.assertEqual(len(list((run_dir / "triage").glob("batch-*.json"))), 900)
         nxt = run_proc(TRIAGE, "next", run_dir)

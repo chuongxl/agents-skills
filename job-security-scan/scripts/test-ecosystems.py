@@ -193,7 +193,8 @@ class ScannerWiringTests(unittest.TestCase):
         for name, body in (("osv-scanner", osv), ("trivy", trivy)):
             path = os.path.join(self.bin, name)
             open(path, "w").write(body)
-            os.chmod(path, 0o755)
+            # nosemgrep: insecure-file-permissions (owner-only executable test stub in a temp dir)
+            os.chmod(path, 0o700)
         self.config = os.path.join(self.work, "repository.md")
         repos = "".join("  - name: %s\n    active: true\n    has-dockerfile: false\n" % n
                         for n in ("monorepo", "unmapped-swift", "go-text"))
@@ -231,7 +232,8 @@ class ScannerWiringTests(unittest.TestCase):
             fh.write('#!/usr/bin/env bash\necho "semgrep $*" >> "%s"\n'
                      'out=""; prev=""; for a in "$@"; do [ "$prev" = "--output" ] && out="$a"; prev="$a"; done\n'
                      '[ -n "$out" ] && echo \'{"results":[]}\' > "$out"\nexit 0\n' % self.calls)
-        os.chmod(semgrep, 0o755)
+        # nosemgrep: insecure-file-permissions (owner-only executable test stub in a temp dir)
+        os.chmod(semgrep, 0o700)
         _r, calls = self.scan("semgrep")
         mono = [c for c in calls.splitlines() if c.endswith("/monorepo")][0]
         for rs in ("p/java", "p/javascript", "p/typescript", "p/owasp-top-ten", "p/secrets"):

@@ -1,0 +1,490 @@
+{
+  "version": 1,
+  "entries": [
+    {
+      "fingerprint": "8a54473344997373",
+      "reason": "Fake token used by a scanner test or plan doc (e.g. FAKE_TOKEN, npm_FAKE...); committed history cannot be rewritten.",
+      "owner": "chuongnd"
+    },
+    {
+      "fingerprint": "54b8da8152ce5adb",
+      "reason": "Fake token used by a scanner test or plan doc (e.g. FAKE_TOKEN, npm_FAKE...); committed history cannot be rewritten.",
+      "owner": "chuongnd"
+    },
+    {
+      "fingerprint": "f1d9023375e85094",
+      "reason": "Fake token used by a scanner test or plan doc (e.g. FAKE_TOKEN, npm_FAKE...); committed history cannot be rewritten.",
+      "owner": "chuongnd"
+    },
+    {
+      "fingerprint": "2e39644fe13022ac",
+      "reason": "Intentionally vulnerable test fixture under job-security-scan/tests/fixtures; scanner test input, never installed or deployed.",
+      "owner": "chuongnd"
+    },
+    {
+      "fingerprint": "61c7841ff9a0bfd8",
+      "reason": "Intentionally vulnerable test fixture under job-security-scan/tests/fixtures; scanner test input, never installed or deployed.",
+      "owner": "chuongnd"
+    },
+    {
+      "fingerprint": "0be233293a0322ef",
+      "reason": "Intentionally vulnerable test fixture under job-security-scan/tests/fixtures; scanner test input, never installed or deployed.",
+      "owner": "chuongnd"
+    },
+    {
+      "fingerprint": "4e90f23581692913",
+      "reason": "Intentionally vulnerable test fixture under job-security-scan/tests/fixtures; scanner test input, never installed or deployed.",
+      "owner": "chuongnd"
+    },
+    {
+      "fingerprint": "e3bbcb5d5062fbd3",
+      "reason": "Intentionally vulnerable test fixture under job-security-scan/tests/fixtures; scanner test input, never installed or deployed.",
+      "owner": "chuongnd"
+    },
+    {
+      "fingerprint": "d411dcab597955ff",
+      "reason": "Intentionally vulnerable test fixture under job-security-scan/tests/fixtures; scanner test input, never installed or deployed.",
+      "owner": "chuongnd"
+    },
+    {
+      "fingerprint": "d42b76f9cb19ce17",
+      "reason": "Intentionally vulnerable test fixture under job-security-scan/tests/fixtures; scanner test input, never installed or deployed.",
+      "owner": "chuongnd"
+    },
+    {
+      "fingerprint": "756c79ad38dac8f9",
+      "reason": "Intentionally vulnerable test fixture under job-security-scan/tests/fixtures; scanner test input, never installed or deployed.",
+      "owner": "chuongnd"
+    },
+    {
+      "fingerprint": "0d0def99d0e439aa",
+      "reason": "Intentionally vulnerable test fixture under job-security-scan/tests/fixtures; scanner test input, never installed or deployed.",
+      "owner": "chuongnd"
+    },
+    {
+      "fingerprint": "63561e3239e5c5a3",
+      "reason": "Intentionally vulnerable test fixture under job-security-scan/tests/fixtures; scanner test input, never installed or deployed.",
+      "owner": "chuongnd"
+    },
+    {
+      "fingerprint": "fd8f871bacb43236",
+      "reason": "Intentionally vulnerable test fixture under job-security-scan/tests/fixtures; scanner test input, never installed or deployed.",
+      "owner": "chuongnd"
+    },
+    {
+      "fingerprint": "46f0618bc63e4431",
+      "reason": "Intentionally vulnerable test fixture under job-security-scan/tests/fixtures; scanner test input, never installed or deployed.",
+      "owner": "chuongnd"
+    },
+    {
+      "fingerprint": "46d0cdfb788eec03",
+      "reason": "Intentionally vulnerable test fixture under job-security-scan/tests/fixtures; scanner test input, never installed or deployed.",
+      "owner": "chuongnd"
+    },
+    {
+      "fingerprint": "824d482072f1e693",
+      "reason": "Intentionally vulnerable test fixture under job-security-scan/tests/fixtures; scanner test input, never installed or deployed.",
+      "owner": "chuongnd"
+    },
+    {
+      "fingerprint": "39cde7420deb82df",
+      "reason": "Intentionally vulnerable test fixture under job-security-scan/tests/fixtures; scanner test input, never installed or deployed.",
+      "owner": "chuongnd"
+    },
+    {
+      "fingerprint": "ecc8cddbce477933",
+      "reason": "Intentionally vulnerable test fixture under job-security-scan/tests/fixtures; scanner test input, never installed or deployed.",
+      "owner": "chuongnd"
+    },
+    {
+      "fingerprint": "0d374079af63d90b",
+      "reason": "Intentionally vulnerable test fixture under job-security-scan/tests/fixtures; scanner test input, never installed or deployed.",
+      "owner": "chuongnd"
+    },
+    {
+      "fingerprint": "63c6c705cd4af3a9",
+      "reason": "Intentionally vulnerable test fixture under job-security-scan/tests/fixtures; scanner test input, never installed or deployed.",
+      "owner": "chuongnd"
+    },
+    {
+      "fingerprint": "ca62e0a19281397d",
+      "reason": "Intentionally vulnerable test fixture under job-security-scan/tests/fixtures; scanner test input, never installed or deployed.",
+      "owner": "chuongnd"
+    },
+    {
+      "fingerprint": "6a6c09cc58ceaeaa",
+      "reason": "Intentionally vulnerable test fixture under job-security-scan/tests/fixtures; scanner test input, never installed or deployed.",
+      "owner": "chuongnd"
+    },
+    {
+      "fingerprint": "5f947b7fd048469d",
+      "reason": "Intentionally vulnerable test fixture under job-security-scan/tests/fixtures; scanner test input, never installed or deployed.",
+      "owner": "chuongnd"
+    },
+    {
+      "fingerprint": "ecd3796523a4aef9",
+      "reason": "Intentionally vulnerable test fixture under job-security-scan/tests/fixtures; scanner test input, never installed or deployed.",
+      "owner": "chuongnd"
+    },
+    {
+      "fingerprint": "f56b2274c86de90e",
+      "reason": "Intentionally vulnerable test fixture under job-security-scan/tests/fixtures; scanner test input, never installed or deployed.",
+      "owner": "chuongnd"
+    },
+    {
+      "fingerprint": "a884234d0e3bc5e1",
+      "reason": "Intentionally vulnerable test fixture under job-security-scan/tests/fixtures; scanner test input, never installed or deployed.",
+      "owner": "chuongnd"
+    },
+    {
+      "fingerprint": "b363c25ce6d72666",
+      "reason": "Intentionally vulnerable test fixture under job-security-scan/tests/fixtures; scanner test input, never installed or deployed.",
+      "owner": "chuongnd"
+    },
+    {
+      "fingerprint": "df159cb89057c2e2",
+      "reason": "Intentionally vulnerable test fixture under job-security-scan/tests/fixtures; scanner test input, never installed or deployed.",
+      "owner": "chuongnd"
+    },
+    {
+      "fingerprint": "796f845454b791bd",
+      "reason": "Intentionally vulnerable test fixture under job-security-scan/tests/fixtures; scanner test input, never installed or deployed.",
+      "owner": "chuongnd"
+    },
+    {
+      "fingerprint": "dd42fe669684ea0a",
+      "reason": "Intentionally vulnerable test fixture under job-security-scan/tests/fixtures; scanner test input, never installed or deployed.",
+      "owner": "chuongnd"
+    },
+    {
+      "fingerprint": "0164daf1ca4ae199",
+      "reason": "Intentionally vulnerable test fixture under job-security-scan/tests/fixtures; scanner test input, never installed or deployed.",
+      "owner": "chuongnd"
+    },
+    {
+      "fingerprint": "c65a9b25fe0a5f25",
+      "reason": "Intentionally vulnerable test fixture under job-security-scan/tests/fixtures; scanner test input, never installed or deployed.",
+      "owner": "chuongnd"
+    },
+    {
+      "fingerprint": "64db472e1153771f",
+      "reason": "Intentionally vulnerable test fixture under job-security-scan/tests/fixtures; scanner test input, never installed or deployed.",
+      "owner": "chuongnd"
+    },
+    {
+      "fingerprint": "a84cbbe7f7210d17",
+      "reason": "Intentionally vulnerable test fixture under job-security-scan/tests/fixtures; scanner test input, never installed or deployed.",
+      "owner": "chuongnd"
+    },
+    {
+      "fingerprint": "c6035614d389549c",
+      "reason": "Intentionally vulnerable test fixture under job-security-scan/tests/fixtures; scanner test input, never installed or deployed.",
+      "owner": "chuongnd"
+    },
+    {
+      "fingerprint": "4c9c0b315c882201",
+      "reason": "Intentionally vulnerable test fixture under job-security-scan/tests/fixtures; scanner test input, never installed or deployed.",
+      "owner": "chuongnd"
+    },
+    {
+      "fingerprint": "00ae76216bdd2d53",
+      "reason": "Intentionally vulnerable test fixture under job-security-scan/tests/fixtures; scanner test input, never installed or deployed.",
+      "owner": "chuongnd"
+    },
+    {
+      "fingerprint": "223db531d4faf565",
+      "reason": "Intentionally vulnerable test fixture under job-security-scan/tests/fixtures; scanner test input, never installed or deployed.",
+      "owner": "chuongnd"
+    },
+    {
+      "fingerprint": "367519abdc7b8c84",
+      "reason": "Intentionally vulnerable test fixture under job-security-scan/tests/fixtures; scanner test input, never installed or deployed.",
+      "owner": "chuongnd"
+    },
+    {
+      "fingerprint": "47c4134bb1655923",
+      "reason": "Intentionally vulnerable test fixture under job-security-scan/tests/fixtures; scanner test input, never installed or deployed.",
+      "owner": "chuongnd"
+    },
+    {
+      "fingerprint": "f62e6e352f7d571b",
+      "reason": "Intentionally vulnerable test fixture under job-security-scan/tests/fixtures; scanner test input, never installed or deployed.",
+      "owner": "chuongnd"
+    },
+    {
+      "fingerprint": "cedf600cdd2ebcac",
+      "reason": "Intentionally vulnerable test fixture under job-security-scan/tests/fixtures; scanner test input, never installed or deployed.",
+      "owner": "chuongnd"
+    },
+    {
+      "fingerprint": "5d204244df0e9326",
+      "reason": "Intentionally vulnerable test fixture under job-security-scan/tests/fixtures; scanner test input, never installed or deployed.",
+      "owner": "chuongnd"
+    },
+    {
+      "fingerprint": "09094939e5a39745",
+      "reason": "Intentionally vulnerable test fixture under job-security-scan/tests/fixtures; scanner test input, never installed or deployed.",
+      "owner": "chuongnd"
+    },
+    {
+      "fingerprint": "cca0b4fc44c01fe4",
+      "reason": "Intentionally vulnerable test fixture under job-security-scan/tests/fixtures; scanner test input, never installed or deployed.",
+      "owner": "chuongnd"
+    },
+    {
+      "fingerprint": "1688b266cb07d863",
+      "reason": "Intentionally vulnerable test fixture under job-security-scan/tests/fixtures; scanner test input, never installed or deployed.",
+      "owner": "chuongnd"
+    },
+    {
+      "fingerprint": "7e0f5d9346c1c8dc",
+      "reason": "Intentionally vulnerable test fixture under job-security-scan/tests/fixtures; scanner test input, never installed or deployed.",
+      "owner": "chuongnd"
+    },
+    {
+      "fingerprint": "5c9d3fd79e681963",
+      "reason": "Intentionally vulnerable test fixture under job-security-scan/tests/fixtures; scanner test input, never installed or deployed.",
+      "owner": "chuongnd"
+    },
+    {
+      "fingerprint": "1cc878f77fa8cdac",
+      "reason": "Unverified false positive: fake test token, commit hash matching a token pattern, or a historical placeholder.",
+      "owner": "chuongnd"
+    },
+    {
+      "fingerprint": "590e018bb08363e0",
+      "reason": "Unverified false positive: fake test token, commit hash matching a token pattern, or a historical placeholder.",
+      "owner": "chuongnd"
+    },
+    {
+      "fingerprint": "e49e6b55a13542e6",
+      "reason": "Unverified false positive: fake test token, commit hash matching a token pattern, or a historical placeholder.",
+      "owner": "chuongnd"
+    },
+    {
+      "fingerprint": "2266802348678e4a",
+      "reason": "Unverified false positive: fake test token, commit hash matching a token pattern, or a historical placeholder.",
+      "owner": "chuongnd"
+    },
+    {
+      "fingerprint": "113d04a3599f6327",
+      "reason": "Unverified false positive: fake test token, commit hash matching a token pattern, or a historical placeholder.",
+      "owner": "chuongnd"
+    },
+    {
+      "fingerprint": "8b3bfaf79ec94e9c",
+      "reason": "Intentionally vulnerable test fixture under job-security-scan/tests/fixtures; scanner test input, never installed or deployed.",
+      "owner": "chuongnd"
+    },
+    {
+      "fingerprint": "76e5f66913f3ba62",
+      "reason": "Intentionally vulnerable test fixture under job-security-scan/tests/fixtures; scanner test input, never installed or deployed.",
+      "owner": "chuongnd"
+    },
+    {
+      "fingerprint": "bc8d343f4658809a",
+      "reason": "Intentionally vulnerable test fixture under job-security-scan/tests/fixtures; scanner test input, never installed or deployed.",
+      "owner": "chuongnd"
+    },
+    {
+      "fingerprint": "c319ff347cdcfd73",
+      "reason": "Intentionally vulnerable test fixture under job-security-scan/tests/fixtures; scanner test input, never installed or deployed.",
+      "owner": "chuongnd"
+    },
+    {
+      "fingerprint": "a256b9e1828a90e1",
+      "reason": "Intentionally vulnerable test fixture under job-security-scan/tests/fixtures; scanner test input, never installed or deployed.",
+      "owner": "chuongnd"
+    },
+    {
+      "fingerprint": "0e078568306c456d",
+      "reason": "Intentionally vulnerable test fixture under job-security-scan/tests/fixtures; scanner test input, never installed or deployed.",
+      "owner": "chuongnd"
+    },
+    {
+      "fingerprint": "ef3cd68c173855d7",
+      "reason": "Intentionally vulnerable test fixture under job-security-scan/tests/fixtures; scanner test input, never installed or deployed.",
+      "owner": "chuongnd"
+    },
+    {
+      "fingerprint": "dd3fa3865aaa9812",
+      "reason": "Intentionally vulnerable test fixture under job-security-scan/tests/fixtures; scanner test input, never installed or deployed.",
+      "owner": "chuongnd"
+    },
+    {
+      "fingerprint": "6f4c3c1c2a19d719",
+      "reason": "Intentionally vulnerable test fixture under job-security-scan/tests/fixtures; scanner test input, never installed or deployed.",
+      "owner": "chuongnd"
+    },
+    {
+      "fingerprint": "d67e1b547998dc59",
+      "reason": "Intentionally vulnerable test fixture under job-security-scan/tests/fixtures; scanner test input, never installed or deployed.",
+      "owner": "chuongnd"
+    },
+    {
+      "fingerprint": "8477802c94862def",
+      "reason": "Intentionally vulnerable test fixture under job-security-scan/tests/fixtures; scanner test input, never installed or deployed.",
+      "owner": "chuongnd"
+    },
+    {
+      "fingerprint": "3ec2d0d87a8f2360",
+      "reason": "Intentionally vulnerable test fixture under job-security-scan/tests/fixtures; scanner test input, never installed or deployed.",
+      "owner": "chuongnd"
+    },
+    {
+      "fingerprint": "0968e6cca80745fa",
+      "reason": "Intentionally vulnerable test fixture under job-security-scan/tests/fixtures; scanner test input, never installed or deployed.",
+      "owner": "chuongnd"
+    },
+    {
+      "fingerprint": "2b2c568f61a48ae2",
+      "reason": "Intentionally vulnerable test fixture under job-security-scan/tests/fixtures; scanner test input, never installed or deployed.",
+      "owner": "chuongnd"
+    },
+    {
+      "fingerprint": "7e843f6c344d5297",
+      "reason": "Intentionally vulnerable test fixture under job-security-scan/tests/fixtures; scanner test input, never installed or deployed.",
+      "owner": "chuongnd"
+    },
+    {
+      "fingerprint": "eadfef36d1304ba7",
+      "reason": "Intentionally vulnerable test fixture under job-security-scan/tests/fixtures; scanner test input, never installed or deployed.",
+      "owner": "chuongnd"
+    },
+    {
+      "fingerprint": "79620979f682e230",
+      "reason": "Intentionally vulnerable test fixture under job-security-scan/tests/fixtures; scanner test input, never installed or deployed.",
+      "owner": "chuongnd"
+    },
+    {
+      "fingerprint": "491429ba4b633abe",
+      "reason": "Intentionally vulnerable test fixture under job-security-scan/tests/fixtures; scanner test input, never installed or deployed.",
+      "owner": "chuongnd"
+    },
+    {
+      "fingerprint": "ba88ed4c97baff32",
+      "reason": "Intentionally vulnerable test fixture under job-security-scan/tests/fixtures; scanner test input, never installed or deployed.",
+      "owner": "chuongnd"
+    },
+    {
+      "fingerprint": "77e7e3145a6997b0",
+      "reason": "Intentionally vulnerable test fixture under job-security-scan/tests/fixtures; scanner test input, never installed or deployed.",
+      "owner": "chuongnd"
+    },
+    {
+      "fingerprint": "8b92f178534bf52f",
+      "reason": "Intentionally vulnerable test fixture under job-security-scan/tests/fixtures; scanner test input, never installed or deployed.",
+      "owner": "chuongnd"
+    },
+    {
+      "fingerprint": "7e68cf1dc9164294",
+      "reason": "Intentionally vulnerable test fixture under job-security-scan/tests/fixtures; scanner test input, never installed or deployed.",
+      "owner": "chuongnd"
+    },
+    {
+      "fingerprint": "e1a7aa34f4b709dd",
+      "reason": "Intentionally vulnerable test fixture under job-security-scan/tests/fixtures; scanner test input, never installed or deployed.",
+      "owner": "chuongnd"
+    },
+    {
+      "fingerprint": "ccfb42dd37ae0ac4",
+      "reason": "Intentionally vulnerable test fixture under job-security-scan/tests/fixtures; scanner test input, never installed or deployed.",
+      "owner": "chuongnd"
+    },
+    {
+      "fingerprint": "cd9083dfbeb8a1cb",
+      "reason": "Intentionally vulnerable test fixture under job-security-scan/tests/fixtures; scanner test input, never installed or deployed.",
+      "owner": "chuongnd"
+    },
+    {
+      "fingerprint": "cb7028f2a5d9ac33",
+      "reason": "Intentionally vulnerable test fixture under job-security-scan/tests/fixtures; scanner test input, never installed or deployed.",
+      "owner": "chuongnd"
+    },
+    {
+      "fingerprint": "8c65987c8beab7b7",
+      "reason": "Intentionally vulnerable test fixture under job-security-scan/tests/fixtures; scanner test input, never installed or deployed.",
+      "owner": "chuongnd"
+    },
+    {
+      "fingerprint": "1e26dd34766c9bd2",
+      "reason": "Intentionally vulnerable test fixture under job-security-scan/tests/fixtures; scanner test input, never installed or deployed.",
+      "owner": "chuongnd"
+    },
+    {
+      "fingerprint": "5efe40b4cc42d0f1",
+      "reason": "Intentionally vulnerable test fixture under job-security-scan/tests/fixtures; scanner test input, never installed or deployed.",
+      "owner": "chuongnd"
+    },
+    {
+      "fingerprint": "7e27f430874cd6a3",
+      "reason": "Intentionally vulnerable test fixture under job-security-scan/tests/fixtures; scanner test input, never installed or deployed.",
+      "owner": "chuongnd"
+    },
+    {
+      "fingerprint": "9b62f6d850e47fa8",
+      "reason": "Intentionally vulnerable test fixture under job-security-scan/tests/fixtures; scanner test input, never installed or deployed.",
+      "owner": "chuongnd"
+    },
+    {
+      "fingerprint": "9225db8de6c3f8b8",
+      "reason": "Intentionally vulnerable test fixture under job-security-scan/tests/fixtures; scanner test input, never installed or deployed.",
+      "owner": "chuongnd"
+    },
+    {
+      "fingerprint": "7a5b03554f3be61e",
+      "reason": "Intentionally vulnerable test fixture under job-security-scan/tests/fixtures; scanner test input, never installed or deployed.",
+      "owner": "chuongnd"
+    },
+    {
+      "fingerprint": "2f3330954faa4c9d",
+      "reason": "Intentionally vulnerable test fixture under job-security-scan/tests/fixtures; scanner test input, never installed or deployed.",
+      "owner": "chuongnd"
+    },
+    {
+      "fingerprint": "6d41d52e230a17a7",
+      "reason": "Intentionally vulnerable test fixture under job-security-scan/tests/fixtures; scanner test input, never installed or deployed.",
+      "owner": "chuongnd"
+    },
+    {
+      "fingerprint": "7c75d8354d02e224",
+      "reason": "Intentionally vulnerable test fixture under job-security-scan/tests/fixtures; scanner test input, never installed or deployed.",
+      "owner": "chuongnd"
+    },
+    {
+      "fingerprint": "bd2a9dd9e8157627",
+      "reason": "Intentionally vulnerable test fixture under job-security-scan/tests/fixtures; scanner test input, never installed or deployed.",
+      "owner": "chuongnd"
+    },
+    {
+      "fingerprint": "6fddd5a1d05523cd",
+      "reason": "Intentionally vulnerable test fixture under job-security-scan/tests/fixtures; scanner test input, never installed or deployed.",
+      "owner": "chuongnd"
+    },
+    {
+      "fingerprint": "24c2897f9cfa7680",
+      "reason": "Intentionally vulnerable test fixture under job-security-scan/tests/fixtures; scanner test input, never installed or deployed.",
+      "owner": "chuongnd"
+    },
+    {
+      "fingerprint": "81a29a3404487ed7",
+      "reason": "CI uses setup-python with a minor line; it resolves the latest patch release.",
+      "owner": "chuongnd"
+    },
+    {
+      "fingerprint": "c816c6915fa5329e",
+      "reason": "CI uses setup-python with a minor line; it resolves the latest patch release.",
+      "owner": "chuongnd"
+    },
+    {
+      "fingerprint": "fa787bdf300f6d62",
+      "reason": "CI uses setup-python with a minor line; it resolves the latest patch release.",
+      "owner": "chuongnd"
+    },
+    {
+      "fingerprint": "44f3ca0fe64bc9da",
+      "reason": "CI uses setup-python with a minor line; it resolves the latest patch release.",
+      "owner": "chuongnd"
+    }
+  ]
+}

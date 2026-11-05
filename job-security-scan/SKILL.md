@@ -19,7 +19,7 @@ compatibility: >
 license: MIT
 metadata:
   author: one-om-ddm-team
-  version: "3.1"
+  version: "3.2"
   config-file: assets/repository.md
 allowed-tools: bash glob grep view create edit
 ---
@@ -204,13 +204,16 @@ the raw output. A CLEAN row with "nothing to check" means the repo had no lockfi
 After `run-scan.sh`, the serious findings are checked by **independent verifiers** before you report. Follow
 `references/verification.md` exactly:
 
-1. `python3 -I scripts/triage.py queue security-run-<datetime>` (prints how many are queued; `quick` queues none).
+1. `python3 -I scripts/triage.py queue security-run-<datetime>` (prints how many are queued and how many stay
+   pending; `quick` queues none). One root cause per repo (same advisory + package + version, same misconfig
+   rule) is one item; at most `--limit 25` items by default. Use `--repo NAME` to work a large scan repo by repo.
 2. Loop: `triage.py next <run>` prints one item (or `{"done": true}`); give it to one **fresh sub-agent** with
    the verifier prompt and the repo path — nothing else. Verifiers read source only: no edits, no running repo
    code, no network, never open a file holding a secret.
 3. Keep only a reply that is a single JSON object and save it with `triage.py record <run> -` (object on stdin).
    Never open the queue, batch or report JSON files yourself; one item at a time keeps large runs in context.
-4. `python3 -I scripts/triage.py apply security-run-<datetime>` merges every recorded verdict.
+4. `python3 -I scripts/triage.py apply security-run-<datetime>` merges every recorded verdict (a grouped item's
+   verdict covers its group). Queue again for the next batch; report the pending count.
 
 Verdicts: **confirmed** (verified severity, never above demonstrated impact), **needs validation** (the exact
 missing fact plus a safe check, listed in `NEEDS-VALIDATION.md`), **rejected** (moved to "Dismissed (with
