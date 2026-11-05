@@ -14,9 +14,15 @@ from the scanned repository, and never contacts a network service.
 1. `python3 -I scripts/triage.py queue security-run-<datetime>` — writes `triage/queue.json`. The run's profile
    decides what is queued: `standard` CRITICAL + HIGH, `deep` also MEDIUM, `quick` nothing. Findings that already
    have a verdict (also verdicts carried over from the previous run for unchanged code) are not queued again.
-2. For each queued item, most severe first, start **one fresh sub-agent that has not seen the scan summary or any
-   other verdict**. Give it only: the verifier prompt below, that one queue item (finding + context), and the
-   repository path. Default budget: 25 items per run; the rest stay pending and the summary says how many.
+   Findings with one root cause in one repo become **one item**: dependency findings by advisory id + package +
+   installed version (every lockfile and scanner that reports it), misconfigurations by scanner + rule (every
+   file). The item lists all members under `group`. Items are ordered most severe first (new before unchanged)
+   and capped at the **budget: `--limit 25` by default**; `queue.json` → `summary` and the printed line say how
+   many items and findings stay pending. Options: `--limit N`, `--all` (no cap), `--repo NAME` (repeatable,
+   e.g. to work through a large multi-repo scan one repo at a time), `--no-group` (one item per finding).
+2. For each queued item, in queue order, start **one fresh sub-agent that has not seen the scan summary or any
+   other verdict**. Give it only: the verifier prompt below, that one queue item (finding + context + group),
+   and the repository path. Report the pending count from the summary; never present pending findings as clean.
    If the agent cannot start sub-agents, do one separate pass per item from the queue item alone, and say in the
    summary that verification was done in-session, not independently.
 3. Keep a reply only if it is exactly one JSON object in the format below. Do not repair a malformed or
@@ -24,7 +30,10 @@ from the scanned repository, and never contacts a network service.
 4. Collect the kept objects as `{"verdicts": [ ... ]}` in `triage/verdicts.json` and run
    `python3 -I scripts/triage.py apply security-run-<datetime> security-run-<datetime>/triage/verdicts.json`.
    `apply` is all or nothing: if it lists errors, fix the collection (drop the bad record) and apply again.
-   It regenerates the three reports and writes `NEEDS-VALIDATION.md`.
+   It regenerates the three reports and writes `NEEDS-VALIDATION.md`. A verdict on a grouped item's
+   fingerprint also applies to every group member in the last `queue.json` that has no verdict yet and no
+   record of its own in the file.
+5. To continue with the next batch, run `queue` again (verdicts already applied are skipped) and repeat.
 
 ## Verifier prompt
 
@@ -50,6 +59,9 @@ Check, in order:
    the installed version really in the affected range?
 5. Severity: state the realistic likelihood and the concrete impact you can show from source.
    Use the anchors you were given; overall severity can never exceed the impact.
+6. If the item has a "group", your verdict is recorded for every listed location. Give a verdict
+   only if it holds for all of them; if the locations differ, answer "needs_validation" and name
+   which locations differ in the blocker.
 
 Decide:
 - "confirmed"        the issue is real and reachable; give evidence, likelihood, impact, severity.

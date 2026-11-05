@@ -1,11 +1,15 @@
 #!/usr/bin/env python3
 """triage.py - the deterministic half of independent verification (SKILL.md Phase 9).
 
-  python3 -I scripts/triage.py queue RUN_DIR
+  python3 -I scripts/triage.py queue RUN_DIR [--limit N | --all] [--repo NAME ...] [--no-group]
       Writes RUN_DIR/triage/queue.json: the findings the run's profile queues for verification
       (standard: CRITICAL+HIGH, deep: +MEDIUM, quick: none), minus those that already have a verdict
       (including verdicts carried over from the previous run). Each item carries a context window of
       +/-15 lines from the repository. Secrets, credential files and symlinks get no context and no code.
+      Findings with the same root cause in one repo become one item (one verifier): dependency findings by
+      advisory + package + version (all scanners, all lockfiles), misconfigurations by scanner + rule.
+      Items are ordered most severe first and capped at --limit (default 25, the verification budget);
+      the summary says how many findings stay pending. --repo restricts the queue to those repos.
 
   python3 -I scripts/triage.py apply RUN_DIR VERDICTS.json
       Checks every verdict (see references/verification.md for the format), then merges them into
@@ -16,6 +20,7 @@ Exit codes: 0 done, 1 invalid input or report, 2 usage. Report-only: nothing in 
 Stdlib only; Python 3.8+.
 """
 
+import argparse
 import importlib.util
 import json
 import os
@@ -43,6 +48,9 @@ TEXT_FIELDS = ("evidence", "blocker", "validation_plan", "reason")
 CREDENTIAL_NAME = re.compile(r"(^\.env(\..*)?$|^\.npmrc$|^\.pypirc$|^\.netrc$|^\.git-credentials$|^\.dockercfg$|"
                              r"^credentials(\.json)?$|^id_(rsa|dsa|ecdsa|ed25519)$|\.(pem|key|p12|pfx|jks|keystore)$)",
                              re.IGNORECASE)
+DEFAULT_LIMIT = 25
+MAX_GROUP_LOCATIONS = 50
+_SEV_RANK = {"CRITICAL": 0, "HIGH": 1, "MEDIUM": 2, "LOW": 3, "INFO": 4}
 QUEUE_KEYS = ("fingerprint", "repo", "scanner", "type", "severity", "file", "line", "code", "package",
               "installed_version", "fixed_version", "rule_id", "title", "description", "url")
 
@@ -54,13 +62,8 @@ def fail(msg):
 
 def load_run(run_dir):
     path = Path(run_dir) / "security-report.json"
-    doc = report_model.load_report(path)
+    doc, errors = report_model.read_report(path)
     if doc is None:
-        errors = []
-        try:
-            errors = report_schema.validate(json.loads(path.read_text(encoding="utf-8")))
-        except (OSError, ValueError) as exc:
-            errors = [str(exc)]
         raise SystemExit(fail("%s is not a valid v2 report (%s) - run run-scan.sh again"
                               % (path, "; ".join(errors[:3]) or "unreadable")))
     return doc
@@ -101,29 +104,80 @@ def context_for(f, run):
     return {"file": f["file"], "start_line": start, "end_line": end, "lines": out}
 
 
-def cmd_queue(run_dir):
+def group_key(f, grouping=True):
+    """Findings sharing a key have one root cause in one repo and get one verifier and one verdict."""
+    if grouping and f.get("type") in report_model.DEPENDENCY_TYPES and f.get("rule_id") and f.get("package"):
+        return ("dependency", f["repo"], f["rule_id"], f["package"], f.get("installed_version") or "")
+    if grouping and f.get("type") == "misconfig" and f.get("rule_id"):
+        return ("misconfig", f["repo"], f["scanner"], f["rule_id"])
+    return ("finding", f["fingerprint"])
+
+
+def _order(f):
+    return (_SEV_RANK.get((f.get("severity") or "").upper(), 9), f.get("change") != "new",
+            f.get("repo") or "", f.get("file") or "", f.get("line") or 0, f["fingerprint"])
+
+
+def cmd_queue(run_dir, limit=DEFAULT_LIMIT, repos=None, grouping=True):
     doc = load_run(run_dir)
     run = doc.get("run") or {}
     profile = run.get("profile")
+    known = set(r["name"] for r in doc.get("repos", []))
+    unknown = sorted(set(repos or ()) - known)
+    if unknown:
+        return fail("--repo %s is not in this report (repos: %s)" % (", ".join(unknown), ", ".join(sorted(known))))
+    eligible = [f for f in doc["findings"] if not f.get("verdict") and report_model.is_queued(f, profile)
+                and (not repos or f.get("repo") in repos)]
+    groups = {}
+    for f in sorted(eligible, key=_order):
+        groups.setdefault(group_key(f, grouping), []).append(f)
+    ordered = sorted(groups.values(), key=lambda members: _order(members[0]))
+    selected = ordered if limit is None else ordered[:limit]
     items = []
-    for f in doc["findings"]:
-        if f.get("verdict") or not report_model.is_queued(f, profile):
-            continue
+    for members in selected:
+        f = members[0]
         item = dict((k, f.get(k)) for k in QUEUE_KEYS)
         if f.get("type") == "secret":
             item["code"] = ""
         item["context"] = context_for(f, run)
+        if len(members) > 1:
+            item["group"] = {
+                "size": len(members),
+                "fingerprints": [m["fingerprint"] for m in members],
+                "scanners": sorted(set(m["scanner"] for m in members)),
+                "locations": [{"file": m.get("file"), "line": m.get("line"), "scanner": m["scanner"]}
+                              for m in members[:MAX_GROUP_LOCATIONS]],
+                "locations_omitted": max(0, len(members) - MAX_GROUP_LOCATIONS)}
         items.append(item)
     out_dir = Path(run_dir) / "triage"
     out_dir.mkdir(exist_ok=True)
+    chosen = sum(len(m) for m in selected)
+    summary = {"eligible_findings": len(eligible), "groups": len(ordered), "queued_items": len(items),
+               "queued_findings": chosen, "remaining_items": len(ordered) - len(items),
+               "remaining_findings": len(eligible) - chosen, "limit": limit, "repos": sorted(repos or []),
+               "grouping": grouping}
     queue = {"schema_version": 1, "run_dir": doc["run_dir"], "profile": profile,
              "instructions": "references/verification.md of the job-security-scan skill",
-             "verdicts_file": str(out_dir / "verdicts.json"), "items": items}
+             "verdicts_file": str(out_dir / "verdicts.json"), "summary": summary, "items": items}
     (out_dir / "queue.json").write_text(json.dumps(queue, indent=2) + "\n", encoding="utf-8")
     skipped = sum(1 for f in doc["findings"] if f.get("verdict") and report_model.is_queued(f, profile))
-    print("triage: %d finding(s) queued for verification (profile %s, %d already have a verdict) -> %s"
-          % (len(items), profile, skipped, out_dir / "queue.json"))
+    print("triage: %d item(s) queued for verification covering %d finding(s) (profile %s%s, %d already have a "
+          "verdict) -> %s" % (len(items), chosen, profile, ", repos " + ", ".join(sorted(repos)) if repos else "",
+                              skipped, out_dir / "queue.json"))
+    if summary["remaining_items"]:
+        print("triage: %d more item(s) (%d finding(s)) stay pending - queue again after apply, or raise --limit"
+              % (summary["remaining_items"], summary["remaining_findings"]))
     return 0
+
+
+def load_groups(run_dir):
+    """{representative fingerprint: [member fingerprints]} from the last queue.json, or {}."""
+    try:
+        queue = json.loads((Path(run_dir) / "triage" / "queue.json").read_text(encoding="utf-8"))
+        return dict((i["fingerprint"], list(i["group"]["fingerprints"])) for i in queue.get("items", [])
+                    if isinstance(i, dict) and isinstance(i.get("group"), dict))
+    except (OSError, ValueError, KeyError, TypeError, AttributeError):
+        return {}
 
 
 def parse_verdicts(text, known):
@@ -200,9 +254,15 @@ def cmd_apply(run_dir, verdicts_path):
         for e in exc.args[0][:50]:
             print("  - %s" % e, file=sys.stderr)
         return 1
+    explicit = set(fp for fp, _, _, _ in records)
+    groups = load_groups(run_dir)
+    shared = 0
     for fp, verdict, verified, detail in records:
-        f = by_fp[fp]
-        f.update(verdict=verdict, verified_severity=verified, verdict_detail=detail, carried=False)
+        targets = [fp] + [m for m in groups.get(fp, []) if m != fp and m in by_fp and m not in explicit
+                          and not by_fp[m].get("verdict")]
+        shared += len(targets) - 1
+        for m in targets:
+            by_fp[m].update(verdict=verdict, verified_severity=verified, verdict_detail=dict(detail), carried=False)
     report_model.refresh(doc)
     errors = report_schema.validate(doc)
     if errors:
@@ -211,14 +271,30 @@ def cmd_apply(run_dir, verdicts_path):
     _, errors = gen.write_reports(doc, {"team": doc.get("team", ""), "org": doc.get("org", "")}, run_dir, run_dir)
     (Path(run_dir) / "NEEDS-VALIDATION.md").write_text(report_formats.render_needs_validation(doc), encoding="utf-8")
     v = doc["verification"]
-    print("triage: applied %d verdict(s): %d confirmed, %d need validation, %d dismissed, %d still pending"
-          % (len(records), v["confirmed"], v["needs_validation"], v["rejected"], v["pending"]))
+    print("triage: applied %d verdict(s) (+%d grouped finding(s)): %d confirmed, %d need validation, "
+          "%d dismissed, %d still pending" % (len(records), shared, v["confirmed"], v["needs_validation"],
+                                               v["rejected"], v["pending"]))
     return 1 if errors else 0
 
 
+def _limit(text):
+    n = int(text)
+    if n < 1:
+        raise argparse.ArgumentTypeError("must be a positive integer")
+    return n
+
+
 def main(argv):
-    if len(argv) == 3 and argv[1] == "queue":
-        return cmd_queue(argv[2])
+    if len(argv) >= 3 and argv[1] == "queue":
+        ap = argparse.ArgumentParser(prog="triage.py queue", usage=__doc__)
+        ap.add_argument("run_dir")
+        cap = ap.add_mutually_exclusive_group()
+        cap.add_argument("--limit", type=_limit, default=DEFAULT_LIMIT)
+        cap.add_argument("--all", action="store_true")
+        ap.add_argument("--repo", action="append", default=[])
+        ap.add_argument("--no-group", action="store_true")
+        a = ap.parse_args(argv[2:])
+        return cmd_queue(a.run_dir, None if a.all else a.limit, set(a.repo), not a.no_group)
     if len(argv) == 4 and argv[1] == "apply":
         return cmd_apply(argv[2], argv[3])
     print(__doc__, file=sys.stderr)
