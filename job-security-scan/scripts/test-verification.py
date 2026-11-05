@@ -613,9 +613,21 @@ class TriageTests(TempDirCase):
         return load_doc(run_dir)
 
     def queue(self, run_dir):
+        """Every queued item, read from queue-index.json and its batch files, in index order."""
         r = run_proc(TRIAGE, "queue", run_dir)
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
-        return json.loads((run_dir / "triage" / "queue.json").read_text())
+        index = json.loads((run_dir / "triage" / "queue-index.json").read_text())
+        items = {}
+        for name in sorted(set(i["batch"] for i in index["items"])):
+            for item in json.loads((run_dir / "triage" / name).read_text())["items"]:
+                items[item["fingerprint"]] = item
+        return dict(index, items=[items[i["fingerprint"]] for i in index["items"]])
+
+    def triage_text(self, run_dir):
+        return "".join(p.read_text() for p in sorted((run_dir / "triage").glob("*.json")))
+
+    def record(self, run_dir, verdict, *extra):
+        return run_proc(TRIAGE, "record", run_dir, "-", *extra, input=json.dumps(verdict))
 
     def fp(self, run_dir, rule):
         return [f["fingerprint"] for f in self.doc(run_dir)["findings"] if f["rule_id"] == rule][0]
@@ -643,7 +655,7 @@ class TriageTests(TempDirCase):
         self.assertEqual((by["github-pat"]["code"], by["github-pat"]["context"]), ("", None))
         self.assertIsNone(by["eval"]["context"])      # .env* files are never opened for context
         self.assertIsNone(by["link"]["context"])      # symlinks are not followed
-        self.assertNotIn(SECRET, (run_dir / "triage" / "queue.json").read_text())
+        self.assertNotIn(SECRET, self.triage_text(run_dir))
 
     def test_quick_profile_queues_nothing_deep_adds_medium(self):
         self.assertEqual(self.queue(self.make_run(profile="quick"))["items"], [])
@@ -724,6 +736,110 @@ class TriageTests(TempDirCase):
         by = dict((f["rule_id"], f) for f in doc["findings"])
         self.assertTrue(by["sqli"]["carried"])
         self.assertEqual(sorted(i["rule_id"] for i in self.queue(second)["items"]), ["github-pat"])
+
+    def test_queue_writes_batches_without_context_in_index(self):
+        run_dir = self.make_run()
+        (run_dir / "triage").mkdir()
+        (run_dir / "triage" / "queue.json").write_text("{}")
+        (run_dir / "triage" / "batch-099.json").write_text("{}")
+        q = self.queue(run_dir)
+        index = json.loads((run_dir / "triage" / "queue-index.json").read_text())
+        self.assertEqual(index["schema_version"], 2)
+        self.assertEqual(len(index["items"]), 4)
+        self.assertNotIn("context", json.dumps(index))
+        self.assertEqual(sorted(p.name for p in (run_dir / "triage").glob("*.json")),
+                         ["batch-001.json", "queue-index.json"])
+        self.assertEqual(q["items"][0]["severity"], "CRITICAL")     # most severe first
+
+    def test_queue_on_large_run_splits_batches(self):
+        run_dir = self.ws / "security-run-20261102-090000"
+        (run_dir / "api").mkdir(parents=True)
+        long = "x" * 1200
+        (run_dir / "api" / "semgrep.json").write_text(json.dumps({"results": [
+            {"check_id": "r%d" % (i % 40), "path": "src/f%d.js" % i, "start": {"line": 1},
+             "extra": {"severity": "ERROR", "message": "m %d %s" % (i, long)}} for i in range(9000)]}))
+        r = run_proc(GENERATE, "--results-dir", run_dir, "--config", self.cfg, "--out-dir", run_dir,
+                     "--repos-root", self.tmp / "repos", "--home", self.tmp / "home")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertGreater(sum(p.stat().st_size for p in (run_dir / "findings").glob("*.json")), 5 * 1024 * 1024)
+        r = run_proc(TRIAGE, "queue", run_dir)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertEqual(len(list((run_dir / "triage").glob("batch-*.json"))), 900)
+        nxt = run_proc(TRIAGE, "next", run_dir)
+        self.assertEqual(nxt.returncode, 0, nxt.stderr)
+        self.assertIn("fingerprint", json.loads(nxt.stdout))
+
+    def test_next_record_loop_equals_bulk_apply(self):
+        run_a = self.make_run()
+        self.ws = self.tmp / "ws-b"
+        run_b = self.make_run()
+        verdicts = dict((v["fingerprint"], v) for v in self.good_verdicts(run_a)["verdicts"])
+        self.assertEqual(run_proc(TRIAGE, "queue", run_a).returncode, 0)
+        seen = []
+        while True:
+            r = run_proc(TRIAGE, "next", run_a)
+            self.assertEqual(r.returncode, 0, r.stderr)
+            item = json.loads(r.stdout)
+            if item.get("done"):
+                break
+            fp = item["fingerprint"]
+            self.assertNotIn(fp, seen)
+            seen.append(fp)
+            v = verdicts.get(fp, {"fingerprint": fp, "verdict": "rejected", "reason": "test token"})
+            verdicts[fp] = v
+            r = self.record(run_a, v)
+            self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertEqual(len(seen), 4)
+        r = run_proc(TRIAGE, "apply", run_a)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertEqual(self.apply(run_b, {"verdicts": list(verdicts.values())}).returncode, 0)
+        strip = lambda d: [dict(f) for f in d["findings"]]
+        self.assertEqual(strip(self.doc(run_a)), strip(self.doc(run_b)))
+        self.assertTrue((run_a / "NEEDS-VALIDATION.md").exists())
+
+    def test_next_prints_done_when_all_recorded(self):
+        run_dir = self.make_run(profile="quick")
+        self.assertEqual(run_proc(TRIAGE, "queue", run_dir).returncode, 0)
+        r = run_proc(TRIAGE, "next", run_dir)
+        self.assertEqual((r.returncode, json.loads(r.stdout)), (0, {"done": True}))
+
+    def test_record_twice_refused_without_replace(self):
+        run_dir = self.make_run()
+        self.queue(run_dir)
+        v = {"fingerprint": self.fp(run_dir, "sqli"), "verdict": "rejected", "reason": "r"}
+        self.assertEqual(self.record(run_dir, v).returncode, 0)
+        r = self.record(run_dir, dict(v, reason="second"))
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("already recorded", r.stderr)
+        self.assertEqual(self.record(run_dir, dict(v, reason="second"), "--replace").returncode, 0)
+        saved = json.loads((run_dir / "triage" / "verdicts" / (v["fingerprint"] + ".json")).read_text())
+        self.assertEqual(saved["reason"], "second")
+
+    def test_record_invalid_writes_nothing(self):
+        run_dir = self.make_run()
+        self.queue(run_dir)
+        fp = self.fp(run_dir, "sqli")
+        for bad in ({"fingerprint": fp, "verdict": "rejected", "reason": "r", "severity": "LOW"},
+                    {"fingerprint": self.fp(run_dir, "xss"), "verdict": "rejected", "reason": "not queued"},
+                    {"fingerprint": "../../evil", "verdict": "rejected", "reason": "r"},
+                    [{"fingerprint": fp, "verdict": "rejected", "reason": "r"}]):
+            r = self.record(run_dir, bad)
+            self.assertEqual(r.returncode, 1, bad)
+        self.assertEqual(list((run_dir / "triage").glob("verdicts/*")), [])
+
+    def test_apply_with_corrupted_shard_changes_nothing(self):
+        run_dir = self.make_run()
+        self.queue(run_dir)
+        self.assertEqual(self.record(run_dir, {"fingerprint": self.fp(run_dir, "sqli"), "verdict": "rejected",
+                                               "reason": "r"}).returncode, 0)
+        shard = sorted((run_dir / "findings").glob("*.json"))[0]
+        shard.write_text(shard.read_text().replace('"line":', '"line": ', 1))
+        index = (run_dir / "security-report.json").read_bytes()
+        r = run_proc(TRIAGE, "apply", run_dir)
+        self.assertEqual(r.returncode, 1)
+        self.assertIn(shard.name, r.stderr)
+        self.assertNotIn("run-scan.sh", r.stderr)
+        self.assertEqual((run_dir / "security-report.json").read_bytes(), index)
 
 
 CHANGED = SKILL_DIR / "scripts" / "changed-files.py"
