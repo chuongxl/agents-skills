@@ -575,5 +575,33 @@ class StoreTests(TempDirCase):
             self.rs.save(doc, self.tmp)
 
 
+
+class ValidateCliTests(TempDirCase):
+    VALIDATE = SKILL_DIR / "scripts" / "validate-report.py"
+
+    def validate(self, path):
+        return subprocess.run([sys.executable, "-I", str(self.VALIDATE), str(path)], capture_output=True, text=True)
+
+    def test_sharded_run_folder_and_index_are_valid(self):
+        import report_store
+        report_store.save(big_doc(), self.tmp)
+        for target in (self.tmp, self.tmp / "security-report.json"):
+            r = self.validate(target)
+            self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+            self.assertIn("VALID", r.stdout)
+            self.assertIn("30000 findings", r.stdout)
+            self.assertIn("shards", r.stdout)
+
+    def test_corrupted_shard_is_invalid(self):
+        import report_store
+        report_store.save(big_doc(3000), self.tmp)
+        shard = sorted((self.tmp / "findings").glob("*.json"))[0]
+        shard.write_text(shard.read_text().replace('"line":', '"line": ', 1))
+        r = self.validate(self.tmp)
+        self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
+        self.assertIn("INVALID", r.stdout)
+        self.assertIn(shard.name, r.stdout)
+
+
 if __name__ == "__main__":
     unittest.main()
