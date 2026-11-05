@@ -16,8 +16,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent / "lib"))
 
 import report_schema  # noqa: E402
-
-MAX_BYTES = 5 * 1024 * 1024
+from report_model import MAX_REPORT_BYTES as MAX_BYTES  # noqa: E402
 
 
 def main(argv):

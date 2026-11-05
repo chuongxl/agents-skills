@@ -728,6 +728,11 @@ def write_reports(doc, config, out_dir, results_dir=None):
     paths[0].write_text(report_formats.render_markdown(doc), encoding="utf-8")
     build_html(doc, config, results_dir or out_dir, str(paths[2]), org, workspace)
     errors = report_schema.validate(doc)
+    size = paths[1].stat().st_size
+    if size > report_model.MAX_REPORT_BYTES:
+        errors.append("security-report.json is %d bytes, larger than the %d-byte limit: triage and the next "
+                      "run cannot read it - narrow the scan (--repo, --scanner) or split the config"
+                      % (size, report_model.MAX_REPORT_BYTES))
     if errors:
         sys.stderr.write("  warning: security-report.json failed validation:\n%s\n"
                          % "\n".join("    - " + e for e in errors[:20]))

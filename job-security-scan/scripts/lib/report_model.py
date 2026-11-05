@@ -224,24 +224,33 @@ def build_document(findings, meta, previous=None):
 
 
 RUN_PREFIX = "security-run-"
-MAX_REPORT_BYTES = 5 * 1024 * 1024
+# Sized for report_schema.MAX_FINDINGS (20000) at a few KB each. A smaller cap makes a large but valid scan
+# unreadable for triage, verdict carry-over and the validator (a 7,000-finding scan is already ~7 MB).
+MAX_REPORT_BYTES = 64 * 1024 * 1024
 
 
-def load_report(path):
-    """A v2 report that passes the validator, or None (missing, too big, not JSON, v1, invalid)."""
+def read_report(path):
+    """(document, errors): a v2 report that passes the validator and [], or None and why it cannot be used."""
     import json
     import os
     import report_schema
     try:
-        if os.path.getsize(str(path)) > MAX_REPORT_BYTES:
-            return None
+        size = os.path.getsize(str(path))
+        if size > MAX_REPORT_BYTES:
+            return None, ["%d bytes, larger than the %d-byte limit" % (size, MAX_REPORT_BYTES)]
         with open(str(path), "r", encoding="utf-8") as fh:
             doc = json.load(fh)
-    except (OSError, ValueError):
-        return None
-    if not isinstance(doc, dict) or report_schema.validate(doc):
-        return None
-    return doc
+    except (OSError, ValueError) as exc:
+        return None, [str(exc)]
+    if not isinstance(doc, dict):
+        return None, ["report must be a JSON object"]
+    errors = report_schema.validate(doc)
+    return (None, errors) if errors else (doc, [])
+
+
+def load_report(path):
+    """A v2 report that passes the validator, or None (missing, too big, not JSON, v1, invalid)."""
+    return read_report(path)[0]
 
 
 def find_previous(run_dir):

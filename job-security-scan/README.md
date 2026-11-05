@@ -191,7 +191,9 @@ Indicator data and sources: [references/ioc-data.md](references/ioc-data.md). If
 ### 8. Independent Verification, Run-to-Run Changes, Report Schema
 
 - **Verification (agent step, Phase 9):** `scripts/triage.py queue` lists the findings to check (`standard`:
-  CRITICAL + HIGH, `deep`: also MEDIUM) with a redacted ±15-line context; each goes to a fresh verifier agent
+  CRITICAL + HIGH, `deep`: also MEDIUM) with a redacted ±15-line context, one item per root cause (same advisory
+  + package + version, or same misconfig rule, in one repo), most severe first, capped at `--limit 25` with the
+  pending count reported (`--all`, `--repo NAME`, `--no-group`); each item goes to a fresh verifier agent
   that tries to disprove it from source only (no edits, no running repo code, no network). `triage.py apply`
   merges the verdicts all-or-nothing and regenerates the reports plus `NEEDS-VALIDATION.md`. Prompt, verdict
   format and severity anchors: [references/verification.md](references/verification.md).
@@ -476,9 +478,20 @@ rm -rf ~/.cache/trivy
 bash job-security-scan/scripts/run-scan.sh  # Re-downloads DB
 ```
 
+### Issue: Too many findings to verify on a large multi-repo scan
+
+**Solution:** `triage.py queue` already groups repeated root causes and stops at 25 items. Work in batches:
+apply the verdicts, queue again, and use `--repo NAME` to finish one repository at a time. The pending count
+in the summary is the work left; pending findings are not clean.
+
 ## Version History
 
-- **v3.0** (current) — Deep audit (Phase 10, `--audit`) adapted from cloudflare/security-audit-skill: coverage
+- **v3.1** (current) — Large scans: report size limit raised from 5 MiB to 64 MiB to match the 20,000-finding
+  schema cap (a 7,000-finding scan no longer breaks triage, validation and verdict carry-over), and an oversize
+  report is now an error instead of a silent skip; `triage.py queue` groups one root cause per repo into one
+  verifier item, orders by severity, enforces the 25-item budget (`--limit`, `--all`), filters with `--repo`
+  and reports the pending count; `apply` shares a group verdict with its members
+- **v3.0** — Deep audit (Phase 10, `--audit`) adapted from cloudflare/security-audit-skill: coverage
   ledger, isolated hunters, adversarial validation, confirmed / needs-validation / rejected verdicts, Python
   validators, optional sandbox and evidence promotion; confirmed audit findings join the report as verified
   findings; baseline of accepted findings (`security-baseline.json`); commit and dirty flag per repo
