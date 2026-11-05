@@ -1,4 +1,4 @@
-"""The v2 security-report model: stable fingerprints, verdicts, changes since the previous run.
+"""The security-report model (schema v3; v2 still read): stable fingerprints, verdicts, changes since the previous run.
 
 A fingerprint identifies a finding across runs without depending on its line number, so moved code keeps its
 identity while edited code gets a new one (and is verified again). Secrets are fingerprinted by location only —
@@ -12,7 +12,7 @@ Stdlib only; Python 3.8+.
 import hashlib
 import re
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 SEVERITIES = ("CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO")
 IMPACTS = ("critical", "high", "medium", "low", "informational")
 LIKELIHOODS = ("high", "medium", "low")

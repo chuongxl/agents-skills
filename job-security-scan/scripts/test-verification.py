@@ -122,7 +122,7 @@ class ValidatorTests(TempDirCase):
     def test_generated_document_is_valid(self):
         doc = v2_doc()
         self.assertEqual(self.validate(doc), [])
-        self.assertEqual(doc["schema_version"], 2)
+        self.assertEqual(doc["schema_version"], 3)
         # standard profile queues CRITICAL+HIGH: the HIGH row is pending, the MEDIUM row is not queued
         self.assertEqual(doc["verification"]["queued"], 1)
         self.assertEqual(doc["verification"]["pending"], 1)
@@ -276,7 +276,7 @@ class ChangesTests(unittest.TestCase):
             later = mk("security-run-20261103-080000", build([finding()]))
             doc, path = report_model.find_previous(cur)
             self.assertEqual(path.name, "security-run-20261101-090000")
-            self.assertEqual(doc["schema_version"], 2)
+            self.assertEqual(doc["schema_version"], 3)
             self.assertTrue(later.exists())
             self.assertEqual(report_model.find_previous(root / "security-run-20261101-090000"), (None, None))
         finally:

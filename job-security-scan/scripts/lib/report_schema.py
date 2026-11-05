@@ -5,18 +5,23 @@ the findings, the verdict contract, severity never above demonstrated impact, an
 Stdlib only; Python 3.8+.
 """
 
+import re
+
 import audit_report
 import baseline
 import report_shaihulud
 from report_model import (CHANGES, IMPACTS, LIKELIHOODS, PROFILES, SCHEMA_VERSION, SEVERITIES, VERDICTS,
                           counts_of, verification_summary)
 
-MAX_FINDINGS = 20000
+MAX_FINDINGS = 200000
 MAX_ERRORS = 100
 TOP_KEYS = ("schema_version", "generated_at", "team", "org", "run_dir", "run", "scanners", "counts", "repos",
             "fixed", "shai_hulud", "verification", "findings")
 FINDING_REQUIRED = ("repo", "scanner", "type", "severity", "file", "line", "code", "rule_id", "title",
                     "fingerprint", "change", "verdict", "verified_severity", "verdict_detail")
+READABLE_VERSIONS = (2, SCHEMA_VERSION)
+SHARD_KEYS = ("file", "repo", "count", "bytes", "sha256")
+_SHARD_FILE = re.compile(r"^findings/[A-Za-z0-9._-]+\.json$")
 _IMPACT_RANK = dict((v, i) for i, v in enumerate(IMPACTS))
 _SEV_RANK = {"CRITICAL": 0, "HIGH": 1, "MEDIUM": 2, "LOW": 3, "INFO": 4}
 
@@ -72,9 +77,9 @@ def validate(doc):
 
     if not isinstance(doc, dict):
         return ["report must be a JSON object"]
-    if doc.get("schema_version") != SCHEMA_VERSION:
-        return ["schema_version must be %d (got %r) - regenerate the report with this version"
-                % (SCHEMA_VERSION, doc.get("schema_version"))]
+    if doc.get("schema_version") not in READABLE_VERSIONS:
+        return ["schema_version must be one of %s (got %r) - regenerate the report with this version"
+                % (", ".join(map(str, READABLE_VERSIONS)), doc.get("schema_version"))]
     for k in TOP_KEYS:
         if k not in doc:
             err("missing top-level key '%s'" % k)
@@ -122,3 +127,37 @@ def validate(doc):
         if doc["verification"] != verification_summary(findings, run.get("profile")):
             err("verification summary does not match the findings")
     return errors
+
+
+def validate_index(index):
+    """Errors for a v3 index (security-report.json without findings; see report_store)."""
+    if not isinstance(index, dict):
+        return ["report index must be a JSON object"]
+    if index.get("schema_version") != SCHEMA_VERSION:
+        return ["index schema_version must be %d (got %r)" % (SCHEMA_VERSION, index.get("schema_version"))]
+    errors = ["missing top-level key '%s'" % k for k in TOP_KEYS + ("findings_total", "shards", "fixed_shards")
+              if k != "findings" and k not in index]
+    if "findings" in index:
+        errors.append("a v3 index must not hold findings inline")
+    if errors:
+        return errors
+    total = 0
+    for name in ("shards", "fixed_shards"):
+        shards = index[name]
+        if not isinstance(shards, list):
+            errors.append("%s must be a list" % name)
+            continue
+        for i, s in enumerate(shards):
+            where = "%s[%d]" % (name, i)
+            if not isinstance(s, dict) or any(k not in s for k in SHARD_KEYS):
+                errors.append("%s: needs %s" % (where, ", ".join(SHARD_KEYS)))
+                continue
+            if not isinstance(s["file"], str) or not _SHARD_FILE.match(s["file"]):
+                errors.append("%s: file must be findings/<name>.json" % where)
+            if not isinstance(s["count"], int) or s["count"] < 0:
+                errors.append("%s: count must be a non-negative integer" % where)
+            elif name == "shards":
+                total += s["count"]
+    if not errors and total != index["findings_total"]:
+        errors.append("shard counts add up to %d, findings_total is %r" % (total, index["findings_total"]))
+    return errors[:MAX_ERRORS]
