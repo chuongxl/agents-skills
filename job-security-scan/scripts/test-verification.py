@@ -509,6 +509,19 @@ class ProfileTests(TempDirCase):
         self.assertIn("--severity LOW,MEDIUM,HIGH,CRITICAL", self.calls())
         self.assertEqual(self.report(run_dir)["run"]["profile"], "deep")
 
+    def test_deep_audit_preparation_is_not_completion_even_with_valid_report(self):
+        r, run_dir = self.scan("--audit", "--profile", "deep")
+        self.assertIn(r.returncode, (0, 1), r.stdout + r.stderr)
+        self.assertEqual(run_proc(VALIDATE, run_dir).returncode, 0)
+        self.assertEqual(run_proc(TRIAGE, "status", run_dir, "--require-complete").returncode, 0)
+        audit_dir = run_dir / "api" / "audit"
+        meta = json.loads((audit_dir / "run-metadata.json").read_text())
+        self.assertEqual(meta["run_status"], "awaiting_agent")
+        check = run_proc(SKILL_DIR / "scripts" / "validate-audit.py", "complete", audit_dir)
+        self.assertEqual(check.returncode, 1, check.stdout + check.stderr)
+        self.assertIn("coverage-ledger.json", check.stdout)
+        self.assertIn("findings.json", check.stdout)
+
     def test_scanner_overrides_profile(self):
         r, run_dir = self.scan("--profile", "quick", "--scanner", "trivy")
         self.assertIn("trivy fs", self.calls())
@@ -794,6 +807,97 @@ class TriageTests(TempDirCase):
         by = dict((f["fingerprint"], f) for f in self.doc(run_dir)["findings"])
         self.assertEqual([by[fp]["verdict"] for fp in cfg["group"]["fingerprints"]], ["rejected", "rejected"])
 
+    def test_requeue_refuses_unapplied_group_verdict_without_changing_queue(self):
+        run_dir = self.grouped_run()
+        q = self.queue(run_dir, "--all")
+        cfg = next(i for i in q["items"] if i["rule_id"] == "KSV-0012")
+        verdict = {"fingerprint": cfg["fingerprint"], "verdict": "rejected", "reason": "non-root PSA"}
+        self.assertEqual(self.record(run_dir, verdict).returncode, 0)
+        index = (run_dir / "triage" / "queue-index.json").read_bytes()
+        r = run_proc(TRIAGE, "queue", run_dir, "--limit", "1")
+        self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
+        self.assertIn("apply", r.stderr)
+        self.assertEqual((run_dir / "triage" / "queue-index.json").read_bytes(), index)
+        self.assertEqual(run_proc(TRIAGE, "apply", run_dir).returncode, 0)
+        by = dict((f["fingerprint"], f) for f in self.doc(run_dir)["findings"])
+        self.assertEqual([by[fp]["verdict"] for fp in cfg["group"]["fingerprints"]], ["rejected", "rejected"])
+        self.queue(run_dir, "--limit", "1")
+
+    def test_status_distinguishes_batch_exhaustion_from_full_verification(self):
+        import report_model, report_store
+        run_dir = self.make_run(profile="deep")
+        rows = [finding(file="src/f%d.js" % i, rule_id="r%d" % i, severity="MEDIUM") for i in range(31)]
+        doc = report_model.build_document(rows, dict(META, profile="deep", run_dir=str(run_dir)))
+        report_store.save(doc, run_dir)
+        r = run_proc(TRIAGE, "status", run_dir, "--require-complete")
+        self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
+        status = json.loads(r.stdout)
+        self.assertEqual((status["verification"]["pending"], status["next_action"]), (31, "queue"))
+        for expected_batch, expected_pending in ((25, 6), (6, 0)):
+            self.queue(run_dir)
+            for _ in range(expected_batch):
+                item = json.loads(run_proc(TRIAGE, "next", run_dir).stdout)
+                verdict = {"fingerprint": item["fingerprint"], "verdict": "needs_validation",
+                           "blocker": "deployed configuration is not in source",
+                           "validation_plan": "owner checks deployed configuration"}
+                self.assertEqual(self.record(run_dir, verdict).returncode, 0)
+            exhausted = json.loads(run_proc(TRIAGE, "next", run_dir).stdout)
+            self.assertTrue(exhausted["done"])
+            self.assertEqual(exhausted["scope"], "current_queue")
+            r = run_proc(TRIAGE, "status", run_dir, "--require-complete")
+            self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
+            status = json.loads(r.stdout)
+            self.assertEqual(status["next_action"], "apply")
+            self.assertEqual(status["batch"]["unapplied_items"], expected_batch)
+            self.assertFalse(status["verification_complete"])
+            self.assertEqual(run_proc(TRIAGE, "apply", run_dir).returncode, 0)
+            r = run_proc(TRIAGE, "status", run_dir, "--require-complete")
+            self.assertEqual(r.returncode, 1 if expected_pending else 0, r.stdout + r.stderr)
+            status = json.loads(r.stdout)
+            self.assertEqual(status["verification"]["pending"], expected_pending)
+            self.assertEqual(status["next_action"], "queue" if expected_pending else "done")
+        self.assertEqual(status["verification"]["needs_validation"], 31)
+        self.assertTrue(status["verification_complete"])
+        self.assertEqual(run_proc(VALIDATE, run_dir).returncode, 0)
+
+    def test_status_resumes_partially_recorded_batch_and_refuses_corrupt_report(self):
+        run_dir = self.make_run()
+        q = self.queue(run_dir)
+        item = q["items"][0]
+        self.assertEqual(self.record(run_dir, {"fingerprint": item["fingerprint"], "verdict": "rejected",
+                                              "reason": "test-only credential"}).returncode, 0)
+        r = run_proc(TRIAGE, "status", run_dir)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        status = json.loads(r.stdout)
+        self.assertEqual(status["batch"], {"queued_items": 4, "unrecorded_items": 3, "unapplied_items": 1})
+        self.assertEqual(status["next_action"], "apply")
+        self.assertEqual(run_proc(TRIAGE, "apply", run_dir).returncode, 0)
+        status = json.loads(run_proc(TRIAGE, "status", run_dir).stdout)
+        self.assertEqual(status["next_action"], "next")
+        shard = sorted((run_dir / "findings").glob("*.json"))[0]
+        shard.write_text(shard.read_text() + " ")
+        r = run_proc(TRIAGE, "status", run_dir, "--require-complete")
+        self.assertEqual(r.returncode, 1)
+        self.assertIn(shard.name, r.stderr)
+
+    def test_status_requires_replacement_verdict_to_be_applied(self):
+        run_dir = self.make_run()
+        q = self.queue(run_dir)
+        for item in q["items"]:
+            self.assertEqual(self.record(run_dir, {"fingerprint": item["fingerprint"], "verdict": "rejected",
+                                                  "reason": "test-only code"}).returncode, 0)
+        self.assertEqual(run_proc(TRIAGE, "apply", run_dir).returncode, 0)
+        fp = q["items"][0]["fingerprint"]
+        replacement = {"fingerprint": fp, "verdict": "needs_validation", "blocker": "deployment unknown",
+                       "validation_plan": "owner checks deployment"}
+        self.assertEqual(self.record(run_dir, replacement, "--replace").returncode, 0)
+        r = run_proc(TRIAGE, "status", run_dir, "--require-complete")
+        self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
+        self.assertEqual(json.loads(r.stdout)["next_action"], "apply")
+        self.assertEqual(run_proc(TRIAGE, "queue", run_dir).returncode, 1)
+        self.assertEqual(run_proc(TRIAGE, "apply", run_dir).returncode, 0)
+        self.assertEqual(run_proc(TRIAGE, "status", run_dir, "--require-complete").returncode, 0)
+
     def test_carried_verdicts_are_not_queued_again(self):
         first = self.make_run()
         self.assertEqual(self.apply(first, self.good_verdicts(first)).returncode, 0)
@@ -830,6 +934,10 @@ class TriageTests(TempDirCase):
         self.assertGreater(sum(p.stat().st_size for p in (run_dir / "findings").glob("*.json")), 5 * 1024 * 1024)
         r = run_proc(VALIDATE, run_dir)
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        status = run_proc(TRIAGE, "status", run_dir, "--require-complete")
+        self.assertEqual(status.returncode, 1, status.stdout + status.stderr)
+        self.assertEqual(json.loads(status.stdout)["verification"]["pending"], 9000)
+        self.assertLess(len(status.stdout), 2000)
         r = run_proc(TRIAGE, "queue", run_dir, "--all")
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         self.assertEqual(len(list((run_dir / "triage").glob("batch-*.json"))), 900)
@@ -869,7 +977,11 @@ class TriageTests(TempDirCase):
         run_dir = self.make_run(profile="quick")
         self.assertEqual(run_proc(TRIAGE, "queue", run_dir).returncode, 0)
         r = run_proc(TRIAGE, "next", run_dir)
-        self.assertEqual((r.returncode, json.loads(r.stdout)), (0, {"done": True}))
+        self.assertEqual((r.returncode, json.loads(r.stdout)),
+                         (0, {"done": True, "scope": "current_queue", "next_action": "status"}))
+        status = run_proc(TRIAGE, "status", run_dir, "--require-complete")
+        self.assertEqual(status.returncode, 0, status.stdout + status.stderr)
+        self.assertTrue(json.loads(status.stdout)["verification_complete"])
 
     def test_record_twice_refused_without_replace(self):
         run_dir = self.make_run()
