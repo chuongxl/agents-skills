@@ -114,7 +114,7 @@ one, also drop its `loaded_guidelines` cache entry so a later stage knows to re-
 
 Stages 04 and 06 run in both modes — Stage 06 (commit verification artifacts, mark spec completed,
 push, offer the PR) is never skipped by mode — unless an earlier stage hard-fails and stops the
-run (a Stage 05 hard failure cleans up what it launched, emits `run_failed`, and does not reach
+run (a Stage 05 environment failure retries once, then YOLO continues as `verification: unavailable` and default mode asks; only a `Stop` answer cleans up, emits `run_failed`, and does not reach
 Stage 06). Stage 05 itself is conditional on the
 `--integration`-time verification opt-in, independent of default/YOLO mode. Stage 03 is a NO-STOP
 ZONE in both modes.
@@ -142,7 +142,7 @@ every pipeline invocation.
 
 At each checkpoint, report: current stage, result (`done` / `needs changes` / `failed`), next
 stage. At completion (Stage 06), report: resolved provider, `speckit-code-review` final status
-(`pass`), verification outcome (`skipped` or `passed`, plus investigate-loop count if any),
+(`pass`), verification outcome (`skipped`, `passed` or `unavailable`, plus investigate-loop count if any),
 implementation commit status/hash, the verification-artifact commit (if any), the spec completion
 commit hash, pushed branches, and per-repo PR outcomes. For a setup invocation (`--integration`),
 report: resolved provider, verification opt-in result, file written, scope, and the next command.

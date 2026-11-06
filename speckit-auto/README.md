@@ -40,7 +40,7 @@ The pipeline:
    `--integration` setup time. Updates the project's generated `verify-<app>` skill for the
    just-implemented feature, runs it, and assesses the captured evidence against the spec's acceptance criteria, then asks
    for a pass/investigate confirmation (default mode). In YOLO the assessment is the gate: a
-   mismatch loops back through Stage 03 (max 3 passes), a clean result continues. A hard failure cleans up what it launched and stops the run. Skipped entirely (with a
+   mismatch loops back through Stage 03 (max 3 passes), a clean result continues. An app that cannot run after one retry is reported as `unavailable`: YOLO continues and the PR is marked UNVERIFIED, default mode asks whether to continue. Skipped entirely (with a
    report line saying so) when verification was not opted into.
 6. **Stage 06 — Clean / Commit / Push / PR / Complete**: tears down anything Stage 05 launched,
    commits verification artifacts (if any), marks the spec `completed` and pushes it. Opening a
@@ -201,7 +201,7 @@ Stages emit boundaries, default-mode named approvals, other input waits, confirm
 and terminal completion/failure. Request changes answers the gate and restarts work, not a
 failed run. YOLO emits no waits for skipped gates. Completion follows required implementation
 and spec completion pushes, not just a passing review. PR events require a real HTTPS URL.
-The Stage 04 `pr-publish` decision is a named approval (`gate_waiting` / `gate_answered`),
+The Stage 06 `pr-publish` decision is a named approval (`gate_waiting` / `gate_answered`),
 not a free-form question; declining it skips the PR and the run still completes.
 
 The standalone helper uses Node builtins and JSON stdin via an argument-vector invocation,

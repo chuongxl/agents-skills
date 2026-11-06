@@ -33,9 +33,9 @@ the full running app, and Stage 05/06 own the cleanup timing; a second launch/dr
 inside `create-verification-skill` itself would double-drive the app and risk tearing down an
 instance Stage 06 still expects to clean up.
 
-**Hard failure** (skill unavailable, or it reports it could not complete the update) → stop and
-report the exact error. Verification was explicitly opted into; a silent skip here would be
-misleading. Follow "Hard Failure Handling" below.
+**Failure** (skill unavailable, or it reports it could not complete the update) → follow
+"Verification Unavailable" below. Verification was explicitly opted into; it is never skipped
+silently.
 
 ## 3. Execute the verification skill for this feature
 
@@ -45,8 +45,8 @@ evidence, per its own Evidence section — but do **not** run cleanup yet; that 
 Stage 06, after the human confirms verification passed (a failed confirmation may mean rerunning
 the drive against the same still-launched instance).
 
-**Hard failure** (launch fails, doctor fails, the drive step cannot complete) → follow "Hard
-Failure Handling" below, same philosophy as step 2.
+**Failure** (launch fails, doctor fails, the drive step cannot complete) → run Cleanup, retry
+steps 2-3 **once**, then follow "Verification Unavailable" below if it fails again.
 
 ## 4. Assess evidence against the spec, then confirm
 
@@ -104,13 +104,22 @@ since the feature's behavior may have changed.
 
 Continue to Stage 06 with `verification: passed`.
 
-## Hard Failure Handling
+## Verification Unavailable
 
-A hard failure at step 2 or 3 does **not** end the run silently, and Stage 06 does not run:
+The environment cannot run the app (no display, missing service, launch crash) after the retry.
+This is not a defect in the implementation, which already passed review and project checks, so it
+must not strand a finished feature without a PR. Clean up first (run `verify-<app>`'s Cleanup for
+anything launched; trouble is a warning), then:
 
-1. **Clean up first.** If anything was launched, run `verify-<app>`'s Cleanup step now (tracked
-   PID/handle only). Stage 06 will not get the chance, so a failed stage must not leave the app
-   running. Cleanup trouble is a warning.
+- **YOLO** → record `verification: unavailable` with a one-line composed reason, emit no waiting
+  events, and continue to Stage 06. Stage 06 states "UNVERIFIED" prominently in the PR body.
+- **Default mode** → ask via the host ask tool `Continue without verification` / `Stop`, bracketed
+  with `gate_waiting`/`gate_answered` using `stage: "05-verification"`,
+  `gate: "verification-unavailable"`. `Continue` → same as YOLO above. `Stop` → "Hard stop" below.
+
+### Hard stop
+
+1. Cleanup already ran above; confirm nothing launched is still running.
 2. Emit `run_failed` with `reason.code: "crashed"` (a one-line, composed message — never raw tool
    output) before reporting. On an event write error, stop and never emit `run_completed`.
 3. Report the exact error, and tell the user: the implementation is already committed and pushed
@@ -122,5 +131,5 @@ A hard failure at step 2 or 3 does **not** end the run silently, and Stage 06 do
 
 Emit `stage_finished` for `05-verification`, then load [stage-06-finish.md](stage-06-finish.md)
 and enter Stage 06 in the same turn, carrying
-forward whether this stage ran (`skipped` or `passed`) and, if it ran, a reference to what
+forward whether this stage ran (`skipped`, `passed` or `unavailable`) and, if it ran, a reference to what
 `verify-<app>` launched so Stage 06 can run its Cleanup step.

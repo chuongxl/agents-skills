@@ -59,7 +59,7 @@ been made yet — make it now.
    end the turn.
 
 8. **Stage 03 is a NO-STOP ZONE** in both modes. The only success exit is `status = pass` from
-   `speckit-code-review`; the only other exit is the circuit breaker. A `failed` review is the
+   `speckit-code-review` plus a clean project-checks gate (R2c); the only other exit is the circuit breaker. A `failed` review is the
    input for the next fix iteration, never a stop.
 
 9. **Every commit is conditional**: check `git status --porcelain` first; an already-clean tree is
