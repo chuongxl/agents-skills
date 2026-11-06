@@ -66,7 +66,8 @@ changes first, then the parent pointer update.
 For the entire duration of this stage, in **both** modes: no human approval gates, no interview
 questions, no pauses, no report-and-stop on failed results.
 
-- The **only** success exit is `status = pass` from `speckit-code-review`.
+- The **only** success exit is `status = pass` from `speckit-code-review` followed by a clean
+  R2c project-checks gate.
 - The **only** other permitted exit is the circuit breaker: the exact same failure repeating 5
   consecutive iterations with no file change between them, or a git/filesystem error that
   prevents writing code. Report the stuck state and stop. A differing failure, or one followed by
@@ -120,9 +121,21 @@ PHASE 2 — Code review loop
        checkpoint-committed implementation in the review scope — without it the review sees
        only uncommitted changes and a clean tree falsely reports `Business cover: 0%`.
   R2 — Read result.status
-       IF "pass"   → EXIT STAGE 03 → load stage-04-finish.md immediately in the same turn
-                     (default mode: Stage 04 human review; --yolo: YOLO auto-commit path)
+       IF "pass"   → go to R2c (project checks) — not yet an exit
        IF "failed" → go to R2b immediately. No summary, no turn end, no user question.
+  R2c — Project checks gate (after a review `pass`, both modes, no questions). Run the repo's
+       own checks for every touched workspace, best-effort detected from its manifests: test,
+       lint, typecheck, build (e.g. `package.json` scripts, `Makefile` targets, `go test ./...`,
+       `mvn -q test`, `pytest`). Record per check `{name, command, result}` in run state as
+       `checks`. No detectable checks → record `checks: none detected` and exit.
+       IF all pass → EXIT STAGE 03 → load stage-04-finish.md immediately in the same turn
+                     (default mode: Stage 04 human review; --yolo: YOLO auto-commit path)
+       IF any fail → treat each failure as a CODE-*/TEST-* fix (R4 input, ONLY-code route), go to
+                     R6, then back to R1. A pre-existing failure proven on the base commit
+                     (run the same check at `BASE_SHA` once) is logged under `checks` as
+                     `pre-existing` and does not block.
+       A check that cannot run (missing tool, no network) is `skipped: <reason>`, never a stop.
+       The circuit breaker's `tests_failing` exit applies when the same check fails 5×.
   R2b — Empty-implementation guard: IF `Business cover` is 0% (or the review scope contains no
        files from any task workspace), implementation never landed — return to PHASE 1 C1
        immediately to (re)run implementation. Never route this case to R5 plan regeneration;
@@ -169,7 +182,7 @@ PHASE 2 — Code review loop
 
 ## Exit Routing
 
-`status = pass` is the **only** normal exit. When it fires, load and execute
+`status = pass` plus a clean R2c is the **only** normal exit. When it fires, load and execute
 [stage-04-finish.md](stage-04-finish.md) **in the same turn** — no summary, no turn end, no user
 question first. Default mode → Stage 04 human review + commit (mandatory); `--yolo` → Stage 04
 auto-commit path. No PR, merge, branch deletion, or workspace deletion happens here.

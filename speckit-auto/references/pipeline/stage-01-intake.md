@@ -19,7 +19,8 @@ creating the linked worktree. On resume, retain/recover that original source ide
 run state/discovery, never replace it with the current linked worktree's root.
 
 1. Base branch priority `develop → main → master` (local first, then remote-tracking). None
-   exists → stop with a missing-base-branch error.
+   exists → stop with a missing-base-branch error. Retain the chosen branch as `base_branch` in
+   run state; Stage 06 targets the pull request at it.
 2. Sync base best-effort: `git fetch origin <base>` → `git checkout <base>` →
    `git pull origin <base>` (fast-forward). Failure → log a warning and continue with the local
    copy; never a stop.

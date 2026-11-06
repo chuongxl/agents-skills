@@ -19,8 +19,8 @@ been made yet — make it now.
 2. a genuinely missing required input, after one ask
 3. the user explicitly choosing `Stop` at an install-recovery ask
 4. a mandatory default-mode human checkpoint: a Stage 02 approval interaction, the Stage 02 →
-   Stage 03 start-implementation confirmation, or Stage 04 — including the Stage 04 `pr-publish`
-   gate
+   Stage 03 start-implementation confirmation, Stage 04, the Stage 05 verification confirmation,
+   or the Stage 06 `pr-publish` gate
 5. Stage 02 self-review failing the same check 3 consecutive times
 6. the Stage 03 circuit breaker (identical failure 5× with no file change, or a git/filesystem
    write error)
@@ -59,7 +59,7 @@ been made yet — make it now.
    end the turn.
 
 8. **Stage 03 is a NO-STOP ZONE** in both modes. The only success exit is `status = pass` from
-   `speckit-code-review`; the only other exit is the circuit breaker. A `failed` review is the
+   `speckit-code-review` plus a clean project-checks gate (R2c); the only other exit is the circuit breaker. A `failed` review is the
    input for the next fix iteration, never a stop.
 
 9. **Every commit is conditional**: check `git status --porcelain` first; an already-clean tree is
@@ -87,8 +87,8 @@ For every pipeline-owned question, including install-recovery choices, Jira miss
 questions, clarification interviews, change details, constraints, and commit-message asks: emit
 `question_waiting` immediately before the actual ask, then `stage_started` for the active stage
 immediately after the response and before continuing.
-Named approvals instead use `gate_waiting` and `gate_answered` — including the Stage 04
-`pr-publish` gate, which decides whether the run opens a pull request; it is a named approval,
+Named approvals instead use `gate_waiting` and `gate_answered` — including the Stage 05
+`verification-confirm` and Stage 06 `pr-publish` gates, which decides whether the run opens a pull request; it is a named approval,
 never a free-form question. Never double-wrap an ask with both types. Use deliberately composed
 questions and bounded option labels, never raw answers, feedback, credentials, tool output, file
 contents, or arbitrary prompts. Do not emit waiting while a provider is still generating an
@@ -96,7 +96,8 @@ artifact. Pass the same bracketing rule to an invoked provider/sub-skill for the
 it asks on behalf of the pipeline.
 
 YOLO emits no waiting events for skipped human gates and stays non-interactive in Stage 02/04 —
-including the Stage 04 `pr-publish` gate, which YOLO authorizes up front.
+including the Stage 06 `pr-publish` gate, which YOLO authorizes up front, and the Stage 05
+confirmation, which YOLO replaces with an automatic evidence-vs-spec assessment.
 Existing install-recovery or genuinely missing-required-input asks, if needed, are still
 instrumented when initialized; instrumentation does not bypass an existing hard prerequisite.
 Stage 03 remains a no-question zone. Waiting for input/approval is not a failed run.
@@ -113,7 +114,7 @@ diagnosed by the client session lifecycle. Pre-init errors have no event file.
 Failed event validation/write is itself a hard instrumentation error: report it and stop.
 Never recurse trying to emit failure on the same broken writer, fall back to prose, or claim
 completion after a write error. A warning, recoverable failure, clean-tree commit skip, or
-Request changes is not `run_failed`. Only successful Stage 04 may emit `run_completed`, after
+Request changes is not `run_failed`. Only successful Stage 06 may emit `run_completed`, after
 required commits/push and spec completion; do not emit any event after a terminal record.
 
 A lock conflict is an instrumentation error, not a `run_failed`. The emitter reclaims a lock

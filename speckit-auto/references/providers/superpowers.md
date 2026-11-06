@@ -76,8 +76,8 @@ Companion read them for progress.
   means "continue Stage 03". No PR, merge, branch deletion, or workspace deletion inside Stage 03;
   its per-task commits are expected and must not be suppressed.
 - `finishing-a-development-branch` is **never** called by the pipeline. Its menu offers a local
-  merge into the base branch and a non-draft PR, both of which Stage 04 forbids, and it asks a
-  branch-lifecycle question that default mode has no answer for. The shared Stage 04 draft-PR
+  merge into the base branch and a non-draft PR, both of which Stage 06 forbids, and it asks a
+  branch-lifecycle question that default mode has no answer for. The shared Stage 06 draft-PR
   step owns PR creation for both providers.
 
 ## Artifacts

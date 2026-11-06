@@ -50,6 +50,8 @@ test('all later stages explicitly emit entry, success boundaries, and classified
     ['stage-02-spec-design.md', '02-spec-design'],
     ['stage-03-implement-review.md', '03-implement-review'],
     ['stage-04-finish.md', '04-finish'],
+    ['stage-05-verification.md', '05-verification'],
+    ['stage-06-finish.md', '06-finish'],
   ]) {
     const text = readSkill(`references/pipeline/${file}`);
     assert.match(text, new RegExp(`stage_started.*${stage}`));
@@ -63,10 +65,14 @@ test('all later stages explicitly emit entry, success boundaries, and classified
 test('named gates and questions preserve default, YOLO, and request-change semantics', () => {
   const design = readSkill('references/pipeline/stage-02-spec-design.md');
   const finish = readSkill('references/pipeline/stage-04-finish.md');
+  const verify = readSkill('references/pipeline/stage-05-verification.md');
+  const publish = readSkill('references/pipeline/stage-06-finish.md');
   for (const gate of ['spec-approval', 'plan-approval', 'implementation-start']) {
     assert.ok(design.includes(gate), `missing ${gate}`);
   }
   assert.ok(finish.includes('implementation-approval'));
+  assert.ok(verify.includes('verification-confirm'));
+  assert.ok(publish.includes('pr-publish'));
   for (const text of [design, finish]) {
     assert.match(text, /gate_waiting/);
     assert.match(text, /gate_answered/);
@@ -82,12 +88,12 @@ test('named gates and questions preserve default, YOLO, and request-change seman
 });
 
 test('completion follows required spec push and only confirmed PR URLs are emitted', () => {
-  const finish = readSkill('references/pipeline/stage-04-finish.md');
+  const finish = readSkill('references/pipeline/stage-06-finish.md');
   assert.match(finish, /completion commit.*push/s);
   assert.match(finish, /actual.*HTTPS.*PR URL.*pr_opened/s);
   const finalReport = finish.slice(finish.indexOf('## Final Report'));
   assert.match(finalReport, /Only after all required commits, the spec completion push, and execution-report updates\s+succeed, emit/);
-  const successBoundary = finalReport.indexOf('{type: "stage_finished", stage: "04-finish"}');
+  const successBoundary = finalReport.indexOf('{type: "stage_finished", stage: "06-finish"}');
   const terminalSuccess = finalReport.indexOf('{type: "run_completed"}');
   assert.ok(successBoundary > finalReport.indexOf('spec completion push'));
   assert.ok(terminalSuccess > successBoundary, 'terminal success must follow the final pushed-stage boundary');

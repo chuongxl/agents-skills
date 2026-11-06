@@ -6,7 +6,7 @@ import { TextDecoder } from 'node:util';
 import { fileURLToPath } from 'node:url';
 
 export const MAX_JSONL_LINE_BYTES = 16 * 1024;
-export const STAGES = ['01-intake', '02-spec-design', '03-implement-review', '04-finish'];
+export const STAGES = ['01-intake', '02-spec-design', '03-implement-review', '04-finish', '05-verification', '06-finish'];
 export const REASON_CODES = [
   'review_loop_stuck',
   'tests_failing',

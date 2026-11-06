@@ -126,8 +126,8 @@ runs also contain `issue_key` (`PROJECT-123`). Exact event-specific fields:
 | `run_completed` | none |
 | `run_failed` | `reason: {code, message}` |
 
-Stages are `01-intake`, `02-spec-design`, `03-implement-review`, and
-`04-finish`. Failure codes are `review_loop_stuck`, `tests_failing`,
+Stages are `01-intake`, `02-spec-design`, `03-implement-review`,
+`04-finish`, `05-verification`, and `06-finish`. Failure codes are `review_loop_stuck`, `tests_failing`,
 `git_error`, `budget_exceeded`, `policy_blocked`, and `crashed`. A reason
 message is a one-line summary, not raw process output. Only absolute HTTPS PR
 URLs without embedded credentials are accepted.

@@ -5,15 +5,16 @@ description: |
   pluggable provider: github-speckit (repo-installed GitHub Spec Kit agents) or superpowers
   (obra/superpowers skills library). Handles provider setup and auto-install, Jira intake via
   jira-to-speckit, spec/design, implementation, a speckit-code-review remediation loop until
-  pass, then human review (default) or YOLO commit and push, and a draft pull request behind its
-  own approval gate (default mode) or authorized by --yolo. Use when a feature must go from
-  requirement to committed implementation in one run.
-compatibility: "Runs on GitHub Copilot, Claude Code, OpenCode, and Hermes Agent. Discovered from ~/.agents/skills/, ~/.claude/skills/, ~/.config/opencode/skills/, or ~/.hermes/skills/ (/opt/data/skills/ in Docker). Requires git, bash, and Node.js >=22.13; network access for Jira intake via --issue. Default mode also needs the host's ask/question tool (Copilot ask_user, Claude AskUser, OpenCode question; Hermes uses a plain chat message) for the Stage 02 and Stage 04 checkpoints; see references/shared/host-adaptation.md."
+  pass, human review (default) or YOLO commit and push, optional Stage 05 verification, and a
+  Stage 06 that completes the spec and opens a draft pull request behind its own approval gate
+  (default mode) or authorized by --yolo. Use when a feature must go from requirement to
+  committed, PR-ready implementation in one run.
+compatibility: "Runs on GitHub Copilot, Claude Code, OpenCode, and Hermes Agent. Discovered from ~/.agents/skills/, ~/.claude/skills/, ~/.config/opencode/skills/, or ~/.hermes/skills/ (/opt/data/skills/ in Docker). Requires git, bash, and Node.js >=22.13; network access for Jira intake via --issue. Default mode also needs the host's ask/question tool (Copilot ask_user, Claude AskUser, OpenCode question; Hermes uses a plain chat message) for the Stage 02, 04, 05 and 06 checkpoints; see references/shared/host-adaptation.md."
 license: MIT
 allowed-tools: bash glob grep view create edit skill ask_user
 metadata:
   author: Alex Nguyen
-  version: "0.6.4"
+  version: "0.7.0"
 ---
 
 # Speckit Auto
@@ -84,6 +85,8 @@ load only that stage's file — never block asking the user to re-run the skill.
 | `references/pipeline/stage-02-spec-design.md` | entering Stage 02 |
 | `references/pipeline/stage-03-implement-review.md` | entering Stage 03 |
 | `references/pipeline/stage-04-finish.md` | `speckit-code-review` returns `pass` |
+| `references/pipeline/stage-05-verification.md` | Stage 04 implementation commit succeeds (or is skipped as already-clean) |
+| `references/pipeline/stage-06-finish.md` | Stage 05 hands off (whether it ran or was skipped) |
 | `references/shared/commit.md` | first commit gate reached (Stage 02 → 03) |
 | `references/shared/host-adaptation.md` | a step needs an ask-tool name, skill dir, or install host key |
 | `references/shared/integration-setup.md` | `--integration` present (setup runs; no stage file loads) |
@@ -100,13 +103,21 @@ one, also drop its `loaded_guidelines` cache entry so a later stage knows to re-
 ## Modes
 
 - **Default**: human-in-the-loop. Mandatory checkpoints: the Stage 02 approval interactions, the
-  Stage 02 → Stage 03 start-implementation confirmation, the Stage 04 implementation approval, and
-  the Stage 04 `pr-publish` gate — no pull request is opened until that gate is approved.
-- **YOLO** (`--yolo`): no human checkpoints; Stage 02 interactions, Stage 04 human review, and the
-  Stage 04 `pr-publish` gate are skipped, with an auto-generated commit message. YOLO authorizes
-  opening a draft pull request on its own.
+  Stage 02 → Stage 03 start-implementation confirmation, the Stage 04 implementation approval,
+  (when verification is enabled) the Stage 05 verification confirmation, and the Stage 06
+  `pr-publish` gate — no pull request is opened until that gate is approved.
+- **YOLO** (`--yolo`): no human checkpoints; Stage 02 interactions, Stage 04 human review, the
+  Stage 05 confirmation, and the Stage 06 `pr-publish` gate are skipped, with an auto-generated
+  commit message and a verification result auto-assessed against the spec (a mismatch loops back
+  to Stage 03 instead of continuing). YOLO authorizes opening a draft pull
+  request on its own.
 
-Stage 03 is a NO-STOP ZONE in both modes.
+Stages 04 and 06 run in both modes — Stage 06 (commit verification artifacts, mark spec completed,
+push, offer the PR) is never skipped by mode — unless an earlier stage hard-fails and stops the
+run (a Stage 05 environment failure retries once, then YOLO continues as `verification: unavailable` and default mode asks; only a `Stop` answer cleans up, emits `run_failed`, and does not reach
+Stage 06). Stage 05 itself is conditional on the
+`--integration`-time verification opt-in, independent of default/YOLO mode. Stage 03 is a NO-STOP
+ZONE in both modes.
 
 ## Sub-Skill Dependencies
 
@@ -114,8 +125,12 @@ Stage 03 is a NO-STOP ZONE in both modes.
 |-----------|---------|------------|
 | `jira-to-speckit` | Jira fetch + compaction (steps 1–5 only) + ticket snapshot write | `skill` tool, name `jira-to-speckit` |
 | `speckit-code-review` | Authoritative JSON pass/fail review gate | `skill` tool, name `speckit-code-review` |
+| `create-verification-skill` | Generate/update the project's `.cursor/skills/verify-<app>/` verification skill | `skill` tool, name `create-verification-skill`; only invoked when `--integration` setup enabled verification |
 
-Both are provider-independent and used by every provider.
+All three are provider-independent and used by every provider. `create-verification-skill` is
+conditional on the `verification` opt-in persisted at `--integration` setup time
+([shared/integration-setup.md](references/shared/integration-setup.md)); the other two run on
+every pipeline invocation.
 
 ## Required Inputs
 
@@ -126,9 +141,11 @@ Both are provider-independent and used by every provider.
 ## Output Behavior
 
 At each checkpoint, report: current stage, result (`done` / `needs changes` / `failed`), next
-stage. At completion, report: resolved provider, `speckit-code-review` final status (`pass`),
-implementation commit status/hash, and the spec completion commit hash. For a setup invocation
-(`--integration`), report: resolved provider, file written, scope, and the next command.
+stage. At completion (Stage 06), report: resolved provider, `speckit-code-review` final status
+(`pass`), verification outcome (`skipped`, `passed` or `unavailable`, plus investigate-loop count if any),
+implementation commit status/hash, the verification-artifact commit (if any), the spec completion
+commit hash, pushed branches, and per-repo PR outcomes. For a setup invocation (`--integration`),
+report: resolved provider, verification opt-in result, file written, scope, and the next command.
 
 ## Portability Note
 
