@@ -25,7 +25,7 @@
 # Reads all team/repo config from repository.md — no hardcoded values.
 #
 # Output: every run writes ./security-run-YYYYMMDD-HHMMSS/ in the folder it is run from, holding
-# security-report.md, security-report.json, security-report.html and each tool's raw output.
+# SUMMARY.md, security-report.{md,json,html}, findings/ (JSON shards) and each tool's raw output.
 # Caches live outside the workspace: $JOB_SECURITY_SCAN_CACHE > cache-dir: > (deprecated) output-dir:
 # > ${XDG_CACHE_HOME:-$HOME/.cache}/job-security-scan.  SECURITY_RUN_ROOT moves the run folders (CI, tests).
 # This script only reports: it never changes any scanned repo.
@@ -130,7 +130,7 @@ detect_cached() {  # detect_cached <path> <format>  -> prints detection output
 
 run_gitleaks() {
   local repo="$1" path="$2"
-  local out="$OUTPUT_BASE/$repo/gitleaks.json"
+  local out="$OUTPUT_BASE/$repo/gitleaks.json" err="$OUTPUT_BASE/$repo/gitleaks.err"
   mkdir -p "$(dirname "$out")"
 
   if ! has_tool gitleaks; then _skip gitleaks "$repo" "tool not installed"; return; fi
@@ -151,13 +151,18 @@ run_gitleaks() {
     --no-banner \
     --redact \
     --exit-code 1 \
-    2>/dev/null
+    2>"$err"
   local rc=$?
   if [[ $rc -eq 0 ]]; then
     _pass gitleaks "$repo" "No secrets found"
+    return
+  fi
+  local count
+  count=$(python3 -I -c 'import json, sys; print(len(json.load(open(sys.argv[1]))))' "$out" 2>/dev/null)
+  if [[ -z "$count" ]]; then
+    rm -f "$out"
+    _fail gitleaks "$repo" "scanner error (exit $rc), no report written: $(sed -e 's/\x1b\[[0-9;]*m//g' "$err" | grep -m1 -E 'FTL|ERR|fatal' | cut -c1-200) - see $err"
   else
-    local count
-    count=$(python3 -I -c 'import json, sys; print(len(json.load(open(sys.argv[1]))))' "$out" 2>/dev/null || echo "?")
     _fail gitleaks "$repo" "$count secret(s) — see $out (values masked in report)"
   fi
 }
@@ -673,8 +678,9 @@ generate_reports() {
       --repos-root  "$WORKSPACE" \
       --home        "$HOME" \
       >"$RUN_DIR/report.log" 2>&1; then
+    echo "  ✅ Summary  → $RUN_DIR/SUMMARY.md"
     echo "  ✅ Markdown → $RUN_DIR/security-report.md"
-    echo "  ✅ JSON     → $RUN_DIR/security-report.json"
+    echo "  ✅ JSON     → $RUN_DIR/security-report.json (+ findings/)"
     echo "  ✅ HTML     → $RUN_DIR/security-report.html"
     if [[ "$(uname -s)" == "Darwin" && -z "${CI:-}" ]]; then
       open "$RUN_DIR/security-report.html" 2>/dev/null || true

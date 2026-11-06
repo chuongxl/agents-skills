@@ -24,6 +24,11 @@ GENERATE = SKILL_DIR / "scripts" / "generate-report.py"
 NPM_TOKEN = "npm_" + "REPORTTESTTOKENREPORTTESTTOKEN0000"
 
 
+
+def load_doc(run_dir):
+    import report_store
+    return report_store.load_full(run_dir)
+
 class TempDirCase(unittest.TestCase):
     def setUp(self):
         self.tmp = Path(tempfile.mkdtemp())
@@ -198,7 +203,7 @@ class FormatTests(unittest.TestCase):
 
     def test_json_shape_and_counts(self):
         doc = self.rf.build_json(rows(), META)
-        self.assertEqual(doc["schema_version"], 2)
+        self.assertEqual(doc["schema_version"], 3)
         self.assertEqual(doc["counts"], {"CRITICAL": 1, "HIGH": 1, "MEDIUM": 1, "LOW": 0, "INFO": 0})
         by = {r["name"]: r for r in doc["repos"]}
         self.assertEqual((by["api"]["status"], by["web"]["status"], by["worker"]["status"]), ("red", "yellow", "green"))
@@ -232,6 +237,36 @@ class FormatTests(unittest.TestCase):
         self.assertIn("Secret \\| in", md)
         self.assertNotIn("in `.env``", md)
 
+    def test_summary_is_bounded(self):
+        out = self.rf.render_summary(big_doc())
+        self.assertLessEqual(len(out.encode("utf-8")), 20 * 1024)
+        self.assertIn("more in security-report.html", out)
+        self.assertIn("| api |", out)
+        small = self.rf.render_summary(big_doc(), max_bytes=4096)
+        self.assertLessEqual(len(small.encode("utf-8")), 4096)
+
+    def test_summary_never_contains_secret_code(self):
+        import report_model
+        doc = report_model.build_document([finding(repo="api", scanner="gitleaks", type="secret", severity="CRITICAL",
+                                                   file=".env", line=3, code="AKIA_SECRET_VALUE", rule_id="aws")],
+                                          dict(META, repos=["api"]))
+        out = self.rf.render_summary(doc)
+        self.assertIn("`.env:3`", out)
+        self.assertNotIn("AKIA_SECRET_VALUE", out)
+
+    def test_markdown_lists_all_high_and_tables_low(self):
+        import report_model
+        rows_ = [finding(repo="api", scanner="semgrep", type="sast", severity="HIGH", file="src/h%d.js" % i, line=1,
+                         code="h()", rule_id="H", title="High") for i in range(300)]
+        rows_ += [finding(repo="api", scanner="semgrep", type="sast", severity="LOW", file="src/l%d.js" % i, line=1,
+                          code="l()", rule_id="L%d" % (i % 7), title="Low") for i in range(20000)]
+        md = self.rf.render_markdown(report_model.build_document(rows_, dict(META, repos=["api"])))
+        for i in range(300):
+            self.assertIn("`src/h%d.js:1`" % i, md)
+        self.assertNotIn("src/l0.js", md)
+        self.assertIn("| api | L0 | LOW | 2858 |", md)
+        self.assertLess(len(md.encode("utf-8")), 2 * 1024 * 1024)
+
     def test_clean_run_reports(self):
         md = self.rf.build_markdown([], META)
         self.assertIn("No findings", md)
@@ -255,15 +290,16 @@ class GenerateTests(TempDirCase):
                            stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
         self.assertEqual(r.returncode, 0, r.stderr)
         md = (out / "security-report.md").read_text()
-        doc = json.loads((out / "security-report.json").read_text())
+        doc = load_doc(out)
         page = (out / "security-report.html").read_text()
         self.assertIn("`src/db.js:2`", md)
         self.assertIn("`const q = 'SELECT ' + id;`", md)
-        self.assertIn("yarn.lock:3", md)
+        self.assertIn("| api | GHSA-x | MEDIUM | 1 |", md)
         osv = [f for f in doc["findings"] if f["scanner"] == "osv"][0]
         self.assertEqual((osv["line"], osv["code"]), (3, "lodash@^4.17.0:"))
         self.assertIn("db.js:2", page)
         self.assertIn("SELECT", page)
+        self.assertIn("# Security scan summary", (out / "SUMMARY.md").read_text())
 
     def test_real_osv_v2_output_with_cvss_vectors(self):
         """osv-scanner v2 shape: CVSS scores are vector strings; severity comes from groups[].max_severity."""
@@ -289,7 +325,7 @@ class GenerateTests(TempDirCase):
                             "--repos-root", str(self.tmp / "repos")],
                            stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
-        rows = json.loads((self.tmp / "run" / "security-report.json").read_text())["findings"]
+        rows = load_doc(self.tmp / "run")["findings"]
         sev = dict((f["rule_id"], f["severity"]) for f in rows)
         self.assertEqual(sev, {"GHSA-p6mc-m468-83gw": "HIGH", "GHSA-29mw-wpgm-hmr9": "MEDIUM",
                                "GHSA-35jh-r3h4-6jhm": "CRITICAL"})
@@ -306,7 +342,7 @@ class GenerateTests(TempDirCase):
                             "--config", str(cfg), "--out-dir", str(self.tmp / "run")],
                            stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
-        rows = json.loads((self.tmp / "run" / "security-report.json").read_text())["findings"]
+        rows = load_doc(self.tmp / "run")["findings"]
         self.assertIn("semgrep", {f["scanner"] for f in rows})
 
     def test_failure_exits_non_zero(self):
@@ -365,7 +401,7 @@ class RunFolderTests(TempDirCase):
                      "infected-lockfile/shai-hulud.json", "clean/shai-hulud.json"):
             self.assertTrue((runs[0] / name).is_file(), name)
         self.assertEqual((runs[0] / ".gitignore").read_text().strip(), "*")
-        doc = json.loads((runs[0] / "security-report.json").read_text())
+        doc = load_doc(runs[0])
         hit = [f for f in doc["findings"] if f["rule_id"] == "known-package"][0]
         self.assertEqual((hit["file"], hit["line"]), ("package-lock.json", 6))
         self.assertIn("node_modules/@accordproject/concerto-linter", hit["code"])
@@ -435,6 +471,224 @@ class RunFolderTests(TempDirCase):
         r = self.run_scan("--config", self.config(), "--scanner", "nope")
         self.assertEqual(r.returncode, 1)
         self.assertEqual(run_dirs(self.ws), [])
+
+
+SEV_CYCLE = ("CRITICAL", "HIGH", "MEDIUM", "LOW")
+
+
+def big_doc(n=30000, repos=("api", "web", "this machine")):
+    import report_model
+    descs = dict(("R%02d" % i, ("advisory %02d " % i) * 250) for i in range(50))   # ~3,000 chars each
+    findings = []
+    for i in range(n):
+        rule = "R%02d" % (i % 50)
+        findings.append(finding(repo=repos[i % len(repos)], scanner="semgrep", type="sast",
+                                severity=SEV_CYCLE[i % 4], file="src/f%d.js" % (i % 997), line=i % 500 + 1,
+                                code="call_%d(x)" % i, rule_id=rule, title="Rule " + rule,
+                                description=descs[rule], url="https://example.test/" + rule))
+    return report_model.build_document(findings, dict(META, repos=list(repos)))
+
+
+class StoreTests(TempDirCase):
+    """report_store: sharded save, verified load, v2 fallback."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.big = big_doc()
+
+    def setUp(self):
+        super(StoreTests, self).setUp()
+        import report_store
+        self.rs = report_store
+
+    def shards(self):
+        return sorted((self.tmp / "findings").glob("*.json"))
+
+    def test_shards_respect_caps_and_round_trip(self):
+        self.rs.save(self.big, self.tmp)
+        self.assertLessEqual((self.tmp / "security-report.json").stat().st_size, 256 * 1024)
+        self.assertGreater(len(self.shards()), 1)
+        for p in self.shards():
+            self.assertLessEqual(p.stat().st_size, 4 * 1024 * 1024)
+            self.assertLessEqual(len(json.loads(p.read_text())["findings"]), 2000)
+        back = self.rs.load_full(self.tmp)
+        key = lambda f: f["fingerprint"]
+        self.assertEqual(sorted(back["findings"], key=key), sorted(self.big["findings"], key=key))
+        self.assertEqual(back["counts"], self.big["counts"])
+        self.assertEqual(back["schema_version"], 3)
+        self.assertNotIn("rules", back)
+        self.assertNotIn("shards", back)
+
+    def test_sha_mismatch_is_corrupt(self):
+        self.rs.save(self.big, self.tmp)
+        p = self.shards()[0]
+        text = p.read_text()
+        self.assertIn('"line":', text)
+        p.write_text(text.replace('"line":', '"line": ', 1))     # still valid JSON, different bytes
+        with self.assertRaises(self.rs.ReportCorrupt) as cm:
+            self.rs.load_full(self.tmp)
+        self.assertIn(p.name, str(cm.exception))
+
+    def test_missing_shard_is_corrupt(self):
+        self.rs.save(self.big, self.tmp)
+        p = self.shards()[0]
+        p.unlink()
+        with self.assertRaises(self.rs.ReportCorrupt) as cm:
+            self.rs.load_full(self.tmp)
+        self.assertIn(p.name, str(cm.exception))
+
+    def test_oversize_shard_is_too_large(self):
+        self.rs.save(self.big, self.tmp)
+        p = self.shards()[0]
+        with open(str(p), "a") as fh:
+            fh.truncate(5 * 1024 * 1024 + 1)
+        with self.assertRaises(self.rs.ReportTooLarge) as cm:
+            self.rs.load_full(self.tmp)
+        self.assertIn("5242880", str(cm.exception))
+
+    def test_resave_removes_stale_shards(self):
+        self.rs.save(self.big, self.tmp)
+        small = big_doc(100)
+        self.rs.save(small, self.tmp)
+        listed = set(s["file"] for s in self.rs.load_index(self.tmp)["shards"])
+        self.assertEqual(set("findings/" + p.name for p in self.shards()), listed)
+        self.assertEqual(len(self.rs.load_full(self.tmp)["findings"]), 100)
+
+    def test_interrupted_save_keeps_previous_report_readable(self):
+        self.rs.save(big_doc(3000), self.tmp)
+        real = self.rs._write
+
+        def die_at_index(path, text):
+            if path.name == "security-report.json":
+                raise KeyboardInterrupt
+            real(path, text)
+        self.rs._write = die_at_index
+        try:
+            with self.assertRaises(KeyboardInterrupt):
+                self.rs.save(big_doc(2000, repos=("api", "web")), self.tmp)
+        finally:
+            self.rs._write = real
+        self.assertEqual(len(self.rs.load_full(self.tmp)["findings"]), 3000)
+
+    def test_symlinked_findings_dir_is_refused(self):
+        outside = self.tmp / "outside"
+        outside.mkdir()
+        (outside / "keep.json").write_text("{}")
+        run = self.tmp / "run"
+        run.mkdir()
+        os.symlink(str(outside), str(run / "findings"))
+        with self.assertRaises(self.rs.ReportError):
+            self.rs.save(big_doc(100), run)
+        self.assertEqual(sorted(p.name for p in outside.iterdir()), ["keep.json"])
+        self.assertFalse((run / "security-report.json").exists())
+
+    def test_symlinked_findings_dir_is_not_read(self):
+        self.rs.save(big_doc(100), self.tmp / "a")
+        run = self.tmp / "b"
+        run.mkdir()
+        (run / "security-report.json").write_text((self.tmp / "a" / "security-report.json").read_text())
+        os.symlink(str(self.tmp / "a" / "findings"), str(run / "findings"))
+        with self.assertRaises(self.rs.ReportCorrupt):
+            self.rs.load_full(run)
+
+    def test_total_size_cap_is_checked_on_save_and_shared_on_load(self):
+        doc = big_doc(3000)
+        doc["fixed"] = [{"fingerprint": "%016x" % i, "repo": "api", "scanner": "semgrep", "rule_id": "R",
+                         "title": "t", "file": "f.js"} for i in range(2500)]
+        self.rs.save(doc, self.tmp)
+        index = self.rs.load_index(self.tmp)
+        findings_bytes = sum(e["bytes"] for e in index["shards"])
+        self.assertTrue(index["fixed_shards"])
+        old = self.rs.MAX_TOTAL
+        try:
+            self.rs.MAX_TOTAL = findings_bytes + 1
+            with self.assertRaises(self.rs.ReportTooLarge):
+                self.rs.load_full(self.tmp)
+            other = self.tmp / "other"
+            with self.assertRaises(self.rs.ReportTooLarge):
+                self.rs.save(doc, other)
+            self.assertFalse((other / "security-report.json").exists())
+        finally:
+            self.rs.MAX_TOTAL = old
+
+    def test_shard_names_are_safe(self):
+        self.assertEqual(self.rs.shard_name("this machine", 1), "this_machine-001.json")
+        self.assertEqual(self.rs.shard_name("../x", 12), "_._x-012.json")
+        self.assertNotIn("/", self.rs.shard_name("a/b", 1))
+
+    def test_v2_file_loads(self):
+        import report_model
+        doc = big_doc(9000)
+        doc["schema_version"] = 2
+        text = json.dumps(doc, indent=2)
+        self.assertGreater(len(text), 5 * 1024 * 1024)       # today's failing case
+        (self.tmp / "security-report.json").write_text(text)
+        back = self.rs.load_full(self.tmp)
+        self.assertEqual(back["schema_version"], 3)
+        self.assertEqual(len(back["findings"]), 9000)
+        self.assertEqual(back["counts"], doc["counts"])
+
+    def test_v2_over_64mb_is_too_large(self):
+        with open(str(self.tmp / "security-report.json"), "w") as fh:
+            fh.truncate(64 * 1024 * 1024 + 1)
+        with self.assertRaises(self.rs.ReportTooLarge):
+            self.rs.load_full(self.tmp)
+
+    def test_missing_report(self):
+        with self.assertRaises(self.rs.ReportMissing):
+            self.rs.load_full(self.tmp)
+
+    def test_fixed_is_capped_in_index(self):
+        doc = big_doc(10)
+        doc["fixed"] = [{"fingerprint": "%016x" % i, "repo": "api", "scanner": "semgrep", "rule_id": "R",
+                         "file": "a", "package": "", "title": "t", "severity": "LOW"} for i in range(2500)]
+        self.rs.save(doc, self.tmp)
+        idx = self.rs.load_index(self.tmp)
+        self.assertEqual(len(idx["fixed"]), 2000)
+        self.assertEqual(idx["fixed_total"], 2500)
+        self.assertEqual(len(self.rs.load_full(self.tmp)["fixed"]), 2500)
+
+    def test_over_max_findings_is_too_large(self):
+        doc = big_doc(10)
+        doc["findings"] = doc["findings"] * 20001     # length check runs before anything is written
+        with self.assertRaises(self.rs.ReportTooLarge) as cm:
+            self.rs.save(doc, self.tmp)
+        self.assertIn("--profile standard", str(cm.exception))
+        self.assertFalse((self.tmp / "security-report.json").exists())
+
+    def test_row_over_64kb_is_rejected(self):
+        doc = big_doc(10)
+        doc["findings"][0]["code"] = "x" * (70 * 1024)
+        with self.assertRaises(self.rs.ReportTooLarge):
+            self.rs.save(doc, self.tmp)
+
+
+
+class ValidateCliTests(TempDirCase):
+    VALIDATE = SKILL_DIR / "scripts" / "validate-report.py"
+
+    def validate(self, path):
+        return subprocess.run([sys.executable, "-I", str(self.VALIDATE), str(path)], capture_output=True, text=True)
+
+    def test_sharded_run_folder_and_index_are_valid(self):
+        import report_store
+        report_store.save(big_doc(), self.tmp)
+        for target in (self.tmp, self.tmp / "security-report.json"):
+            r = self.validate(target)
+            self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+            self.assertIn("VALID", r.stdout)
+            self.assertIn("30000 findings", r.stdout)
+            self.assertIn("shards", r.stdout)
+
+    def test_corrupted_shard_is_invalid(self):
+        import report_store
+        report_store.save(big_doc(3000), self.tmp)
+        shard = sorted((self.tmp / "findings").glob("*.json"))[0]
+        shard.write_text(shard.read_text().replace('"line":', '"line": ', 1))
+        r = self.validate(self.tmp)
+        self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
+        self.assertIn("INVALID", r.stdout)
+        self.assertIn(shard.name, r.stdout)
 
 
 if __name__ == "__main__":

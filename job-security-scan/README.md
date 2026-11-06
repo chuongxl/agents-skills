@@ -37,6 +37,10 @@ All tools are free, open-source, and configurable. Security findings are organiz
 11. **Deep Audit (opt-in)** — `--audit`: agent-driven, coverage-led review for logic flaws scanners cannot see, every finding independently re-verified
 12. **Baseline** — Accept known findings with a reason and an expiry date
 
+Diagrams (open in a browser): [architecture](docs/diagrams/job-security-scan-architecture.html) ·
+[run flow](docs/diagrams/job-security-scan-run-flow.html).
+What each scanner does and why it is in the set: [references/scanners.md](references/scanners.md).
+
 ## Quick Start
 
 ### 1. Install
@@ -91,8 +95,10 @@ Every run creates its own folder in the workspace folder, so earlier runs are ne
 
 ```
 security-run-20261102-153600/
-├── security-report.md     # summary + findings, each with file:line and the line of code
-├── security-report.json   # same data, machine-readable
+├── SUMMARY.md             # short summary to read first (under 20 KB)
+├── security-report.md     # CRITICAL/HIGH with file:line and the line of code; lower severities counted
+├── security-report.json   # index (run info, counts, shard list), machine-readable
+├── findings/              # every finding, in compact JSON shards
 ├── security-report.html   # interactive report
 ├── .gitignore             # "*" - never committed by accident
 └── <repo-name>/           # raw tool output: gitleaks.json, trivy.json, semgrep.json, osv.json, shai-hulud.json ...
@@ -191,14 +197,18 @@ Indicator data and sources: [references/ioc-data.md](references/ioc-data.md). If
 ### 8. Independent Verification, Run-to-Run Changes, Report Schema
 
 - **Verification (agent step, Phase 9):** `scripts/triage.py queue` lists the findings to check (`standard`:
-  CRITICAL + HIGH, `deep`: also MEDIUM) with a redacted ±15-line context; each goes to a fresh verifier agent
-  that tries to disprove it from source only (no edits, no running repo code, no network). `triage.py apply`
-  merges the verdicts all-or-nothing and regenerates the reports plus `NEEDS-VALIDATION.md`. Prompt, verdict
+  CRITICAL + HIGH, `deep`: also MEDIUM) with a redacted ±15-line context, one item per root cause (same advisory
+  + package + version, or same misconfig rule, in one repo), most severe first, capped at `--limit 25` with the
+  pending count reported (`--all`, `--repo NAME`, `--no-group`); each item goes to a fresh verifier agent
+  that tries to disprove it from source only (no edits, no running repo code, no network). `triage.py next` hands
+  out one item at a time, `triage.py record` saves each verdict, and `triage.py apply`
+  merges them all-or-nothing and regenerates the reports plus `NEEDS-VALIDATION.md`. Prompt, verdict
   format and severity anchors: [references/verification.md](references/verification.md).
 - **Changes:** every finding has a fingerprint that survives code moving within a file; reports compare with
   the previous `security-run-*` folder (new / unchanged / fixed), and verdicts carry over while code is unchanged.
-- **Schema:** `security-report.json` is `schema_version` 2 ([assets/report.schema.json](assets/report.schema.json));
-  `python3 -I scripts/validate-report.py <run>/security-report.json` checks it (exit 0 valid, 1 invalid, 2 unreadable).
+- **Schema:** `security-report.json` is a `schema_version` 3 index with the findings in `findings/` shards
+  ([assets/report.schema.json](assets/report.schema.json)); `python3 -I scripts/validate-report.py <run>` checks
+  the index and every shard (exit 0 valid, 1 invalid, 2 unreadable). v2 single-file reports are still read.
 
 ### 9. Deep Audit — Logic Flaws Scanners Miss (opt-in, Phase 10)
 
@@ -476,9 +486,26 @@ rm -rf ~/.cache/trivy
 bash job-security-scan/scripts/run-scan.sh  # Re-downloads DB
 ```
 
+### Issue: Too many findings to verify on a large multi-repo scan
+
+**Solution:** `triage.py queue` already groups repeated root causes and stops at 25 items. Work in batches:
+apply the verdicts, queue again, and use `--repo NAME` to finish one repository at a time. The pending count
+in the summary is the work left; pending findings are not clean.
+
 ## Version History
 
-- **v3.0** (current) — Deep audit (Phase 10, `--audit`) adapted from cloudflare/security-audit-skill: coverage
+- **v3.2** (current) — Large reports no longer break: `security-report.json` is a schema v3 index with the
+  findings in sha256-checked `findings/` shards (v2 reports still read; no single file has to hold every
+  finding); a bounded `SUMMARY.md` (under 20 KB); `security-report.md` lists CRITICAL/HIGH in full and counts
+  lower severities; Phase 9 runs one item at a time (`triage.py next` / `record`, `apply` without a file) over
+  the grouped, `--limit`-bounded queue; an unreadable previous report is reported as "Change tracking
+  unavailable" instead of making every finding new, and `--keep-verdicts` fails loudly
+- **v3.1** — Large scans: report size limit raised from 5 MiB to 64 MiB to match the 20,000-finding
+  schema cap (a 7,000-finding scan no longer breaks triage, validation and verdict carry-over), and an oversize
+  report is now an error instead of a silent skip; `triage.py queue` groups one root cause per repo into one
+  verifier item, orders by severity, enforces the 25-item budget (`--limit`, `--all`), filters with `--repo`
+  and reports the pending count; `apply` shares a group verdict with its members
+- **v3.0** — Deep audit (Phase 10, `--audit`) adapted from cloudflare/security-audit-skill: coverage
   ledger, isolated hunters, adversarial validation, confirmed / needs-validation / rejected verdicts, Python
   validators, optional sandbox and evidence promotion; confirmed audit findings join the report as verified
   findings; baseline of accepted findings (`security-baseline.json`); commit and dirty flag per repo
