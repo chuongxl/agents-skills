@@ -2,19 +2,29 @@
 """triage.py - the deterministic half of independent verification (SKILL.md Phase 9).
 
   python3 -I scripts/triage.py queue RUN_DIR [--limit N | --all] [--repo NAME ...] [--no-group]
-      Writes RUN_DIR/triage/queue.json: the findings the run's profile queues for verification
-      (standard: CRITICAL+HIGH, deep: +MEDIUM, quick: none), minus those that already have a verdict
-      (including verdicts carried over from the previous run). Each item carries a context window of
-      +/-15 lines from the repository. Secrets, credential files and symlinks get no context and no code.
-      Findings with the same root cause in one repo become one item (one verifier): dependency findings by
-      advisory + package + version (all scanners, all lockfiles), misconfigurations by scanner + rule.
-      Items are ordered most severe first and capped at --limit (default 25, the verification budget);
-      the summary says how many findings stay pending. --repo restricts the queue to those repos.
+      Queues the findings the run's profile sends to verification (standard: CRITICAL+HIGH, deep: +MEDIUM,
+      quick: none), minus those that already have a verdict (including verdicts carried over from the
+      previous run). Findings with the same root cause in one repo become one item (one verifier):
+      dependency findings by advisory + package + version (all scanners, all lockfiles), misconfigurations
+      by scanner + rule. Items are ordered most severe first and capped at --limit (default 25, the
+      verification budget); the summary says how many findings stay pending. --repo restricts the queue
+      to those repos. Writes RUN_DIR/triage/queue-index.json (summary; per item fingerprint, repo,
+      severity, group size, batch file; no code) and triage/batch-NNN.json files of 10 items. Each item
+      carries a context window of +/-15 lines from the repository. Secrets, credential files and symlinks
+      get no context and no code.
 
-  python3 -I scripts/triage.py apply RUN_DIR VERDICTS.json
-      Checks every verdict (see references/verification.md for the format), then merges them into
-      security-report.json, regenerates the Markdown and HTML reports and writes NEEDS-VALIDATION.md.
-      All or nothing: one bad record and nothing changes. Applying the same file twice gives the same report.
+  python3 -I scripts/triage.py next RUN_DIR
+      Prints the next queued item that has no recorded verdict, or {"done": true}.
+
+  python3 -I scripts/triage.py record RUN_DIR FILE|- [--replace]
+      Checks one verdict object (see references/verification.md) and saves it as
+      triage/verdicts/<fingerprint>.json. A second verdict for the same finding needs --replace.
+
+  python3 -I scripts/triage.py apply RUN_DIR [VERDICTS.json]
+      Checks every verdict (the recorded ones in triage/verdicts/, or the given file), then merges them
+      into the report, regenerates SUMMARY.md, the Markdown and HTML reports and writes NEEDS-VALIDATION.md.
+      A grouped item's verdict covers its members unless they already have, or are given, their own verdict.
+      All or nothing: one bad record and nothing changes. Applying the same verdicts twice gives the same report.
 
 Exit codes: 0 done, 1 invalid input or report, 2 usage. Report-only: nothing in any repository is changed.
 Stdlib only; Python 3.8+.
@@ -34,6 +44,7 @@ sys.path.insert(0, str(SCRIPT_DIR / "lib"))
 import report_formats  # noqa: E402
 import report_locate   # noqa: E402
 import report_model    # noqa: E402
+import report_store    # noqa: E402
 import report_schema   # noqa: E402
 from shaihulud.findings import redact  # noqa: E402
 
@@ -48,9 +59,13 @@ TEXT_FIELDS = ("evidence", "blocker", "validation_plan", "reason")
 CREDENTIAL_NAME = re.compile(r"(^\.env(\..*)?$|^\.npmrc$|^\.pypirc$|^\.netrc$|^\.git-credentials$|^\.dockercfg$|"
                              r"^credentials(\.json)?$|^id_(rsa|dsa|ecdsa|ed25519)$|\.(pem|key|p12|pfx|jks|keystore)$)",
                              re.IGNORECASE)
+BATCH_SIZE = 10
 DEFAULT_LIMIT = 25
 MAX_GROUP_LOCATIONS = 50
 _SEV_RANK = {"CRITICAL": 0, "HIGH": 1, "MEDIUM": 2, "LOW": 3, "INFO": 4}
+MAX_INDEX_BYTES = 64 * 1024 * 1024
+MAX_RECORD_BYTES = 64 * 1024
+FINGERPRINT = re.compile(r"^[0-9a-f]{16}$")
 QUEUE_KEYS = ("fingerprint", "repo", "scanner", "type", "severity", "file", "line", "code", "package",
               "installed_version", "fixed_version", "rule_id", "title", "description", "url")
 
@@ -61,12 +76,10 @@ def fail(msg):
 
 
 def load_run(run_dir):
-    path = Path(run_dir) / "security-report.json"
-    doc, errors = report_model.read_report(path)
-    if doc is None:
-        raise SystemExit(fail("%s is not a valid v2 report (%s) - run run-scan.sh again"
-                              % (path, "; ".join(errors[:3]) or "unreadable")))
-    return doc
+    try:
+        return report_model.load_report(run_dir)
+    except report_store.ReportError as exc:
+        raise SystemExit(fail(str(exc)))
 
 
 def _inside(path, root):
@@ -104,6 +117,12 @@ def context_for(f, run):
     return {"file": f["file"], "start_line": start, "end_line": end, "lines": out}
 
 
+def _write(path, text):
+    tmp = path.with_name(path.name + ".tmp")
+    tmp.write_text(text, encoding="utf-8")
+    os.replace(str(tmp), str(path))
+
+
 def group_key(f, grouping=True):
     """Findings sharing a key have one root cause in one repo and get one verifier and one verdict."""
     if grouping and f.get("type") in report_model.DEPENDENCY_TYPES and f.get("rule_id") and f.get("package"):
@@ -114,7 +133,7 @@ def group_key(f, grouping=True):
 
 
 def _order(f):
-    return (_SEV_RANK.get((f.get("severity") or "").upper(), 9), f.get("change") != "new",
+    return (_SEV_RANK.get((report_model.effective_severity(f) or "").upper(), 9), f.get("change") != "new",
             f.get("repo") or "", f.get("file") or "", f.get("line") or 0, f["fingerprint"])
 
 
@@ -133,37 +152,48 @@ def cmd_queue(run_dir, limit=DEFAULT_LIMIT, repos=None, grouping=True):
         groups.setdefault(group_key(f, grouping), []).append(f)
     ordered = sorted(groups.values(), key=lambda members: _order(members[0]))
     selected = ordered if limit is None else ordered[:limit]
-    items = []
-    for members in selected:
-        f = members[0]
-        item = dict((k, f.get(k)) for k in QUEUE_KEYS)
-        if f.get("type") == "secret":
-            item["code"] = ""
-        item["context"] = context_for(f, run)
-        if len(members) > 1:
-            item["group"] = {
-                "size": len(members),
-                "fingerprints": [m["fingerprint"] for m in members],
-                "scanners": sorted(set(m["scanner"] for m in members)),
-                "locations": [{"file": m.get("file"), "line": m.get("line"), "scanner": m["scanner"]}
-                              for m in members[:MAX_GROUP_LOCATIONS]],
-                "locations_omitted": max(0, len(members) - MAX_GROUP_LOCATIONS)}
-        items.append(item)
     out_dir = Path(run_dir) / "triage"
     out_dir.mkdir(exist_ok=True)
+    for old in list(out_dir.glob("batch-*.json")) + [out_dir / "queue.json"]:
+        if old.exists():
+            old.unlink()
+    index_items = []
+    for start in range(0, len(selected), BATCH_SIZE):
+        name = "batch-%03d.json" % (start // BATCH_SIZE + 1)
+        items = []
+        for members in selected[start:start + BATCH_SIZE]:
+            f = members[0]
+            item = dict((k, f.get(k)) for k in QUEUE_KEYS)
+            if f.get("type") == "secret":
+                item["code"] = ""
+            item["context"] = context_for(f, run)
+            if len(members) > 1:
+                item["group"] = {
+                    "size": len(members),
+                    "fingerprints": [m["fingerprint"] for m in members],
+                    "scanners": sorted(set(m["scanner"] for m in members)),
+                    "locations": [{"file": m.get("file"), "line": m.get("line"), "scanner": m["scanner"]}
+                                  for m in members[:MAX_GROUP_LOCATIONS]],
+                    "locations_omitted": max(0, len(members) - MAX_GROUP_LOCATIONS)}
+            items.append(item)
+            index_items.append({"fingerprint": f["fingerprint"], "repo": f.get("repo"),
+                                "severity": report_model.effective_severity(f), "group_size": len(members),
+                                "batch": name})
+        _write(out_dir / name, json.dumps({"items": items}, indent=2) + "\n")
     chosen = sum(len(m) for m in selected)
-    summary = {"eligible_findings": len(eligible), "groups": len(ordered), "queued_items": len(items),
-               "queued_findings": chosen, "remaining_items": len(ordered) - len(items),
+    summary = {"eligible_findings": len(eligible), "groups": len(ordered), "queued_items": len(selected),
+               "queued_findings": chosen, "remaining_items": len(ordered) - len(selected),
                "remaining_findings": len(eligible) - chosen, "limit": limit, "repos": sorted(repos or []),
                "grouping": grouping}
-    queue = {"schema_version": 1, "run_dir": doc["run_dir"], "profile": profile,
+    index = {"schema_version": 2, "run_dir": doc["run_dir"], "profile": profile,
              "instructions": "references/verification.md of the job-security-scan skill",
-             "verdicts_file": str(out_dir / "verdicts.json"), "summary": summary, "items": items}
-    (out_dir / "queue.json").write_text(json.dumps(queue, indent=2) + "\n", encoding="utf-8")
+             "verdicts_dir": str(out_dir / "verdicts"), "summary": summary, "items": index_items}
+    _write(out_dir / "queue-index.json", json.dumps(index, separators=(",", ":")) + "\n")
     skipped = sum(1 for f in doc["findings"] if f.get("verdict") and report_model.is_queued(f, profile))
     print("triage: %d item(s) queued for verification covering %d finding(s) (profile %s%s, %d already have a "
-          "verdict) -> %s" % (len(items), chosen, profile, ", repos " + ", ".join(sorted(repos)) if repos else "",
-                              skipped, out_dir / "queue.json"))
+          "verdict) in %d batch(es) -> %s" % (len(selected), chosen, profile,
+                                              ", repos " + ", ".join(sorted(repos)) if repos else "", skipped,
+                                              -(-len(selected) // BATCH_SIZE), out_dir / "queue-index.json"))
     if summary["remaining_items"]:
         print("triage: %d more item(s) (%d finding(s)) stay pending - queue again after apply, or raise --limit"
               % (summary["remaining_items"], summary["remaining_findings"]))
@@ -171,13 +201,103 @@ def cmd_queue(run_dir, limit=DEFAULT_LIMIT, repos=None, grouping=True):
 
 
 def load_groups(run_dir):
-    """{representative fingerprint: [member fingerprints]} from the last queue.json, or {}."""
+    """{representative fingerprint: [member fingerprints]} from the current queue's batch files, or {}."""
+    triage = Path(run_dir) / "triage"
     try:
-        queue = json.loads((Path(run_dir) / "triage" / "queue.json").read_text(encoding="utf-8"))
-        return dict((i["fingerprint"], list(i["group"]["fingerprints"])) for i in queue.get("items", [])
-                    if isinstance(i, dict) and isinstance(i.get("group"), dict))
+        index = json.loads((triage / "queue-index.json").read_text(encoding="utf-8"))
+        names = sorted(set(i["batch"] for i in index["items"] if i.get("group_size", 1) > 1))
+        groups = {}
+        for name in names:
+            if not re.match(r"^batch-[0-9]{3,}\.json$", name):
+                continue
+            for i in json.loads((triage / name).read_text(encoding="utf-8"))["items"]:
+                if isinstance(i, dict) and isinstance(i.get("group"), dict):
+                    groups[i["fingerprint"]] = list(i["group"]["fingerprints"])
+        return groups
     except (OSError, ValueError, KeyError, TypeError, AttributeError):
         return {}
+
+
+def _queue_index(run_dir):
+    path = Path(run_dir) / "triage" / "queue-index.json"
+    try:
+        if path.stat().st_size > MAX_INDEX_BYTES:
+            raise SystemExit(fail("%s is larger than %d bytes" % (path, MAX_INDEX_BYTES)))
+        index = json.loads(path.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        raise SystemExit(fail("no queue in %s - run: triage.py queue %s" % (path.parent, run_dir)))
+    except (OSError, ValueError) as exc:
+        raise SystemExit(fail("cannot read %s: %s" % (path, exc)))
+    if not isinstance(index, dict) or index.get("schema_version") != 2 or not isinstance(index.get("items"), list):
+        raise SystemExit(fail("%s is not a queue index (schema_version 2) - run: triage.py queue %s"
+                              % (path, run_dir)))
+    return index
+
+
+def _verdict_path(run_dir, fp):
+    return Path(run_dir) / "triage" / "verdicts" / (fp + ".json")
+
+
+def cmd_next(run_dir):
+    index = _queue_index(run_dir)
+    pending = [i for i in index["items"] if isinstance(i, dict) and FINGERPRINT.match(str(i.get("fingerprint")))
+               and not _verdict_path(run_dir, i["fingerprint"]).exists()]
+    if not pending:
+        print(json.dumps({"done": True}))
+        return 0
+    head = pending[0]
+    batch = str(head.get("batch") or "")
+    if not re.match(r"^batch-[0-9]{3,}\.json$", batch):
+        return fail("queue index names a bad batch file %r" % batch)
+    try:
+        items = json.loads((Path(run_dir) / "triage" / batch).read_text(encoding="utf-8"))["items"]
+    except (OSError, ValueError, KeyError, TypeError) as exc:
+        return fail("cannot read %s: %s - run: triage.py queue %s" % (batch, exc, run_dir))
+    for item in items:
+        if isinstance(item, dict) and item.get("fingerprint") == head["fingerprint"]:
+            print(json.dumps(item, indent=2))
+            print("triage: %d left after this one" % (len(pending) - 1), file=sys.stderr)
+            return 0
+    return fail("%s does not hold %s - run: triage.py queue %s" % (batch, head["fingerprint"], run_dir))
+
+
+def cmd_record(run_dir, source, replace):
+    index = _queue_index(run_dir)
+    try:
+        if source == "-":
+            text = sys.stdin.read(MAX_RECORD_BYTES + 1)
+        else:
+            if os.path.getsize(source) > MAX_RECORD_BYTES:
+                return fail("%s is larger than %d bytes" % (source, MAX_RECORD_BYTES))
+            text = Path(source).read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError) as exc:
+        return fail("cannot read %s: %s" % (source, exc))
+    if len(text.encode("utf-8")) > MAX_RECORD_BYTES:
+        return fail("verdict is larger than %d bytes" % MAX_RECORD_BYTES)
+    try:
+        obj = json.loads(text)
+    except ValueError as exc:
+        return fail("verdict is not plain JSON (%s) - send only the JSON object, no prose" % exc)
+    if not isinstance(obj, dict):
+        return fail("expected one verdict object {\"fingerprint\": ..., \"verdict\": ...}")
+    known = set(i.get("fingerprint") for i in index["items"] if isinstance(i, dict))
+    try:
+        parse_verdicts(json.dumps({"verdicts": [obj]}), known)
+    except ValueError as exc:
+        print("triage: verdict rejected, nothing recorded:", file=sys.stderr)
+        for e in exc.args[0][:50]:
+            print("  - %s" % e, file=sys.stderr)
+        return 1
+    fp = obj["fingerprint"]
+    if not FINGERPRINT.match(fp):
+        return fail("fingerprint %r is not 16 hex characters" % fp)
+    path = _verdict_path(run_dir, fp)
+    if path.exists() and not replace:
+        return fail("%s already recorded (%s); use --replace to change it" % (fp, path))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    _write(path, json.dumps(obj, indent=2) + "\n")
+    print("triage: recorded %s %s" % (obj.get("verdict"), fp))
+    return 0
 
 
 def parse_verdicts(text, known):
@@ -238,14 +358,32 @@ def load_generator():
     return mod
 
 
-def cmd_apply(run_dir, verdicts_path):
+def _recorded_verdicts(run_dir):
+    """The verdict objects saved by `record`, as one {"verdicts": [...]} text."""
+    records = []
+    for path in sorted((Path(run_dir) / "triage" / "verdicts").glob("*.json")):
+        if os.path.getsize(str(path)) > MAX_RECORD_BYTES:
+            raise ValueError("%s is larger than %d bytes" % (path, MAX_RECORD_BYTES))
+        try:
+            records.append(json.loads(path.read_text(encoding="utf-8")))
+        except ValueError as exc:
+            raise ValueError("%s: not JSON (%s)" % (path, exc))
+    if not records:
+        raise ValueError("no recorded verdicts in %s - use triage.py record" % (Path(run_dir) / "triage" / "verdicts"))
+    return json.dumps({"verdicts": records})
+
+
+def cmd_apply(run_dir, verdicts_path=None):
     doc = load_run(run_dir)
     try:
-        if os.path.getsize(verdicts_path) > MAX_VERDICT_BYTES:
+        if verdicts_path is None:
+            text = _recorded_verdicts(run_dir)
+        elif os.path.getsize(verdicts_path) > MAX_VERDICT_BYTES:
             return fail("%s is larger than %d bytes" % (verdicts_path, MAX_VERDICT_BYTES))
-        text = Path(verdicts_path).read_text(encoding="utf-8")
-    except (OSError, UnicodeDecodeError) as exc:
-        return fail("cannot read %s: %s" % (verdicts_path, exc))
+        else:
+            text = Path(verdicts_path).read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError, ValueError) as exc:
+        return fail("cannot read verdicts: %s" % exc)
     by_fp = dict((f["fingerprint"], f) for f in doc["findings"])
     try:
         records = parse_verdicts(text, by_fp)
@@ -295,8 +433,12 @@ def main(argv):
         ap.add_argument("--no-group", action="store_true")
         a = ap.parse_args(argv[2:])
         return cmd_queue(a.run_dir, None if a.all else a.limit, set(a.repo), not a.no_group)
-    if len(argv) == 4 and argv[1] == "apply":
-        return cmd_apply(argv[2], argv[3])
+    if len(argv) == 3 and argv[1] == "next":
+        return cmd_next(argv[2])
+    if len(argv) in (4, 5) and argv[1] == "record" and (len(argv) == 4 or argv[4] == "--replace"):
+        return cmd_record(argv[2], argv[3], len(argv) == 5)
+    if len(argv) in (3, 4) and argv[1] == "apply":
+        return cmd_apply(argv[2], argv[3] if len(argv) == 4 else None)
     print(__doc__, file=sys.stderr)
     return 2
 

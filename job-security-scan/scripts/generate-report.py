@@ -34,6 +34,7 @@ import audit_report    # noqa: E402
 import baseline        # noqa: E402
 import report_formats  # noqa: E402
 import report_locate   # noqa: E402
+import report_store    # noqa: E402
 import report_model    # noqa: E402
 import report_schema   # noqa: E402
 import report_scope    # noqa: E402
@@ -554,7 +555,9 @@ def _runinfo_html(doc):
              "<div><strong>Verification:</strong> %d queued · %d pending · %d confirmed · %d need validation · "
              "%d dismissed</div>" % (ver.get("queued", 0), ver.get("pending", 0), ver.get("confirmed", 0),
                                      ver.get("needs_validation", 0), ver.get("rejected", 0))]
-    if run.get("previous_run"):
+    if run.get("previous_error"):
+        parts.append("<div><strong>Change tracking unavailable:</strong> %s</div>" % e(run["previous_error"]))
+    elif run.get("previous_run"):
         rows = doc["findings"]
         new = sum(1 for f in rows if f.get("change") == "new")
         parts.append("<div><strong>Changes since last run</strong> (<code>%s</code>): %d new · %d unchanged · "
@@ -716,23 +719,20 @@ def build_html(doc, config, results_dir, output_path, org, workspace="."):
 
 
 def write_reports(doc, config, out_dir, results_dir=None):
-    """Write security-report.{json,md,html} for a v2 document, validate the JSON and return the paths.
+    """Write SUMMARY.md and security-report.{json (+ findings/ shards),md,html} for a report document, validate the JSON and return the paths.
     Used by this script and by triage.py apply (which regenerates the reports after verification)."""
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     org = config.get("org", "unknown")
     run = doc.get("run") or {}
     workspace = run.get("repos_root") or run.get("workspace") or "."   # file links: <repos root>/<repo>/<file>
-    paths = [out_dir / "security-report.md", out_dir / "security-report.json", out_dir / "security-report.html"]
-    paths[1].write_text(json.dumps(doc, indent=2) + "\n", encoding="utf-8")
+    paths = [out_dir / "security-report.md", out_dir / "security-report.json", out_dir / "security-report.html",
+             out_dir / "SUMMARY.md"]
+    report_store.save(doc, out_dir)
     paths[0].write_text(report_formats.render_markdown(doc), encoding="utf-8")
     build_html(doc, config, results_dir or out_dir, str(paths[2]), org, workspace)
+    paths[3].write_text(report_formats.render_summary(doc), encoding="utf-8")
     errors = report_schema.validate(doc)
-    size = paths[1].stat().st_size
-    if size > report_model.MAX_REPORT_BYTES:
-        errors.append("security-report.json is %d bytes, larger than the %d-byte limit: triage and the next "
-                      "run cannot read it - narrow the scan (--repo, --scanner) or split the config"
-                      % (size, report_model.MAX_REPORT_BYTES))
     if errors:
         sys.stderr.write("  warning: security-report.json failed validation:\n%s\n"
                          % "\n".join("    - " + e for e in errors[:20]))
@@ -832,15 +832,17 @@ def main():
     print(f"  Total findings parsed: {len(findings)} ({located} located to a line)")
 
     out_dir = Path(args.out_dir) if args.out_dir else Path(args.output).resolve().parent
-    previous, previous_dir = None, None
+    previous, previous_dir, previous_error = None, None, None
     if args.previous == "auto":
-        previous, previous_dir = report_model.find_previous(out_dir)
+        previous, previous_dir, previous_error = report_model.find_previous(out_dir)
     elif args.previous != "none":
         previous_dir = Path(args.previous).resolve()
-        previous = report_model.load_report(previous_dir / "security-report.json")
-        if previous is None:
-            sys.stderr.write("  warning: %s has no valid v2 report; comparing with nothing\n" % previous_dir)
-            previous_dir = None
+        try:
+            previous = report_model.load_report(previous_dir)
+        except report_store.ReportError as exc:
+            previous_error = str(exc)
+    if previous_error:
+        sys.stderr.write("  warning: cannot compare with %s: %s\n" % (previous_dir, previous_error))
     if previous is not None:
         previous = dict(previous, run_dir=str(previous_dir))
         print(f"  Comparing with previous run: {previous_dir}")
@@ -866,8 +868,15 @@ def main():
     }
     doc = report_model.build_document(findings, meta, previous=previous)
     if args.keep_verdicts and args.out_dir:
-        report_model.keep_verdicts(doc, report_model.load_report(out_dir / "security-report.json"))
-    doc["run"].update(workspace=workspace, repos_root=repos_root, home=home)
+        try:
+            existing = report_model.load_report(out_dir)
+        except report_store.ReportMissing:
+            existing = None
+        except report_store.ReportError as exc:
+            sys.stderr.write("generate-report: cannot keep verdicts: %s\n" % exc)
+            return 1
+        report_model.keep_verdicts(doc, existing)
+    doc["run"].update(workspace=workspace, repos_root=repos_root, home=home, previous_error=previous_error)
 
     outputs, errors = [], []
     if args.out_dir:

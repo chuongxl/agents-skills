@@ -1,4 +1,4 @@
-"""The v2 security-report model: stable fingerprints, verdicts, changes since the previous run.
+"""The security-report model (schema v3; v2 still read): stable fingerprints, verdicts, changes since the previous run.
 
 A fingerprint identifies a finding across runs without depending on its line number, so moved code keeps its
 identity while edited code gets a new one (and is verified again). Secrets are fingerprinted by location only —
@@ -12,7 +12,7 @@ Stdlib only; Python 3.8+.
 import hashlib
 import re
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 SEVERITIES = ("CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO")
 IMPACTS = ("critical", "high", "medium", "low", "informational")
 LIKELIHOODS = ("high", "medium", "low")
@@ -224,50 +224,35 @@ def build_document(findings, meta, previous=None):
 
 
 RUN_PREFIX = "security-run-"
-# Sized for report_schema.MAX_FINDINGS (20000) at a few KB each. A smaller cap makes a large but valid scan
-# unreadable for triage, verdict carry-over and the validator (a 7,000-finding scan is already ~7 MB).
-MAX_REPORT_BYTES = 64 * 1024 * 1024
 
 
-def read_report(path):
-    """(document, errors): a v2 report that passes the validator and [], or None and why it cannot be used."""
-    import json
-    import os
-    import report_schema
-    try:
-        size = os.path.getsize(str(path))
-        if size > MAX_REPORT_BYTES:
-            return None, ["%d bytes, larger than the %d-byte limit" % (size, MAX_REPORT_BYTES)]
-        with open(str(path), "r", encoding="utf-8") as fh:
-            doc = json.load(fh)
-    except (OSError, ValueError) as exc:
-        return None, [str(exc)]
-    if not isinstance(doc, dict):
-        return None, ["report must be a JSON object"]
-    errors = report_schema.validate(doc)
-    return (None, errors) if errors else (doc, [])
-
-
-def load_report(path):
-    """A v2 report that passes the validator, or None (missing, too big, not JSON, v1, invalid)."""
-    return read_report(path)[0]
+def load_report(run_dir):
+    """The whole report of a run folder (v2 or v3); raises report_store.ReportError when it cannot be read."""
+    import report_store
+    return report_store.load_full(run_dir)
 
 
 def find_previous(run_dir):
-    """(document, folder) of the newest earlier security-run-* sibling with a valid v2 report, else (None, None).
-    "Earlier" is by folder name, which sorts by the run's date and time."""
+    """(document, folder, error) for the newest earlier security-run-* sibling that has a report.
+    Folders without a report (aborted runs) are skipped; if the newest report cannot be read the result is
+    (None, folder, message) - never an older run, which would mark findings fixed against stale data.
+    "Earlier" is by folder name, which sorts by the run's date and time. (None, None, None): nothing earlier."""
     from pathlib import Path
+    import report_store
     run_dir = Path(run_dir).resolve()
     try:
         siblings = [p for p in run_dir.parent.iterdir()
                     if p.is_dir() and p.name.startswith(RUN_PREFIX) and p.name < run_dir.name]
     except OSError:
-        return None, None
+        return None, None, None
     for p in sorted(siblings, key=lambda x: x.name, reverse=True):
-        doc = load_report(p / "security-report.json")
-        if doc is not None:
-            return doc, p
-    return None, None
+        try:
+            return report_store.load_full(p), p, None
+        except report_store.ReportMissing:
+            continue
+        except report_store.ReportError as exc:
+            return None, p, str(exc)
+    return None, None, None
 
 
 def keep_verdicts(doc, existing):

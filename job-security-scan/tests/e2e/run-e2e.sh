@@ -97,9 +97,9 @@ for f in security-report.md security-report.json security-report.html; do
   check "osv run wrote $f"                      test -s "$OSV_RUN/$f"
 done
 check "every OSV finding located to a line"     python3 -I "$HERE/assert-located.py" "$OSV_RUN/security-report.json" osv
-check "osv report validates (schema v2)"       python3 -I "$SKILL_DIR/scripts/validate-report.py" "$OSV_RUN/security-report.json"
-check "sbom report validates (schema v2)"      python3 -I "$SKILL_DIR/scripts/validate-report.py" "$SBOM_RUN/security-report.json"
-check "sbom run compared with the osv run"     python3 -I -c 'import json,sys; d=json.load(open(sys.argv[1])); sys.exit(0 if d["run"]["previous_run"] else 1)' "$SBOM_RUN/security-report.json"
+check "osv report validates (schema v3)"       python3 -I "$SKILL_DIR/scripts/validate-report.py" "$OSV_RUN/security-report.json"
+check "sbom report validates (schema v3)"      python3 -I "$SKILL_DIR/scripts/validate-report.py" "$SBOM_RUN/security-report.json"
+check "sbom run compared with the osv run"     python3 -I -c 'import sys; sys.path.insert(0, sys.argv[1]); import report_store; from pathlib import Path; sys.exit(0 if report_store.load_index(Path(sys.argv[2]))["run"]["previous_run"] else 1)' "$SKILL_DIR/scripts/lib" "$SBOM_RUN"
 check "osv findings queued for verification"   python3 -I "$SKILL_DIR/scripts/triage.py" queue "$OSV_RUN"
 
 if [[ $FAILS -gt 0 ]]; then

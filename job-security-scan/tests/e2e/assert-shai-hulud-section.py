@@ -6,8 +6,11 @@ import json
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts" / "lib"))
+import report_store  # noqa: E402
+
 run = Path(sys.argv[1])
-doc = json.loads((run / "security-report.json").read_text())
+doc = report_store.load_full(run)
 sh = doc["shai_hulud"]
 rows = dict((t["repo"], t) for t in sh["targets"])
 md = (run / "security-report.md").read_text().split("## 🪱 Shai-Hulud check")[1].split("\n## ")[0]

@@ -11,29 +11,40 @@ from the scanned repository, and never contacts a network service.
 
 ## Steps (the parent agent)
 
-1. `python3 -I scripts/triage.py queue security-run-<datetime>` — writes `triage/queue.json`. The run's profile
+1. `python3 -I scripts/triage.py queue security-run-<datetime>` — prints how many findings are queued and writes
+   `triage/queue-index.json` plus `triage/batch-NNN.json` (10 items each, most severe first). The run's profile
    decides what is queued: `standard` CRITICAL + HIGH, `deep` also MEDIUM, `quick` nothing. Findings that already
    have a verdict (also verdicts carried over from the previous run for unchanged code) are not queued again.
    Findings with one root cause in one repo become **one item**: dependency findings by advisory id + package +
    installed version (every lockfile and scanner that reports it), misconfigurations by scanner + rule (every
    file). The item lists all members under `group`. Items are ordered most severe first (new before unchanged)
-   and capped at the **budget: `--limit 25` by default**; `queue.json` → `summary` and the printed line say how
-   many items and findings stay pending. Options: `--limit N`, `--all` (no cap), `--repo NAME` (repeatable,
-   e.g. to work through a large multi-repo scan one repo at a time), `--no-group` (one item per finding).
-2. For each queued item, in queue order, start **one fresh sub-agent that has not seen the scan summary or any
-   other verdict**. Give it only: the verifier prompt below, that one queue item (finding + context + group),
-   and the repository path. Report the pending count from the summary; never present pending findings as clean.
-   If the agent cannot start sub-agents, do one separate pass per item from the queue item alone, and say in the
-   summary that verification was done in-session, not independently.
-3. Keep a reply only if it is exactly one JSON object in the format below. Do not repair a malformed or
-   prose-wrapped reply: discard it, retry once with a new verifier, otherwise leave that finding pending.
-4. Collect the kept objects as `{"verdicts": [ ... ]}` in `triage/verdicts.json` and run
-   `python3 -I scripts/triage.py apply security-run-<datetime> security-run-<datetime>/triage/verdicts.json`.
-   `apply` is all or nothing: if it lists errors, fix the collection (drop the bad record) and apply again.
-   It regenerates the three reports and writes `NEEDS-VALIDATION.md`. A verdict on a grouped item's
-   fingerprint also applies to every group member in the last `queue.json` that has no verdict yet and no
-   record of its own in the file.
-5. To continue with the next batch, run `queue` again (verdicts already applied are skipped) and repeat.
+   and capped at the **budget: `--limit 25` by default**; the `summary` in `queue-index.json` and the printed
+   line say how many items and findings stay pending. Options: `--limit N`, `--all` (no cap), `--repo NAME`
+   (repeatable, e.g. to work through a large multi-repo scan one repo at a time), `--no-group` (one item per
+   finding).
+2. Loop, one item at a time:
+   1. `python3 -I scripts/triage.py next security-run-<datetime>` prints one queue item as JSON (finding +
+      context + group), or `{"done": true}` when every queued item has a recorded verdict.
+   2. Start **one fresh sub-agent that has not seen the scan summary or any other verdict**. Give it only: the
+      verifier prompt below, that one item and the repository path. If the agent cannot start sub-agents, do one
+      separate pass per item from the item alone, and say in the summary that verification was done in-session,
+      not independently.
+   3. Keep the reply only if it is exactly one JSON object in the format below. Do not repair a malformed or
+      prose-wrapped reply: discard it, retry once with a new verifier, otherwise leave that finding pending and
+      stop the loop for it (record nothing).
+   4. Save the kept object: `python3 -I scripts/triage.py record security-run-<datetime> -` with the object on
+      stdin (or a file path instead of `-`). It is checked and stored as `triage/verdicts/<fingerprint>.json`;
+      a rejected object stores nothing. A second verdict for the same finding needs `--replace`.
+
+   Report the pending count from the summary; never present pending findings as clean. Never open
+   `queue-index.json`, the batch files, `findings/` shards or `security-report.json` yourself — on a large run
+   they do not fit in context; `next` hands you exactly one item.
+3. `python3 -I scripts/triage.py apply security-run-<datetime>` merges every recorded verdict. `apply` is all or
+   nothing: if it lists errors, fix or delete the named file in `triage/verdicts/` and apply again. It
+   regenerates `SUMMARY.md` and the three reports and writes `NEEDS-VALIDATION.md`. A verdict on a grouped
+   item's fingerprint also applies to every group member in the current queue that has no verdict yet and no
+   record of its own. (A whole `{"verdicts": [ ... ]}` file still works: `triage.py apply <run> VERDICTS.json`.)
+4. To continue with the next batch, run `queue` again (verdicts already applied are skipped) and repeat.
 
 ## Verifier prompt
 
