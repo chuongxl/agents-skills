@@ -198,11 +198,13 @@ Indicator data and sources: [references/ioc-data.md](references/ioc-data.md). If
 
 - **Verification (agent step, Phase 9):** `scripts/triage.py queue` lists the findings to check (`standard`:
   CRITICAL + HIGH, `deep`: also MEDIUM) with a redacted ±15-line context, one item per root cause (same advisory
-  + package + version, or same misconfig rule, in one repo), most severe first, capped at `--limit 25` with the
+  + package + version, or same misconfig rule, in one repo), most severe first, capped at `--limit 25` per batch with the
   pending count reported (`--all`, `--repo NAME`, `--no-group`); each item goes to a fresh verifier agent
   that tries to disprove it from source only (no edits, no running repo code, no network). `triage.py next` hands
   out one item at a time, `triage.py record` saves each verdict, and `triage.py apply`
-  merges them all-or-nothing and regenerates the reports plus `NEEDS-VALIDATION.md`. Prompt, verdict
+  merges them all-or-nothing and regenerates the reports plus `NEEDS-VALIDATION.md`.
+  `triage.py status <run> --require-complete` checks run-wide pending work. An exhausted batch does not
+  mean the run is complete, and unapplied verdicts must be applied before requeuing. Prompt, verdict
   format and severity anchors: [references/verification.md](references/verification.md).
 - **Changes:** every finding has a fingerprint that survives code moving within a file; reports compare with
   the previous `security-run-*` folder (new / unchanged / fixed), and verdicts carry over while code is unchanged.
@@ -230,6 +232,13 @@ this skill (provenance: [references/audit/NOTICE.md](references/audit/NOTICE.md)
 - **Report**: confirmed findings join the scanner findings as ordinary findings (scanner `audit`, already
   verified); a Deep audit section lists coverage, gaps, leads and hardening notes. An unfinished audit merges
   nothing.
+
+`run-scan.sh --audit --profile deep` prepares the audit but cannot launch agents itself. The coding agent
+must follow [references/audit/WORKFLOW.md](references/audit/WORKFLOW.md). It starts audit reconnaissance
+before draining scanner verification, rotates audit work and verification batches across repos, and
+checkpoints progress for resume. `validate-audit.py complete <run>/<repo>/audit` checks the final artifacts
+and rejects unfinished units or unvalidated candidates. Run it for every requested repo before calling
+the deep audit complete. Source-only audits can finish with independently reviewed needs-validation leads.
 
 ```bash
 bash job-security-scan/scripts/run-scan.sh --audit                       # scanners + deep audit
@@ -488,9 +497,19 @@ bash job-security-scan/scripts/run-scan.sh  # Re-downloads DB
 
 ### Issue: Too many findings to verify on a large multi-repo scan
 
-**Solution:** `triage.py queue` already groups repeated root causes and stops at 25 items. Work in batches:
-apply the verdicts, queue again, and use `--repo NAME` to finish one repository at a time. The pending count
-in the summary is the work left; pending findings are not clean.
+`triage.py queue` groups repeated root causes and selects 25 items per batch, not per run.
+Use `triage.py status <run>` for the next action. Apply saved verdicts, resume unrecorded items, then
+queue again. Continue until `triage.py status <run> --require-complete` exits 0.
+Use `--repo NAME` for per-repo batches. With `--audit`, follow the scheduling rules above so Phase 9
+does not consume the session before Phase 10 starts. Pending findings are not clean.
+
+### Issue: Valid report, but deep audit incomplete
+
+Report validation checks formatting, not whether agents finished the audit. Resume the existing run
+with its `audit/AGENT-TASK.md`, metadata, ledger and saved results. Do not rerun preparation over those
+files. Keep the original audit budget and source scope. Both the run-wide Phase 9 check and each repo's
+Phase 10 completion check must pass. If resources or independent agents are unavailable, retain partial
+artifacts and report the blocker and resume action. Raising `--limit` alone does not complete Phase 10.
 
 ### DefectDojo import
 
@@ -502,7 +521,10 @@ See [references/defectdojo.md](references/defectdojo.md) for setup and import op
 
 ## Version History
 
-- **v3.3** (current) — DefectDojo import now reads legacy v2 reports and current v3 run
+- **v3.3.1** (current). Added run-wide verification status, a final deep-audit artifact check, safe
+  requeuing after saved verdicts, and multi-repo scheduling/resume rules. The 25-item queue limit is
+  a batch size, not a total verification budget.
+- **v3.3** — DefectDojo import now reads legacy v2 reports and current v3 run
   folders; uploads require an explicit DefectDojo URL.
 - **v3.2** — Large reports no longer break: `security-report.json` is a schema v3 index with the
   findings in sha256-checked `findings/` shards (v2 reports still read; no single file has to hold every
