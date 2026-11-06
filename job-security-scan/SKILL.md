@@ -93,6 +93,8 @@ bash .github/skills/job-security-scan/scripts/run-scan.sh \
 
 Short aliases: `-r` for `--repo`, `-s` for `--scanner`
 
+What each scanner finds, how it maps severity and where it overlaps with the others: `references/scanners.md`.
+
 ## Phase 0 — Parse Config & Install Tools
 
 Load team/repo config from `repository.md`, then install any missing tools:

@@ -39,6 +39,7 @@ All tools are free, open-source, and configurable. Security findings are organiz
 
 Diagrams (open in a browser): [architecture](docs/diagrams/job-security-scan-architecture.html) ·
 [run flow](docs/diagrams/job-security-scan-run-flow.html).
+What each scanner does and why it is in the set: [references/scanners.md](references/scanners.md).
 
 ## Quick Start
 
