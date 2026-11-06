@@ -1,0 +1,92 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "job-security-scan v3.2 Architecture",
+    "output": ".archify/architecture-job-security-scan-20261106-060924/job-security-scan-architecture.html",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "git@github.com:chuongxl/agents-skills.git",
+      "link_mode": "local-only",
+      "revision": "27b836b5eada764a3322c6ce46b99c0c8b44e7f1"
+    }
+  },
+  "components": [
+    { "id": "agent", "type": "external", "label": "Agent / CI", "sublabel": "skill caller", "pos": [40, 240], "size": [140, 64],
+      "sources": [{ "path": "job-security-scan/SKILL.md", "line": 35, "end_line": 45, "label": "Modes" }] },
+    { "id": "config", "type": "database", "label": "repository.md", "sublabel": "team + repo config", "pos": [270, 80], "size": [150, 64],
+      "sources": [{ "path": "job-security-scan/scripts/run-scan.sh", "line": 82, "end_line": 83, "label": "parse-config.py" }] },
+    { "id": "runscan", "type": "backend", "label": "run-scan.sh", "sublabel": "orchestrator", "tag": "--profile --since", "pos": [270, 240], "size": [150, 64],
+      "sources": [
+        { "path": "job-security-scan/scripts/run-scan.sh", "line": 604, "end_line": 645, "label": "run folder + repo loop" },
+        { "path": "job-security-scan/scripts/run-scan.sh", "line": 658, "end_line": 690, "label": "generate_reports" }
+      ] },
+    { "id": "scanners", "type": "backend", "label": "Scanners", "sublabel": "gitleaks trivy semgrep osv…", "tag": "Phases 1-8", "pos": [510, 240], "size": [170, 64],
+      "sources": [
+        { "path": "job-security-scan/scripts/run-scan.sh", "line": 549, "end_line": 564, "label": "profile scanner set" },
+        { "path": "job-security-scan/scripts/run-scan.sh", "line": 131, "end_line": 168, "label": "run_gitleaks" }
+      ] },
+    { "id": "raw", "type": "database", "label": "Raw tool output", "sublabel": "run/<repo>/*.json", "pos": [770, 240], "size": [160, 64],
+      "sources": [{ "path": "job-security-scan/scripts/run-scan.sh", "line": 604, "end_line": 611, "label": "security-run-<stamp>" }] },
+    { "id": "prev", "type": "database", "label": "Previous run", "sublabel": "newest security-run-*", "pos": [1010, 80], "size": [180, 64],
+      "sources": [{ "path": "job-security-scan/scripts/lib/report_model.py", "line": 235, "end_line": 257, "label": "find_previous" }] },
+    { "id": "gen", "type": "backend", "label": "generate-report.py", "sublabel": "parse · fingerprint · compare", "pos": [1010, 240], "size": [180, 64],
+      "sources": [
+        { "path": "job-security-scan/scripts/generate-report.py", "line": 488, "end_line": 500, "label": "collect_findings" },
+        { "path": "job-security-scan/scripts/generate-report.py", "line": 834, "end_line": 879, "label": "compare + build" }
+      ] },
+    { "id": "outputs", "type": "frontend", "label": "Reports", "sublabel": "SUMMARY · md · html", "tag": "SUMMARY < 20 KB", "pos": [1280, 240], "size": [170, 64],
+      "sources": [
+        { "path": "job-security-scan/scripts/generate-report.py", "line": 721, "end_line": 741, "label": "write_reports" },
+        { "path": "job-security-scan/scripts/lib/report_formats.py", "line": 217, "end_line": 280, "label": "render_summary" }
+      ] },
+    { "id": "store", "type": "database", "label": "Report store v3", "sublabel": "index + findings/ shards", "tag": "sha256 · 4 MB cap", "pos": [1010, 420], "size": [180, 64],
+      "sources": [
+        { "path": "job-security-scan/scripts/lib/report_store.py", "line": 169, "end_line": 214, "label": "save" },
+        { "path": "job-security-scan/scripts/lib/report_store.py", "line": 274, "end_line": 310, "label": "iter_findings / load_full" }
+      ] },
+    { "id": "triage", "type": "backend", "label": "triage.py", "sublabel": "queue · next · record · apply", "tag": "Phase 9", "pos": [1010, 600], "size": [180, 64],
+      "sources": [
+        { "path": "job-security-scan/scripts/triage.py", "line": 140, "end_line": 200, "label": "cmd_queue (grouped, --limit)" },
+        { "path": "job-security-scan/scripts/triage.py", "line": 241, "end_line": 302, "label": "next / record" },
+        { "path": "job-security-scan/scripts/triage.py", "line": 376, "end_line": 416, "label": "cmd_apply" }
+      ] },
+    { "id": "verifier", "type": "security", "label": "Verifier sub-agents", "sublabel": "fresh, one item each", "pos": [1010, 780], "size": [180, 64],
+      "sources": [{ "path": "job-security-scan/references/verification.md", "line": 14, "end_line": 46, "label": "loop steps" }] }
+  ],
+  "boundaries": [
+    { "kind": "security-group", "label": "source-only: no edits, no network", "wraps": ["verifier"] }
+  ],
+  "connections": [
+    { "id": "invoke-scan", "from": "agent", "to": "runscan", "label": "invoke", "variant": "emphasis" },
+    { "id": "read-config", "from": "config", "to": "runscan", "label": "parse-config" },
+    { "id": "run-scanners", "from": "runscan", "to": "scanners", "label": "per repo", "variant": "emphasis" },
+    { "id": "write-raw", "from": "scanners", "to": "raw", "label": "write" },
+    { "id": "parse-raw", "from": "raw", "to": "gen", "label": "parse", "variant": "emphasis" },
+    { "id": "compare-prev", "from": "prev", "to": "gen", "label": "compare", "variant": "dashed" },
+    { "id": "render-reports", "from": "gen", "to": "outputs", "label": "render" },
+    { "id": "save-shards", "from": "gen", "to": "store", "label": "save shards", "variant": "emphasis" },
+    { "id": "load-shards", "from": "store", "to": "triage", "label": "load shards" },
+    { "id": "phase9-loop", "from": "agent", "to": "triage", "label": "Phase 9: queue / next / record / apply", "fromSide": "bottom", "toSide": "left" },
+    { "id": "one-item", "from": "triage", "to": "verifier", "label": "one item", "variant": "security" },
+    { "id": "apply-rewrite", "from": "triage", "to": "outputs", "label": "apply: rewrite", "variant": "dashed", "fromSide": "right", "toSide": "bottom" }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "Scan (Phases 0-8)", "items": [
+      "run-scan.sh parses repository.md, installs pinned tools, makes one security-run-<stamp>/ folder",
+      "quick: gitleaks, osv, shai-hulud; standard/deep: all scanners + SBOM + advisories + trufflehog"
+    ] },
+    { "dot": "emerald", "title": "Reports (v3.2)", "items": [
+      "security-report.json is a small index; findings live in sha256-checked findings/ shards",
+      "Unreadable previous run shows 'Change tracking unavailable'; --keep-verdicts fails loudly"
+    ] },
+    { "dot": "rose", "title": "Verification (Phase 9)", "items": [
+      "Grouped by root cause, capped at --limit 25; next hands out one item at a time",
+      "record stores triage/verdicts/<fp>.json; apply merges all-or-nothing + NEEDS-VALIDATION.md"
+    ] },
+    { "dot": "violet", "title": "Opt-in deep audit (Phase 10)", "items": [
+      "--audit prepares <repo>/audit/; agent runs references/audit/WORKFLOW.md",
+      "Confirmed audit findings rejoin the report as scanner 'audit'"
+    ] }
+  ]
+}

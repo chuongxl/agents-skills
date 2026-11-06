@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "receiptId": "d1f590d7-83df-4886-8a53-07f5bd68f24a",
+  "status": "current",
+  "command": "deliver",
+  "type": "workflow",
+  "input": "/Users/chuongnd/Github-me/agents-skills/.archify/workflow-job-security-scan-run-20261106-060924/candidate.json",
+  "output": "/Users/chuongnd/Github-me/agents-skills/.archify/workflow-job-security-scan-run-20261106-060924/job-security-scan-run-flow.html",
+  "specification": {
+    "sha256": "338abcd7750cd1a6bccdabb852496645e8b17d5cd1459eb55f8f24575abeaf33",
+    "bytes": 8060
+  },
+  "artifact": {
+    "sha256": "5a9a932cbff984f21b8ed5ba8290f9d2f4e14c886dfa06c48e6e4bd81bb092a8",
+    "bytes": 767624
+  }
+}

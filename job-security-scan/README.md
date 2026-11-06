@@ -240,6 +240,15 @@ Known, accepted findings go in `security-baseline.json` next to `repository.md` 
 left out of the counts; expired entries stop applying; entries matching nothing are flagged. If every
 CRITICAL/HIGH finding is accepted, the run exits 1 (warning) instead of 2.
 
+## DefectDojo import
+
+Import existing reports with the stdlib-only `scripts/import-defectdojo.py`.
+It defaults to dry-run, recovers full metadata from adjacent scanner JSON,
+preserves verification status, excludes secret excerpts and rejected findings,
+and never closes existing findings. Use `--update-existing` to repair details
+in older imports; `--include-code` opts into redacted non-secret report excerpts. See
+[DefectDojo usage and matching configuration](references/defectdojo.md).
+
 ## Installation & Setup
 
 ### Platform-Specific Setup
@@ -478,7 +487,12 @@ bash job-security-scan/scripts/run-scan.sh  # Re-downloads DB
 
 ## Version History
 
-- **v3.0** (current) — Deep audit (Phase 10, `--audit`) adapted from cloudflare/security-audit-skill: coverage
+- **v3.2** (current) - DefectDojo scanner-detail enrichment, opt-in redacted
+  excerpts, native fix/CVSS/CWE fields, run and clean-scan context, and explicit
+  matched-finding detail refresh preserving human review state.
+- **v3.1** - Opt-in DefectDojo importer with dry-run, verification-aware
+  conversion, bounded batches and private receipts; absent findings are never closed.
+- **v3.0** — Deep audit (Phase 10, `--audit`) adapted from cloudflare/security-audit-skill: coverage
   ledger, isolated hunters, adversarial validation, confirmed / needs-validation / rejected verdicts, Python
   validators, optional sandbox and evidence promotion; confirmed audit findings join the report as verified
   findings; baseline of accepted findings (`security-baseline.json`); commit and dirty flag per repo

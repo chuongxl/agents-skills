@@ -19,7 +19,7 @@ compatibility: >
 license: MIT
 metadata:
   author: one-om-ddm-team
-  version: "3.0"
+  version: "3.2"
   config-file: assets/repository.md
 allowed-tools: bash glob grep view create edit
 ---
@@ -374,6 +374,17 @@ The scanner reads untrusted repositories, so it is built not to be an attack pat
    remediation guidance in the report is for the reader.
 
 Secrets: never print secret values or the code line of a secret finding, only `file:line` and the rule.
+
+## DefectDojo export
+
+When explicitly asked to send an existing report to DefectDojo, use
+`scripts/import-defectdojo.py`; see [references/defectdojo.md](references/defectdojo.md)
+for dry-run, authentication and upload commands. This is opt-in, never part of a
+normal scan. Recover full scanner metadata from adjacent JSON by default; use
+`--update-existing` when repairing older imports. Include redacted non-secret
+excerpts only with explicit user approval via `--include-code`. Preserve
+verification status; never upload raw secret output or automatically close
+absent findings.
 
 ## CI Integration
 
