@@ -18,20 +18,22 @@ from the scanned repository, and never contacts a network service.
    Findings with one root cause in one repo become **one item**: dependency findings by advisory id + package +
    installed version (every lockfile and scanner that reports it), misconfigurations by scanner + rule (every
    file). The item lists all members under `group`. Items are ordered most severe first (new before unchanged)
-   and capped at the **budget: `--limit 25` by default**; the `summary` in `queue-index.json` and the printed
+   and capped at the **batch size of `--limit 25` by default**; the `summary` in `queue-index.json` and the printed
    line say how many items and findings stay pending. Options: `--limit N`, `--all` (no cap), `--repo NAME`
    (repeatable, e.g. to work through a large multi-repo scan one repo at a time), `--no-group` (one item per
    finding).
 2. Loop, one item at a time:
    1. `python3 -I scripts/triage.py next security-run-<datetime>` prints one queue item as JSON (finding +
-      context + group), or `{"done": true}` when every queued item has a recorded verdict.
+      context + group), or `{"done": true, "scope": "current_queue", "next_action": "status"}` when every
+      item in the current queue has a recorded verdict. This does not mean the whole run is verified.
    2. Start **one fresh sub-agent that has not seen the scan summary or any other verdict**. Give it only: the
       verifier prompt below, that one item and the repository path. If the agent cannot start sub-agents, do one
       separate pass per item from the item alone, and say in the summary that verification was done in-session,
       not independently.
    3. Keep the reply only if it is exactly one JSON object in the format below. Do not repair a malformed or
-      prose-wrapped reply: discard it, retry once with a new verifier, otherwise leave that finding pending and
-      stop the loop for it (record nothing).
+      prose-wrapped reply: discard it, retry once with a new verifier, otherwise leave that finding pending
+      (record nothing). Apply valid records before stopping or replacing the queue. Report the fingerprint
+      and `verifier_result_invalid_after_retry` as the blocker; do not fabricate a needs-validation verdict.
    4. Save the kept object: `python3 -I scripts/triage.py record security-run-<datetime> -` with the object on
       stdin (or a file path instead of `-`). It is checked and stored as `triage/verdicts/<fingerprint>.json`;
       a rejected object stores nothing. A second verdict for the same finding needs `--replace`.
@@ -44,7 +46,23 @@ from the scanned repository, and never contacts a network service.
    regenerates `SUMMARY.md` and the three reports and writes `NEEDS-VALIDATION.md`. A verdict on a grouped
    item's fingerprint also applies to every group member in the current queue that has no verdict yet and no
    record of its own. (A whole `{"verdicts": [ ... ]}` file still works: `triage.py apply <run> VERDICTS.json`.)
-4. To continue with the next batch, run `queue` again (verdicts already applied are skipped) and repeat.
+4. Run `python3 -I scripts/triage.py status security-run-<datetime>`. It reads the validated report and
+   prints compact live verification counts, batch progress and `next_action`.
+   - `apply` means saved verdicts have not reached the report. Apply them before changing the queue,
+     including when resuming. `queue` refuses to overwrite a queue while verdicts remain unapplied.
+   - `next` means the current batch still has unrecorded items. Resume it without rebuilding.
+   - `queue` means the applied batch is exhausted but eligible findings remain. Queue the next batch,
+     using `--repo NAME` when working repo by repo.
+   - `done` means the run's profile has no pending eligible findings. Needs-validation verdicts still
+     need owner checks; done does not mean clean.
+5. Repeat until `python3 -I scripts/triage.py status security-run-<datetime> --require-complete` exits 0.
+   The default 25 items limit one batch, not total work or agent invocations. Do not stop after one batch
+   or invent a total cap. A user-requested skip or an actual execution, verifier or resource blocker must
+   appear in the final summary with the pending count and the command to resume the same run.
+
+When Phase 10 was requested, follow the scheduling rules in [audit/WORKFLOW.md](audit/WORKFLOW.md).
+Phase 9 pending findings do not block Phase 10. Keep its audit-agent budget separate from scanner
+verification. Never load whole report shards into the parent context to count progress.
 
 ## Verifier prompt
 

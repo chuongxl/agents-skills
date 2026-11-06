@@ -7,14 +7,21 @@
       previous run). Findings with the same root cause in one repo become one item (one verifier):
       dependency findings by advisory + package + version (all scanners, all lockfiles), misconfigurations
       by scanner + rule. Items are ordered most severe first and capped at --limit (default 25, the
-      verification budget); the summary says how many findings stay pending. --repo restricts the queue
-      to those repos. Writes RUN_DIR/triage/queue-index.json (summary; per item fingerprint, repo,
+      batch size, not a total verification budget); the summary says how many findings stay pending.
+      --repo restricts the queue to those repos. Writes RUN_DIR/triage/queue-index.json (summary; per item fingerprint, repo,
       severity, group size, batch file; no code) and triage/batch-NNN.json files of 10 items. Each item
       carries a context window of +/-15 lines from the repository. Secrets, credential files and symlinks
       get no context and no code.
 
   python3 -I scripts/triage.py next RUN_DIR
-      Prints the next queued item that has no recorded verdict, or {"done": true}.
+      Prints the next queued item that has no recorded verdict, or {"done": true, "scope": "current_queue",
+      "next_action": "status"}. Queue exhaustion does not mean run-wide verification is complete.
+
+  python3 -I scripts/triage.py status RUN_DIR [--require-complete]
+      Prints compact run-wide verification counts, current batch progress and the next action.
+      --require-complete exits 1 while eligible findings remain pending or saved verdicts remain unapplied.
+      Needs-validation verdicts are processed findings, not pending work; this check does not prove a
+      clean scan or a completed deep audit.
 
   python3 -I scripts/triage.py record RUN_DIR FILE|- [--replace]
       Checks one verdict object (see references/verification.md) and saves it as
@@ -137,6 +144,19 @@ def _order(f):
             f.get("repo") or "", f.get("file") or "", f.get("line") or 0, f["fingerprint"])
 
 
+def unapplied_records(doc, run_dir):
+    if not any((Path(run_dir) / "triage" / "verdicts").glob("*.json")):
+        return set()
+    by_fp = {f["fingerprint"]: f for f in doc["findings"]}
+    try:
+        records = parse_verdicts(_recorded_verdicts(run_dir), by_fp)
+    except (OSError, UnicodeDecodeError, ValueError) as exc:
+        raise SystemExit(fail("cannot read recorded verdicts: %s" % exc))
+    return {fp for fp, verdict, severity, detail in records
+            if (by_fp[fp].get("verdict"), by_fp[fp].get("verified_severity"), by_fp[fp].get("verdict_detail") or {})
+            != (verdict, severity, detail)}
+
+
 def cmd_queue(run_dir, limit=DEFAULT_LIMIT, repos=None, grouping=True):
     doc = load_run(run_dir)
     run = doc.get("run") or {}
@@ -145,6 +165,9 @@ def cmd_queue(run_dir, limit=DEFAULT_LIMIT, repos=None, grouping=True):
     unknown = sorted(set(repos or ()) - known)
     if unknown:
         return fail("--repo %s is not in this report (repos: %s)" % (", ".join(unknown), ", ".join(sorted(known))))
+    if unapplied_records(doc, run_dir):
+        return fail("recorded verdicts have not been applied - run: triage.py apply %s before rebuilding the queue"
+                    % run_dir)
     eligible = [f for f in doc["findings"] if not f.get("verdict") and report_model.is_queued(f, profile)
                 and (not repos or f.get("repo") in repos)]
     groups = {}
@@ -243,7 +266,7 @@ def cmd_next(run_dir):
     pending = [i for i in index["items"] if isinstance(i, dict) and FINGERPRINT.match(str(i.get("fingerprint")))
                and not _verdict_path(run_dir, i["fingerprint"]).exists()]
     if not pending:
-        print(json.dumps({"done": True}))
+        print(json.dumps({"done": True, "scope": "current_queue", "next_action": "status"}))
         return 0
     head = pending[0]
     batch = str(head.get("batch") or "")
@@ -259,6 +282,25 @@ def cmd_next(run_dir):
             print("triage: %d left after this one" % (len(pending) - 1), file=sys.stderr)
             return 0
     return fail("%s does not hold %s - run: triage.py queue %s" % (batch, head["fingerprint"], run_dir))
+
+
+def cmd_status(run_dir, require_complete=False):
+    doc = load_run(run_dir)
+    by_fp = {f["fingerprint"]: f for f in doc["findings"]}
+    items = []
+    if (Path(run_dir) / "triage" / "queue-index.json").exists():
+        items = _queue_index(run_dir)["items"]
+    unrecorded = sum(1 for i in items if isinstance(i, dict) and i.get("fingerprint") in by_fp
+                     and not by_fp[i["fingerprint"]].get("verdict")
+                     and not _verdict_path(run_dir, i["fingerprint"]).exists())
+    unapplied = len(unapplied_records(doc, run_dir))
+    complete = doc["verification"]["pending"] == 0 and not unapplied
+    action = "apply" if unapplied else "next" if unrecorded else "done" if complete else "queue"
+    print(json.dumps({"profile": doc["run"]["profile"], "verification": doc["verification"],
+                      "verification_complete": complete, "next_action": action,
+                      "batch": {"queued_items": len(items), "unrecorded_items": unrecorded,
+                                "unapplied_items": unapplied}}))
+    return 1 if require_complete and not complete else 0
 
 
 def cmd_record(run_dir, source, replace):
@@ -435,6 +477,8 @@ def main(argv):
         return cmd_queue(a.run_dir, None if a.all else a.limit, set(a.repo), not a.no_group)
     if len(argv) == 3 and argv[1] == "next":
         return cmd_next(argv[2])
+    if len(argv) in (3, 4) and argv[1] == "status" and (len(argv) == 3 or argv[3] == "--require-complete"):
+        return cmd_status(argv[2], len(argv) == 4)
     if len(argv) in (4, 5) and argv[1] == "record" and (len(argv) == 4 or argv[4] == "--replace"):
         return cmd_record(argv[2], argv[3], len(argv) == 5)
     if len(argv) in (3, 4) and argv[1] == "apply":

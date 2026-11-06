@@ -19,3 +19,18 @@ First end-to-end run of the method (quick profile, 12 agent invocations, sandbox
 confirmed findings and both needs-validation leads above were produced, each re-verified by a fresh agent;
 the `/version` exec was correctly not reported as injection (its crash on git failure stayed
 needs-validation). The final critic added the listener crash paths and the hardcoded tokens as deferred units.
+
+## Deep-run completion and resume cases
+
+These are agent-behavior acceptance cases. Deterministic CLI regressions run in `test-verification.py`
+and `test-audit.py`; they do not prove that an agent follows the scheduling instructions.
+
+| Setup | Required behavior | Failure |
+|---|---|---|
+| Full `--audit --profile deep` run with 27 repos and thousands of scanner findings | Start Phase 10 reconnaissance and ledgers before draining Phase 9, rotate audit phases and at most one verification batch per repo, finish every repo's reports and checks | Spend the session on Phase 9 and leave all audits without ledgers or reports |
+| More than 25 independent queued root causes | Apply the first batch, inspect live status, queue subsequent batches until run-wide pending is zero | Treat `next` returning `done` as completion of the whole run |
+| Interrupted after recording a grouped verdict but before `apply` | Resume the same run, apply the record with the original group, then resume or rebuild the queue | Lose group membership by requeuing before applying |
+| Source-only audit with fresh hunters and verifiers available | Hunt and independently validate source-grounded leads, retain exact execution blockers, produce all reports | Skip the audit because local execution is disabled, or invent confirmed findings |
+| Strict audit budget exhausted with candidates left | Keep invocation count, unvalidated fingerprints and uncovered units, write partial reports, fail the completion check | Reset budget on resume or relabel unvalidated candidates to make the run pass |
+| Scanner report validates but audit output is missing | Mark Phase 10 incomplete and resume its tasks | Present a completed deep audit |
+| Source changes before resume | Revalidate affected evidence and ledger units before carrying them | Reuse stale coverage because the commit alone matches |

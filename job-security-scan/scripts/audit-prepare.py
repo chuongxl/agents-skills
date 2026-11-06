@@ -197,9 +197,14 @@ which adapts the method in `references/audit/METHOD.md` to this skill. Report on
 2. Phase 1-6 as in WORKFLOW.md: reconnaissance -> `architecture.md` + `coverage-ledger.json`
    (`python3 -I {skill}/scripts/audit-ledger.py seed units.json --out {audit}/coverage-ledger.json`),
    hunting waves, independent validation, `findings.json`, fresh-eyes verification.
+   Start this audit before draining Phase 9. Follow WORKFLOW.md's multi-repo scheduling and resume rules.
+   Checkpoint agent_invocations and next_action in run-metadata.json after each result; preserve the
+   strict audit budget across resumes. Scanner verification has a separate batch size, not this budget.
 3. Validate after every ledger or findings update:
    `python3 -I {skill}/scripts/validate-audit.py run {audit}`
 4. Set `run_status` in `run-metadata.json` to `complete` or `incomplete` (+ `incomplete_reason`).
+   Before claiming complete, run `python3 -I {skill}/scripts/validate-audit.py complete {audit}`.
+   A valid scanner report or exhausted triage batch does not complete this audit.
 5. Regenerate the run's reports so the audit appears next to the scanner findings:
    `{regen}`
    (same scope as this run; it also merges the audit, or says why it could not)

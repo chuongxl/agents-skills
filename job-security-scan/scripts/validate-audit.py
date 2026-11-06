@@ -5,6 +5,7 @@ Usage:
   python3 -I validate-audit.py findings <run>/<repo>/audit/findings.json
   python3 -I validate-audit.py ledger   <run>/<repo>/audit/coverage-ledger.json
   python3 -I validate-audit.py run      <run>/<repo>/audit        # both files, plus run-metadata.json
+  python3 -I validate-audit.py complete <run>/<repo>/audit        # final artifacts and no unfinished work
   python3 -I validate-audit.py hunter   result.json [--assigned ID ...]   # one hunter's structured result
   python3 -I validate-audit.py verifier result.json [--fingerprint FP]    # one verifier's decision
 
@@ -75,11 +76,11 @@ def check_agent_result(kind, path, extra):
 def main(argv):
     if len(argv) >= 3 and argv[1] in ("hunter", "verifier"):
         return check_agent_result(argv[1], argv[2], argv[3:])
-    if len(argv) != 3 or argv[1] not in ("findings", "ledger", "run"):
+    if len(argv) != 3 or argv[1] not in ("findings", "ledger", "run", "complete"):
         sys.stderr.write(__doc__)
         return 2
     kind, target = argv[1], argv[2]
-    if kind != "run":
+    if kind not in ("run", "complete"):
         return audit.main_validate(kind, target)
     worst = 0
     for name, check in (("run-metadata.json", check_metadata),
@@ -91,6 +92,30 @@ def main(argv):
             worst = max(worst, 1)
             continue
         worst = max(worst, check(path))
+    if kind == "complete" and worst == 0:
+        meta = audit.load_json(os.path.join(target, "run-metadata.json"))
+        ledger = audit.load_json(os.path.join(target, "coverage-ledger.json"))
+        records = audit.load_json(os.path.join(target, "findings.json"))
+        errors = []
+        if meta["run_status"] != "complete":
+            errors.append("run_status is %s: %s" % (meta["run_status"], meta.get("incomplete_reason") or "not final"))
+        for name in ("architecture.md", "REPORT.md", "FINDINGS-DETAIL.md", "NEEDS-VALIDATION.md"):
+            path = os.path.join(target, name)
+            if not os.path.isfile(path) or os.path.getsize(path) == 0:
+                errors.append("%s missing or empty" % name)
+        finalized = {r["fingerprint"] for r in records}
+        for unit in ledger:
+            if unit["status"] in ("planned", "in_progress", "blocked", "deferred"):
+                errors.append("%s: unfinished unit (%s)" % (unit["coverage_id"], unit["status"]))
+            for fp in unit["result_fingerprints"]:
+                if fp not in finalized:
+                    errors.append("%s: unvalidated candidate %s" % (unit["coverage_id"], fp))
+        if errors:
+            print("INCOMPLETE %s" % target)
+            for error in errors[:audit.LIMITS["errors"]]:
+                print("  " + error)
+            return 1
+        print("COMPLETE %s (artifact and ledger checks only, not proof of absence of vulnerabilities)" % target)
     return worst
 
 

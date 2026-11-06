@@ -19,9 +19,9 @@ compatibility: >
 license: MIT
 metadata:
   author: one-om-ddm-team
-  version: "3.2"
+  version: "3.3.1"
   config-file: assets/repository.md
-allowed-tools: bash glob grep view create edit
+allowed-tools: bash glob grep view create edit ask_user
 ---
 
 # Job Security Scan
@@ -30,7 +30,8 @@ Generic, config-driven security scanner for any multi-repo workspace.
 
 > **Report only.** This skill finds and reports problems; it never fixes them. Never modify, patch, upgrade,
 > delete or commit anything in a scanned repo, and never offer, ask or attempt to fix findings. Remediation
-> appears only as guidance text in the report (`references/remediation.md`). End after presenting the report.
+> appears only as guidance text in the report (`references/remediation.md`). End after presenting the report and
+> asking whether the user wants to import it into DefectDojo.
 
 ## Modes
 
@@ -206,16 +207,25 @@ the raw output. A CLEAN row with "nothing to check" means the repo had no lockfi
 After `run-scan.sh`, the serious findings are checked by **independent verifiers** before you report. Follow
 `references/verification.md` exactly:
 
+For `--audit` or `--scanner audit`, start Phase 10 before draining Phase 9. Follow the multi-repo
+scheduling and resume rules in `references/audit/WORKFLOW.md`. Thousands of scanner findings must not
+prevent the requested code audit from starting.
+
 1. `python3 -I scripts/triage.py queue security-run-<datetime>` (prints how many are queued and how many stay
    pending; `quick` queues none). One root cause per repo (same advisory + package + version, same misconfig
-   rule) is one item; at most `--limit 25` items by default. Use `--repo NAME` to work a large scan repo by repo.
-2. Loop: `triage.py next <run>` prints one item (or `{"done": true}`); give it to one **fresh sub-agent** with
+   rule) is one item; at most `--limit 25` items per batch by default, not per run.
+   Use `--repo NAME` to work a large scan repo by repo.
+2. Loop: `triage.py next <run>` prints one item (or `{"done": true, "scope": "current_queue", "next_action": "status"}`);
+   give it to one **fresh sub-agent** with
    the verifier prompt and the repo path — nothing else. Verifiers read source only: no edits, no running repo
    code, no network, never open a file holding a secret.
 3. Keep only a reply that is a single JSON object and save it with `triage.py record <run> -` (object on stdin).
    Never open the queue, batch or report JSON files yourself; one item at a time keeps large runs in context.
 4. `python3 -I scripts/triage.py apply security-run-<datetime>` merges every recorded verdict (a grouped item's
-   verdict covers its group). Queue again for the next batch; report the pending count.
+   verdict covers its group). Use `triage.py status <run>` to choose `apply`, `next`, `queue` or `done`.
+   Continue batches until `triage.py status <run> --require-complete` exits 0, unless the user explicitly
+   skips verification or a concrete blocker prevents progress. A batch ending or a report passing validation
+   is not completion. Do not invent a total verification budget; `--budget` belongs to Phase 10.
 
 Verdicts: **confirmed** (verified severity, never above demonstrated impact), **needs validation** (the exact
 missing fact plus a safe check, listed in `NEEDS-VALIDATION.md`), **rejected** (moved to "Dismissed (with
@@ -240,7 +250,10 @@ scanners and to Phase 9; it does not replace them.
    calibrated by likelihood × demonstrated impact), **needs validation** (a specific fact outside the source
    decides it; no severity, with the exact check that resolves it), **rejected** (disproved; kept so later
    runs do not repeat it). A missing best practice with no affected principal is a hardening note.
-4. `python3 -I scripts/validate-audit.py run <audit-dir>` checks the ledger and findings. Then run the
+4. `python3 -I scripts/validate-audit.py run <audit-dir>` checks the ledger and findings during execution.
+   Before declaring Phase 10 complete, `validate-audit.py complete <audit-dir>` must exit 0 for every repo.
+   It also checks final status, report files, unfinished units and candidates missing from `findings.json`.
+   Then run the
    `generate-report.py` command in `AGENT-TASK.md`: confirmed findings join the run's report as ordinary
    findings (scanner `audit`, already verified, so Phase 9 skips them) and the report gains a Deep audit
    section with coverage, leads that need validation, gaps and hardening notes. An unfinished or invalid audit
@@ -374,18 +387,41 @@ The scanner reads untrusted repositories, so it is built not to be an attack pat
 
 `run-scan.sh` writes the report itself; the agent does not compose one. After the run:
 
-1. Run Phase 9 (verification) unless the profile is `quick` or the user asked to skip it. If a deep audit
-   was prepared, run it now (Phase 10) and regenerate the report with `--keep-verdicts`, as `AGENT-TASK.md` says.
+1. If a deep audit was prepared, use `references/audit/WORKFLOW.md` to schedule Phase 10 with Phase 9.
+   Otherwise run Phase 9 unless the profile is `quick` or the user asked to skip it.
+   Regenerate the report with `--keep-verdicts`, as `AGENT-TASK.md` says.
+   Check Phase 9 with `triage.py status <run> --require-complete` and Phase 10 with
+   `validate-audit.py complete <audit-dir>` for every requested repo. A valid report can describe an
+   incomplete run. If either check fails, report the incomplete phase, exact blocker and resume action,
+   not a completed deep audit. Never replace pending work with blanket `needs_validation` verdicts or
+   empty findings merely to pass a check.
 2. Read `security-run-<datetime>/SUMMARY.md` (the last console line names the folder). Do not open
    `security-report.json` or `findings/` directly; they can be many megabytes.
 3. Reply with a short summary: the per-repo status table, the Shai-Hulud check row for every target (verdict
    and what was checked; say plainly if it errored or did not run), the changes since the last run, the confirmed
    Critical and High findings as `file:line` with their rule, how many need validation, were dismissed or are
    still pending, any deep-audit findings (`file:line`, severity) and leads, and the paths of the report files.
-4. Stop there. Do not offer, propose or ask to fix anything, and do not edit any scanned file — the
-   remediation guidance in the report is for the reader.
+4. Stop after presenting the report and asking the optional DefectDojo question below. Do not offer, propose or ask
+   to fix anything, and do not edit any scanned file — the remediation guidance in the report is for the reader.
 
 Secrets: never print secret values or the code line of a secret finding, only `file:line` and the rule.
+
+## DefectDojo export
+
+After presenting each completed scan, ask whether the user wants to import its
+report into DefectDojo. If they agree, ask for the exact DefectDojo base URL
+before uploading. A direct upload request counts as consent, but still requires
+the URL. Never assume localhost, `DEFECTDOJO_URL`, or a guessed address. Do not
+upload until both consent and the URL are explicit.
+
+If the user declines, stop. Otherwise use `scripts/import-defectdojo.py` with
+the supplied URL; see [references/defectdojo.md](references/defectdojo.md) for
+dry-run, authentication and upload commands. Import is opt-in and never part of
+the scan itself. Recover full scanner metadata from adjacent JSON by default;
+use `--update-existing` when repairing older imports. Include redacted
+non-secret excerpts only with explicit user approval via `--include-code`.
+Preserve verification status; never upload raw secret output or automatically
+close absent findings.
 
 ## CI Integration
 
