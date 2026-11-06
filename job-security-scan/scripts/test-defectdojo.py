@@ -2,10 +2,12 @@
 """Offline tests for the DefectDojo importer. Run: python3 -I scripts/test-defectdojo.py."""
 
 import importlib.util
+import io
 import json
 import sys
 import tempfile
 import unittest
+from contextlib import redirect_stderr
 from copy import deepcopy
 from pathlib import Path
 from unittest.mock import patch
@@ -14,6 +16,7 @@ from urllib import error
 SCRIPTS = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPTS / "lib"))
 import report_model  # noqa: E402
+import report_store  # noqa: E402
 
 spec = importlib.util.spec_from_file_location("import_defectdojo", SCRIPTS / "import-defectdojo.py")
 importer = importlib.util.module_from_spec(spec)
@@ -26,11 +29,13 @@ def document():
            "package": "example", "installed_version": "1.0", "fixed_version": "2.0",
            "rule_id": "CVE-2026-1234", "title": "Outdated dependency", "description": "Upgrade it.",
            "url": "https://example.com/advisory"}
-    return report_model.build_document([row], {
+    doc = report_model.build_document([row], {
         "org": "org", "team": "team", "repos": ["app"], "run_dir": "/tmp/security-run-example",
         "profile": "standard", "coverage": {"app": {"trivy": "medium"}},
         "generated_at": "2026-11-05T14:09:18+07:00",
     })
+    doc["schema_version"] = 2
+    return doc
 
 
 class ConversionTests(unittest.TestCase):
@@ -159,13 +164,30 @@ class ConversionTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "security-report.json"
             doc = document()
+            doc["schema_version"] = 2
             doc["padding"] = " " * (6 * 1024 * 1024)
             path.write_text(json.dumps(doc))
-            self.assertEqual(importer.load_report(tmp)["schema_version"], 2)
+            self.assertEqual(importer.load_report(tmp)["findings"][0]["title"], "Outdated dependency")
+            self.assertEqual(importer.load_report(path)["findings"][0]["title"], "Outdated dependency")
             doc["counts"]["HIGH"] = 0
             path.write_text(json.dumps(doc))
             with self.assertRaisesRegex(ValueError, "counts do not match"):
                 importer.load_report(tmp)
+
+    def test_v3_run_folder_imports_finding_from_integrity_checked_shard(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = Path(tmp)
+            report_store.save(document(), run_dir)
+            index = json.loads((run_dir / "security-report.json").read_text())
+            self.assertEqual(index["schema_version"], 3)
+            self.assertEqual(len(index["shards"]), 1)
+            self.assertTrue((run_dir / index["shards"][0]["file"]).is_file())
+
+            loaded = importer.load_report(run_dir)
+            batches, _ = importer.build_batches(loaded, "main")
+
+            self.assertEqual(len(batches[0]["report"]["findings"]), 1)
+            self.assertEqual(batches[0]["report"]["findings"][0]["title"], "Outdated dependency")
 
 
 class EnrichmentTests(unittest.TestCase):
@@ -373,7 +395,7 @@ class TransportTests(unittest.TestCase):
 
     def test_dry_run_never_connects_and_output_is_private(self):
         with tempfile.TemporaryDirectory() as tmp:
-            path = Path(tmp) / "input.json"
+            path = Path(tmp) / "security-report.json"
             path.write_text(json.dumps(document()))
             output = Path(tmp) / "export"
             with patch.object(importer, "upload_batch") as upload:
@@ -385,6 +407,22 @@ class TransportTests(unittest.TestCase):
             self.assertEqual(summary["findings"], 1)
             with self.assertRaises(FileExistsError):
                 importer.write_private(output / "summary.json", {})
+
+    def test_upload_requires_explicit_url_before_reading_credentials(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            report = Path(tmp) / "security-report.json"
+            report.write_text(json.dumps(document()))
+            stderr = io.StringIO()
+            with patch.object(importer, "upload_batch") as upload, \
+                    redirect_stderr(stderr):
+                result = importer.main([
+                    str(report), "--branch", "main", "--upload",
+                    "--token-file", str(Path(tmp) / "missing-token"),
+                ])
+
+            self.assertEqual(result, 1)
+            self.assertIn("requires an explicit --url", stderr.getvalue())
+            upload.assert_not_called()
 
 
 if __name__ == "__main__":

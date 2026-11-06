@@ -25,7 +25,7 @@
 # Reads all team/repo config from repository.md — no hardcoded values.
 #
 # Output: every run writes ./security-run-YYYYMMDD-HHMMSS/ in the folder it is run from, holding
-# security-report.md, security-report.json, security-report.html and each tool's raw output.
+# SUMMARY.md, security-report.{md,json,html}, findings/ (JSON shards) and each tool's raw output.
 # Caches live outside the workspace: $JOB_SECURITY_SCAN_CACHE > cache-dir: > (deprecated) output-dir:
 # > ${XDG_CACHE_HOME:-$HOME/.cache}/job-security-scan.  SECURITY_RUN_ROOT moves the run folders (CI, tests).
 # This script only reports: it never changes any scanned repo.
@@ -678,8 +678,9 @@ generate_reports() {
       --repos-root  "$WORKSPACE" \
       --home        "$HOME" \
       >"$RUN_DIR/report.log" 2>&1; then
+    echo "  ✅ Summary  → $RUN_DIR/SUMMARY.md"
     echo "  ✅ Markdown → $RUN_DIR/security-report.md"
-    echo "  ✅ JSON     → $RUN_DIR/security-report.json"
+    echo "  ✅ JSON     → $RUN_DIR/security-report.json (+ findings/)"
     echo "  ✅ HTML     → $RUN_DIR/security-report.html"
     if [[ "$(uname -s)" == "Darwin" && -z "${CI:-}" ]]; then
       open "$RUN_DIR/security-report.html" 2>/dev/null || true

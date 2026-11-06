@@ -31,6 +31,11 @@ CONFIG = ('---\nteam: t\norg: o\nmonorepo-root: "."\nci-runner: x\nfail-on-sever
           'repos:\n  - name: api\n    active: true\n    has-dockerfile: false\n---\n')
 
 
+
+def load_doc(run_dir):
+    import report_store
+    return report_store.load_full(run_dir)
+
 class Env(unittest.TestCase):
     def setUp(self):
         self.tmp = Path(tempfile.mkdtemp())
@@ -66,7 +71,7 @@ class Env(unittest.TestCase):
                             "--repos-root", str(self.ws), "--home", str(self.tmp)] + list(extra),
                            stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
-        return json.loads((self.ws / run / "security-report.json").read_text())
+        return load_doc(self.ws / run)
 
 
 GOOD = lambda: sorted([ta.confirmed(), ta.needs_validation(), ta.rejected()], key=lambda r: r["fingerprint"])  # noqa
@@ -155,7 +160,8 @@ class MergeIntoReportTests(Env):
         sem.update(verdict="rejected", verdict_detail={"reason": "test only"})
         import report_model
         report_model.refresh(doc)
-        (self.ws / run / "security-report.json").write_text(json.dumps(doc))
+        import report_store
+        report_store.save(doc, self.ws / run)
         self.write_audit(run, GOOD())
         again = self.generate(run, "--keep-verdicts")
         by = dict((f["scanner"], f) for f in again["findings"])
@@ -244,7 +250,7 @@ class RunScanTests(Env):
         self.assertEqual((meta["profile"], meta["budget"], meta["run_status"]), ("quick", 12, "awaiting_agent"))
         top = json.loads((run / "run-metadata.json").read_text())
         self.assertIn("api", top["source_refs"])
-        doc = json.loads((run / "security-report.json").read_text())
+        doc = load_doc(run)
         self.assertEqual(report_schema.validate(doc), [])
         self.assertIn("api", doc["run"]["source_refs"])
         self.assertFalse(doc["audit"]["api"]["valid"])
@@ -268,7 +274,7 @@ class RunScanTests(Env):
                         str(self.ws / "api"), dirs_exist_ok=True)
         r, run = self.scan("--scanner", "shai-hulud")
         self.assertEqual(r.returncode, 2, r.stdout + r.stderr)
-        doc = json.loads((run / "security-report.json").read_text())
+        doc = load_doc(run)
         crit = [f["fingerprint"] for f in doc["findings"] if f["severity"] in ("CRITICAL", "HIGH")]
         self.assertTrue(crit)
         (self.ws / "security-baseline.json").write_text(json.dumps({"version": 1, "entries": [
@@ -276,7 +282,7 @@ class RunScanTests(Env):
         r2, run2 = self.scan("--scanner", "shai-hulud")
         self.assertEqual(r2.returncode, 1, r2.stdout + r2.stderr)
         self.assertIn("downgraded to warning", r2.stdout)
-        doc2 = json.loads((run2 / "security-report.json").read_text())
+        doc2 = load_doc(run2)
         self.assertEqual(doc2["counts"]["CRITICAL"] + doc2["counts"]["HIGH"], 0)
         self.assertEqual(report_schema.validate(doc2), [])
 

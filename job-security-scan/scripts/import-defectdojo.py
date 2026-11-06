@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Import a v2 security-report.json into DefectDojo. Stdlib only; Python 3.8+.
+"""Import a v2 or v3 security report into DefectDojo. Stdlib only; Python 3.8+.
 
 Dry-run by default. --upload requires DEFECTDOJO_API_TOKEN or --token-file.
 Never closes/reopens old findings or changes the input. Source excerpts are opt-in.
@@ -21,7 +21,7 @@ from urllib import error, parse, request
 sys.path.insert(0, str(Path(__file__).resolve().parent / "lib"))
 
 import report_model  # noqa: E402
-import report_schema  # noqa: E402
+import report_store  # noqa: E402
 import defectdojo_enrich as enrichment  # noqa: E402
 
 MAX_BYTES = 50 * 1024 * 1024
@@ -33,20 +33,25 @@ SEVERITIES = dict(zip(report_model.SEVERITIES, ("Critical", "High", "Medium", "L
 def load_report(path, enrich=True):
     path = Path(path).expanduser()
     if path.is_dir():
-        path /= "security-report.json"
-    if path.stat().st_size > MAX_BYTES:
+        run_dir = path
+    elif path.name == report_store.INDEX_NAME and path.is_file():
+        run_dir = path.parent
+    else:
+        raise ValueError("report must be a run folder or its security-report.json file")
+    report_path = run_dir / report_store.INDEX_NAME
+    if report_path.stat().st_size > MAX_BYTES:
         raise ValueError("report exceeds the 50 MiB import limit")
-    doc = json.loads(path.read_text(encoding="utf-8"))
-    errors = report_schema.validate(doc)
-    if errors:
-        raise ValueError("invalid v2 report: " + "; ".join(errors[:5]))
+    try:
+        doc = report_store.load_full(run_dir)
+    except report_store.ReportError as exc:
+        raise ValueError(str(exc)) from None
     for f in doc["findings"]:
         if not re.fullmatch(r"[0-9a-f]{16}", f["fingerprint"]):
             raise ValueError("invalid finding fingerprint")
         for key in ("repo", "scanner", "title", "file", "rule_id"):
             if not isinstance(f.get(key), str):
                 raise ValueError("finding %s must be text" % key)
-    return enrichment.enrich(doc, path.parent) if enrich else doc
+    return enrichment.enrich(doc, run_dir) if enrich else doc
 
 
 def convert_finding(f, doc, include_code=False):
@@ -369,7 +374,7 @@ def write_private(path, data):
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("report", help="Run folder or security-report.json")
-    parser.add_argument("--url", default=os.environ.get("DEFECTDOJO_URL", "http://127.0.0.1:8080"))
+    parser.add_argument("--url", help="DefectDojo base URL; required with --upload")
     parser.add_argument("--branch", help="Engagement branch/scope; required when absent from report")
     parser.add_argument("--repo", help="Import only this repository")
     parser.add_argument("--upload", action="store_true", help="Send results; otherwise dry-run only")
@@ -385,7 +390,9 @@ def main(argv=None):
     try:
         if not 1 <= args.batch_size <= 1000 or args.timeout < 1:
             raise ValueError("batch size must be 1-1000 and timeout must be positive")
-        url = validate_url(args.url)
+        if args.upload and not args.url:
+            raise ValueError("--upload requires an explicit --url for the authorized DefectDojo instance")
+        url = validate_url(args.url) if args.url else None
         doc = load_report(args.report, enrich=not args.no_enrich)
         batches, skipped = build_batches(doc, args.branch, args.repo, args.batch_size, args.include_code)
         token = None

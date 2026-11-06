@@ -30,6 +30,11 @@ def run(*args, **kw):
                           stderr=subprocess.PIPE, universal_newlines=True, **kw)
 
 
+
+def load_doc(run_dir):
+    import report_store
+    return report_store.load_full(run_dir)
+
 class TempDirCase(unittest.TestCase):
     def setUp(self):
         self.tmp = Path(tempfile.mkdtemp())
@@ -120,7 +125,7 @@ class ReportSectionTests(TempDirCase):
         r = run(GENERATE, "--results-dir", self.run_dir, "--config", self.cfg, "--out-dir", self.run_dir,
                 "--repos-root", self.repos, "--home", self.tmp / "home", *extra)
         self.assertIn(r.returncode, (0,), r.stdout + r.stderr)
-        doc = json.loads((self.run_dir / "security-report.json").read_text())
+        doc = load_doc(self.run_dir)
         md = (self.run_dir / "security-report.md").read_text()
         page = (self.run_dir / "security-report.html").read_text()
         return doc, md, page
@@ -217,7 +222,7 @@ class ReportSectionTests(TempDirCase):
         r = run(GENERATE, "--results-dir", later, "--config", self.cfg, "--out-dir", later,
                 "--repos-root", self.repos, "--home", self.tmp / "home")
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
-        doc = json.loads((later / "security-report.json").read_text())
+        doc = load_doc(later)
         self.assertEqual(doc["run"]["previous_run"], str(self.run_dir.resolve()))
         self.assertEqual(doc["fixed"], [])
         self.assertEqual(doc["shai_hulud"]["targets"][0]["verdict"], "error")

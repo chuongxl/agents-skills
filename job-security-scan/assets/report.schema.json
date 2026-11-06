@@ -1,137 +1,1224 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/chuongxl/agents-skills/job-security-scan/assets/report.schema.json",
-  "title": "job-security-scan security-report.json (schema v2)",
-  "description": "Documentation mirror of scripts/validate-report.py, which is the enforced contract. Rules a JSON Schema cannot express are enforced there only: unique fingerprints, counts and verification summary match the findings, verified_severity never above demonstrated impact, no code excerpt on secret rows.",
+  "title": "security-report.json v3 index",
+  "description": "Run index written by job-security-scan v3.1+. Holds every report field except the findings, which live in findings/*.json shards (see $defs/shard) listed in `shards` with their size and sha256. `fixed` holds at most 2,000 entries inline; the rest are in `fixed_shards`. Read and write only through scripts/lib/report_store.py; check with scripts/validate-report.py <run>.",
   "type": "object",
-  "required": ["schema_version", "generated_at", "team", "org", "run_dir", "run", "scanners", "counts", "repos", "fixed", "shai_hulud", "verification", "findings"],
+  "required": [
+    "schema_version",
+    "generated_at",
+    "team",
+    "org",
+    "run_dir",
+    "run",
+    "scanners",
+    "counts",
+    "repos",
+    "fixed",
+    "shai_hulud",
+    "verification",
+    "shards",
+    "findings_total",
+    "fixed_total",
+    "fixed_shards"
+  ],
   "properties": {
-    "schema_version": {"const": 2},
-    "generated_at": {"type": "string"},
-    "team": {"type": "string"},
-    "org": {"type": "string"},
-    "config": {"type": "string"},
-    "run_dir": {"type": "string"},
+    "schema_version": {
+      "const": 3
+    },
+    "generated_at": {
+      "type": "string"
+    },
+    "team": {
+      "type": "string"
+    },
+    "org": {
+      "type": "string"
+    },
+    "config": {
+      "type": "string"
+    },
+    "run_dir": {
+      "type": "string"
+    },
     "run": {
       "type": "object",
-      "required": ["profile", "since", "partial", "previous_run"],
+      "required": [
+        "profile",
+        "since",
+        "partial",
+        "previous_run"
+      ],
       "properties": {
-        "profile": {"enum": ["quick", "standard", "deep"]},
-        "since": {"type": ["string", "null"]},
-        "partial": {"type": "boolean"},
-        "previous_run": {"type": ["string", "null"]},
-        "coverage": {"type": "object", "description": "{repo: {scanner: mode}} - what ran; a finding is fixed only if its scanner ran in the same mode both times", "additionalProperties": {"type": "object", "additionalProperties": {"type": "string"}}},
-        "workspace": {"type": "string"},
-        "repos_root": {"type": "string"},
-        "home": {"type": "string"},
-        "source_refs": {"type": "object", "description": "{repo: {commit, dirty, branch, vcs}} from run-metadata.json", "additionalProperties": {"type": "object"}}
+        "profile": {
+          "enum": [
+            "quick",
+            "standard",
+            "deep"
+          ]
+        },
+        "since": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "partial": {
+          "type": "boolean"
+        },
+        "previous_run": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "coverage": {
+          "type": "object",
+          "description": "{repo: {scanner: mode}} - what ran; a finding is fixed only if its scanner ran in the same mode both times",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          }
+        },
+        "workspace": {
+          "type": "string"
+        },
+        "repos_root": {
+          "type": "string"
+        },
+        "home": {
+          "type": "string"
+        },
+        "source_refs": {
+          "type": "object",
+          "description": "{repo: {commit, dirty, branch, vcs}} from run-metadata.json",
+          "additionalProperties": {
+            "type": "object"
+          }
+        }
       }
     },
-    "audit": {"type": "object", "description": "Deep audit (--audit) per repo: {repo: summary}. Confirmed audit findings are ordinary findings (scanner 'audit', verdict confirmed); leads that could not be confirmed are listed here with no severity. A summary with valid=false contributed no finding.", "additionalProperties": {"type": "object", "required": ["valid", "confirmed", "needs_validation", "rejected", "errors"], "properties": {"valid": {"type": "boolean"}, "run_status": {"type": ["string", "null"]}, "profile": {"type": ["string", "null"]}, "execution_policy": {"type": ["string", "null"]}, "source_ref": {"type": ["object", "null"]}, "confirmed": {"type": "integer", "minimum": 0}, "rejected": {"type": "integer", "minimum": 0}, "coverage": {"type": ["object", "null"], "additionalProperties": {"type": "integer"}}, "needs_validation": {"type": "array", "items": {"type": "object"}}, "deferred": {"type": "array", "items": {"type": "object"}}, "hardening": {"type": "array", "items": {"type": "string"}}, "errors": {"type": "array", "items": {"type": "string"}}, "incomplete_reason": {"type": ["string", "null"]}}}},
-    "baseline": {"type": "object", "description": "Accepted findings from security-baseline.json: removed from counts and findings, listed with the reason. An accepted fingerprint must not also be a reported finding.", "required": ["accepted", "unused"], "properties": {"path": {"type": ["string", "null"]}, "accepted": {"type": "array", "items": {"type": "object", "required": ["fingerprint", "accepted_reason"]}}, "unused": {"type": "array", "items": {"type": "string"}}, "expired": {"type": "array"}, "invalid": {"type": "array"}}},
-    "scanners": {"type": "array", "items": {"type": "string"}},
-    "counts": {"$ref": "#/$defs/counts"},
+    "audit": {
+      "type": "object",
+      "description": "Deep audit (--audit) per repo: {repo: summary}. Confirmed audit findings are ordinary findings (scanner 'audit', verdict confirmed); leads that could not be confirmed are listed here with no severity. A summary with valid=false contributed no finding.",
+      "additionalProperties": {
+        "type": "object",
+        "required": [
+          "valid",
+          "confirmed",
+          "needs_validation",
+          "rejected",
+          "errors"
+        ],
+        "properties": {
+          "valid": {
+            "type": "boolean"
+          },
+          "run_status": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "profile": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "execution_policy": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "source_ref": {
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "confirmed": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "rejected": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "coverage": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "additionalProperties": {
+              "type": "integer"
+            }
+          },
+          "needs_validation": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "deferred": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "hardening": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "incomplete_reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      }
+    },
+    "baseline": {
+      "type": "object",
+      "description": "Accepted findings from security-baseline.json: removed from counts and findings, listed with the reason. An accepted fingerprint must not also be a reported finding.",
+      "required": [
+        "accepted",
+        "unused"
+      ],
+      "properties": {
+        "path": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "accepted": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "fingerprint",
+              "accepted_reason"
+            ]
+          }
+        },
+        "unused": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "expired": {
+          "type": "array"
+        },
+        "invalid": {
+          "type": "array"
+        }
+      }
+    },
+    "scanners": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "counts": {
+      "$ref": "#/$defs/counts"
+    },
     "repos": {
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["name", "status", "counts", "secrets"],
+        "required": [
+          "name",
+          "status",
+          "counts",
+          "secrets"
+        ],
         "properties": {
-          "name": {"type": "string"},
-          "status": {"enum": ["red", "yellow", "green"]},
-          "counts": {"$ref": "#/$defs/counts"},
-          "secrets": {"type": "integer", "minimum": 0}
+          "name": {
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "red",
+              "yellow",
+              "green"
+            ]
+          },
+          "counts": {
+            "$ref": "#/$defs/counts"
+          },
+          "secrets": {
+            "type": "integer",
+            "minimum": 0
+          }
         }
       }
     },
-    "skipped": {"type": "array"},
-    "fixed": {"type": "array", "items": {"type": "object", "required": ["fingerprint"]}},
+    "skipped": {
+      "type": "array"
+    },
+    "fixed": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "fingerprint"
+        ]
+      }
+    },
     "shai_hulud": {
       "type": "object",
       "description": "One row per target (repo, or 'this machine' for --host). A clean verdict with Shai-Hulud findings, or affected/suspicious without any (outside a partial run), is invalid.",
-      "required": ["ran", "ioc_version", "targets"],
+      "required": [
+        "ran",
+        "ioc_version",
+        "targets"
+      ],
       "properties": {
-        "ran": {"type": "boolean"},
-        "ioc_version": {"type": ["string", "null"]},
-        "targets": {"type": "array", "items": {
-          "type": "object",
-          "required": ["repo", "mode", "verdict", "checked", "counts", "raw", "error", "credential_stores"],
-          "properties": {
-            "repo": {"type": "string"},
-            "mode": {"enum": ["repo", "host"]},
-            "verdict": {"enum": ["affected", "suspicious", "clean", "error", "not-run"]},
-            "checked": {"type": "object", "properties": {
-              "ioc_version": {"type": "string"}, "ioc_packages": {"type": "integer"},
-              "dependency_files": {"type": "array", "items": {"type": "string"}},
-              "packages": {"type": "integer"}, "installed_packages": {"type": "integer"},
-              "manifests": {"type": "integer"}, "install_hooks": {"type": "integer"}, "workflows": {"type": "integer"},
-              "projects": {"type": "integer"}, "global_packages": {"type": "integer"},
-              "python_packages": {"type": "integer"}, "npm_cache_entries": {"type": "integer"},
-              "credential_stores": {"type": "integer"}}},
-            "counts": {"type": "object", "additionalProperties": {"type": "integer"}},
-            "raw": {"type": ["string", "null"]},
-            "error": {"type": ["string", "null"]},
-            "credential_stores": {"type": "array", "items": {"type": "string"}}
-          }}}
+        "ran": {
+          "type": "boolean"
+        },
+        "ioc_version": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "targets": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "repo",
+              "mode",
+              "verdict",
+              "checked",
+              "counts",
+              "raw",
+              "error",
+              "credential_stores"
+            ],
+            "properties": {
+              "repo": {
+                "type": "string"
+              },
+              "mode": {
+                "enum": [
+                  "repo",
+                  "host"
+                ]
+              },
+              "verdict": {
+                "enum": [
+                  "affected",
+                  "suspicious",
+                  "clean",
+                  "error",
+                  "not-run"
+                ]
+              },
+              "checked": {
+                "type": "object",
+                "properties": {
+                  "ioc_version": {
+                    "type": "string"
+                  },
+                  "ioc_packages": {
+                    "type": "integer"
+                  },
+                  "dependency_files": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "packages": {
+                    "type": "integer"
+                  },
+                  "installed_packages": {
+                    "type": "integer"
+                  },
+                  "manifests": {
+                    "type": "integer"
+                  },
+                  "install_hooks": {
+                    "type": "integer"
+                  },
+                  "workflows": {
+                    "type": "integer"
+                  },
+                  "projects": {
+                    "type": "integer"
+                  },
+                  "global_packages": {
+                    "type": "integer"
+                  },
+                  "python_packages": {
+                    "type": "integer"
+                  },
+                  "npm_cache_entries": {
+                    "type": "integer"
+                  },
+                  "credential_stores": {
+                    "type": "integer"
+                  }
+                }
+              },
+              "counts": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "integer"
+                }
+              },
+              "raw": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "error": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "credential_stores": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "verification": {
       "type": "object",
-      "required": ["profile", "queued", "pending", "confirmed", "needs_validation", "rejected"],
+      "required": [
+        "profile",
+        "queued",
+        "pending",
+        "confirmed",
+        "needs_validation",
+        "rejected"
+      ],
       "properties": {
-        "profile": {"enum": ["quick", "standard", "deep"]},
-        "queued": {"type": "integer", "minimum": 0},
-        "pending": {"type": "integer", "minimum": 0},
-        "confirmed": {"type": "integer", "minimum": 0},
-        "needs_validation": {"type": "integer", "minimum": 0},
-        "rejected": {"type": "integer", "minimum": 0}
+        "profile": {
+          "enum": [
+            "quick",
+            "standard",
+            "deep"
+          ]
+        },
+        "queued": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "pending": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "confirmed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "needs_validation": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "rejected": {
+          "type": "integer",
+          "minimum": 0
+        }
       }
     },
-    "findings": {"type": "array", "maxItems": 20000, "items": {"$ref": "#/$defs/finding"}}
+    "shards": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/shard_entry"
+      }
+    },
+    "findings_total": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Sum of shards[].count"
+    },
+    "fixed_total": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "fixed_shards": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/shard_entry"
+      }
+    }
+  },
+  "not": {
+    "required": [
+      "findings"
+    ]
   },
   "$defs": {
-    "severity": {"enum": ["CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO"]},
+    "severity": {
+      "enum": [
+        "CRITICAL",
+        "HIGH",
+        "MEDIUM",
+        "LOW",
+        "INFO"
+      ]
+    },
     "counts": {
       "type": "object",
-      "required": ["CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO"],
-      "additionalProperties": {"type": "integer", "minimum": 0}
+      "required": [
+        "CRITICAL",
+        "HIGH",
+        "MEDIUM",
+        "LOW",
+        "INFO"
+      ],
+      "additionalProperties": {
+        "type": "integer",
+        "minimum": 0
+      }
     },
     "finding": {
       "type": "object",
-      "required": ["repo", "scanner", "type", "severity", "file", "line", "code", "rule_id", "title", "fingerprint", "change", "verdict", "verified_severity", "verdict_detail"],
+      "required": [
+        "repo",
+        "scanner",
+        "type",
+        "severity",
+        "file",
+        "line",
+        "code",
+        "rule_id",
+        "title",
+        "fingerprint",
+        "change",
+        "verdict",
+        "verified_severity",
+        "verdict_detail"
+      ],
       "properties": {
-        "fingerprint": {"type": "string", "pattern": "^[0-9a-f]{16}$"},
-        "change": {"enum": ["new", "unchanged"]},
-        "severity": {"$ref": "#/$defs/severity"},
-        "line": {"type": ["integer", "null"], "minimum": 1},
-        "verdict": {"enum": [null, "confirmed", "needs_validation", "rejected"]},
-        "verified_severity": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/severity"}]},
-        "carried": {"type": "boolean"},
+        "fingerprint": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{16}$"
+        },
+        "change": {
+          "enum": [
+            "new",
+            "unchanged"
+          ]
+        },
+        "severity": {
+          "$ref": "#/$defs/severity"
+        },
+        "line": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "verdict": {
+          "enum": [
+            null,
+            "confirmed",
+            "needs_validation",
+            "rejected"
+          ]
+        },
+        "verified_severity": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/severity"
+            }
+          ]
+        },
+        "carried": {
+          "type": "boolean"
+        },
         "verdict_detail": {
           "type": "object",
           "properties": {
-            "evidence": {"type": "string"},
-            "likelihood": {"enum": ["high", "medium", "low"]},
-            "impact": {"enum": ["critical", "high", "medium", "low", "informational"]},
-            "blocker": {"type": "string"},
-            "validation_plan": {"type": "string"},
-            "reason": {"type": "string"}
+            "evidence": {
+              "type": "string"
+            },
+            "likelihood": {
+              "enum": [
+                "high",
+                "medium",
+                "low"
+              ]
+            },
+            "impact": {
+              "enum": [
+                "critical",
+                "high",
+                "medium",
+                "low",
+                "informational"
+              ]
+            },
+            "blocker": {
+              "type": "string"
+            },
+            "validation_plan": {
+              "type": "string"
+            },
+            "reason": {
+              "type": "string"
+            }
           }
         }
       },
       "allOf": [
-        {"if": {"properties": {"verdict": {"const": "confirmed"}}},
-         "then": {"properties": {"verified_severity": {"$ref": "#/$defs/severity"},
-                                 "verdict_detail": {"required": ["evidence", "likelihood", "impact"]}}}},
-        {"if": {"properties": {"verdict": {"const": "needs_validation"}}},
-         "then": {"properties": {"verified_severity": {"type": "null"},
-                                 "verdict_detail": {"required": ["blocker", "validation_plan"]}}}},
-        {"if": {"properties": {"verdict": {"const": "rejected"}}},
-         "then": {"properties": {"verified_severity": {"type": "null"},
-                                 "verdict_detail": {"required": ["reason"]}}}},
-        {"if": {"properties": {"type": {"const": "secret"}}},
-         "then": {"properties": {"code": {"const": ""}}}}
+        {
+          "if": {
+            "properties": {
+              "verdict": {
+                "const": "confirmed"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "verified_severity": {
+                "$ref": "#/$defs/severity"
+              },
+              "verdict_detail": {
+                "required": [
+                  "evidence",
+                  "likelihood",
+                  "impact"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "verdict": {
+                "const": "needs_validation"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "verified_severity": {
+                "type": "null"
+              },
+              "verdict_detail": {
+                "required": [
+                  "blocker",
+                  "validation_plan"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "verdict": {
+                "const": "rejected"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "verified_severity": {
+                "type": "null"
+              },
+              "verdict_detail": {
+                "required": [
+                  "reason"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "secret"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "code": {
+                "const": ""
+              }
+            }
+          }
+        }
       ]
+    },
+    "shard_entry": {
+      "type": "object",
+      "required": [
+        "file",
+        "repo",
+        "count",
+        "bytes",
+        "sha256"
+      ],
+      "properties": {
+        "file": {
+          "type": "string",
+          "pattern": "^findings/[A-Za-z0-9._-]+\\.json$"
+        },
+        "repo": {
+          "type": "string",
+          "description": "Repo of every row in the shard; \"_fixed\" for fixed-finding overflow"
+        },
+        "count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "bytes": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 5242880
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "shard": {
+      "title": "findings/<repo>-NNN-<sha256 prefix>.json shard",
+      "type": "object",
+      "description": "Compact JSON, at most 2,000 rows and 4 MB. A row whose title/description/url equal its rule's entry in `rules` omits them; the reader restores them. Rows are otherwise $defs/finding.",
+      "required": [
+        "schema_version",
+        "repo",
+        "rules",
+        "findings"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": 3
+        },
+        "repo": {
+          "type": "string"
+        },
+        "rules": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "title": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "description": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "maxLength": 4000
+              },
+              "url": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          }
+        },
+        "findings": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "fingerprint",
+              "repo",
+              "severity"
+            ]
+          }
+        }
+      }
+    },
+    "report_v2": {
+      "title": "security-report.json v2 (single file, findings inline; written by v3.0 and earlier, still read)",
+      "description": "Documentation mirror of scripts/validate-report.py, which is the enforced contract. Rules a JSON Schema cannot express are enforced there only: unique fingerprints, counts and verification summary match the findings, verified_severity never above demonstrated impact, no code excerpt on secret rows.",
+      "type": "object",
+      "required": [
+        "schema_version",
+        "generated_at",
+        "team",
+        "org",
+        "run_dir",
+        "run",
+        "scanners",
+        "counts",
+        "repos",
+        "fixed",
+        "shai_hulud",
+        "verification",
+        "findings"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": 2
+        },
+        "generated_at": {
+          "type": "string"
+        },
+        "team": {
+          "type": "string"
+        },
+        "org": {
+          "type": "string"
+        },
+        "config": {
+          "type": "string"
+        },
+        "run_dir": {
+          "type": "string"
+        },
+        "run": {
+          "type": "object",
+          "required": [
+            "profile",
+            "since",
+            "partial",
+            "previous_run"
+          ],
+          "properties": {
+            "profile": {
+              "enum": [
+                "quick",
+                "standard",
+                "deep"
+              ]
+            },
+            "since": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "partial": {
+              "type": "boolean"
+            },
+            "previous_run": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "coverage": {
+              "type": "object",
+              "description": "{repo: {scanner: mode}} - what ran; a finding is fixed only if its scanner ran in the same mode both times",
+              "additionalProperties": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string"
+                }
+              }
+            },
+            "workspace": {
+              "type": "string"
+            },
+            "repos_root": {
+              "type": "string"
+            },
+            "home": {
+              "type": "string"
+            },
+            "source_refs": {
+              "type": "object",
+              "description": "{repo: {commit, dirty, branch, vcs}} from run-metadata.json",
+              "additionalProperties": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        "audit": {
+          "type": "object",
+          "description": "Deep audit (--audit) per repo: {repo: summary}. Confirmed audit findings are ordinary findings (scanner 'audit', verdict confirmed); leads that could not be confirmed are listed here with no severity. A summary with valid=false contributed no finding.",
+          "additionalProperties": {
+            "type": "object",
+            "required": [
+              "valid",
+              "confirmed",
+              "needs_validation",
+              "rejected",
+              "errors"
+            ],
+            "properties": {
+              "valid": {
+                "type": "boolean"
+              },
+              "run_status": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "profile": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "execution_policy": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "source_ref": {
+                "type": [
+                  "object",
+                  "null"
+                ]
+              },
+              "confirmed": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "rejected": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "coverage": {
+                "type": [
+                  "object",
+                  "null"
+                ],
+                "additionalProperties": {
+                  "type": "integer"
+                }
+              },
+              "needs_validation": {
+                "type": "array",
+                "items": {
+                  "type": "object"
+                }
+              },
+              "deferred": {
+                "type": "array",
+                "items": {
+                  "type": "object"
+                }
+              },
+              "hardening": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "errors": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "incomplete_reason": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          }
+        },
+        "baseline": {
+          "type": "object",
+          "description": "Accepted findings from security-baseline.json: removed from counts and findings, listed with the reason. An accepted fingerprint must not also be a reported finding.",
+          "required": [
+            "accepted",
+            "unused"
+          ],
+          "properties": {
+            "path": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "accepted": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "fingerprint",
+                  "accepted_reason"
+                ]
+              }
+            },
+            "unused": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "expired": {
+              "type": "array"
+            },
+            "invalid": {
+              "type": "array"
+            }
+          }
+        },
+        "scanners": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "counts": {
+          "$ref": "#/$defs/counts"
+        },
+        "repos": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "name",
+              "status",
+              "counts",
+              "secrets"
+            ],
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "status": {
+                "enum": [
+                  "red",
+                  "yellow",
+                  "green"
+                ]
+              },
+              "counts": {
+                "$ref": "#/$defs/counts"
+              },
+              "secrets": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
+          }
+        },
+        "skipped": {
+          "type": "array"
+        },
+        "fixed": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "fingerprint"
+            ]
+          }
+        },
+        "shai_hulud": {
+          "type": "object",
+          "description": "One row per target (repo, or 'this machine' for --host). A clean verdict with Shai-Hulud findings, or affected/suspicious without any (outside a partial run), is invalid.",
+          "required": [
+            "ran",
+            "ioc_version",
+            "targets"
+          ],
+          "properties": {
+            "ran": {
+              "type": "boolean"
+            },
+            "ioc_version": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "targets": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "repo",
+                  "mode",
+                  "verdict",
+                  "checked",
+                  "counts",
+                  "raw",
+                  "error",
+                  "credential_stores"
+                ],
+                "properties": {
+                  "repo": {
+                    "type": "string"
+                  },
+                  "mode": {
+                    "enum": [
+                      "repo",
+                      "host"
+                    ]
+                  },
+                  "verdict": {
+                    "enum": [
+                      "affected",
+                      "suspicious",
+                      "clean",
+                      "error",
+                      "not-run"
+                    ]
+                  },
+                  "checked": {
+                    "type": "object",
+                    "properties": {
+                      "ioc_version": {
+                        "type": "string"
+                      },
+                      "ioc_packages": {
+                        "type": "integer"
+                      },
+                      "dependency_files": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "packages": {
+                        "type": "integer"
+                      },
+                      "installed_packages": {
+                        "type": "integer"
+                      },
+                      "manifests": {
+                        "type": "integer"
+                      },
+                      "install_hooks": {
+                        "type": "integer"
+                      },
+                      "workflows": {
+                        "type": "integer"
+                      },
+                      "projects": {
+                        "type": "integer"
+                      },
+                      "global_packages": {
+                        "type": "integer"
+                      },
+                      "python_packages": {
+                        "type": "integer"
+                      },
+                      "npm_cache_entries": {
+                        "type": "integer"
+                      },
+                      "credential_stores": {
+                        "type": "integer"
+                      }
+                    }
+                  },
+                  "counts": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "integer"
+                    }
+                  },
+                  "raw": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "error": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "credential_stores": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "verification": {
+          "type": "object",
+          "required": [
+            "profile",
+            "queued",
+            "pending",
+            "confirmed",
+            "needs_validation",
+            "rejected"
+          ],
+          "properties": {
+            "profile": {
+              "enum": [
+                "quick",
+                "standard",
+                "deep"
+              ]
+            },
+            "queued": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "pending": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "confirmed": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "needs_validation": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "rejected": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        },
+        "findings": {
+          "type": "array",
+          "maxItems": 20000,
+          "items": {
+            "$ref": "#/$defs/finding"
+          }
+        }
+      }
     }
   }
 }

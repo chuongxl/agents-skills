@@ -1,7 +1,10 @@
 # Import reports into DefectDojo
 
-`scripts/import-defectdojo.py` reads an existing schema-v2 `security-report.json`,
-validates it, and converts it to DefectDojo's Generic Findings Import format.
+`scripts/import-defectdojo.py` reads a run folder or its `security-report.json`
+file and converts it to DefectDojo's Generic Findings Import format. It accepts
+legacy v2 reports with inline findings and current v3 reports with an index and
+integrity-checked finding shards. The shared report reader validates and
+reassembles both formats before scanner metadata enrichment.
 Python 3.8+ and its standard library are sufficient. It does not run scanners,
 change the source report, or read repository source files. By default it also
 reads adjacent run metadata and Trivy, Semgrep, OSV and advisory JSON to recover
@@ -23,14 +26,18 @@ python3 -I job-security-scan/scripts/import-defectdojo.py \
 In DefectDojo, get an API v2 token from the user menu. Set
 `DEFECTDOJO_API_TOKEN` through your secret manager, or save the token in a
 private file outside any repository, readable only by you. Never commit it.
+For uploads, pass the HTTPS URL of the authorized production DefectDojo instance
+explicitly. The importer has no localhost URL default. Dry runs do not need a URL.
 
 ```bash
 python3 -I job-security-scan/scripts/import-defectdojo.py \
   /path/to/security-run-YYYYMMDD-HHMMSS \
-  --branch main --url http://127.0.0.1:8080 \
+  --branch main --url https://defectdojo.example.com \
   --token-file ~/.config/job-security-scan/defectdojo.token --upload
 ```
 
+Replace `https://defectdojo.example.com` with the production URL approved for
+your organization.
 Use the same branch label on subsequent runs. If the report has source-reference
 branches, `--branch` is optional and each repository uses its recorded branch.
 For older reports with no branch, supply a label describing the actual scope,
@@ -44,12 +51,14 @@ Optional arguments:
 | `--output-dir PATH` | Create a new directory with private JSON payloads, per-request receipts and `summary.json`; refuses an existing directory |
 | `--batch-size N` | Findings per request, 1-1000; default 500 |
 | `--timeout N` | HTTP timeout in seconds; default 300 |
-| `--url URL` | DefectDojo base URL; defaults to `DEFECTDOJO_URL`, then `http://127.0.0.1:8080` |
+| `--url URL` | DefectDojo base URL; required with `--upload`, with no default |
 | `--include-code` | Include redacted non-secret excerpts already in the report; never opens source files |
 | `--no-enrich` | Use only the normalized report; skip adjacent metadata and scanner JSON |
 | `--update-existing` | Refresh matched findings' scanner-owned descriptions and native detail fields; preserve lifecycle and review state |
 
-HTTPS is required except for loopback HTTP. Redirects and environment HTTP
+HTTPS is required for remote instances. Loopback HTTP is supported only for an
+explicitly supplied local test URL; the importer never selects localhost by
+default. Redirects and environment HTTP
 proxies are disabled so credentials cannot be forwarded elsewhere. TLS
 certificate verification stays enabled. The importer does not retry failed
 uploads automatically. After an ambiguous timeout, check DefectDojo before

@@ -1,15 +1,15 @@
 # Speckit Auto — Spec-Driven Delivery Pipeline
 
-![Version](https://img.shields.io/badge/version-0.6.4-blue)
+![Version](https://img.shields.io/badge/version-0.7.0-blue)
 
-**Version**: 0.6.4
+**Version**: 0.7.0
 **Author**: Alex Nguyen
 
 ## Overview
 
 Speckit Auto runs a complete spec-driven delivery pipeline from a requirement or Jira issue:
 intake, spec/design, implementation, an automatic `speckit-code-review` remediation loop until
-pass, then human review (default mode) or fully automated (YOLO mode) commit and push.
+pass, then human review (default mode) or fully automated (YOLO mode) commit and push, optional verification, and a gated draft PR.
 
 It is a **provider factory**: the same pipeline runs on either of two pluggable providers,
 selected once and fixed for the run:
@@ -19,7 +19,7 @@ selected once and fixed for the run:
 | `github-speckit` | Repo-installed GitHub Spec Kit agents (`/speckit.specify`, `/speckit.plan`, `/speckit.implement`, ...) |
 | `superpowers` | The `obra/superpowers` skills library (`brainstorming`, `writing-plans`, `subagent-driven-development`, ...) |
 
-Both providers run the same four shared pipeline stages; only the stage agents/skills, install
+Both providers run the same six shared pipeline stages; only the stage agents/skills, install
 layout, and fix-application style differ (provider adapters under `references/providers/`).
 
 The pipeline:
@@ -33,11 +33,21 @@ The pipeline:
    spec/plan commit before implementation starts.
 3. **Stage 03 — Implement + Code Review Loop** (NO-STOP ZONE): implement → converge/verify → run
    `speckit-code-review` → fix → repeat until `pass`. No human gates in either mode.
-4. **Stage 04 — Human Review / Commit / Completion**: default mode asks for human approval before
-   committing; YOLO mode auto-commits. Both modes then mark the spec `completed` with a follow-up
-   commit and push it. Opening a pull request sits behind its own gate: default mode asks
-   (`pr-publish`) and skips the PR when declined; YOLO opens the draft PR on its own. Either way
-   an existing PR for the branch is reused, never duplicated.
+4. **Stage 04 — Human Review / Implementation Commit**: default mode asks for human approval
+   before committing; YOLO mode auto-commits. Both modes push the implementation and hand off to
+   Stage 05.
+5. **Stage 05 — Verification** (conditional): only runs when verification was enabled at
+   `--integration` setup time. Updates the project's generated `verify-<app>` skill for the
+   just-implemented feature, runs it, and assesses the captured evidence against the spec's acceptance criteria, then asks
+   for a pass/investigate confirmation (default mode). In YOLO the assessment is the gate: a
+   mismatch loops back through Stage 03 (max 3 passes), a clean result continues. An app that cannot run after one retry is reported as `unavailable`: YOLO continues and the PR is marked UNVERIFIED, default mode asks whether to continue. Skipped entirely (with a
+   report line saying so) when verification was not opted into.
+6. **Stage 06 — Clean / Commit / Push / PR / Complete**: tears down anything Stage 05 launched,
+   commits verification artifacts (if any), marks the spec `completed` and pushes it. Opening a
+   pull request sits behind its own gate: default mode asks (`pr-publish`) and skips the PR when
+   declined; YOLO opens the draft PR on its own. An existing PR for the branch is reused, never
+   duplicated; submodules with local commits get their own PR where the remote is GitHub —
+   non-blocking per repo.
 
 ## Install
 
@@ -45,7 +55,9 @@ Copy the `speckit-auto` folder (with `speckit-code-review` and `jira-to-speckit`
 skill directory: `~/.agents/skills/` (Copilot), `~/.claude/skills/` (Claude Code),
 `~/.config/opencode/skills/` (OpenCode), or `~/.hermes/skills/` (Hermes Agent; `/opt/data/skills/`
 inside its Docker container). The skill is auto-discovered from those locations.
-Requires git, bash, and Node.js >=22.13 for the built-in structured event producer.
+Requires git, bash, and Node.js >=22.13 for the built-in structured event producer. Also copy
+`create-verification-skill` if this repo opts into Stage 05 verification — it's a conditional
+dependency, only invoked when verification was enabled at `--integration` setup time.
 
 **Key rule**: Stage 03 is a **NO-STOP ZONE** in both default and YOLO modes; code review loops continue automatically until the spec is satisfied.
 
@@ -57,7 +69,8 @@ Requires git, bash, and Node.js >=22.13 for the built-in structured event produc
 
 Speckit Auto resolves its provider only from repo-local `.speckit/integration.json`.
 Missing or invalid config stops the pipeline and directs you to `--integration <provider>`.
-There is no global fallback or first-run provider prompt.
+There is no global fallback or first-run provider prompt. The same file's `verification` field
+(also set at `--integration` setup time) gates Stage 05.
 
 Supported providers:
 
@@ -71,18 +84,23 @@ Each provider includes stage-specific reference files that implement the pipelin
 ### YOLO vs Default Mode
 
 **Default Mode** (recommended for critical features):
-- Runs Stages 01–04 with Stage 02 approvals, implementation-start confirmation, and Stage 04 review
+- Runs Stages 01–06 with Stage 02 approvals, implementation-start confirmation, Stage 04 review,
+  and (when verification is enabled) the Stage 05 verification confirmation
 - Requires explicit human approval before implementation commit/push
 - Requires explicit human approval before a pull request is opened — the implementation approval
   alone does not authorize publishing the branch
 - Best for production, regulatory, or high-stakes work
 
 **YOLO Mode** (`--yolo` flag):
-- Runs the same four stages, skipping human approvals and using autonomous checks
-- Stage 04 auto-commits, marks the spec completed, and pushes the completion commit
+- Runs the same six stages, skipping human approvals and using autonomous checks
+- Stage 04 auto-commits; Stage 06 marks the spec completed and pushes the completion commit
 - Opens the draft pull request without a human wait — `--yolo` is the authorization to publish
 - Ideal for internal tools, experiments, or when continuous delivery is the goal
-- All code still passes speckit-code-review before merge
+- All code still passes speckit-code-review before merge; if verification is enabled, it still
+  runs — YOLO only skips asking a human to confirm the result
+
+**Verification is independent of mode.** It is enabled or disabled once, per repo, at
+`--integration` setup time — not per run, and not tied to `--yolo`.
 
 ---
 
@@ -141,6 +159,9 @@ repo map.
 
 - `jira-to-speckit` — Jira fetch + compaction + ticket snapshot (`--issue` only)
 - `speckit-code-review` — authoritative JSON pass/fail gate; the only way Stage 03 exits
+- `create-verification-skill` — generates/updates the project's `verify-<app>` skill; conditional
+  on the `verification` opt-in persisted at `--integration` setup time; not needed if verification
+  was never enabled for this repo
 
 ## Progressive Loading (context budget)
 
@@ -180,7 +201,7 @@ Stages emit boundaries, default-mode named approvals, other input waits, confirm
 and terminal completion/failure. Request changes answers the gate and restarts work, not a
 failed run. YOLO emits no waits for skipped gates. Completion follows required implementation
 and spec completion pushes, not just a passing review. PR events require a real HTTPS URL.
-The Stage 04 `pr-publish` decision is a named approval (`gate_waiting` / `gate_answered`),
+The Stage 06 `pr-publish` decision is a named approval (`gate_waiting` / `gate_answered`),
 not a free-form question; declining it skips the PR and the run still completes.
 
 The standalone helper uses Node builtins and JSON stdin via an argument-vector invocation,

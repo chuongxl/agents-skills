@@ -27,6 +27,11 @@ FIX = SKILL_DIR / "tests" / "fixtures"
 SECRET = "ghp_" + "VERIFYTESTVERIFYTESTVERIFYTEST123456"
 
 
+
+def load_doc(run_dir):
+    import report_store
+    return report_store.load_full(run_dir)
+
 class TempDirCase(unittest.TestCase):
     def setUp(self):
         self.tmp = Path(tempfile.mkdtemp())
@@ -122,7 +127,7 @@ class ValidatorTests(TempDirCase):
     def test_generated_document_is_valid(self):
         doc = v2_doc()
         self.assertEqual(self.validate(doc), [])
-        self.assertEqual(doc["schema_version"], 2)
+        self.assertEqual(doc["schema_version"], 3)
         # standard profile queues CRITICAL+HIGH: the HIGH row is pending, the MEDIUM row is not queued
         self.assertEqual(doc["verification"]["queued"], 1)
         self.assertEqual(doc["verification"]["pending"], 1)
@@ -259,26 +264,37 @@ class ChangesTests(unittest.TestCase):
 
     def test_find_previous_run(self):
         import report_model
+        import report_store
         root = Path(tempfile.mkdtemp())
         try:
             def mk(name, doc):
                 d = root / name
                 d.mkdir()
-                if doc is not None:
-                    (d / "security-report.json").write_text(json.dumps(doc) if isinstance(doc, dict) else doc)
+                if isinstance(doc, dict):
+                    report_store.save(doc, d)
+                elif doc is not None:
+                    (d / "security-report.json").write_text(doc)
                 return d
             mk("security-run-20261101-090000", build([finding()]))
-            mk("security-run-20261101-100000", {"schema_version": 1, "findings": []})
-            mk("security-run-20261101-110000", "{not json")
-            mk("security-run-20261101-120000", None)
+            v1 = mk("security-run-20261101-100000", json.dumps({"schema_version": 1, "findings": []}))
+            bad = mk("security-run-20261101-110000", "{not json")
+            mk("security-run-20261101-120000", None)                 # aborted run: no report, skipped
             mk("not-a-run", build([finding()]))
             cur = mk("security-run-20261102-080000", None)
             later = mk("security-run-20261103-080000", build([finding()]))
-            doc, path = report_model.find_previous(cur)
-            self.assertEqual(path.name, "security-run-20261101-090000")
-            self.assertEqual(doc["schema_version"], 2)
+            doc, path, error = report_model.find_previous(cur)       # newest report is broken: say so, no fallback
+            self.assertEqual((doc, path.name), (None, bad.name))
+            self.assertIn("not valid JSON", error)
+            shutil.rmtree(str(bad))
+            doc, path, error = report_model.find_previous(cur)
+            self.assertEqual((doc, path.name), (None, v1.name))
+            self.assertIn("schema_version", error)
+            shutil.rmtree(str(v1))
+            doc, path, error = report_model.find_previous(cur)
+            self.assertEqual((path.name, error), ("security-run-20261101-090000", None))
+            self.assertEqual(doc["schema_version"], 3)
             self.assertTrue(later.exists())
-            self.assertEqual(report_model.find_previous(root / "security-run-20261101-090000"), (None, None))
+            self.assertEqual(report_model.find_previous(root / "security-run-20261101-090000"), (None, None, None))
         finally:
             shutil.rmtree(str(root), ignore_errors=True)
 
@@ -311,7 +327,7 @@ class GenerateChangesTests(TempDirCase):
         write_results(second, [("sqli", "src/db.js", 2), ("eval", "src/db.js", 3)])
         r = self.generate(second)
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
-        doc = json.loads((second / "security-report.json").read_text())
+        doc = load_doc(second)
         self.assertEqual(dict((f["rule_id"], f["change"]) for f in doc["findings"]),
                          {"sqli": "unchanged", "eval": "new"})
         self.assertEqual([f["rule_id"] for f in doc["fixed"]], ["sqli-delete"])
@@ -329,7 +345,7 @@ class GenerateChangesTests(TempDirCase):
         run_dir = self.tmp / "ws" / "security-run-20261102-090000"
         write_results(run_dir, [("sqli", str(self.tmp / "repos" / "api" / "src" / "db.js"), 1)])
         self.assertEqual(self.generate(run_dir).returncode, 0)
-        f = json.loads((run_dir / "security-report.json").read_text())["findings"][0]
+        f = load_doc(run_dir)["findings"][0]
         self.assertEqual((f["file"], f["line"], f["code"]), ("src/db.js", 1, "const q = 'SELECT ' + id;"))
         page = (run_dir / "security-report.html").read_text()
         self.assertIn("vscode://file%s" % (self.tmp / "repos" / "api" / "src" / "db.js"), page)
@@ -341,8 +357,66 @@ class GenerateChangesTests(TempDirCase):
         second = self.tmp / "ws" / "security-run-20261102-100000"
         write_results(second, [("sqli", "src/db.js", 1)])
         self.assertEqual(self.generate(second, "--previous", "none").returncode, 0)
-        doc = json.loads((second / "security-report.json").read_text())
+        doc = load_doc(second)
         self.assertEqual(doc["findings"][0]["change"], "new")
+
+    def two_runs(self):
+        self.put("repos/api/src/db.js", "const q = 'SELECT ' + id;\nconst r = 'DELETE ' + id;\n")
+        first = self.tmp / "ws" / "security-run-20261102-090000"
+        write_results(first, [("sqli", "src/db.js", 1), ("sqli-delete", "src/db.js", 2)])
+        self.assertEqual(self.generate(first).returncode, 0)
+        second = self.tmp / "ws" / "security-run-20261102-100000"
+        write_results(second, [("sqli", "src/db.js", 1)])
+        return first, second
+
+    def test_previous_v2_over_5mb_is_compared(self):
+        import report_store
+        first, second = self.two_runs()
+        doc = report_store.load_full(first)
+        doc["schema_version"] = 2
+        doc["skipped"] = ["padding " * 125] * 6000        # ~6 MB: today's silent-skip case
+        shutil.rmtree(str(first / "findings"), ignore_errors=True)
+        (first / "security-report.json").write_text(json.dumps(doc, indent=2))
+        self.assertGreater((first / "security-report.json").stat().st_size, 5 * 1024 * 1024)
+        r = self.generate(second)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        now = report_store.load_full(second)
+        self.assertEqual(now["run"]["previous_run"], str(first.resolve()))
+        self.assertEqual([f["change"] for f in now["findings"]], ["unchanged"])
+        self.assertEqual([f["rule_id"] for f in now["fixed"]], ["sqli-delete"])
+
+    def test_unreadable_previous_sets_error_and_fixes_nothing(self):
+        import report_store
+        first, second = self.two_runs()
+        shards = sorted((first / "findings").glob("*.json"))
+        self.assertTrue(shards)
+        shards[0].unlink()
+        r = self.generate(second)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        now = report_store.load_full(second)
+        self.assertIn("missing", now["run"]["previous_error"])
+        self.assertEqual(now["fixed"], [])
+        self.assertIn("Change tracking unavailable", (second / "security-report.md").read_text())
+
+    def test_keep_verdicts_with_unreadable_report_exits_1(self):
+        first, _ = self.two_runs()
+        shard = sorted((first / "findings").glob("*.json"))[0]
+        shard.write_text(shard.read_text().replace('"line":', '"line": ', 1))
+        index = (first / "security-report.json").read_bytes()
+        r = self.generate(first, "--keep-verdicts", "--previous", "none")
+        self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
+        self.assertIn("cannot keep verdicts", r.stderr)
+        self.assertEqual((first / "security-report.json").read_bytes(), index)
+
+    def test_explicit_previous_unreadable_is_reported(self):
+        import report_store
+        _, second = self.two_runs()
+        empty = self.tmp / "ws" / "security-run-20261101-000000"
+        empty.mkdir()
+        r = self.generate(second, "--previous", empty)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn(str(empty), r.stderr)
+        self.assertIn("does not exist", report_store.load_full(second)["run"]["previous_error"])
 
 
 def run_proc(*args, **kw):
@@ -408,7 +482,7 @@ class ProfileTests(TempDirCase):
         return self.log.read_text() if self.log.exists() else ""
 
     def report(self, run_dir):
-        return json.loads((run_dir / "security-report.json").read_text())
+        return load_doc(run_dir)
 
     def test_quick_profile(self):
         r, run_dir = self.scan("--profile", "quick")
@@ -515,10 +589,12 @@ class TriageTests(TempDirCase):
                             "    active: true\n---\n")
         self.ws = self.tmp / "ws"
 
-    def make_run(self, name="security-run-20261102-090000", profile="standard"):
+    def make_run(self, name="security-run-20261102-090000", profile="standard", trivy=None):
         run_dir = self.ws / name
         d = run_dir / "api"
         d.mkdir(parents=True)
+        if trivy:
+            (d / "trivy.json").write_text(json.dumps(trivy))
         (d / "semgrep.json").write_text(json.dumps({"results": [
             {"check_id": "sqli", "path": "src/db.js", "start": {"line": 20},
              "extra": {"severity": "ERROR", "message": "SQL injection"}},
@@ -536,12 +612,24 @@ class TriageTests(TempDirCase):
         return run_dir
 
     def doc(self, run_dir):
-        return json.loads((run_dir / "security-report.json").read_text())
+        return load_doc(run_dir)
 
-    def queue(self, run_dir):
-        r = run_proc(TRIAGE, "queue", run_dir)
+    def queue(self, run_dir, *opts):
+        """Every queued item, read from queue-index.json and its batch files, in index order."""
+        r = run_proc(TRIAGE, "queue", run_dir, *opts)
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
-        return json.loads((run_dir / "triage" / "queue.json").read_text())
+        index = json.loads((run_dir / "triage" / "queue-index.json").read_text())
+        items = {}
+        for name in sorted(set(i["batch"] for i in index["items"])):
+            for item in json.loads((run_dir / "triage" / name).read_text())["items"]:
+                items[item["fingerprint"]] = item
+        return dict(index, items=[items[i["fingerprint"]] for i in index["items"]])
+
+    def triage_text(self, run_dir):
+        return "".join(p.read_text() for p in sorted((run_dir / "triage").glob("*.json")))
+
+    def record(self, run_dir, verdict, *extra):
+        return run_proc(TRIAGE, "record", run_dir, "-", *extra, input=json.dumps(verdict))
 
     def fp(self, run_dir, rule):
         return [f["fingerprint"] for f in self.doc(run_dir)["findings"] if f["rule_id"] == rule][0]
@@ -569,7 +657,7 @@ class TriageTests(TempDirCase):
         self.assertEqual((by["github-pat"]["code"], by["github-pat"]["context"]), ("", None))
         self.assertIsNone(by["eval"]["context"])      # .env* files are never opened for context
         self.assertIsNone(by["link"]["context"])      # symlinks are not followed
-        self.assertNotIn(SECRET, (run_dir / "triage" / "queue.json").read_text())
+        self.assertNotIn(SECRET, self.triage_text(run_dir))
 
     def test_quick_profile_queues_nothing_deep_adds_medium(self):
         self.assertEqual(self.queue(self.make_run(profile="quick"))["items"], [])
@@ -642,6 +730,70 @@ class TriageTests(TempDirCase):
             self.assertEqual((run_dir / "security-report.json").read_text(), original, text[:80])
         self.assertFalse((run_dir / "NEEDS-VALIDATION.md").exists())
 
+    def grouped_run(self):
+        misconfig = {"ID": "KSV-0012", "Severity": "HIGH", "Title": "Runs as root", "Message": "m",
+                     "CauseMetadata": {"StartLine": 3}}
+        vuln = {"VulnerabilityID": "CVE-2026-0001", "PkgName": "lodash", "InstalledVersion": "4.0.0",
+                "Severity": "CRITICAL"}
+        return self.make_run(trivy={"Results": [
+            {"Target": "k8s/a.yaml", "Misconfigurations": [misconfig]},
+            {"Target": "k8s/b.yaml", "Misconfigurations": [misconfig]},
+            {"Target": "package-lock.json", "Vulnerabilities": [vuln]},
+            {"Target": "web/package-lock.json", "Vulnerabilities": [vuln]},
+            {"Target": "web/package-lock.json", "Vulnerabilities": [dict(vuln, InstalledVersion="4.1.0")]}]})
+
+    def test_queue_groups_one_root_cause_into_one_item(self):
+        q = self.queue(self.grouped_run(), "--all")
+        sizes = sorted((i["rule_id"], i["installed_version"], i.get("group", {}).get("size", 1)) for i in q["items"])
+        self.assertIn(("CVE-2026-0001", "4.0.0", 2), sizes)      # same advisory + version, two lockfiles
+        self.assertIn(("CVE-2026-0001", "4.1.0", 1), sizes)      # another version is another root cause
+        self.assertIn(("KSV-0012", "", 2), sizes)
+        self.assertEqual((q["summary"]["eligible_findings"], q["summary"]["queued_items"]), (9, 7))
+        self.assertEqual(q["items"][0]["severity"], "CRITICAL")
+        ungrouped = self.queue(self.ws / "security-run-20261102-090000", "--all", "--no-group")
+        self.assertEqual(len(ungrouped["items"]), 9)
+
+    def test_queue_limit_and_repo_filter(self):
+        run_dir = self.grouped_run()
+        q = self.queue(run_dir, "--limit", "2")
+        self.assertEqual([i["severity"] for i in q["items"]], ["CRITICAL"] * 2)
+        s = q["summary"]
+        self.assertEqual((s["queued_items"], s["remaining_items"], s["queued_findings"] + s["remaining_findings"]),
+                         (2, 5, 9))
+        self.assertEqual(len(self.queue(run_dir, "--repo", "api")["items"]), 7)
+        self.assertEqual(run_proc(TRIAGE, "queue", run_dir, "--repo", "web").returncode, 1)
+        self.assertEqual(run_proc(TRIAGE, "queue", run_dir, "--limit", "0").returncode, 2)
+
+    def test_apply_shares_a_group_verdict_but_not_over_explicit_ones(self):
+        run_dir = self.grouped_run()
+        items = dict((i["rule_id"] + i["installed_version"], i) for i in self.queue(run_dir, "--all")["items"])
+        dep, cfg = items["CVE-2026-00014.0.0"], items["KSV-0012"]
+        other = [fp for fp in cfg["group"]["fingerprints"] if fp != cfg["fingerprint"]][0]
+        r = self.apply(run_dir, {"verdicts": [
+            {"fingerprint": dep["fingerprint"], "verdict": "rejected", "reason": "dev-only dependency"},
+            {"fingerprint": cfg["fingerprint"], "verdict": "rejected", "reason": "pod runs as non-root via PSA"},
+            {"fingerprint": other, "verdict": "needs_validation", "blocker": "b", "validation_plan": "p"}]})
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn("+1 grouped finding", r.stdout)
+        by = dict((f["fingerprint"], f) for f in self.doc(run_dir)["findings"])
+        self.assertEqual([by[fp]["verdict"] for fp in dep["group"]["fingerprints"]], ["rejected", "rejected"])
+        self.assertEqual(by[other]["verdict"], "needs_validation")
+        self.assertEqual(run_proc(VALIDATE, run_dir / "security-report.json").returncode, 0)
+
+    def test_recorded_group_verdict_is_shared_by_directory_apply(self):
+        run_dir = self.grouped_run()
+        q = self.queue(run_dir, "--all")
+        cfg = [i for i in q["items"] if i["rule_id"] == "KSV-0012"][0]
+        self.assertEqual([i["group_size"] for i in json.loads((run_dir / "triage" / "queue-index.json").read_text())
+                          ["items"] if i["fingerprint"] == cfg["fingerprint"]], [2])
+        r = self.record(run_dir, {"fingerprint": cfg["fingerprint"], "verdict": "rejected", "reason": "non-root PSA"})
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        r = run_proc(TRIAGE, "apply", run_dir)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn("+1 grouped finding", r.stdout)
+        by = dict((f["fingerprint"], f) for f in self.doc(run_dir)["findings"])
+        self.assertEqual([by[fp]["verdict"] for fp in cfg["group"]["fingerprints"]], ["rejected", "rejected"])
+
     def test_carried_verdicts_are_not_queued_again(self):
         first = self.make_run()
         self.assertEqual(self.apply(first, self.good_verdicts(first)).returncode, 0)
@@ -650,6 +802,112 @@ class TriageTests(TempDirCase):
         by = dict((f["rule_id"], f) for f in doc["findings"])
         self.assertTrue(by["sqli"]["carried"])
         self.assertEqual(sorted(i["rule_id"] for i in self.queue(second)["items"]), ["github-pat"])
+
+    def test_queue_writes_batches_without_context_in_index(self):
+        run_dir = self.make_run()
+        (run_dir / "triage").mkdir()
+        (run_dir / "triage" / "queue.json").write_text("{}")
+        (run_dir / "triage" / "batch-099.json").write_text("{}")
+        q = self.queue(run_dir)
+        index = json.loads((run_dir / "triage" / "queue-index.json").read_text())
+        self.assertEqual(index["schema_version"], 2)
+        self.assertEqual(len(index["items"]), 4)
+        self.assertNotIn("context", json.dumps(index))
+        self.assertEqual(sorted(p.name for p in (run_dir / "triage").glob("*.json")),
+                         ["batch-001.json", "queue-index.json"])
+        self.assertEqual(q["items"][0]["severity"], "CRITICAL")     # most severe first
+
+    def test_queue_on_large_run_splits_batches(self):
+        run_dir = self.ws / "security-run-20261102-090000"
+        (run_dir / "api").mkdir(parents=True)
+        long = "x" * 1200
+        (run_dir / "api" / "semgrep.json").write_text(json.dumps({"results": [
+            {"check_id": "r%d" % (i % 40), "path": "src/f%d.js" % i, "start": {"line": 1},
+             "extra": {"severity": "ERROR", "message": "m %d %s" % (i, long)}} for i in range(9000)]}))
+        r = run_proc(GENERATE, "--results-dir", run_dir, "--config", self.cfg, "--out-dir", run_dir,
+                     "--repos-root", self.tmp / "repos", "--home", self.tmp / "home")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertGreater(sum(p.stat().st_size for p in (run_dir / "findings").glob("*.json")), 5 * 1024 * 1024)
+        r = run_proc(VALIDATE, run_dir)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        r = run_proc(TRIAGE, "queue", run_dir, "--all")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertEqual(len(list((run_dir / "triage").glob("batch-*.json"))), 900)
+        nxt = run_proc(TRIAGE, "next", run_dir)
+        self.assertEqual(nxt.returncode, 0, nxt.stderr)
+        self.assertIn("fingerprint", json.loads(nxt.stdout))
+
+    def test_next_record_loop_equals_bulk_apply(self):
+        run_a = self.make_run()
+        self.ws = self.tmp / "ws-b"
+        run_b = self.make_run()
+        verdicts = dict((v["fingerprint"], v) for v in self.good_verdicts(run_a)["verdicts"])
+        self.assertEqual(run_proc(TRIAGE, "queue", run_a).returncode, 0)
+        seen = []
+        while True:
+            r = run_proc(TRIAGE, "next", run_a)
+            self.assertEqual(r.returncode, 0, r.stderr)
+            item = json.loads(r.stdout)
+            if item.get("done"):
+                break
+            fp = item["fingerprint"]
+            self.assertNotIn(fp, seen)
+            seen.append(fp)
+            v = verdicts.get(fp, {"fingerprint": fp, "verdict": "rejected", "reason": "test token"})
+            verdicts[fp] = v
+            r = self.record(run_a, v)
+            self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertEqual(len(seen), 4)
+        r = run_proc(TRIAGE, "apply", run_a)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertEqual(self.apply(run_b, {"verdicts": list(verdicts.values())}).returncode, 0)
+        strip = lambda d: [dict(f) for f in d["findings"]]
+        self.assertEqual(strip(self.doc(run_a)), strip(self.doc(run_b)))
+        self.assertTrue((run_a / "NEEDS-VALIDATION.md").exists())
+
+    def test_next_prints_done_when_all_recorded(self):
+        run_dir = self.make_run(profile="quick")
+        self.assertEqual(run_proc(TRIAGE, "queue", run_dir).returncode, 0)
+        r = run_proc(TRIAGE, "next", run_dir)
+        self.assertEqual((r.returncode, json.loads(r.stdout)), (0, {"done": True}))
+
+    def test_record_twice_refused_without_replace(self):
+        run_dir = self.make_run()
+        self.queue(run_dir)
+        v = {"fingerprint": self.fp(run_dir, "sqli"), "verdict": "rejected", "reason": "r"}
+        self.assertEqual(self.record(run_dir, v).returncode, 0)
+        r = self.record(run_dir, dict(v, reason="second"))
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("already recorded", r.stderr)
+        self.assertEqual(self.record(run_dir, dict(v, reason="second"), "--replace").returncode, 0)
+        saved = json.loads((run_dir / "triage" / "verdicts" / (v["fingerprint"] + ".json")).read_text())
+        self.assertEqual(saved["reason"], "second")
+
+    def test_record_invalid_writes_nothing(self):
+        run_dir = self.make_run()
+        self.queue(run_dir)
+        fp = self.fp(run_dir, "sqli")
+        for bad in ({"fingerprint": fp, "verdict": "rejected", "reason": "r", "severity": "LOW"},
+                    {"fingerprint": self.fp(run_dir, "xss"), "verdict": "rejected", "reason": "not queued"},
+                    {"fingerprint": "../../evil", "verdict": "rejected", "reason": "r"},
+                    [{"fingerprint": fp, "verdict": "rejected", "reason": "r"}]):
+            r = self.record(run_dir, bad)
+            self.assertEqual(r.returncode, 1, bad)
+        self.assertEqual(list((run_dir / "triage").glob("verdicts/*")), [])
+
+    def test_apply_with_corrupted_shard_changes_nothing(self):
+        run_dir = self.make_run()
+        self.queue(run_dir)
+        self.assertEqual(self.record(run_dir, {"fingerprint": self.fp(run_dir, "sqli"), "verdict": "rejected",
+                                               "reason": "r"}).returncode, 0)
+        shard = sorted((run_dir / "findings").glob("*.json"))[0]
+        shard.write_text(shard.read_text().replace('"line":', '"line": ', 1))
+        index = (run_dir / "security-report.json").read_bytes()
+        r = run_proc(TRIAGE, "apply", run_dir)
+        self.assertEqual(r.returncode, 1)
+        self.assertIn(shard.name, r.stderr)
+        self.assertNotIn("run-scan.sh", r.stderr)
+        self.assertEqual((run_dir / "security-report.json").read_bytes(), index)
 
 
 CHANGED = SKILL_DIR / "scripts" / "changed-files.py"

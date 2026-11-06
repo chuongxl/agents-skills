@@ -94,7 +94,7 @@ check "Markdown report written"                     test -s "$OUT/security-repor
 check "JSON report written"                         test -s "$OUT/security-report.json"
 check "Markdown shows file:line for the worm release" grep -q 'package-lock.json:6' "$OUT/security-report.md"
 check "every file finding located; no code on secret/credential rows" python3 -I "$HERE/assert-located.py" "$OUT/security-report.json"
-check "report validates (schema v2)"               python3 -I "$SKILL_DIR/scripts/validate-report.py" "$OUT/security-report.json"
+check "report validates (schema v3)"               python3 -I "$SKILL_DIR/scripts/validate-report.py" "$OUT/security-report.json"
 check "report section: every repo and this machine, verdicts match the raw output" \
   python3 -I "$HERE/assert-shai-hulud-section.py" "$OUT"
 check "Markdown has the Shai-Hulud check section"  grep -q '## 🪱 Shai-Hulud check' "$OUT/security-report.md"
