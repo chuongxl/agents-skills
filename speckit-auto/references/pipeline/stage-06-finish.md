@@ -15,7 +15,7 @@ tear down is a warning, not a stop — log it and continue.
 
 ## 2. Commit verification artifacts (only if Stage 05 ran)
 
-Commit the `.cursor/skills/verify-<app>/` skill files and feature-map changes only — never the
+Commit the `.agents/skills/verify-<app>/` skill files and feature-map changes only — never the
 run's evidence/screenshots — via [../shared/commit.md](../shared/commit.md), call site "Stage 06
 verification artifacts". The conditional-commit rule applies: if the update-mode call in Stage 05
 produced no changes worth committing, skip this commit and log why.

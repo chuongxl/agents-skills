@@ -125,7 +125,7 @@ ZONE in both modes.
 |-----------|---------|------------|
 | `jira-to-speckit` | Jira fetch + compaction (steps 1–5 only) + ticket snapshot write | `skill` tool, name `jira-to-speckit` |
 | `speckit-code-review` | Authoritative JSON pass/fail review gate | `skill` tool, name `speckit-code-review` |
-| `create-verification-skill` | Generate/update the project's `.cursor/skills/verify-<app>/` verification skill | `skill` tool, name `create-verification-skill`; only invoked when `--integration` setup enabled verification |
+| `create-verification-skill` | Generate/update the project's `.agents/skills/verify-<app>/` verification skill | `skill` tool, name `create-verification-skill`; only invoked when `--integration` setup enabled verification |
 
 All three are provider-independent and used by every provider. `create-verification-skill` is
 conditional on the `verification` opt-in persisted at `--integration` setup time

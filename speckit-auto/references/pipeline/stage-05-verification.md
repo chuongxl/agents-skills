@@ -25,7 +25,7 @@ Invoke the `skill` tool with name `create-verification-skill`, in **update mode*
 feature this run just implemented (from the spec title / Jira summary) and pass the spec, plan,
 and the list of files changed in the implementation commit as context. It adds a new
 `features/<feature-slug>.md` file, or updates the existing one if this run modified a
-previously-mapped feature, inside the already-generated `.cursor/skills/verify-<app>/features/`
+previously-mapped feature, inside the already-generated `.agents/skills/verify-<app>/features/`
 map. It never touches other features' files, and only touches `SKILL.md` itself if this feature
 changed Launch/Doctor/Drive/Evidence/Cleanup. **Explicitly tell it to skip its own Step 4
 (Prove) proof-and-cleanup for this call** — Stage 05 §3 below is the real proof, driven against
