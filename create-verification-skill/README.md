@@ -3,7 +3,7 @@
 ## Overview
 
 **create-verification-skill** generates a project-local, self-contained skill
-(`.cursor/skills/verify-<app>/`) that launches the real app, drives it the way a user would, and
+(`.agents/skills/verify-<app>/`) that launches the real app, drives it the way a user would, and
 captures evidence — Launch, Doctor, Drive, Evidence, Cleanup, Helpers, plus a maintained feature
 map. It works for any language, framework, or platform: web UI, CLI/TUI, desktop app, API, mobile
 app, or library.

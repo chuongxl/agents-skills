@@ -31,7 +31,7 @@ all three host agents (GitHub Copilot, Claude Code, OpenCode).
 | T24 | Missing provider config + no selection | No persisted provider anywhere | Run pipeline | Asks once, persists selection, continues without restart | Both |
 | T25 | Unsupported stored provider | Corrupt `integration.json` | Run pipeline | Ignores bad value, falls through to next precedence or selection | Both |
 | T26 | Default-mode PR gate | Mode = default | Reach the Stage 06 PR step | Asks the `pr-publish` gate before any PR command; no pull request is opened until it is approved | Both |
-| T27 | Verification opt-in at setup | Running `--integration` for the first time on a repo | Answer "Yes" to the verification question | Generates `.cursor/skills/verify-<app>/`, proves it once, commits it, persists `verification: true` | Both |
+| T27 | Verification opt-in at setup | Running `--integration` for the first time on a repo | Answer "Yes" to the verification question | Generates `.agents/skills/verify-<app>/`, proves it once, commits it, persists `verification: true` | Both |
 | T28 | Verification opt-out at setup | Running `--integration` for the first time on a repo | Answer "No" (or no answer) | Persists `verification: false`; nothing generated | Both |
 | T29 | Stage 05 skipped when disabled | `verification: false` in `.speckit/integration.json` | Run pipeline through Stage 04 | Stage 05 is skipped; report shows `verification: skipped`; proceeds straight to Stage 06 | Both |
 | T30 | Stage 05 runs when enabled | `verification: true` | Run pipeline through Stage 04 | Invokes `create-verification-skill` in update mode for the implemented feature, runs `verify-<app>`, asks pass/investigate | Both |

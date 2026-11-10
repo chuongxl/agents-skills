@@ -27,12 +27,12 @@ TURN (the one legitimate no-pipeline turn end in the whole skill). Never enter t
 
 2a. **If verification = true, generate the project's verification skill now:**
    1. Invoke the `skill` tool with name `create-verification-skill`, in **create mode** (no
-      `.cursor/skills/verify-<app>/` exists yet for this repo). It runs its own repo interview
+      `.agents/skills/verify-<app>/` exists yet for this repo). It runs its own repo interview
       (surface, run, drive, observe, isolate) directly — no separate analysis step is needed
       first.
-   2. It writes `.cursor/skills/verify-<app>/SKILL.md` plus a feature map covering the repo's
+   2. It writes `.agents/skills/verify-<app>/SKILL.md` plus a feature map covering the repo's
       existing top 3-5 features, and proves itself once per its own Step 4.
-   3. Commit the generated skill: `git add .cursor/skills/verify-<app>/` then
+   3. Commit the generated skill: `git add .agents/skills/verify-<app>/` then
       `git commit -m "chore(verify-<app>): scaffold project verification skill"` (on whatever
       branch setup mode is running on — setup mode does not create its own dedicated branch
       unless installing a provider framework, per step 3 below).
@@ -92,7 +92,7 @@ TURN (the one legitimate no-pipeline turn end in the whole skill). Never enter t
      > to initialise the project constitution, then you can run your pipeline command.
 
      If verification is enabled for this project:
-     > A `.cursor/skills/verify-<app>/` skill was generated and committed — Stage 05 will run it
+     > A `.agents/skills/verify-<app>/` skill was generated and committed — Stage 05 will run it
      > after every implementation.
 
      If verification is disabled for this project:
@@ -104,7 +104,7 @@ TURN (the one legitimate no-pipeline turn end in the whole skill). Never enter t
      > OpenCode / Hermes Agent) now** so the new skills are discovered, then re-run your pipeline command.
 
      If verification is enabled for this project:
-     > A `.cursor/skills/verify-<app>/` skill was generated and committed — Stage 05 will run it
+     > A `.agents/skills/verify-<app>/` skill was generated and committed — Stage 05 will run it
      > after every implementation.
 
      If verification is disabled for this project:
