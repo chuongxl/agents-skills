@@ -8,13 +8,13 @@ skills into both the main checkout and the worktree, verifies the layout, proves
 and continues the pipeline in the same turn. It never switches provider and never runs
 `specify init` only inside the worktree.
 
-1. **Install the CLI** (source install recommended, PyPI is the fallback):
-   - Source (pinned, requires `uv`): read the current release tag `vX.Y.Z` from
+1. **Install the CLI** from the official GitHub source at a pinned release tag — never from PyPI
+   (`specify-cli` on PyPI is not published from the Spec Kit repository) and never from a branch:
+   - Requires `uv`: read the current release tag `vX.Y.Z` from
      `https://github.com/github/spec-kit` Releases, then
      `uv tool install specify-cli --from git+https://github.com/github/spec-kit.git@vX.Y.Z`.
      No tag resolvable → use `@v0.16.4`.
-   - PyPI: `uv tool install specify-cli`, or `pipx install specify-cli`, or
-     `pip install specify-cli`.
+   - `uv` missing → stop and ask the user to install `uv`; do not fall back to another index.
 2. **Sanity check**: `specify version` must print a version. Command not found after a
    successful-looking install → PATH likely missing the tool dir; report the exact output and
    stop. Never proceed with a broken install.

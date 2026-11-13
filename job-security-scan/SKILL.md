@@ -13,13 +13,14 @@ description: >
 compatibility: >
   Requires bash, git, Python 3.8+ (pre-installed on most systems — used
   only to parse repository.md, no pip packages needed). Security tools
-  auto-installed via Homebrew (macOS) or curl/apt (Linux) on first run.
+  installed on first run at pinned versions: Homebrew (macOS) or SHA-256-verified
+  GitHub release downloads (Linux); nothing downloaded is piped into a shell.
   Network access required for tool install and CVE DB download on first run.
   Subsequent runs use cached DB and installed binaries.
 license: MIT
 metadata:
   author: one-om-ddm-team
-  version: "3.2"
+  version: "3.2.1"
   config-file: assets/repository.md
 allowed-tools: bash glob grep view create edit
 ---
@@ -97,12 +98,10 @@ What each scanner finds, how it maps severity and where it overlaps with the oth
 
 ## Phase 0 — Parse Config & Install Tools
 
-Load team/repo config from `repository.md`, then install any missing tools:
+Install any missing tools. The scripts parse `repository.md` themselves (Python 3 std-lib only, no
+pip needed) — never `eval` or `source` the config in your own shell:
 
 ```bash
-# Parse config (Python 3 std-lib only — no pip needed)
-eval "$(python3 -I scripts/parse-config.py assets/repository.md)"   # values are shell-quoted
-
 # Install missing tools based on stack + repo config
 bash scripts/install-tools.sh
 ```

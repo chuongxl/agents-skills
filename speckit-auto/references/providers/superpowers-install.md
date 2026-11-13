@@ -15,12 +15,18 @@ provider (run contract, rule 2).
    - **Claude Code** — `/plugin marketplace add obra/superpowers-marketplace`, then
      `/plugin install superpowers@superpowers-marketplace` (fallback: the same two as
      `claude plugin ...` commands).
-   - **OpenCode** — `git clone https://github.com/obra/superpowers.git /tmp/superpowers`, then
-     `mkdir -p <skills dir> && cp -R /tmp/superpowers/skills/* <skills dir>/`, where
-     `<skills dir>` is `~/.config/opencode/skills/` or `.opencode/skills/`.
-   - **Hermes Agent** — `git clone https://github.com/obra/superpowers.git /tmp/superpowers`, then
-     `mkdir -p <skills dir> && cp -R /tmp/superpowers/skills/* <skills dir>/`, where
-     `<skills dir>` is `~/.hermes/skills/` (`/opt/data/skills/` inside the Docker container).
+   - **OpenCode** / **Hermes Agent** — clone the newest release tag (never the default branch)
+     into a fresh private temp directory (never a fixed `/tmp` path another local user could
+     pre-create), in one shell invocation:
+     ```bash
+     tag="$(git ls-remote --tags --refs --sort=-v:refname https://github.com/obra/superpowers.git 'v*' | head -n1 | sed 's#.*refs/tags/##')"
+     [ -n "$tag" ] || { echo "no superpowers release tag resolvable"; exit 1; }
+     src="$(mktemp -d)" && git clone --depth 1 --branch "$tag" https://github.com/obra/superpowers.git "$src"
+     mkdir -p <skills dir> && cp -R "$src"/skills/* <skills dir>/ && rm -rf "$src"
+     ```
+     `<skills dir>` is `~/.config/opencode/skills/` or `.opencode/skills/` on OpenCode, and
+     `~/.hermes/skills/` (`/opt/data/skills/` inside the Docker container) on Hermes Agent. Report
+     the installed tag. No tag resolvable → stop; do not install an unpinned copy.
 
    Host-specific command unavailable → stop and report it as a concrete install failure.
 3. **Confirm the install landed on disk**: re-run the on-disk probe from the current linked
