@@ -28,7 +28,7 @@ All tools are free, open-source, and configurable. Security findings are organiz
 3. **Free Tools** — No vendor lock-in or licensing costs
 4. **Stack-Aware** — Enables only relevant tools based on tech stack (TypeScript, Python, Go, etc.)
 5. **Structured Output** — JSON results for easy CI/CD integration
-6. **Auto-Install** — Security tools auto-install on first run via Homebrew (macOS) or apt/curl (Linux)
+6. **Auto-Install** — Security tools install on first run at pinned versions: Homebrew (macOS) or SHA-256-verified GitHub release downloads (Linux)
 7. **Allowlist Support** — Exclude false positives and intentional secrets from scanning
 8. **Verified Findings** — Serious findings are re-checked by an independent verifier agent: confirmed (with
    calibrated severity), needs validation (with the exact missing fact), or dismissed (with the reason)
@@ -268,20 +268,13 @@ trivy version
 #### Linux (Ubuntu/Debian)
 
 ```bash
-# Auto-install runs via apt and curl
-# Manual install:
-sudo apt-get install -y gitleaks trivy semgrep hadolint
-
-# For OSV-Scanner and TruffleHog, curl is used:
-curl -sSfL https://raw.githubusercontent.com/google/osv-scanner/main/scripts/install.sh | sh
+# Use the bundled installer: every tool is pinned to an exact version and each download is
+# checked against the release's SHA-256 sums. No root needed with a user-writable INSTALL_DIR.
+INSTALL_DIR=~/.local/bin bash job-security-scan/scripts/install-tools.sh
 ```
 
-#### Docker
-
-```bash
-docker run -v $(pwd):/workspace aquasec/trivy fs /workspace
-docker run -v $(pwd):/repo zricethezav/gitleaks detect --source /repo -v
-```
+Do not pipe a remote install script into a shell, and do not run unpinned scanner container images
+(`aquasec/trivy` images 0.69.4-0.69.6 were malicious, GHSA-69fq-xp46-6x23).
 
 ### Configuration Requirements
 
@@ -451,10 +444,11 @@ commits = [
 
 ### Issue: "tools not found" on first run
 
-**Solution:** Ensure network access is available and run with sufficient privileges:
+**Solution:** Ensure network access is available and install into a directory you own (no `sudo`;
+add it to `PATH`):
 
 ```bash
-sudo bash job-security-scan/scripts/install-tools.sh
+INSTALL_DIR=~/.local/bin bash job-security-scan/scripts/install-tools.sh
 ```
 
 ### Issue: Gitleaks takes too long on large repos
@@ -494,7 +488,10 @@ in the summary is the work left; pending findings are not clean.
 
 ## Version History
 
-- **v3.2** (current) — Large reports no longer break: `security-report.json` is a schema v3 index with the
+- **v3.2.1** (current) — Docs hardening: removed the `eval` of the parsed config from the agent
+  instructions, the pipe-to-shell and `sudo` install commands and the unpinned scanner container images;
+  manual install now points at the pinned, checksum-verified installer
+- **v3.2** — Large reports no longer break: `security-report.json` is a schema v3 index with the
   findings in sha256-checked `findings/` shards (v2 reports still read; no single file has to hold every
   finding); a bounded `SUMMARY.md` (under 20 KB); `security-report.md` lists CRITICAL/HIGH in full and counts
   lower severities; Phase 9 runs one item at a time (`triage.py next` / `record`, `apply` without a file) over
