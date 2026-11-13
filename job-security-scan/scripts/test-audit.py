@@ -315,6 +315,54 @@ class CliTests(unittest.TestCase):
         f.write_bytes(b"[" + b" " * (5 * 1024 * 1024) + b"]")
         self.assertEqual(self.run_py("validate-audit.py", "findings", f).returncode, 2)
 
+    def completed_audit(self):
+        meta = {"run_id": "r/api", "repo": "api", "target": str(self.tmp / "api"),
+                "source_ref": {"commit": None, "dirty": False}, "profile": "deep", "scope_paths": [],
+                "budget": None, "execution_policy": "source-only", "run_status": "complete"}
+        (self.tmp / "run-metadata.json").write_text(json.dumps(meta))
+        ledger = [unit(status="covered", agent_id="h1", reviewed_paths=["src/app.js"], local_checks=[check()])]
+        (self.tmp / "coverage-ledger.json").write_text(json.dumps(ledger))
+        (self.tmp / "findings.json").write_text("[]")
+        return meta
+
+    def test_complete_requires_reports_and_final_status_not_just_valid_json(self):
+        meta = self.completed_audit()
+        self.assertEqual(self.run_py("validate-audit.py", "run", self.tmp).returncode, 0)
+        r = self.run_py("validate-audit.py", "complete", self.tmp)
+        self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
+        self.assertIn("REPORT.md", r.stdout)
+        for name in ("architecture.md", "REPORT.md", "FINDINGS-DETAIL.md", "NEEDS-VALIDATION.md"):
+            (self.tmp / name).write_text("# Reviewed\n\nNo findings.\n")
+        self.assertEqual(self.run_py("validate-audit.py", "complete", self.tmp).returncode, 0)
+        meta.update(run_status="incomplete", incomplete_reason="validation_budget_exhausted")
+        (self.tmp / "run-metadata.json").write_text(json.dumps(meta))
+        self.assertEqual(self.run_py("validate-audit.py", "run", self.tmp).returncode, 0)
+        r = self.run_py("validate-audit.py", "complete", self.tmp)
+        self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
+        self.assertIn("validation_budget_exhausted", r.stdout)
+
+    def test_complete_refuses_unfinished_units_and_unvalidated_candidates(self):
+        self.completed_audit()
+        for name in ("architecture.md", "REPORT.md", "FINDINGS-DETAIL.md", "NEEDS-VALIDATION.md"):
+            (self.tmp / name).write_text("# Reviewed\n")
+        ledger_path = self.tmp / "coverage-ledger.json"
+        for status in ("planned", "in_progress", "deferred", "blocked"):
+            u = unit(status=status, unresolved=["work remains"] if status in ("deferred", "blocked") else [])
+            if status in ("in_progress", "blocked"):
+                u["agent_id"] = "h1"
+            ledger_path.write_text(json.dumps([u]))
+            r = self.run_py("validate-audit.py", "complete", self.tmp)
+            self.assertEqual(r.returncode, 1, (status, r.stdout + r.stderr))
+        u = unit(status="candidate", agent_id="h1", reviewed_paths=["src/app.js"], local_checks=[check()],
+                 result_fingerprints=["unvalidated-candidate"])
+        ledger_path.write_text(json.dumps([u]))
+        self.assertEqual(self.run_py("validate-audit.py", "run", self.tmp).returncode, 0)
+        r = self.run_py("validate-audit.py", "complete", self.tmp)
+        self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
+        self.assertIn("unvalidated-candidate", r.stdout)
+        (self.tmp / "findings.json").write_text(json.dumps([needs_validation("unvalidated-candidate")]))
+        self.assertEqual(self.run_py("validate-audit.py", "complete", self.tmp).returncode, 0)
+
     @unittest.skipUnless(shutil.which("git"), "git required")
     def test_prepare_metadata_hints_and_since_scope(self):
         repo = self.tmp / "audit-demo"

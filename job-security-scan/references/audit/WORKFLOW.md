@@ -64,6 +64,41 @@ sits inside the scanned repository. That satisfies the upstream rule for an in-t
 `run_status` values are `awaiting_agent` (set by the script), `in_progress`, `complete` and `incomplete`.
 `execution_policy` is `source-only` or `sandboxed-source-and-local-only`.
 
+## Scheduling and resuming a multi-repo run
+
+`run-scan.sh` only prepares Phase 10. A regenerated, valid scanner report does not execute or complete
+the code audit. The parent owns both Phase 9 and Phase 10 until their completion checks pass.
+
+1. List the prepared `audit/AGENT-TASK.md` paths from the scanner output. Keep a per-repo checklist of
+   reconnaissance, hunting, candidate validation, final verification, reports and completion checks.
+   Start reconnaissance and seed a validated ledger for every requested repo before draining the
+   scanner-verification queue. Do not treat recon hints as coverage or create empty placeholder ledgers.
+2. Rotate through repos. Advance one audit wave or validation/reporting phase, then process at most
+   one Phase 9 batch for that repo before moving to the next. Do not drain thousands of scanner
+   findings while other repos still have no audit ledger. Finish a ready audit's validation and
+   reports before starting more hunting. Agents return isolated results; only the parent writes shared
+   files or regenerates the unified report.
+3. After every agent result, update the ledger and findings when applicable, validate the files that
+   exist, and checkpoint `agent_invocations` and `next_action` in that repo's `run-metadata.json`.
+   Persist the count before every launch, including failed agents and retries.
+   Preserve the profile's critic and verifier reserves in [METHOD.md](METHOD.md).
+   `--budget` is the maximum audit-agent invocations for each repo, as prepared in its metadata.
+   It does not cap Phase 9. An unset budget is not permission to invent a silent cutoff.
+4. On a context or session limit, retain completed artifacts and the exact next action for each repo.
+   Set unfinished audits to `incomplete` with the concrete reason. Write partial Phase 6 reports
+   from the evidence already collected, including unresolved candidate fingerprints and uncovered
+   units. Do not abandon all 27 audits because the scanner queue is large.
+5. To resume, reuse the existing run directory, `AGENT-TASK.md`, metadata, ledger, agent results and
+   findings. Do not rerun `run-scan.sh` or `audit-prepare.py`, which creates a new run or overwrites
+   preparation metadata. Verify the relevant source still matches the recorded evidence, including
+   dirty and untracked files. Revalidate changed paths instead of carrying stale coverage.
+   Read the persisted invocation count; never reset a strict budget on resume. If older metadata has
+   no count, reconstruct it from retained launch records before spending a strict budget.
+   Use `triage.py status <run>` to apply saved verdicts or resume the active batch without losing groups.
+6. Continue until Phase 9's run-wide check and every requested repo's Phase 10 check pass. If a real
+   blocker prevents that, report partial completion, exact remaining work and the same-run resume
+   action. Report validation alone is never the stopping condition.
+
 ## Rules of this skill that tighten the method
 
 1. **Report only.** Never edit, patch, commit or delete anything in the target, and never offer, ask or
@@ -110,13 +145,21 @@ sits inside the scanned repository. That satisfies the upstream rule for an in-t
    verifier while the budget allows. Validate both files after every change: `python3 -I <skill-dir>/scripts/validate-audit.py run <audit-dir>`.
 5. **Phase 6 — Reports**: write `REPORT.md`, `FINDINGS-DETAIL.md` and `NEEDS-VALIDATION.md` in the audit
    folder, then set `run_status` to `complete` (or `incomplete` with `incomplete_reason`) and validate
-   again.
+   again. Before claiming completion, run `python3 -I <skill-dir>/scripts/validate-audit.py complete <audit-dir>`.
+   It requires the architecture and report files, valid metadata/ledger/findings, `run_status: complete`,
+   no planned, in-progress, blocked or deferred units, and a final finding record for every candidate
+   fingerprint. `needs_validation` records with source evidence and independent verification are allowed;
+   unvalidated candidates are not. Passing this check proves artifact consistency, not absence of bugs.
+   If it fails, finish the named work or retain `incomplete` with the actual blocker. Never add empty
+   findings, blanket blockers or fake coverage to satisfy the validator.
 6. **Merge into the unified report**: run the `generate-report.py` command from `AGENT-TASK.md` (it keeps this run's profile, scope and baseline). Confirmed
    records join the scanner findings (scanner `audit`, already verified, with their own severity); `needs_validation` leads,
    coverage, gaps and hardening notes get their own section. The merge only happens when all three files
    validate and `run_status` is final; otherwise the report says why the audit was not merged.
 7. Reply as in "Output Format" of `SKILL.md`, adding the confirmed audit findings (`file:line`, severity)
-   and the number of needs-validation leads. Stop there.
+   and the number of needs-validation leads. Include completion-check failures and resume actions when
+   either phase is unfinished. A source-only audit may complete with independently validated
+   needs-validation leads; disabled local execution is not a reason to skip hunting or reporting.
 
 ## Severity
 
