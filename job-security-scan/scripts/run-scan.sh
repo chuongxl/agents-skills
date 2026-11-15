@@ -247,6 +247,8 @@ run_trivy() {
     --no-progress --quiet \
     2>/dev/null || true
 
+  [[ -s "$out_json" ]] && { python3 -I "$SKILL_DIR/scripts/lib/sanitize.py" trivy "$out_json" >/dev/null 2>&1 || : > "$out_json"; }
+
   local crits highs
   crits=$(grep -c "CRITICAL" "$out_table" 2>/dev/null || true)
   highs=$(grep -c "HIGH"     "$out_table" 2>/dev/null || true)
@@ -287,6 +289,9 @@ run_semgrep() {
     --metrics=off \
     --no-rewrite-rule-ids --quiet \
     "$path" 2>"$OUTPUT_BASE/$repo/semgrep.err" || true
+
+  # Secret-rule matches carry the secret itself in extra.lines/metavars: blank them before the file stays on disk.
+  [[ -s "$out" ]] && { python3 -I "$SKILL_DIR/scripts/lib/sanitize.py" semgrep "$out" >/dev/null 2>&1 || rm -f "$out"; }
 
   local count
   count=$(python3 -I -c \
@@ -508,10 +513,10 @@ run_trufflehog() {
 }
 
 # Shai-Hulud worm check (offline): known indicators = affected, worm-like install hooks = suspicious.
-shai_hulud_iocs_args() {
-  local cache="$CACHE_BASE/ioc/shai-hulud.json"
-  [[ -s "$cache" ]] && echo "--iocs $cache"
-}
+# The refreshed cache is merged ON TOP of the committed indicators (it can add, never remove), and is passed as an
+# array so a path with spaces stays one argument.
+IOC_ARGS=()
+[[ -s "$CACHE_BASE/ioc/shai-hulud.json" ]] && IOC_ARGS=(--iocs "$CACHE_BASE/ioc/shai-hulud.json")
 
 _shai_hulud_result() {  # _shai_hulud_result <label> <rc> <txt>
   local label="$1" rc="$2" txt="$3"
@@ -528,9 +533,8 @@ run_shai_hulud() {
   local out="$OUTPUT_BASE/$repo/shai-hulud.json" txt="$OUTPUT_BASE/$repo/shai-hulud.txt"
   mkdir -p "$(dirname "$out")"
   _log shai-hulud "$repo" "Checking for Shai-Hulud worm indicators and install-hook behaviour..."
-  # shellcheck disable=SC2046
   python3 -I "$SKILL_DIR/scripts/shai-hulud-scan.py" --repo "$path" --output "$out" --format text \
-    $(shai_hulud_iocs_args) >"$txt" 2>&1
+    ${IOC_ARGS[@]+"${IOC_ARGS[@]}"} >"$txt" 2>&1
   _shai_hulud_result "$repo" $? "$txt"
 }
 
@@ -540,9 +544,8 @@ run_shai_hulud_host() {
   echo ""
   echo "  ── this machine ($HOME) ──"
   _log shai-hulud "host" "Checking projects, global installs, npm cache and credential stores..."
-  # shellcheck disable=SC2046
   python3 -I "$SKILL_DIR/scripts/shai-hulud-scan.py" --host --output "$out" --format text \
-    $(shai_hulud_iocs_args) >"$txt" 2>&1
+    ${IOC_ARGS[@]+"${IOC_ARGS[@]}"} >"$txt" 2>&1
   _shai_hulud_result "host" $? "$txt"
 }
 
@@ -649,6 +652,7 @@ RUN_STAMP="$(date +%Y%m%d-%H%M%S)"
 OUTPUT_BASE="$RUN_ROOT/security-run-$RUN_STAMP"
 n=2
 while [[ -e "$OUTPUT_BASE" ]]; do OUTPUT_BASE="$RUN_ROOT/security-run-$RUN_STAMP-$n"; n=$((n+1)); done
+umask 077   # raw scanner output stays readable by this user only
 mkdir -p "$OUTPUT_BASE" "$CACHE_BASE"
 printf '*\n' > "$OUTPUT_BASE/.gitignore"   # keeps the run folder out of git without touching the repo's .gitignore
 RUN_DIR="$OUTPUT_BASE"
@@ -660,6 +664,7 @@ echo "  Profile  : ${PROFILE}$([[ $SCANNER_SET -eq 1 ]] && echo " (scanner: ${SC
 [[ -n "$SINCE" ]] && echo "  Scope    : files changed since ${SINCE} (partial run)"
 [[ $AUDIT_MODE -eq 1 || "$SCANNER" == "audit" ]] && echo "  Audit    : deep audit, profile ${PROFILE}${AUDIT_BUDGET:+, budget $AUDIT_BUDGET}"
 [[ -n "$BASELINE_PATH" ]] && echo "  Baseline : ${BASELINE_PATH}"
+[[ ${#IOC_ARGS[@]} -gt 0 ]] && echo "  IOC cache: ${IOC_ARGS[1]} (merged onto the committed indicators)"
 echo "  Repos    : ${REPOS_TO_SCAN[*]:-(none)}"
 [[ $HOST_MODE -eq 1 ]] && echo "  Host     : this machine (Shai-Hulud check)"
 echo "  Run      : ${OUTPUT_BASE}/"

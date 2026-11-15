@@ -211,6 +211,40 @@ class SecretLeakTests(TempDirCase):
         self.assertEqual(rows[0]["Redacted"], "AKIA****")
         self.assertTrue(rows[0]["Verified"])
 
+    def test_semgrep_secret_matches_are_blanked_other_findings_kept(self):
+        import sanitize
+        f = self.put("semgrep.json", json.dumps({"results": [
+            {"check_id": "generic.secrets.security.detected-aws-access-key-id-value", "path": "cfg.js",
+             "start": {"line": 1}, "extra": {"lines": SECRET, "metavars": {"$X": {"abstract_content": SECRET}},
+                                             "fingerprint": SECRET, "message": "AWS key"}},
+            {"check_id": "javascript.lang.security.audit.code-string-concat", "path": "a.js", "start": {"line": 2},
+             "extra": {"lines": "db.query(a + b)", "message": "m"}}]}))
+        self.assertEqual(sanitize.strip_semgrep(str(f)), 1)
+        text = f.read_text()
+        self.assertNotIn(SECRET, text)
+        rows = json.loads(text)["results"]
+        self.assertEqual(rows[0]["path"], "cfg.js")
+        self.assertEqual(rows[0]["start"]["line"], 1)
+        self.assertEqual(rows[1]["extra"]["lines"], "db.query(a + b)")
+
+    def test_trivy_secret_match_and_code_are_dropped(self):
+        import sanitize
+        f = self.put("trivy.json", json.dumps({"Results": [{"Target": ".env", "Secrets": [
+            {"RuleID": "aws-access-key-id", "StartLine": 3, "Match": "KEY=" + SECRET,
+             "Code": {"Lines": [{"Number": 3, "Content": "KEY=" + SECRET}]}}],
+            "Vulnerabilities": [{"VulnerabilityID": "CVE-1"}]}]}))
+        self.assertEqual(sanitize.strip_trivy(str(f)), 1)
+        self.assertNotIn(SECRET, f.read_text())
+        res = json.loads(f.read_text())["Results"][0]
+        self.assertEqual(res["Secrets"][0]["RuleID"], "aws-access-key-id")
+        self.assertEqual(res["Secrets"][0]["StartLine"], 3)
+        self.assertEqual(res["Vulnerabilities"][0]["VulnerabilityID"], "CVE-1")
+
+    def test_run_folder_is_private(self):
+        self.run_trufflehog_scan()
+        run = sorted((self.tmp / "ws").glob("security-run-*"))[-1]
+        self.assertEqual(run.stat().st_mode & 0o077, 0)
+
     def test_verified_trufflehog_secret_fails_the_scan(self):
         if not shutil.which("bash"):
             self.skipTest("bash required")
@@ -496,6 +530,47 @@ class HostileGitConfigTests(TempDirCase):
         self.assertIn("GIT_CONFIG_KEY_0=core.fsmonitor", text)
         self.assertIn("GIT_CONFIG_VALUE_0=false", text)
         self.assertIn("GIT_TERMINAL_PROMPT=0", text)
+
+class IocMergeTests(TempDirCase):
+    """A refreshed or overridden indicator file adds to the committed indicators; it never replaces them."""
+
+    def setUp(self):
+        super(IocMergeTests, self).setUp()
+        from shaihulud import iocs
+        self.iocs = iocs
+        self.base = json.loads(Path(iocs.DEFAULT_IOCS).read_text())
+        self.wave = next(iter(self.base["waves"]))
+
+    def extra(self, **kw):
+        doc = {"version": "cache-1", "waves": self.base["waves"], "packages": [], "files": [], "paths": [], "markers": []}
+        doc.update(kw)
+        return self.put("extra.json", json.dumps(doc))
+
+    def test_cache_adds_without_dropping_committed_indicators(self):
+        f = self.extra(packages=[{"ecosystem": "npm", "name": "brand-new-evil", "versions": ["1.0.0"], "wave": self.wave}])
+        loaded = self.iocs.load(str(f))
+        self.assertEqual(loaded.package_wave("npm", "brand-new-evil", "1.0.0"), self.wave)
+        pkg = self.base["packages"][0]
+        self.assertEqual(loaded.package_wave(pkg["ecosystem"], pkg["name"], pkg["versions"][0]), pkg["wave"])
+        self.assertEqual(len(loaded.files), len(self.base["files"]))
+
+    def test_empty_or_stale_cache_cannot_blind_the_check(self):
+        loaded = self.iocs.load(str(self.extra()))
+        for pkg in self.base["packages"][:50]:
+            self.assertTrue(loaded.package_wave(pkg["ecosystem"], pkg["name"], pkg["versions"][0]))
+
+    def test_versions_of_a_known_package_are_unioned(self):
+        pkg = self.base["packages"][0]
+        f = self.extra(packages=[{"ecosystem": pkg["ecosystem"], "name": pkg["name"], "versions": ["9.9.9-new"],
+                                  "wave": pkg["wave"]}])
+        loaded = self.iocs.load(str(f))
+        self.assertTrue(loaded.package_wave(pkg["ecosystem"], pkg["name"], "9.9.9-new"))
+        self.assertTrue(loaded.package_wave(pkg["ecosystem"], pkg["name"], pkg["versions"][0]))
+
+    def test_invalid_extra_file_is_refused(self):
+        bad = self.extra(packages=[{"ecosystem": "npm", "name": "x", "versions": [], "wave": "nope"}])
+        with self.assertRaises(ValueError):
+            self.iocs.load(str(bad))
 
 
 if __name__ == "__main__":

@@ -35,6 +35,7 @@ import baseline        # noqa: E402
 import report_formats  # noqa: E402
 import report_locate   # noqa: E402
 import report_store    # noqa: E402
+import sanitize        # noqa: E402
 import report_model    # noqa: E402
 import report_schema   # noqa: E402
 import report_scope    # noqa: E402
@@ -172,17 +173,8 @@ def parse_gitleaks(repo, results_dir, workspace):
 
 
 def _semgrep_is_secret(item):
-    """Secret-detection rules (p/secrets, *.secrets.* ids, or metadata saying so) are reported like other
-    secrets: file and line, never the matched line, which holds the secret."""
-    check_id = str(item.get("check_id", "")).lower()
-    if ".secrets." in check_id or check_id.startswith("secrets.") or "hardcoded-secret" in check_id:
-        return True
-    meta = (item.get("extra") or {}).get("metadata") or {}
-    tags = []
-    for key in ("category", "subcategory", "technology", "cwe"):
-        v = meta.get(key)
-        tags += v if isinstance(v, list) else [v]
-    return any(isinstance(t, str) and ("secret" in t.lower() or "CWE-798" in t) for t in tags)
+    """Secret-detection rules are reported like other secrets: file and line, never the matched line."""
+    return sanitize.semgrep_is_secret(item)
 
 
 def parse_semgrep(repo, results_dir, workspace):

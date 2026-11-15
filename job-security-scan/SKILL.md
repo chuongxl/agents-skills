@@ -192,7 +192,8 @@ never runs npm/node/pip. `run-scan.sh --scanner shai-hulud` (also part of `all`)
 
 Benign hooks (`node-gyp rebuild`, `prebuild-install`, `husky`, esbuild's installer...) are allowlisted in
 `assets/ioc/hook-allowlist.json`. Indicators live in `assets/ioc/shai-hulud.json`; refresh with
-`python3 -I scripts/fetch-iocs.py --out ~/.cache/job-security-scan/ioc` (used automatically when present).
+`python3 -I scripts/fetch-iocs.py --out ~/.cache/job-security-scan/ioc` (used automatically when present; it is merged
+on top of the committed indicators, so a stale, truncated or tampered cache can add indicators but never remove one).
 Data provenance: `references/ioc-data.md`. If affected: the runbook in `references/remediation.md`.
 Standalone: `python3 -I scripts/shai-hulud-scan.py --repo PATH` or `--host` (exit 0 clean / 1 suspicious / 2 affected).
 
@@ -370,7 +371,8 @@ The scanner reads untrusted repositories, so it is built not to be an attack pat
 - **Config is data, not code.** Values from `repository.md` are shell-quoted before `run-scan.sh` loads them;
   repo names may only use letters, digits, `.`, `_`, `-` (no `/`, no `..`), or the config is rejected.
 - **No secret values are kept.** Gitleaks runs with `--redact`; TruffleHog's raw values are stripped from its
-  output; secret findings (Gitleaks, TruffleHog, Trivy, Semgrep secret rules) show file and line only.
+  output; Semgrep secret-rule matches and Trivy secret `Match`/code lines are blanked in the raw JSON; the run folder
+  is created `umask 077`; secret findings (Gitleaks, TruffleHog, Trivy, Semgrep secret rules) show file and line only.
 - **Network input is constrained.** Fetchers use HTTPS to allowlisted hosts only; advisory feeds with DTDs or
   entity declarations are refused; text copied into GitHub issues cannot @-mention people or inject HTML.
 - **Deep audit is source-only by default.** Target code runs only with `JOB_SECURITY_SCAN_AUDIT_EXEC=1`,

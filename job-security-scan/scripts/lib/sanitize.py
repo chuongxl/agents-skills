@@ -3,7 +3,10 @@
 TruffleHog has no redact option: each JSON line carries the found secret in "Raw" / "RawV2" (and sometimes
 in ExtraData). The report needs where and what kind, never the value, so those fields are removed in place.
 
-Usage: python3 -I scripts/lib/sanitize.py trufflehog FILE
+Semgrep secret rules put the matched text in extra.lines and in extra.metavars[*].abstract_content, and Trivy's
+JSON carries a Match and code lines for each secret: those fields are blanked, location and rule stay.
+
+Usage: python3 -I scripts/lib/sanitize.py trufflehog|semgrep|trivy FILE
 Stdlib only; Python 3.8+.
 """
 
@@ -41,11 +44,66 @@ def strip_trufflehog(path):
     return len(kept)
 
 
+def semgrep_is_secret(item):
+    """Secret-detection rules (p/secrets, *.secrets.* ids, or metadata saying so)."""
+    check_id = str(item.get("check_id", "")).lower()
+    if ".secrets." in check_id or check_id.startswith("secrets.") or "hardcoded-secret" in check_id:
+        return True
+    meta = (item.get("extra") or {}).get("metadata") or {}
+    tags = []
+    for key in ("category", "subcategory", "technology", "cwe"):
+        v = meta.get(key)
+        tags += v if isinstance(v, list) else [v]
+    return any(isinstance(t, str) and ("secret" in t.lower() or "CWE-798" in t) for t in tags)
+
+
+def _rewrite(path, doc):
+    tmp = path + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as fh:
+        json.dump(doc, fh)
+    os.replace(tmp, path)
+
+
+def strip_semgrep(path):
+    """Blank the matched text of every secret-rule result in a Semgrep JSON file. Returns the number blanked."""
+    with open(path, "r", encoding="utf-8", errors="replace") as fh:
+        doc = json.load(fh)
+    n = 0
+    for item in doc.get("results", []) if isinstance(doc, dict) else []:
+        if isinstance(item, dict) and semgrep_is_secret(item):
+            extra = item.get("extra")
+            if isinstance(extra, dict):
+                extra["lines"] = ""
+                if "metavars" in extra:
+                    extra["metavars"] = {}
+                if "fingerprint" in extra:
+                    extra["fingerprint"] = ""
+                n += 1
+    _rewrite(path, doc)
+    return n
+
+
+def strip_trivy(path):
+    """Drop Match and code lines from every secret in a Trivy JSON file. Returns the number cleaned."""
+    with open(path, "r", encoding="utf-8", errors="replace") as fh:
+        doc = json.load(fh)
+    n = 0
+    for result in doc.get("Results", []) if isinstance(doc, dict) else []:
+        for s in result.get("Secrets", []) if isinstance(result, dict) else []:
+            if isinstance(s, dict):
+                s.pop("Match", None)
+                s.pop("Code", None)
+                n += 1
+    _rewrite(path, doc)
+    return n
+
+
 def main(argv):
-    if len(argv) != 3 or argv[1] != "trufflehog":
+    modes = {"trufflehog": strip_trufflehog, "semgrep": strip_semgrep, "trivy": strip_trivy}
+    if len(argv) != 3 or argv[1] not in modes:
         print(__doc__, file=sys.stderr)
         return 2
-    print(strip_trufflehog(argv[2]))
+    print(modes[argv[1]](argv[2]))
     return 0
 
 
