@@ -444,6 +444,59 @@ class VersionGateTests(TempDirCase):
         self.assertIn("known-malicious", r.stdout)
         self.assertEqual(r.returncode, 2, r.stdout)
 
+@unittest.skipUnless(shutil.which("git"), "git required")
+class HostileGitConfigTests(TempDirCase):
+    """A scanned repo's own .git/config must not get to run commands through our git calls."""
+
+    def hostile_repo(self):
+        repo = self.tmp / "repo"
+        repo.mkdir()
+        g = lambda *a: subprocess.run(["git", "-C", str(repo)] + list(a), stdout=subprocess.PIPE,
+                                      stderr=subprocess.PIPE, check=True)
+        g("init", "-q")
+        g("-c", "user.email=a@b", "-c", "user.name=n", "commit", "-q", "--allow-empty", "-m", "x")
+        self.marker = self.tmp / "PWNED"
+        cmd = "touch %s" % self.marker
+        with open(str(repo / ".git" / "config"), "a") as fh:
+            fh.write('[core]\n\tfsmonitor = "%s; echo"\n\tsshCommand = "%s"\n\tpager = "%s"\n' % (cmd, cmd, cmd))
+        (repo / "untracked.txt").write_text("x")
+        return repo
+
+    def test_metadata_scripts_do_not_run_repo_configured_commands(self):
+        repo = self.hostile_repo()
+        meta = load_script("write-run-metadata.py").source_ref(str(repo))
+        self.assertEqual(meta["vcs"], "git")
+        self.assertTrue(meta["dirty"])
+        prep = load_script("audit-prepare.py").source_ref(str(repo))
+        self.assertEqual(prep["vcs"], "git")
+        cf = load_script("changed-files.py")
+        self.assertIn("untracked.txt", cf.changed(str(repo), "HEAD"))
+        self.assertFalse(self.marker.exists(), "a command from the repo's .git/config ran")
+
+    def test_the_hostile_config_would_run_without_the_overrides(self):
+        repo = self.hostile_repo()     # guards the test above against passing for the wrong reason
+        subprocess.run(["git", "-C", str(repo), "status", "--porcelain"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        self.assertTrue(self.marker.exists())
+
+    def test_run_scan_exports_the_overrides_to_scanner_children(self):
+        out = self.tmp / "env.txt"
+        bin_dir = self.tmp / "bin"
+        bin_dir.mkdir()
+        g = bin_dir / "gitleaks"
+        g.write_text('#!/usr/bin/env bash\nenv | grep "^GIT_" | sort > "%s"\nexit 0\n' % out)
+        g.chmod(0o755)
+        cfg = self.put("repository.md", '---\nteam: t\norg: o\nmonorepo-root: "%s"\nrepos:\n'
+                       '  - name: clean\n    active: true\n---\n' % (FIX / "shai-hulud"))
+        (self.tmp / "ws").mkdir()
+        env = dict(os.environ, PATH=str(bin_dir) + os.pathsep + os.environ["PATH"],
+                   JOB_SECURITY_SCAN_CACHE=str(self.tmp / "c"), SECURITY_RUN_ROOT=str(self.tmp / "ws"))
+        subprocess.run(["bash", str(RUN_SCAN), "--config", str(cfg), "--scanner", "gitleaks"],
+                       stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=str(self.tmp / "ws"), env=env)
+        text = out.read_text()
+        self.assertIn("GIT_CONFIG_KEY_0=core.fsmonitor", text)
+        self.assertIn("GIT_CONFIG_VALUE_0=false", text)
+        self.assertIn("GIT_TERMINAL_PROMPT=0", text)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -26,6 +26,7 @@ from datetime import datetime
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(SCRIPT_DIR, "lib"))
 import ecosystems  # noqa: E402
+import safegit  # noqa: E402
 
 SKIP_DIRS = {".git", "node_modules", "vendor", "dist", "build", "target", ".venv", "venv", "__pycache__",
              ".next", ".gradle", ".idea", "coverage", ".terraform"}
@@ -75,11 +76,7 @@ HINTS = [
 
 
 def git(path, *args):
-    try:
-        r = subprocess.run(["git", "-C", path] + list(args), capture_output=True, text=True, timeout=60)
-    except (OSError, subprocess.TimeoutExpired):
-        return None
-    return r.stdout if r.returncode == 0 else None
+    return safegit.text(path, *args)
 
 
 def source_ref(path):

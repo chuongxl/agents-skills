@@ -11,16 +11,16 @@ import argparse
 import json
 import os
 import subprocess
+import sys
 from datetime import datetime
+
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "lib"))
+import safegit  # noqa: E402
 
 
 def source_ref(path):
     def git(*args):
-        try:
-            r = subprocess.run(["git", "-C", path] + list(args), capture_output=True, text=True, timeout=60)
-        except (OSError, subprocess.TimeoutExpired):
-            return None
-        return r.stdout if r.returncode == 0 else None
+        return safegit.text(path, *args)
     commit = git("rev-parse", "HEAD")
     if not commit:
         return {"commit": None, "dirty": None, "vcs": None}

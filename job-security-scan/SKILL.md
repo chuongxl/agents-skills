@@ -358,7 +358,13 @@ python3 .github/skills/job-security-scan/scripts/generate-report.py \
 The scanner reads untrusted repositories, so it is built not to be an attack path:
 
 - **Nothing from a scanned repo runs.** Install hooks, scripts and lockfiles are only read. Docker base images
-  are probed only on opt-in (`JOB_SECURITY_SCAN_PROBE_IMAGES=1`) and then sandboxed.
+  are probed only on opt-in (`JOB_SECURITY_SCAN_PROBE_IMAGES=1`) and then sandboxed. Every `git` call on a
+  scanned repo goes through `scripts/lib/safegit.py` (and `run-scan.sh` exports the same settings to Gitleaks and
+  TruffleHog), which overrides the repo's own `.git/config` for `core.fsmonitor`, `core.hooksPath`,
+  `core.sshCommand`, `core.pager`, `diff.external`, credential helpers and `gpg.program`. Residual: a
+  `diff.<driver>.textconv` command chosen by the repo's `.gitattributes` cannot be disabled globally and can be
+  reached by a history scan - scan untrusted repos from a fresh clone (`git clone --no-local`), not a
+  checkout that arrived with its own `.git/`.
 - **Config is data, not code.** Values from `repository.md` are shell-quoted before `run-scan.sh` loads them;
   repo names may only use letters, digits, `.`, `_`, `-` (no `/`, no `..`), or the config is rejected.
 - **No secret values are kept.** Gitleaks runs with `--redact`; TruffleHog's raw values are stripped from its

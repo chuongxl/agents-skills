@@ -106,6 +106,17 @@ else
   REPOS_TO_SCAN=("${ACTIVE_REPOS[@]}")
 fi
 
+# A scanned repo may carry its own .git/config (core.fsmonitor, sshCommand, pager ...). Force safe values through
+# the environment so every git process we or the scanners start ignores them (scripts/lib/safegit.py).
+while IFS='=' read -r _k _v; do export "$_k=$_v"; done < <(python3 -I -c '
+import os, sys
+sys.path.insert(0, sys.argv[1])
+import safegit
+e = safegit.env({})
+for k in sorted(e):
+    print("%s=%s" % (k, e[k]))' "$SKILL_DIR/scripts/lib")
+unset _k _v
+
 # ─── Helpers ──────────────────────────────────────────────────────────────
 GLOBAL_EXIT=0
 
