@@ -157,8 +157,11 @@ CycloneDX SBOM and OSV-Scanner matches it (`sbom.cdx.json`, `osv-sbom.json`).
 
 ## Phase 6 — Verified Secret Detection (TruffleHog)
 
-Scans git history and **actively verifies** whether found credentials are
-still valid via live API calls. Reports `VERIFIED ACTIVE` vs `unverified`.
+Scans git history for credentials. By default it does **not** verify them: verification sends each found
+credential to its vendor's API, and some detectors contact hosts named in the scanned repo, so a hostile repo
+could make this machine issue requests. Findings are reported as `unverified`. Set
+`JOB_SECURITY_SCAN_VERIFY_SECRETS=1` (only on a repo you trust, where sending credentials out is allowed) to
+verify live; verified findings are then `VERIFIED ACTIVE` and CRITICAL.
 
 ## Phase 7 — Vendor Advisories (any language or runtime)
 

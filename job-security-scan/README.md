@@ -167,12 +167,14 @@ Google's database for supply-chain vulnerabilities:
 
 ### 6. TruffleHog — Live Credential Verification
 
-Different from Gitleaks (which scans git history), TruffleHog verifies live credentials:
-- Detects if an exposed secret is currently valid
+Different from Gitleaks (which scans git history), TruffleHog can verify live credentials. Verification is
+**off by default** (it sends found credentials to vendor APIs, and a hostile repo can steer some detectors to
+hosts it names); set `JOB_SECURITY_SCAN_VERIFY_SECRETS=1` on repos you trust:
+- Detects if an exposed secret is currently valid (verification on)
 - Prioritizes urgent remediation for active credentials
 - Supports multiple credential types
 
-**Output:** `trufflehog.json` with verified/unverified status
+**Output:** `trufflehog.json` with verified/unverified status (everything is `unverified` unless verification is on)
 
 ### 7. Shai-Hulud — Supply-Chain Worm Check (repo and laptop)
 

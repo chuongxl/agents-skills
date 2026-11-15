@@ -235,6 +235,30 @@ class SecretLeakTests(TempDirCase):
             if f.is_file():
                 self.assertNotIn(SECRET, f.read_text(errors="replace"), str(f))
 
+    def run_trufflehog_scan(self, **extra_env):
+        bin_dir = self.tmp / "bin"
+        bin_dir.mkdir(exist_ok=True)
+        th = bin_dir / "trufflehog"
+        th.write_text('#!/usr/bin/env bash\necho "$@" > "%s"\n' % (self.tmp / "args.txt"))
+        th.chmod(0o755)
+        cfg = self.put("repository.md", '---\nteam: t\norg: o\nmonorepo-root: "%s"\nrepos:\n'
+                       '  - name: clean\n    active: true\n---\n' % (FIX / "shai-hulud"))
+        (self.tmp / "ws").mkdir(exist_ok=True)
+        env = dict(os.environ, PATH=str(bin_dir) + os.pathsep + os.environ["PATH"],
+                   JOB_SECURITY_SCAN_CACHE=str(self.tmp / "c"), SECURITY_RUN_ROOT=str(self.tmp / "ws"))
+        env.pop("JOB_SECURITY_SCAN_VERIFY_SECRETS", None)
+        env.update(extra_env)
+        subprocess.run(["bash", str(RUN_SCAN), "--config", str(cfg), "--scanner", "trufflehog"],
+                       stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True,
+                       cwd=str(self.tmp / "ws"), env=env)
+        return (self.tmp / "args.txt").read_text()
+
+    def test_trufflehog_does_not_verify_live_by_default(self):
+        self.assertIn("--no-verification", self.run_trufflehog_scan())
+
+    def test_trufflehog_verification_is_opt_in(self):
+        self.assertNotIn("--no-verification", self.run_trufflehog_scan(JOB_SECURITY_SCAN_VERIFY_SECRETS="1"))
+
     def test_semgrep_secret_rules_are_secrets(self):
         gen = load_script("generate-report.py")
         self.put("run/r/semgrep.json", json.dumps({"results": [

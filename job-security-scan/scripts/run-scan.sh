@@ -465,9 +465,17 @@ run_trufflehog() {
 
   if ! has_tool trufflehog; then _skip trufflehog "$repo" "tool not installed"; return; fi
 
-  _log trufflehog "$repo" "Scanning git history — verifying active credentials..."
+  # Verification sends each found credential to the vendor API it belongs to, and some detectors contact hosts
+  # named in the scanned repo - so a hostile repo could make this machine issue requests. Off by default.
+  local verify_args=(--no-verification)
+  if [[ "${JOB_SECURITY_SCAN_VERIFY_SECRETS:-}" == "1" ]]; then
+    verify_args=()
+    _log trufflehog "$repo" "Scanning git history - VERIFYING credentials against live APIs (JOB_SECURITY_SCAN_VERIFY_SECRETS=1)..."
+  else
+    _log trufflehog "$repo" "Scanning git history (credentials not verified live; set JOB_SECURITY_SCAN_VERIFY_SECRETS=1 to verify)..."
+  fi
   trufflehog git "file://$path" \
-    --json --no-update \
+    --json --no-update ${verify_args[@]+"${verify_args[@]}"} \
     2>/dev/null | grep -v "^$" > "$out" || true
   # TruffleHog has no redact flag: drop the secret values before the raw file stays in the run folder.
   python3 -I "$SKILL_DIR/scripts/lib/sanitize.py" trufflehog "$out" >/dev/null 2>&1 || : > "$out"
