@@ -589,5 +589,42 @@ class ProbeRegistryTests(unittest.TestCase):
         self.assertFalse(probe.image_allowed("ghcr.io/myorgevil/node:22", "ghcr.io/myorg"))
 
 
+class CiTemplateTests(unittest.TestCase):
+    """The CI template must not run, or take its configuration from, the pull request it is scanning."""
+
+    def setUp(self):
+        import re
+        text = (SKILL_DIR / "references" / "ci-workflow.md").read_text()
+        self.yaml = text[text.index("```yaml") + 7:text.index("\n```\n", text.index("```yaml"))]
+        body = self.yaml[self.yaml.index("\njobs:"):]
+        parts = re.split(r"\n  ([a-z-]+):\n", body)[1:]
+        self.jobs = dict(zip(parts[0::2], parts[1::2]))
+
+    def test_every_job_uses_the_base_commit_copy_of_the_skill(self):
+        self.assertEqual(len(self.jobs), 6)
+        for name, job in self.jobs.items():
+            self.assertIn("path: .trusted", job, name)
+            self.assertIn("github.event.pull_request.base.sha || github.sha", job, name)
+
+    def test_scripts_and_config_are_only_referenced_from_the_trusted_copy(self):
+        import re
+        self.assertIn("SKILL_DIR: .trusted/.github/skills/job-security-scan", self.yaml)
+        self.assertIn("CONFIG:    .trusted/.github/skills/job-security-scan/assets/repository.md", self.yaml)
+        for m in re.finditer(r"\.github/skills", self.yaml):
+            self.assertTrue(self.yaml[:m.start()].endswith(".trusted/") or self.yaml[:m.start()].endswith("sparse-checkout: "),
+                            self.yaml[m.start() - 30:m.start() + 30])
+
+    def test_fork_pull_requests_do_not_reach_the_runner(self):
+        for name, job in self.jobs.items():
+            self.assertIn("github.event.pull_request.head.repo.full_name == github.repository", job, name)
+
+    def test_actions_and_images_are_pinned_and_semgrep_reports_no_metrics(self):
+        import re
+        for m in re.finditer(r"uses:\s*(\S+)", self.yaml):
+            self.assertRegex(m.group(1), r"@[0-9a-f]{40}$", m.group(1))
+        self.assertRegex(self.yaml, r"image: semgrep/semgrep:[\d.]+@sha256:[0-9a-f]{64}")
+        self.assertIn("--metrics=off", self.yaml)
+
+
 if __name__ == "__main__":
     unittest.main()
