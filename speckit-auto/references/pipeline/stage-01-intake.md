@@ -124,9 +124,11 @@ the meta-repo root instead of their real submodule.
 
 ## 4. Scratch Hygiene
 
-Stage 04 commits with `git add -A`, so before Stage 03 ensure `.superpowers/` (superpowers only)
+Stage 04 stages by explicit path (shared/commit.md Staging Safety Check), but scratch must still not
+be left lying around, so before Stage 03 ensure `.superpowers/` (superpowers only)
 is git-ignored if needed. The relocated `ticket.md` is **not** scratch — never gitignore it.
-Ensure `.speckit/` is git-ignored in both source repo and worktree before initializing events.
+Ensure `.speckit/` is git-ignored in both source repo and worktree before initializing events, and
+likewise any Stage 05 evidence folder the project's `verify-<app>` skill names.
 Keep runtime `events.jsonl`, locks, and `.speckit/runs/` discovery out of commits. Mirror this
 ignore rule during the worktree gate, not after the first write.
 

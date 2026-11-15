@@ -27,16 +27,35 @@ conditional:
    success path, not a failure.
 3. Non-empty → commit as below.
 
+## Staging Safety Check (every call site, both modes)
+
+Never `git add -A` or `git add .`: that publishes whatever happens to be untracked — a stray `.env`
+copy, a key file, run evidence — and in `--yolo` nobody looks at the diff first. Before staging in a
+repo:
+
+1. List what would be committed: `git status --porcelain --untracked-files=all`.
+2. **Stop with the paths quoted** (no commit, no push; `run_failed` `policy_blocked`) when any
+   changed or untracked path matches `.env`, `.env.*` (except `.env.example`), `*.pem`, `*.key`,
+   `*.p12`, `*.pfx`, `id_rsa*`, `id_ed25519*`, `*credentials*`, `*.kdbx`, or sits under `.speckit/`,
+   `.superpowers/`, `.worktrees/` or a Stage 05 evidence folder. Do not "fix" it by deleting or
+   ignoring the file yourself; say what it is and let the human decide.
+3. Stage **by explicit path** (`git add -- <path> ...`) taken from the listing: the artifact folder
+   plus the files the plan and tasks name. A changed path nothing in the spec, plan or tasks accounts
+   for is surfaced, not staged (default mode: ask; `--yolo`: stop with the paths quoted).
+4. When `gitleaks` is installed, run `gitleaks protect --staged --redact --no-banner`; a finding
+   stops the commit with the file and line only, never the value.
+
 ## With Submodules
 
-If modified submodules exist: commit inside each dirty submodule first (`git add -A` →
-`git commit -m "<message>"`), then commit the parent pointer update and any parent changes. Re-check
-the parent status **after** the submodule commits — a submodule commit dirties the parent pointer,
-so the parent may need a commit even when it looked clean moments earlier.
+If modified submodules exist: commit inside each dirty submodule first (run the Staging Safety Check
+there, `git add -- <paths>` → `git commit -m "<message>"`), then commit the parent pointer update
+and any parent changes. Re-check the parent status **after** the submodule commits — a submodule
+commit dirties the parent pointer, so the parent may need a commit even when it looked clean moments
+earlier.
 
 ## Without Submodules
 
-`git add -A` → `git commit -m "<message>"`.
+Staging Safety Check → `git add -- <paths>` → `git commit -m "<message>"`.
 
 ## Branch Sync + Push (Required)
 
@@ -72,7 +91,8 @@ failure stops instrumentation explicitly; do not try to continue or claim comple
 
 ## Scratch Must Already Be Ignored
 
-`git add -A` would otherwise sweep run scratch into the feature commit. Stage 01 guarantees
+Staging by explicit path (above) keeps run scratch out of the feature commit as a second line of
+defence; the ignore rules below are the first. Stage 01 guarantees
 `.superpowers/` in superpowers mode may be git-ignored if needed. The relocated `ticket.md`
 inside the artifact folder is **not** scratch and is committed with the artifacts.
 `.speckit/` must also be git-ignored in source and worktree for both providers; check that event
