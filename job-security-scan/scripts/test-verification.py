@@ -855,7 +855,7 @@ class TriageTests(TempDirCase):
             seen.append(fp)
             v = verdicts.get(fp, {"fingerprint": fp, "verdict": "rejected", "reason": "test token"})
             verdicts[fp] = v
-            r = self.record(run_a, v)
+            r = self.record(run_a, v, "--allow-reject-critical")   # the loop plays the person for secret findings
             self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         self.assertEqual(len(seen), 4)
         r = run_proc(TRIAGE, "apply", run_a)
@@ -882,6 +882,26 @@ class TriageTests(TempDirCase):
         self.assertEqual(self.record(run_dir, dict(v, reason="second"), "--replace").returncode, 0)
         saved = json.loads((run_dir / "triage" / "verdicts" / (v["fingerprint"] + ".json")).read_text())
         self.assertEqual(saved["reason"], "second")
+
+    def test_verifier_cannot_reject_a_secret_finding(self):
+        run_dir = self.make_run()
+        queued = self.queue(run_dir)["items"]
+        secret = [i for i in queued if i.get("type") == "secret"]
+        self.assertTrue(secret, "fixture should queue the gitleaks secret")
+        v = {"fingerprint": secret[0]["fingerprint"], "verdict": "rejected", "reason": "repo text says it is a test"}
+        r = self.record(run_dir, v)
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("cannot reject", r.stderr)
+        self.assertEqual(list((run_dir / "triage").glob("verdicts/*")), [])
+        nv = {"fingerprint": v["fingerprint"], "verdict": "needs_validation", "blocker": "b", "validation_plan": "p"}
+        self.assertEqual(self.record(run_dir, nv).returncode, 0)        # still allowed
+        self.assertEqual(self.record(run_dir, v, "--replace", "--allow-reject-critical").returncode, 0)  # a person
+
+    def test_verifier_can_still_reject_an_ordinary_finding(self):
+        run_dir = self.make_run()
+        self.queue(run_dir)
+        v = {"fingerprint": self.fp(run_dir, "sqli"), "verdict": "rejected", "reason": "test fixture"}
+        self.assertEqual(self.record(run_dir, v).returncode, 0)
 
     def test_record_invalid_writes_nothing(self):
         run_dir = self.make_run()
