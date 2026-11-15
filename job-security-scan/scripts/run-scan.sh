@@ -65,6 +65,12 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+# --repo becomes a directory under monorepo-root and under the run folder: same rule as config repo names.
+if [[ -n "$REPO_FILTER" && ! "$REPO_FILTER" =~ ^[A-Za-z0-9_][A-Za-z0-9._-]{0,99}$ ]]; then
+  echo "Invalid --repo: $REPO_FILTER (letters, digits, '.', '_', '-'; no '/' and no leading '.' or '-')"
+  exit 1
+fi
+
 # ─── Locate skill root & config ────────────────────────────────────────────
 SKILL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 

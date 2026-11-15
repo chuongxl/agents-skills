@@ -300,6 +300,21 @@ class ImageProbeTests(TempDirCase):
                      "--pids-limit", "--memory", "--user 65534:65534"):
             self.assertIn(flag, runs[0])
 
+@unittest.skipUnless(shutil.which("bash"), "bash required")
+class RepoArgumentTests(TempDirCase):
+    def test_repo_flag_cannot_leave_the_workspace(self):
+        cfg = self.put("repository.md", '---\nteam: t\norg: o\nmonorepo-root: "%s"\nrepos:\n'
+                       '  - name: clean\n    active: true\n---\n' % (FIX / "shai-hulud"))
+        (self.tmp / "ws").mkdir()
+        env = dict(os.environ, JOB_SECURITY_SCAN_CACHE=str(self.tmp / "c"), SECURITY_RUN_ROOT=str(self.tmp / "ws"))
+        for bad in ("../clean", "a/b", "..", "-x", ".git"):
+            r = subprocess.run(["bash", str(RUN_SCAN), "--config", str(cfg), "--scanner", "shai-hulud", "--repo", bad],
+                               stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True,
+                               cwd=str(self.tmp / "ws"), env=env)
+            self.assertEqual(r.returncode, 1, bad + r.stdout)
+            self.assertIn("Invalid --repo", r.stdout, bad)
+            self.assertEqual(list((self.tmp / "ws").glob("security-run-*")), [], bad)
+
 
 if __name__ == "__main__":
     unittest.main()
