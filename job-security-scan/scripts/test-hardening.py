@@ -573,5 +573,21 @@ class IocMergeTests(TempDirCase):
             self.iocs.load(str(bad))
 
 
+class ProbeRegistryTests(unittest.TestCase):
+    def test_default_allows_docker_hub_official_images_only(self):
+        probe = load_script("probe-runtime.py")
+        for ok in ("node:22-alpine", "golang", "node:22@sha256:abc", "docker.io/library/node:22"):
+            self.assertTrue(probe.image_allowed(ok), ok)
+        for bad in ("evil.example/node:22", "ghcr.io/org/node:22", "someuser/node:22", "localhost:5000/node",
+                    "docker.io/someuser/node:22", "mcr.microsoft.com/dotnet/sdk:8.0"):
+            self.assertFalse(probe.image_allowed(bad), bad)
+
+    def test_extra_registries_come_from_the_operator(self):
+        probe = load_script("probe-runtime.py")
+        self.assertTrue(probe.image_allowed("ghcr.io/myorg/node:22", "ghcr.io/myorg"))
+        self.assertFalse(probe.image_allowed("ghcr.io/other/node:22", "ghcr.io/myorg"))
+        self.assertFalse(probe.image_allowed("ghcr.io/myorgevil/node:22", "ghcr.io/myorg"))
+
+
 if __name__ == "__main__":
     unittest.main()

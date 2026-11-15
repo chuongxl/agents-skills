@@ -11,7 +11,9 @@ working docker the probe is skipped (exit 0, nothing written) and says so on std
 
 Only the base image named in the Dockerfile is run, with --entrypoint set to the runtime binary, so no
 repository file executes - but the image itself is chosen by the scanned repo and may be hostile. run-scan.sh
-therefore calls this only when JOB_SECURITY_SCAN_PROBE_IMAGES=1, and every container runs sandboxed: no network,
+therefore calls this only when JOB_SECURITY_SCAN_PROBE_IMAGES=1, pulls only Docker Hub official images unless
+JOB_SECURITY_SCAN_PROBE_REGISTRIES lists more (a repo cannot send this machine to a registry of its choosing), and
+every container runs sandboxed: no network,
 read-only root, all capabilities dropped, no privilege escalation, nobody user, and pid/memory/CPU limits.
 Stdlib only; Python 3.8+. Run with -I.
 """
@@ -34,6 +36,19 @@ PROBES = {"node": ("node", ["-v"]), "python": ("python", ["-V"]), "go": ("go", [
 SANDBOX = ["--network", "none", "--read-only", "--cap-drop", "ALL", "--security-opt", "no-new-privileges",
            "--pids-limit", "64", "--memory", "256m", "--cpus", "1", "--user", "65534:65534", "--tmpfs", "/tmp:rw,size=16m"]
 _IMAGE_RE = re.compile(r"[A-Za-z0-9][\w./:@-]*")
+
+
+def image_allowed(image, extra=""):
+    """Only Docker Hub official images (node:22, golang:1.22, docker.io/library/node) are pulled by default: a repo
+    chooses its own base image, so any other registry is the repo deciding where this machine pulls from. Extra
+    registries/prefixes (space-separated) come from JOB_SECURITY_SCAN_PROBE_REGISTRIES, set by the person scanning."""
+    name = image.split("@")[0]
+    parts = name.split("/")
+    if len(parts) == 1:
+        return True
+    if len(parts) == 3 and parts[0] in ("docker.io", "index.docker.io") and parts[1] == "library":
+        return True
+    return any(name.startswith(prefix.rstrip("/") + "/") for prefix in extra.split() if prefix)
 _VER_RE = re.compile(r"(\d+\.\d+\.\d+)")
 
 
@@ -75,7 +90,12 @@ def main(argv=None):
         return 0
 
     comps = []
+    extra = os.environ.get("JOB_SECURITY_SCAN_PROBE_REGISTRIES", "")
     for (runtime, image), location in sorted(images.items()):
+        if not image_allowed(image, extra):
+            print("probe: %s NOT probed - registry is not Docker Hub official; set "
+                  "JOB_SECURITY_SCAN_PROBE_REGISTRIES to allow it" % image, file=sys.stderr)
+            continue
         try:
             v = probe(runtime, image, args.timeout)
         except (OSError, subprocess.SubprocessError) as exc:

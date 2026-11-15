@@ -170,7 +170,8 @@ Catches issues the CVE databases lag on, such as a runtime security release anno
 enrichment into the advisory cache (`~/.cache/job-security-scan/advisories`), and matches them against the repository's runtimes, images and dependencies
 (`scripts/fetch-advisories.py`, `scripts/match.py`). Results appear in the report as "Vendor advisories".
 It also checks the runtime itself: Dockerfile base images (probed with `node -v` and equivalents **only when
-`JOB_SECURITY_SCAN_PROBE_IMAGES=1`** - the probe pulls and runs the image the scanned repo names, in a sandbox:
+`JOB_SECURITY_SCAN_PROBE_IMAGES=1`** - the probe pulls and runs the image the scanned repo names, in a sandbox (Docker Hub official images only;
+add more with `JOB_SECURITY_SCAN_PROBE_REGISTRIES="ghcr.io/myorg ..."`):
 no network, read-only, no capabilities, `nobody` user, resource limits), compose files, CI `setup-*` actions and version files; end-of-life lines and unpinned tags (`node:22-alpine`, `latest`) are reported.
 Set `ADVISORY_OFFLINE=1` to skip the fetch and use the cache. Details: `references/advisory-data.md`.
 
