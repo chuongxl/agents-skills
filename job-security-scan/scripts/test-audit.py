@@ -506,5 +506,88 @@ class SandboxAndPromotionTests(unittest.TestCase):
         self.assertEqual(r.returncode, 2)
 
 
+def load_sandbox():
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("audit_sandbox", str(HERE / "audit-sandbox.py"))
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+class SandboxHidingTests(unittest.TestCase):
+    """The sandbox hides credentials and local sockets: $HOME wholesale, or its credential paths when the
+    workspace lives inside it."""
+
+    def setUp(self):
+        self.tmp = Path(os.path.realpath(tempfile.mkdtemp()))
+        self.home = self.tmp / "home"
+        (self.home / ".ssh").mkdir(parents=True)
+        (self.home / ".ssh" / "id_test").write_text("PRIVATE-KEY-CANARY\n")
+        (self.home / ".netrc").write_text("machine x password CANARY\n")
+        (self.home / "work").mkdir()
+        (self.home / "work" / "notes.txt").write_text("workspace file\n")
+        self.old_home = os.environ.get("HOME")
+        os.environ["HOME"] = str(self.home)
+
+    def tearDown(self):
+        if self.old_home is None:
+            os.environ.pop("HOME", None)
+        else:
+            os.environ["HOME"] = self.old_home
+        shutil.rmtree(str(self.tmp), ignore_errors=True)
+
+    def scratch_at(self, base):
+        s = base / "audit" / "agents" / "v1" / "scratch"
+        s.mkdir(parents=True)
+        return s
+
+    def test_home_is_hidden_wholesale_when_workspace_is_elsewhere(self):
+        mod = load_sandbox()
+        spec = mod.hide_spec(str(self.scratch_at(self.tmp / "elsewhere")), None, [])
+        self.assertIn("d:%s" % self.home, spec.splitlines())
+
+    def test_credential_paths_are_hidden_when_workspace_is_inside_home(self):
+        mod = load_sandbox()
+        spec = mod.hide_spec(str(self.scratch_at(self.home / "work")), None, []).splitlines()
+        self.assertIn("d:%s" % (self.home / ".ssh"), spec)
+        self.assertIn("f:%s" % (self.home / ".netrc"), spec)
+        self.assertNotIn("d:%s" % self.home, spec)
+        self.assertFalse([e for e in spec if e.startswith("d:%s" % (self.home / "work"))])
+
+    def test_cwd_and_extra_paths_keep_their_directories_visible(self):
+        mod = load_sandbox()
+        spec = mod.hide_spec(str(self.scratch_at(self.tmp / "elsewhere")), str(self.home / "work"), []).splitlines()
+        self.assertNotIn("d:%s" % self.home, spec)             # cwd lives in home, so home is not hidden wholesale
+        self.assertIn("d:%s" % (self.home / ".ssh"), spec)
+
+    def run_sandbox(self, scratch, *cmd):
+        env = dict(os.environ, JOB_SECURITY_SCAN_AUDIT_EXEC="1")
+        return subprocess.run([PY, "-I", str(HERE / "audit-sandbox.py"), "--scratch", str(scratch), "--"] + list(cmd),
+                              stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True, env=env)
+
+    @unittest.skipUnless(sys.platform.startswith("linux") and namespaces_available(), "needs Linux namespaces")
+    def test_check_cannot_read_home_credentials(self):
+        for base, label in ((self.tmp / "elsewhere", "workspace outside home"), (self.home / "work", "inside home")):
+            scratch = self.scratch_at(base)
+            r = self.run_sandbox(scratch, "sh", "-c",
+                                 "cat %s/.ssh/id_test %s/.netrc 2>/dev/null; ls %s/.ssh 2>/dev/null; true"
+                                 % (self.home, self.home, self.home))
+            if r.returncode == 97 and "cannot make" in r.stderr:
+                self.skipTest("this host cannot remount every mount read-only: " + r.stderr.splitlines()[0])
+            self.assertEqual(r.returncode, 0, label + r.stderr)
+            self.assertNotIn("CANARY", r.stdout, label)
+            self.assertNotIn("id_test", r.stdout, label)
+
+    @unittest.skipUnless(sys.platform.startswith("linux") and namespaces_available(), "needs Linux namespaces")
+    def test_workspace_inside_home_stays_readable_and_run_is_hidden(self):
+        scratch = self.scratch_at(self.home / "work")
+        r = self.run_sandbox(scratch, "sh", "-c", "cat %s/work/notes.txt; ls -A /run | grep -v '^mount$' | wc -l" % self.home)   # mount(8) makes /run/mount itself
+        if r.returncode == 97 and "cannot make" in r.stderr:
+            self.skipTest("this host cannot remount every mount read-only: " + r.stderr.splitlines()[0])
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn("workspace file", r.stdout)
+        self.assertEqual(r.stdout.splitlines()[-1].strip(), "0")     # /run (docker.sock, agents) is empty
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -250,8 +250,10 @@ scanners and to Phase 9; it does not replace them.
 
 Safety: source-only by default — nothing from the target runs. Sandboxed local checks need
 `JOB_SECURITY_SCAN_AUDIT_EXEC=1` and go only through `scripts/audit-sandbox.py` (no network, read-only
-filesystem except the agent's scratch folder, empty environment, CPU/memory/process/time limits; it refuses
-to run if any control is missing). Evidence leaves scratch only through `scripts/audit-promote.py`.
+filesystem except the agent's scratch folder, empty environment, CPU/memory/process/time limits, `$HOME`,
+`/root`, `/run` (docker.sock, ssh-agent) hidden - or, when the workspace lives inside `$HOME`, its credential
+paths such as `~/.ssh`, `~/.aws`, `~/.netrc`; it refuses to run if any control is missing). For the strongest
+isolation keep audited workspaces outside your home directory. Evidence leaves scratch only through `scripts/audit-promote.py`.
 
 ## Reports — one folder per run
 
