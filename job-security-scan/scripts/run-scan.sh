@@ -115,7 +115,23 @@ _warn() { echo "  🟡 [$1] $2: $3"; [[ $GLOBAL_EXIT -lt 1 ]] && GLOBAL_EXIT=1; 
 _fail() { echo "  🔴 [$1] $2: $3"; GLOBAL_EXIT=2; }
 _skip() { echo "  ⏭️  [$1] $2: $3 — skipped"; }
 
-has_tool() { command -v "$1" &>/dev/null; }
+# A tool is usable when it is on PATH - except the Trivy releases that shipped malware (GHSA-69fq-xp46-6x23):
+# those are never run, whoever installed them.
+TRIVY_STATE=""
+has_tool() {
+  command -v "$1" &>/dev/null || return 1
+  [[ "$1" == "trivy" ]] || return 0
+  if [[ -z "$TRIVY_STATE" ]]; then
+    TRIVY_STATE="ok"
+    if trivy --version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -n1 | grep -qE '^0\.69\.[456]$'; then
+      TRIVY_STATE="malicious"
+      echo "  🔴 [trivy] the installed Trivy is a known-malicious release (0.69.4-0.69.6) - NOT run. Remove it," \
+           "install the pinned version (scripts/install-tools.sh) and rotate any secret it could reach."
+      GLOBAL_EXIT=2
+    fi
+  fi
+  [[ "$TRIVY_STATE" == "ok" ]]
+}
 
 # osv-scanner flag names changed across v2 releases (--output -> --output-file, --sbom -> -L).
 OSV_OUT_FLAG=""
@@ -257,6 +273,7 @@ run_semgrep() {
   semgrep scan \
     "${config_args[@]}" \
     --json --output "$out" \
+    --metrics=off \
     --no-rewrite-rule-ids --quiet \
     "$path" 2>"$OUTPUT_BASE/$repo/semgrep.err" || true
 

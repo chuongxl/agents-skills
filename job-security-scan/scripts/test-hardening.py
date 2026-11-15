@@ -115,7 +115,10 @@ class InstallerVerificationTests(TempDirCase):
             with tarfile.open(str(rel / asset), "w:gz") as tf:   # swapped after the sums were published
                 src.write_text("#!/bin/sh\necho EVIL\n")
                 tf.add(str(src), arcname=tool)
-        (rel / sums_name).write_text("%s  %s\n%s  other-asset.tar.gz\n" % (digest, asset, "0" * 64))
+        with open(str(self.tmp / "pinned.txt"), "a") as fh:     # stands in for assets/tool-checksums.txt
+            fh.write("%s  %s\n" % (digest, asset))
+        # a checksum file published next to the asset must be ignored: here it "confirms" the tampered download
+        (rel / sums_name).write_text("%s  %s\n" % (hashlib.sha256((rel / asset).read_bytes()).hexdigest(), asset))
 
     def test_good_checksum_installs_and_tampered_download_is_refused(self):
         self.release("trivy", "0.69.3", "trivy_0.69.3_Linux-64bit.tar.gz", "", "trivy_0.69.3_checksums.txt")
@@ -137,9 +140,16 @@ class InstallerVerificationTests(TempDirCase):
         if (Path("/bin") / "uname").exists() and "x86_64" not in subprocess.run(
                 ["uname", "-m"], stdout=subprocess.PIPE, universal_newlines=True).stdout:
             self.skipTest("fixture assets are x86_64")
+        # served by the release but absent from the pinned file: must be refused, not trusted on first sight
+        import tarfile
+        with tarfile.open(str(self.tmp / "releases" / "trufflehog_3.99.7_linux_amd64.tar.gz"), "w:gz") as tf:
+            tf.add(str(self.tmp / "src" / "trivy"), arcname="trufflehog")
         r = subprocess.run(["bash", str(SKILL_DIR / "scripts" / "install-tools.sh"), "--config", str(cfg)],
                            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True,
-                           env=dict(os.environ, PATH=path, INSTALL_DIR=str(dest)))
+                           env=dict(os.environ, PATH=path, INSTALL_DIR=str(dest),
+                                    JOB_SECURITY_SCAN_CHECKSUMS=str(self.tmp / "pinned.txt")))
+        self.assertFalse((dest / "trufflehog").exists(), r.stdout)
+        self.assertIn("no pinned checksum for trufflehog_3.99.7_linux_amd64.tar.gz", r.stdout)
         self.assertTrue((dest / "trivy").is_file(), r.stdout)
         self.assertTrue(os.access(str(dest / "trivy"), os.X_OK))
         self.assertFalse((dest / "gitleaks").exists(), r.stdout)
@@ -314,6 +324,101 @@ class RepoArgumentTests(TempDirCase):
             self.assertEqual(r.returncode, 1, bad + r.stdout)
             self.assertIn("Invalid --repo", r.stdout, bad)
             self.assertEqual(list((self.tmp / "ws").glob("security-run-*")), [], bad)
+
+INSTALLER = SKILL_DIR / "scripts" / "install-tools.sh"
+PINNED = {"trivy": "0.69.3", "gitleaks": "8.30.1", "trufflehog": "3.99.7", "osv-scanner": "2.7.0",
+          "semgrep": "1.183.0"}
+
+
+class PinnedSupplyChainTests(unittest.TestCase):
+    def test_every_linux_asset_has_a_committed_checksum(self):
+        text = INSTALLER.read_text()
+        for tool, version in PINNED.items():
+            self.assertIn('="%s"' % version, text, tool)
+        pinned = {}
+        for line in (SKILL_DIR / "assets" / "tool-checksums.txt").read_text().splitlines():
+            if line and not line.startswith("#"):
+                digest, name = line.split()
+                self.assertRegex(digest, r"^[0-9a-f]{64}$")
+                pinned[name] = digest
+        for asset in ("trivy_0.69.3_Linux-64bit.tar.gz", "trivy_0.69.3_Linux-ARM64.tar.gz",
+                      "gitleaks_8.30.1_linux_x64.tar.gz", "gitleaks_8.30.1_linux_arm64.tar.gz",
+                      "trufflehog_3.99.7_linux_amd64.tar.gz", "trufflehog_3.99.7_linux_arm64.tar.gz",
+                      "hadolint-linux-x86_64", "hadolint-linux-arm64",
+                      "osv-scanner_linux_amd64", "osv-scanner_linux_arm64"):
+            self.assertIn(asset, pinned)
+
+    def test_installer_never_trusts_a_release_checksum_file_or_file_urls(self):
+        text = INSTALLER.read_text()
+        for marker in ("_checksums.txt", "SHA256SUMS", ".sha256\"", "=https,file", "NF==1"):
+            self.assertNotIn(marker, text)
+
+    def test_semgrep_is_installed_hash_locked_and_runs_without_metrics(self):
+        text = INSTALLER.read_text()
+        self.assertIn("--require-hashes", text)
+        self.assertNotIn("pip install --quiet --user", text)
+        req = (SKILL_DIR / "assets" / "semgrep-requirements.txt").read_text()
+        self.assertIn("semgrep==1.183.0", req)
+        for line in req.splitlines():       # every requirement line is followed by at least one hash
+            if line and not line.startswith(("#", " ")):
+                self.assertTrue(line.rstrip().endswith("\\"), line)
+        self.assertIn("--metrics=off", RUN_SCAN.read_text())
+
+
+@unittest.skipUnless(shutil.which("bash"), "bash required")
+class VersionGateTests(TempDirCase):
+    """Tools already on PATH are only accepted at the pinned version; a malicious Trivy never is."""
+
+    def stub(self, name, body):
+        b = self.tmp / "bin"
+        b.mkdir(exist_ok=True)
+        f = b / name
+        f.write_text("#!/usr/bin/env bash\n" + body + "\n")
+        f.chmod(0o755)
+
+    def install(self, versions, **env):
+        for tool, version in versions.items():
+            self.stub(tool, 'echo "%s version %s"' % (tool, version))
+        cfg = self.put("repository.md", "---\nteam: t\norg: o\nrepos:\n  - name: svc\n    active: true\n---\n")
+        e = dict(os.environ, PATH=str(self.tmp / "bin") + os.pathsep + os.environ["PATH"],
+                 INSTALL_DIR=str(self.tmp / "dest"))
+        e.pop("JOB_SECURITY_SCAN_ALLOW_VERSION_DRIFT", None)
+        e.update(env)
+        return subprocess.run(["bash", str(INSTALLER), "--config", str(cfg)], stdout=subprocess.PIPE,
+                              stderr=subprocess.STDOUT, universal_newlines=True, env=e).stdout
+
+    def test_pinned_versions_pass(self):
+        out = self.install(PINNED)
+        self.assertIn("All tools ready", out)
+
+    def test_other_version_fails_unless_drift_is_allowed(self):
+        out = self.install(dict(PINNED, gitleaks="9.9.9"))
+        self.assertIn("gitleaks failed to install: found version 9.9.9, pinned is 8.30.1", out)
+        self.assertIn("Failed tools: gitleaks", out)
+        out = self.install(dict(PINNED, gitleaks="9.9.9"), JOB_SECURITY_SCAN_ALLOW_VERSION_DRIFT="1")
+        self.assertIn("gitleaks is 9.9.9, not the pinned 8.30.1 - accepted", out)
+        self.assertIn("All tools ready", out)
+
+    def test_malicious_trivy_is_refused_even_with_drift_allowed(self):
+        for bad in ("0.69.4", "0.69.5", "0.69.6"):
+            out = self.install(dict(PINNED, trivy=bad), JOB_SECURITY_SCAN_ALLOW_VERSION_DRIFT="1")
+            self.assertIn("known-malicious", out, bad)
+            self.assertIn("Failed tools: trivy", out, bad)
+
+    def test_scan_never_runs_a_malicious_trivy(self):
+        ran = self.tmp / "TRIVY_RAN"
+        self.stub("trivy", 'case "$*" in *--version*) echo "Version: 0.69.5";; *) touch "%s";; esac' % ran)
+        cfg = self.put("repository.md", '---\nteam: t\norg: o\nmonorepo-root: "%s"\nrepos:\n'
+                       '  - name: clean\n    active: true\n---\n' % (FIX / "shai-hulud"))
+        (self.tmp / "ws").mkdir()
+        env = dict(os.environ, PATH=str(self.tmp / "bin") + os.pathsep + os.environ["PATH"],
+                   JOB_SECURITY_SCAN_CACHE=str(self.tmp / "c"), SECURITY_RUN_ROOT=str(self.tmp / "ws"))
+        r = subprocess.run(["bash", str(RUN_SCAN), "--config", str(cfg), "--scanner", "trivy"],
+                           stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True,
+                           cwd=str(self.tmp / "ws"), env=env)
+        self.assertFalse(ran.exists(), r.stdout)
+        self.assertIn("known-malicious", r.stdout)
+        self.assertEqual(r.returncode, 2, r.stdout)
 
 
 if __name__ == "__main__":
