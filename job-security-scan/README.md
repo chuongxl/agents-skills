@@ -488,7 +488,10 @@ in the summary is the work left; pending findings are not clean.
 
 ## Version History
 
-- **v3.2.1** (current) — Docs hardening: removed the `eval` of the parsed config from the agent
+- **v3.2.2** (current) — Security fix: `write-run-metadata.py` and `audit-prepare.py` ran git on scanned
+  repos without the safe-config flags, so a repo's `.git/config` (`core.fsmonitor`) could run a command on
+  every scan; all git calls on scanned repos now go through `scripts/lib/safegit.py`
+- **v3.2.1** — Docs hardening: removed the `eval` of the parsed config from the agent
   instructions, the pipe-to-shell and `sudo` install commands and the unpinned scanner container images;
   manual install now points at the pinned, checksum-verified installer
 - **v3.2** — Large reports no longer break: `security-report.json` is a schema v3 index with the

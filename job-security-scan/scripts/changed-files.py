@@ -19,9 +19,10 @@ import re
 import subprocess
 import sys
 
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "lib"))
+import safegit  # noqa: E402
+
 REF_RE = re.compile(r"^[A-Za-z0-9._/~^@{}+-]{1,200}$")
-SAFE = ["-c", "core.fsmonitor=false", "-c", "core.hooksPath=" + os.devnull, "-c", "diff.external=",
-        "-c", "core.untrackedCache=false"]
 MAX_FILES = 50000
 
 
@@ -30,9 +31,8 @@ def valid_ref(ref):
 
 
 def _git(path, *args):
-    env = dict(os.environ, GIT_PAGER="cat", GIT_TERMINAL_PROMPT="0", GIT_OPTIONAL_LOCKS="0")
-    r = subprocess.run(["git", "-C", path] + SAFE + list(args), stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                       env=env, timeout=60)
+    r = subprocess.run(safegit.argv(path, *args), stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                       env=safegit.env(), timeout=60)
     if r.returncode != 0:
         raise RuntimeError(r.stderr.decode("utf-8", "replace").strip().splitlines()[-1:] or ["git failed"])
     return [p for p in r.stdout.decode("utf-8", "surrogateescape").split("\0") if p]
