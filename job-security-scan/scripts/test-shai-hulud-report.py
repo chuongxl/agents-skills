@@ -174,7 +174,7 @@ class ReportSectionTests(TempDirCase):
         (home / ".npmrc").write_text("//registry.npmjs.org/:_authToken=%s\n" % NPM_TOKEN)
         d = self.run_dir / "_host"
         d.mkdir(parents=True)
-        env = dict(os.environ, HOME=str(home), npm_config_cache=str(home / ".npm"))
+        env = dict(os.environ, HOME=str(home), USERPROFILE=str(home), npm_config_cache=str(home / ".npm"))
         r = run(CLI, "--host", "--root", home, "--output", d / "shai-hulud.json", env=env)
         (d / "shai-hulud.txt").write_text(r.stdout)
         doc, md, page = self.generate()
