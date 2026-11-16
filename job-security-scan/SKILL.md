@@ -281,7 +281,15 @@ If the previous report cannot be read, the report says "Change tracking unavaila
 Every finding is located to **file + line + one line of code**. Secrets show file and line only — never the
 value or the line. Caches (vendor advisories, refreshed indicators) live outside the workspace in
 `~/.cache/job-security-scan` (`cache-dir:` or `JOB_SECURITY_SCAN_CACHE` to move them, e.g. for CI).
-`SECURITY_RUN_ROOT` puts run folders somewhere else. On macOS the HTML report opens automatically.
+`SECURITY_RUN_ROOT` puts run folders somewhere else (CI/tests only; agents never set it). Reports are always
+saved in the workspace folder: run `run-scan.sh` from the workspace root, never from `/tmp` or the skill folder
+(the script refuses the latter), and never copy results elsewhere.
+
+**Browser.** No script or agent step opens `security-report.html` in a visible browser while a scan, Phase 9 or
+Phase 10 is running — the report is rewritten several times. After everything has finished, open it at most
+once, only if rendering must be checked, with a headless browser, e.g.
+`"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --headless --disable-gpu --screenshot=security-run-<datetime>/report.png file://$PWD/security-run-<datetime>/security-report.html`
+(or `chromium --headless ...`). Otherwise leave the file for the user to open.
 
 **HTML report features:**
 - **Summary cards** — CRITICAL / HIGH / MEDIUM / LOW counts at a glance
@@ -319,7 +327,7 @@ python3 .github/skills/job-security-scan/scripts/generate-report.py \
 # Step 1 — install tools (once per machine)
 bash .github/skills/job-security-scan/scripts/install-tools.sh
 
-# Step 2 — full scan; reports in ./security-run-<datetime>/ (HTML auto-opens on macOS)
+# Step 2 — full scan; reports in ./security-run-<datetime>/ (HTML is never auto-opened)
 bash .github/skills/job-security-scan/scripts/run-scan.sh
 
 # Scope to one repo
@@ -381,7 +389,8 @@ The scanner reads untrusted repositories, so it is built not to be an attack pat
    and what was checked; say plainly if it errored or did not run), the changes since the last run, the confirmed
    Critical and High findings as `file:line` with their rule, how many need validation, were dismissed or are
    still pending, any deep-audit findings (`file:line`, severity) and leads, and the paths of the report files.
-4. Stop there. Do not offer, propose or ask to fix anything, and do not edit any scanned file — the
+4. Do not open the report in a visible browser (see **Browser** above).
+5. Stop there. Do not offer, propose or ask to fix anything, and do not edit any scanned file — the
    remediation guidance in the report is for the reader.
 
 Secrets: never print secret values or the code line of a secret finding, only `file:line` and the rule.
