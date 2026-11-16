@@ -171,7 +171,7 @@ def sandbox_status(audit_dir):
     probe = os.path.join(audit_dir, "agents", "sandbox-selftest", "scratch")
     os.makedirs(probe, exist_ok=True)
     r = subprocess.run([sys.executable, "-I", os.path.join(SCRIPT_DIR, "audit-sandbox.py"), "--self-test",
-                        "--scratch", probe], capture_output=True, text=True)
+                        "--scratch", probe], capture_output=True, encoding="utf-8", errors="replace")
     detail = (r.stdout.strip() or r.stderr.strip())[-2000:]
     if r.returncode == 0:
         return "sandboxed-source-and-local-only", {"enabled": True, "self_test": json.loads(r.stdout)}
@@ -283,7 +283,7 @@ def main():
         fh.write("\n")
     skill = os.path.dirname(SCRIPT_DIR)
     run_abs = os.path.abspath(args.run_dir)
-    regen = ["python3", "-I", os.path.join(skill, "scripts", "generate-report.py"), "--results-dir", run_abs,
+    regen = [sys.executable or "python3", "-I", os.path.join(skill, "scripts", "generate-report.py"), "--results-dir", run_abs,
              "--out-dir", run_abs, "--config", os.path.abspath(args.config) if args.config else "<config>",
              "--workspace", os.path.abspath(args.workspace), "--repos-root", os.path.dirname(target),
              "--home", os.path.expanduser("~"), "--profile", args.profile, "--keep-verdicts"]

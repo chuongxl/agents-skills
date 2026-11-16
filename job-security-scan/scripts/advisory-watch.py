@@ -135,7 +135,7 @@ def main(argv=None):
         fetch_cmd = py + [os.path.join(SKILL_DIR, "scripts", "fetch-advisories.py"), "--out", args.cache]
         if args.sbom or args.inventory:
             fetch_cmd += ["--inventory", args.sbom or args.inventory]
-        r = subprocess.run(fetch_cmd, capture_output=True, text=True)
+        r = subprocess.run(fetch_cmd, capture_output=True, encoding="utf-8", errors="replace")
         if r.returncode not in (0, 3):     # 3 = some sources unreachable: carry on with what we have
             print("ERROR: fetch failed (exit %d)\n%s" % (r.returncode, r.stdout[-1500:] + r.stderr[-500:]), file=sys.stderr)
             return 2
@@ -148,7 +148,7 @@ def main(argv=None):
             cmd += [flag, val]
     for e in args.env:
         cmd += ["--env", e]
-    r = subprocess.run(cmd, capture_output=True, text=True)
+    r = subprocess.run(cmd, capture_output=True, encoding="utf-8", errors="replace")
     if r.returncode != 0:
         print("ERROR: match failed\n%s" % r.stderr[-1500:], file=sys.stderr)
         return 2

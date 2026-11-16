@@ -22,7 +22,7 @@ import shlex
 REPO_NAME_RE = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9._-]{0,99}$")
 
 def parse_frontmatter(filepath):
-    with open(filepath, "r") as f:
+    with open(filepath, "r", encoding="utf-8-sig") as f:
         content = f.read()
 
     # Extract YAML between first pair of ---

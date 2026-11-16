@@ -63,7 +63,7 @@ def parse_version(runtime, text):
 def probe(runtime, image, timeout):
     binary, args = PROBES[runtime]
     r = subprocess.run(["docker", "run", "--rm"] + SANDBOX + ["--entrypoint", binary, image] + args,
-                       capture_output=True, text=True, timeout=timeout)
+                       capture_output=True, encoding="utf-8", errors="replace", timeout=timeout)
     return parse_version(runtime, r.stdout + r.stderr) if r.returncode == 0 else None
 
 

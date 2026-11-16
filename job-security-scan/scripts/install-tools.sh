@@ -14,6 +14,9 @@
 # Trivy is pinned to v0.69.3 (an immutable release): v0.69.4 and images 0.69.4-0.69.6 were malicious
 # (GHSA-69fq-xp46-6x23). Bump a version only after checking the release and its advisories.
 #
+# Platforms: macOS (Homebrew), Linux (x64/arm64 release binaries), Windows x64 from Git Bash (release binaries; run
+# in a Git Bash shell). Windows has no native Semgrep build: use WSL (a Linux environment, fully supported) for SAST.
+#
 # Usage: bash scripts/install-tools.sh [--config path/to/repository.md]
 #        INSTALL_DIR=/usr/local/bin bash scripts/install-tools.sh   (default ~/.local/bin; put it on PATH)
 set -euo pipefail
@@ -25,18 +28,22 @@ HADOLINT_VERSION="2.15.1"
 OSV_SCANNER_VERSION="2.7.0"
 SEMGREP_VERSION="1.183.0"
 
-SKILL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+_HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+. "$_HERE/lib/find-python.sh"   # sets PY; defines py(), abs_dir(), native_path()
+SKILL_DIR="$(abs_dir "$_HERE/..")"
 CONFIG="$SKILL_DIR/assets/repository.md"
 [[ "${1:-}" == "--config" && -n "${2:-}" ]] && CONFIG="$2"
 OS="$(uname -s)"
-INSTALL_DIR="${INSTALL_DIR:-$HOME/.local/bin}"   # user-writable: no sudo, nothing system-wide by default
+EXE=""; WIN=0
+case "$OS" in MINGW*|MSYS*|CYGWIN*) WIN=1; EXE=".exe" ;; esac
+INSTALL_DIR="$(native_path "${INSTALL_DIR:-$HOME/.local/bin}")"   # user-writable: no sudo, nothing system-wide by default
 GH="https://github.com"
 CHECKSUMS="${JOB_SECURITY_SCAN_CHECKSUMS:-$SKILL_DIR/assets/tool-checksums.txt}"
 ALLOW_DRIFT="${JOB_SECURITY_SCAN_ALLOW_VERSION_DRIFT:-}"
 FAILED=()
 
 # Load config (values are shell-quoted by parse-config.py; stop if the config is rejected)
-CONFIG_SH="$(python3 -I "$SKILL_DIR/scripts/parse-config.py" "$CONFIG")" || { echo "❌ Invalid config: $CONFIG"; exit 1; }
+CONFIG_SH="$(py "$SKILL_DIR/scripts/parse-config.py" "$CONFIG")" || { echo "❌ Invalid config: $CONFIG"; exit 1; }
 eval "$CONFIG_SH"
 
 log()  { echo "  [install] $*"; }
@@ -76,10 +83,10 @@ fetch_verified() {
 installed_version() {
   local tool="$1" bin args
   bin="$(command -v "$tool" 2>/dev/null || true)"
-  [[ -z "$bin" && -x "$INSTALL_DIR/$tool" ]] && bin="$INSTALL_DIR/$tool"
+  [[ -z "$bin" && -x "$INSTALL_DIR/$tool$EXE" ]] && bin="$INSTALL_DIR/$tool$EXE"
   [[ -n "$bin" ]] || return 0
   case "$tool" in gitleaks) args=(version) ;; *) args=(--version) ;; esac
-  "$bin" "${args[@]}" 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -n1 || true
+  "$bin" "${args[@]}" 2>&1 | tr -d '\r' | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -n1 || true
 }
 
 # verify_version <tool> <pinned>  - ok only when the tool reports the pinned version
@@ -102,8 +109,23 @@ install_tarball() {
   local tool="$1" want="$2" url="$3" asset="$4" tmp
   tmp="$(mktemp -d)"
   if fetch_verified "$url" "$asset" "$tmp/$asset" \
-     && tar -xzf "$tmp/$asset" -C "$tmp" "$tool" \
-     && install -m 0755 "$tmp/$tool" "$INSTALL_DIR/$tool"; then
+     && tar -xzf "$tmp/$asset" -C "$tmp" "$tool$EXE" \
+     && install -m 0755 "$tmp/$tool$EXE" "$INSTALL_DIR/$tool$EXE"; then
+    verify_version "$tool" "$want"
+  else
+    fail "$tool" "download or checksum verification failed"
+  fi
+  rm -rf "$tmp"
+}
+
+# install_zip <tool> <pinned-version> <url> <asset>   - binary named <tool>.exe inside a .zip (Windows; Git Bash has no unzip)
+install_zip() {
+  local tool="$1" want="$2" url="$3" asset="$4" tmp
+  tmp="$(mktemp -d)"
+  if fetch_verified "$url" "$asset" "$tmp/$asset" \
+     && py -c 'import sys, zipfile; zipfile.ZipFile(sys.argv[1]).extract(sys.argv[2], sys.argv[3])' \
+          "$(native_path "$tmp/$asset")" "$tool$EXE" "$(native_path "$tmp")" \
+     && install -m 0755 "$tmp/$tool$EXE" "$INSTALL_DIR/$tool$EXE"; then
     verify_version "$tool" "$want"
   else
     fail "$tool" "download or checksum verification failed"
@@ -115,7 +137,7 @@ install_tarball() {
 install_binary() {
   local tool="$1" want="$2" url="$3" asset="$4" tmp
   tmp="$(mktemp -d)"
-  if fetch_verified "$url" "$asset" "$tmp/$asset" && install -m 0755 "$tmp/$asset" "$INSTALL_DIR/$tool"; then
+  if fetch_verified "$url" "$asset" "$tmp/$asset" && install -m 0755 "$tmp/$asset" "$INSTALL_DIR/$tool$EXE"; then
     verify_version "$tool" "$want"
   else
     fail "$tool" "download or checksum verification failed"
@@ -123,6 +145,8 @@ install_binary() {
   rm -rf "$tmp"
 }
 
+# Windows: x64 only (several of these tools publish no Windows arm64 build).
+need_win_x64() { case "$(uname -m)" in x86_64|amd64) return 0 ;; esac; fail "$1" "unsupported CPU $(uname -m) on Windows - use WSL"; return 1; }
 need_linux_arch() { [[ -n "$ARCH_GO" ]] || { fail "$1" "unsupported CPU $(uname -m)"; return 1; }; }
 
 # brew_install <tool> <formula> <pinned-version>
@@ -140,6 +164,11 @@ echo ""
 # 1. Trivy — CVE + secret + misconfig
 if command -v trivy >/dev/null 2>&1; then verify_version trivy "$TRIVY_VERSION"
 elif [[ "$OS" == "Darwin" ]]; then brew_install trivy trivy "$TRIVY_VERSION"
+elif [[ $WIN -eq 1 ]]; then
+  if need_win_x64 trivy; then
+    a="trivy_${TRIVY_VERSION}_windows-64bit.zip"; r="$GH/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}"
+    install_zip trivy "$TRIVY_VERSION" "$r/$a" "$a"
+  fi
 elif need_linux_arch trivy; then
   a="trivy_${TRIVY_VERSION}_Linux-${ARCH_TRIVY}.tar.gz"; r="$GH/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}"
   install_tarball trivy "$TRIVY_VERSION" "$r/$a" "$a"
@@ -148,6 +177,11 @@ fi
 # 2. Gitleaks — secrets in git history
 if command -v gitleaks >/dev/null 2>&1; then verify_version gitleaks "$GITLEAKS_VERSION"
 elif [[ "$OS" == "Darwin" ]]; then brew_install gitleaks gitleaks "$GITLEAKS_VERSION"
+elif [[ $WIN -eq 1 ]]; then
+  if need_win_x64 gitleaks; then
+    a="gitleaks_${GITLEAKS_VERSION}_windows_x64.zip"; r="$GH/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}"
+    install_zip gitleaks "$GITLEAKS_VERSION" "$r/$a" "$a"
+  fi
 elif need_linux_arch gitleaks; then
   a="gitleaks_${GITLEAKS_VERSION}_linux_${ARCH_X}.tar.gz"; r="$GH/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}"
   install_tarball gitleaks "$GITLEAKS_VERSION" "$r/$a" "$a"
@@ -156,6 +190,11 @@ fi
 # 3. TruffleHog — verified secrets
 if command -v trufflehog >/dev/null 2>&1; then verify_version trufflehog "$TRUFFLEHOG_VERSION"
 elif [[ "$OS" == "Darwin" ]]; then brew_install trufflehog trufflehog "$TRUFFLEHOG_VERSION"
+elif [[ $WIN -eq 1 ]]; then
+  if need_win_x64 trufflehog; then
+    a="trufflehog_${TRUFFLEHOG_VERSION}_windows_amd64.tar.gz"; r="$GH/trufflesecurity/trufflehog/releases/download/v${TRUFFLEHOG_VERSION}"
+    install_tarball trufflehog "$TRUFFLEHOG_VERSION" "$r/$a" "$a"
+  fi
 elif need_linux_arch trufflehog; then
   a="trufflehog_${TRUFFLEHOG_VERSION}_linux_${ARCH_GO}.tar.gz"; r="$GH/trufflesecurity/trufflehog/releases/download/v${TRUFFLEHOG_VERSION}"
   install_tarball trufflehog "$TRUFFLEHOG_VERSION" "$r/$a" "$a"
@@ -165,6 +204,11 @@ fi
 if [[ ${#DOCKERFILE_REPOS[@]} -gt 0 ]]; then
   if command -v hadolint >/dev/null 2>&1; then verify_version hadolint "$HADOLINT_VERSION"
   elif [[ "$OS" == "Darwin" ]]; then brew_install hadolint hadolint "$HADOLINT_VERSION"
+  elif [[ $WIN -eq 1 ]]; then
+    if need_win_x64 hadolint; then
+      a="hadolint-windows-x86_64.exe"; r="$GH/hadolint/hadolint/releases/download/v${HADOLINT_VERSION}"
+      install_binary hadolint "$HADOLINT_VERSION" "$r/$a" "$a"
+    fi
   elif need_linux_arch hadolint; then
     a="hadolint-linux-${ARCH_HADO}"; r="$GH/hadolint/hadolint/releases/download/v${HADOLINT_VERSION}"
     install_binary hadolint "$HADOLINT_VERSION" "$r/$a" "$a"
@@ -178,13 +222,15 @@ NEEDS_SEMGREP=false
 for s in "${SEMGREP_RULESETS[@]:-}"; do
   [[ "$s" == p/* ]] && NEEDS_SEMGREP=true && break
 done
-if [[ "$NEEDS_SEMGREP" == "true" ]]; then
+if [[ "$NEEDS_SEMGREP" == "true" && $WIN -eq 1 ]]; then
+  echo "  ⏭️  semgrep has no native Windows build — skipping SAST here. Run this skill inside WSL to include it."
+elif [[ "$NEEDS_SEMGREP" == "true" ]]; then
   if command -v semgrep >/dev/null 2>&1; then verify_version semgrep "$SEMGREP_VERSION"; else
     # Own virtualenv, installed from the hash-locked set: semgrep and every transitive dependency are pinned
     # by SHA-256 (assets/semgrep-requirements.txt), so pip can never resolve something unreviewed.
     venv="${JOB_SECURITY_SCAN_TOOLS:-${XDG_DATA_HOME:-$HOME/.local/share}/job-security-scan}/semgrep-venv"
     log "Installing semgrep ${SEMGREP_VERSION} into $venv (requires Python 3.10+)..."
-    if python3 -m venv "$venv" >/dev/null 2>&1 \
+    if "$PY" -m venv "$venv" >/dev/null 2>&1 \
        && "$venv/bin/python" -m pip install --quiet --disable-pip-version-check --no-deps --require-hashes \
             -r "$SKILL_DIR/assets/semgrep-requirements.txt" >/dev/null 2>&1 \
        && mkdir -p "$INSTALL_DIR" 2>/dev/null && ln -sf "$venv/bin/semgrep" "$INSTALL_DIR/semgrep" 2>/dev/null; then
@@ -200,6 +246,11 @@ fi
 # 6. OSV-Scanner — every ecosystem (lockfiles are detected per repo)
 if command -v osv-scanner >/dev/null 2>&1; then verify_version osv-scanner "$OSV_SCANNER_VERSION"
 elif [[ "$OS" == "Darwin" ]]; then brew_install osv-scanner osv-scanner "$OSV_SCANNER_VERSION"
+elif [[ $WIN -eq 1 ]]; then
+  if need_win_x64 osv-scanner; then
+    a="osv-scanner_windows_amd64.exe"; r="$GH/google/osv-scanner/releases/download/v${OSV_SCANNER_VERSION}"
+    install_binary osv-scanner "$OSV_SCANNER_VERSION" "$r/$a" "$a"
+  fi
 elif need_linux_arch osv-scanner; then
   a="osv-scanner_linux_${ARCH_GO}"; r="$GH/google/osv-scanner/releases/download/v${OSV_SCANNER_VERSION}"
   install_binary osv-scanner "$OSV_SCANNER_VERSION" "$r/$a" "$a"
@@ -212,3 +263,4 @@ else
   echo "⚠️  Failed tools: ${FAILED[*]} — not installed, or not the pinned version (see above)"
 fi
 echo ""
+case ":$PATH:" in *":$INSTALL_DIR:"*) ;; *) echo "ℹ️  $INSTALL_DIR is not on your PATH - add it so run-scan.sh finds the tools."; echo "" ;; esac

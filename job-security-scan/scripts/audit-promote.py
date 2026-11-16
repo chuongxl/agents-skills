@@ -131,9 +131,15 @@ def main():
     ap.add_argument("--max-file-bytes", type=int, default=64 * 1024)
     ap.add_argument("--max-total-bytes", type=int, default=256 * 1024)
     args = ap.parse_args()
+    if not (hasattr(os, "O_NOFOLLOW") and os.open in os.supports_dir_fd):
+        sys.stderr.write("error: promotion needs a POSIX system (Linux or macOS); sandboxed local checks are "
+                         "Linux-only, so on this platform the audit stays source-only and nothing is promoted\n")
+        return 2
     agent_dir = os.path.normpath(os.path.abspath(args.agent_dir))
     m = AGENT_DIR.search(agent_dir)
-    if not m or not audit.safe_agent_id(m.group(1)) or os.path.realpath(agent_dir) != agent_dir:
+    # A symlinked parent (macOS /var -> /private/var, a symlinked workspace) is fine; agents/<id> itself must not be one.
+    expected = m and os.path.join(os.path.realpath(os.path.dirname(os.path.dirname(agent_dir))), "agents", m.group(1))
+    if not m or not audit.safe_agent_id(m.group(1)) or os.path.realpath(agent_dir) != expected:
         sys.stderr.write("error: --agent-dir must be <audit-dir>/agents/<agent-id> with no symlinks\n")
         return 2
     try:
