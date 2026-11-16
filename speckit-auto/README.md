@@ -1,8 +1,8 @@
 # Speckit Auto — Spec-Driven Delivery Pipeline
 
-![Version](https://img.shields.io/badge/version-0.8.0-blue)
+![Version](https://img.shields.io/badge/version-0.8.1-blue)
 
-**Version**: 0.8.0
+**Version**: 0.8.1
 **Author**: Alex Nguyen
 
 ## Overview
