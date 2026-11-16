@@ -499,3 +499,27 @@ test('refuses an existing JSONL line over the 16 KiB limit', (t) => {
   assert.notEqual(resumed.status, 0);
   assert.match(resumed.stderr, /exceeds 16384 bytes/);
 });
+
+test('refuses to write events through a symlinked events.jsonl or .speckit directory', (t) => {
+  const { repo, worktree } = makeWorkspace(t);
+  const runId = '123e4567-e89b-42d3-a456-426614174301';
+  const speckit = path.join(worktree, '.speckit');
+  const outside = path.join(path.dirname(worktree), 'victim.txt');
+  fs.writeFileSync(outside, 'keep me\n');
+  fs.mkdirSync(speckit, { recursive: true });
+  fs.symlinkSync(outside, path.join(speckit, 'events.jsonl'));
+  const linked = run(['init', '--repo', repo, '--worktree', worktree, '--run-id', runId]);
+  assert.notEqual(linked.status, 0);
+  assert.match(linked.stderr, /symlink|regular file/i);
+  assert.equal(fs.readFileSync(outside, 'utf8'), 'keep me\n', 'the symlink target must be untouched');
+
+  fs.unlinkSync(path.join(speckit, 'events.jsonl'));
+  fs.rmSync(speckit, { recursive: true });
+  const elsewhere = path.join(path.dirname(worktree), 'elsewhere');
+  fs.mkdirSync(elsewhere);
+  fs.symlinkSync(elsewhere, speckit);
+  const dir = run(['init', '--repo', repo, '--worktree', worktree, '--run-id', runId]);
+  assert.notEqual(dir.status, 0);
+  assert.match(dir.stderr, /symlink/i);
+  assert.deepEqual(fs.readdirSync(elsewhere), [], 'nothing may be written through a symlinked .speckit');
+});
