@@ -1,8 +1,8 @@
 # Speckit Auto — Spec-Driven Delivery Pipeline
 
-![Version](https://img.shields.io/badge/version-0.7.1-blue)
+![Version](https://img.shields.io/badge/version-0.8.1-blue)
 
-**Version**: 0.7.1
+**Version**: 0.8.1
 **Author**: Alex Nguyen
 
 ## Overview
@@ -146,6 +146,14 @@ Writes `.speckit/integration.json` in the repo — the **only** provider source 
 Without it, the pipeline stops and asks you to run the command above. Missing framework
 installations (Spec Kit agents not in the repo, superpowers skills not installed) are also
 repaired by this setup command, per provider.
+
+Provider installs are **pinned to verified commits** in
+[references/providers/pins.md](references/providers/pins.md) (spec-kit v1.4.0, superpowers v7.0.2 as of
+2026-11-16); bumping them is a reviewed change, never a run-time lookup. Other keys in
+`.speckit/integration.json`: `verification_yolo` (default `true`: `--yolo` runs Stage 05 unattended with a scrubbed environment;
+set `false` to make `--yolo` skip it) and `commit_ticket` (default `true`: set `false` to keep the Jira snapshot
+`ticket.md` out of commits). Commits stage explicit paths and stop on credential-like files; under `--yolo`
+a diff touching CI/release config the spec does not name stops the run before the push.
 
 ## Project Context
 

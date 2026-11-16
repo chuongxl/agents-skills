@@ -87,13 +87,13 @@ Not a separate tool. When a repo has an ecosystem the skill doesn't recognise, o
 
 ## TruffleHog
 
-Phase 6. Scans git history for secrets like Gitleaks does, then calls the provider's API to check whether each credential still works. Runs with `--no-update`.
+Phase 6. Scans git history for secrets like Gitleaks does. With `JOB_SECURITY_SCAN_VERIFY_SECRETS=1` it also calls the provider's API to check whether each credential still works; without it (the default) it runs `--no-verification`, because verification sends credentials out and a hostile repo can steer some detectors to hosts it names. Runs with `--no-update`.
 
-That verification step is why TruffleHog is in the set. A verified AWS key is an incident. An unverified match may be a revoked key or a fixture.
+That verification step is why TruffleHog is in the set when you turn it on. A verified AWS key is an incident. An unverified match may be a revoked key or a fixture.
 
-- Severity: verified is CRITICAL and marked "VERIFIED ACTIVE". Unverified is HIGH.
+- Severity: verified is CRITICAL and marked "VERIFIED ACTIVE" (verification on only). Unverified is HIGH - which is every finding in a default run.
 - `lib/sanitize.py` strips secret values from the output before the report reads it.
-- Limits: verification sends the credential to the provider. Only run it where that is allowed. It is slower than Gitleaks and covers fewer secret types.
+- Limits: verification sends the credential to the provider. Only enable it on a repo you trust and where that is allowed. It is slower than Gitleaks and covers fewer secret types.
 
 ## Vendor advisories
 

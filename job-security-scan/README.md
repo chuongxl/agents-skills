@@ -167,12 +167,14 @@ Google's database for supply-chain vulnerabilities:
 
 ### 6. TruffleHog — Live Credential Verification
 
-Different from Gitleaks (which scans git history), TruffleHog verifies live credentials:
-- Detects if an exposed secret is currently valid
+Different from Gitleaks (which scans git history), TruffleHog can verify live credentials. Verification is
+**off by default** (it sends found credentials to vendor APIs, and a hostile repo can steer some detectors to
+hosts it names); set `JOB_SECURITY_SCAN_VERIFY_SECRETS=1` on repos you trust:
+- Detects if an exposed secret is currently valid (verification on)
 - Prioritizes urgent remediation for active credentials
 - Supports multiple credential types
 
-**Output:** `trufflehog.json` with verified/unverified status
+**Output:** `trufflehog.json` with verified/unverified status (everything is `unverified` unless verification is on)
 
 ### 7. Shai-Hulud — Supply-Chain Worm Check (repo and laptop)
 
@@ -488,9 +490,16 @@ in the summary is the work left; pending findings are not clean.
 
 ## Version History
 
-- **v3.2.2** (current) — Security fix: `write-run-metadata.py` and `audit-prepare.py` ran git on scanned
-  repos without the safe-config flags, so a repo's `.git/config` (`core.fsmonitor`) could run a command on
-  every scan; all git calls on scanned repos now go through `scripts/lib/safegit.py`
+- **v3.3.0** (current) — Security review follow-up: every tool must report its pinned version (Homebrew
+  and pre-installed binaries included; malicious Trivy 0.69.4-0.69.6 refused at install and at scan time);
+  Linux downloads are checked against `assets/tool-checksums.txt`, not a checksum file from the same release;
+  Semgrep installs from a hash-locked set and runs with `--metrics=off`; TruffleHog live verification is opt-in
+  (`JOB_SECURITY_SCAN_VERIFY_SECRETS=1`); `--repo` is validated; git runs on scanned repos with the repo's own
+  config overridden (`scripts/lib/safegit.py`); the audit sandbox hides `$HOME` credentials, `/run` and other
+  local sockets; verifier prompts treat repo text as data and verifiers cannot reject secret/worm findings; the
+  CI template runs the base-commit skill and skips forks; indicator caches only add to the committed set; Semgrep
+  and Trivy secret matches are blanked in raw output and the run folder is `umask 077`; the image probe pulls
+  Docker Hub official images only unless allowed
 - **v3.2.1** — Docs hardening: removed the `eval` of the parsed config from the agent
   instructions, the pipe-to-shell and `sudo` install commands and the unpinned scanner container images;
   manual install now points at the pinned, checksum-verified installer

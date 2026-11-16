@@ -8,21 +8,19 @@ skills into both the main checkout and the worktree, verifies the layout, proves
 and continues the pipeline in the same turn. It never switches provider and never runs
 `specify init` only inside the worktree.
 
-1. **Install the CLI** from the official GitHub source at a pinned release tag — never from PyPI
-   (`specify-cli` on PyPI is not published from the Spec Kit repository) and never from a branch:
-   - Requires `uv`: read the current release tag `vX.Y.Z` from
-     `https://github.com/github/spec-kit` Releases, then
-     `uv tool install specify-cli --from git+https://github.com/github/spec-kit.git@vX.Y.Z`.
-     No tag resolvable → use `@v0.16.4`.
-   - `uv` missing → stop and ask the user to install `uv`; do not fall back to another index.
-2. **Sanity check**: `specify version` must print a version. Command not found after a
-   successful-looking install → PATH likely missing the tool dir; report the exact output and
-   stop. Never proceed with a broken install.
-3. **Resolve the host key** (`copilot` / `claude` / `opencode` / `hermes`) from the run's fixed
+1. **Ask the user once**: `Install GitHub Speckit` / `Stop`, naming the pinned release from
+   [pins.md](pins.md) (`v1.4.0`, commit `0019fa14d12f45edabc2cc3176c9168a68bd0f97`). `Stop` → halt and report that installation is
+   required. Nothing below runs before this answer.
+2. **Install the CLI** from the official GitHub source **at the pinned commit** — never from PyPI
+   (`specify-cli` on PyPI is not published from the Spec Kit repository), never from a branch, and never
+   from "the newest tag" resolved at run time:
+   `uv tool install specify-cli --from git+https://github.com/github/spec-kit.git@0019fa14d12f45edabc2cc3176c9168a68bd0f97`.
+   `uv` missing → stop and ask the user to install `uv`; do not fall back to another index.
+3. **Sanity check**: `specify version` must print `1.4.0` (the pinned release). Command not found →
+   PATH likely missing the tool dir; a different version → report both and stop. Never proceed with a
+   broken or unexpected install.
+4. **Resolve the host key** (`copilot` / `claude` / `opencode` / `hermes`) from the run's fixed
    host — see [../shared/host-adaptation.md](../shared/host-adaptation.md). Never guess, never ask.
-4. **Ask the user once**: `Install GitHub Speckit` / `Stop`. `Stop` → halt and report that
-   installation is required. Steps 1–2 may run before or after the ask; step 5 never runs before
-   it.
 5. **Initialize into BOTH locations (mandatory success gate)** — run in the main checkout
    (`<repo-root>`) and then in `<worktree-path>`:
    ```

@@ -499,3 +499,67 @@ test('refuses an existing JSONL line over the 16 KiB limit', (t) => {
   assert.notEqual(resumed.status, 0);
   assert.match(resumed.stderr, /exceeds 16384 bytes/);
 });
+
+test('refuses to write events through a symlinked events.jsonl or .speckit directory', (t) => {
+  const { repo, worktree } = makeWorkspace(t);
+  const runId = '123e4567-e89b-42d3-a456-426614174301';
+  const speckit = path.join(worktree, '.speckit');
+  const outside = path.join(path.dirname(worktree), 'victim.txt');
+  fs.writeFileSync(outside, 'keep me\n');
+  fs.mkdirSync(speckit, { recursive: true });
+  fs.symlinkSync(outside, path.join(speckit, 'events.jsonl'));
+  const linked = run(['init', '--repo', repo, '--worktree', worktree, '--run-id', runId]);
+  assert.notEqual(linked.status, 0);
+  assert.match(linked.stderr, /symlink|regular file/i);
+  assert.equal(fs.readFileSync(outside, 'utf8'), 'keep me\n', 'the symlink target must be untouched');
+
+  fs.unlinkSync(path.join(speckit, 'events.jsonl'));
+  fs.rmSync(speckit, { recursive: true });
+  const elsewhere = path.join(path.dirname(worktree), 'elsewhere');
+  fs.mkdirSync(elsewhere);
+  fs.symlinkSync(elsewhere, speckit);
+  const dir = run(['init', '--repo', repo, '--worktree', worktree, '--run-id', runId]);
+  assert.notEqual(dir.status, 0);
+  assert.match(dir.stderr, /symlink/i);
+  assert.deepEqual(fs.readdirSync(elsewhere), [], 'nothing may be written through a symlinked .speckit');
+});
+
+test('security hardening instructions stay in place', () => {
+  const rules = readSkill('references/shared/operating-rules.md');
+  assert.match(rules, /9\. a security stop/);
+  assert.match(rules, /repo guidance.*tracked skill files/s);
+
+  const commit = readSkill('references/shared/commit.md');
+  assert.match(commit, /Staging Safety Check/);
+  assert.doesNotMatch(commit, /→ `git add -A`/);
+  assert.match(commit, /git add -- <path>/);
+
+  const pins = readSkill('references/providers/pins.md');
+  const shas = [...pins.matchAll(/\|\s*`(v[\d.]+)`\s*\|\s*`([0-9a-f]{40})`/g)];
+  assert.equal(shas.length, 2, 'both providers are pinned to a tag and a full commit');
+  for (const file of ['github-speckit-install.md', 'superpowers-install.md']) {
+    const text = readSkill(`references/providers/${file}`);
+    assert.doesNotMatch(text, /v0\.16\.4|newest release tag|sort=-v:refname/);
+    assert.match(text, /pins\.md/);
+  }
+  assert.ok(readSkill('references/providers/github-speckit-install.md').includes(shas[0][2]));
+  assert.ok(readSkill('references/providers/pins.md').includes('rev-parse HEAD'));
+  assert.doesNotMatch(readSkill('references/shared/integration-setup.md'), /vX\.Y\.Z|v0\.16\.4/);
+
+  const intake = readSkill('references/pipeline/stage-01-intake.md');
+  assert.doesNotMatch(intake, /submodule update --init --recursive/);
+  assert.match(intake, /protocol\.file\.allow=never/);
+  assert.match(intake, /host equals the host of `JIRA_URL`/);
+  assert.match(intake, /commit_ticket/);
+
+  const fallback = readSkill('references/pipeline/jira-fallback.md');
+  assert.match(fallback, /starts with `https:\/\//);
+  assert.match(fallback, /\^\[A-Z\]\[A-Z0-9\]\*-\[0-9\]\+\$/);
+
+  assert.match(readSkill('references/pipeline/stage-04-finish.md'), /YOLO publish guard/);
+  const verify = readSkill('references/pipeline/stage-05-verification.md');
+  assert.match(verify, /verification_yolo.*absent or `true`/s);
+  assert.doesNotMatch(verify, /not authorized for verification/);
+  assert.match(verify, /env -i/);
+  assert.match(readSkill('references/pipeline/stage-06-finish.md'), /never paste the ticket description/i);
+});

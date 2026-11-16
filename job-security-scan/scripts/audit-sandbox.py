@@ -7,6 +7,11 @@ this wrapper, which enforces every control the upstream method requires or refus
 
   - no external network (new network namespace; optional isolated loopback with --loopback)
   - empty environment, populated only from --env NAME=VALUE plus HOME/TMPDIR inside scratch, LANG, PATH
+  - credentials and local sockets hidden: $HOME, /root, /home, /run (docker.sock, ssh-agent, dbus), /mnt and
+    /media are replaced by empty read-only mounts, except that a directory holding scratch, --cwd or a --path
+    entry stays visible, and then the well-known credential locations inside it (~/.ssh, ~/.aws, ~/.gnupg,
+    ~/.kube, ~/.docker, ~/.netrc, .npmrc, shell history, browser profiles ... and /tmp/ssh-*, /tmp/.X11-unix)
+    are hidden instead. Run audits from a workspace outside your home for the strongest isolation.
   - the whole filesystem read-only except the agent's own scratch/ directory
     (remounted read-only, then locked by a second unprivileged user+mount namespace: uid 65534, no capabilities,
     no_new_privs - the check cannot remount anything writable)
@@ -42,7 +47,7 @@ SCRATCH_SHAPE = re.compile(r"/agents/[a-z0-9][a-z0-9_-]{0,63}/scratch$")
 # optionally bring up loopback, then drop into a second, unprivileged namespace that cannot undo it.
 INNER = r'''
 set -u
-S="$1"; LOOP="$2"; DISK="$3"; shift 3
+S="$1"; LOOP="$2"; DISK="$3"; HIDE="$4"; shift 4
 mount --make-rprivate / 2>/dev/null || { echo "BLOCKED: cannot make mounts private" >&2; exit 97; }
 # Keep a handle on the real scratch directory, then cover it with a size-limited tmpfs: the check writes only
 # into the tmpfs (cumulative disk quota); its files are copied back to the real scratch after it exits.
@@ -52,6 +57,19 @@ mount -t tmpfs -o "size=${DISK}m,mode=1777,nosuid,nodev" sandbox-scratch "$S" 2>
   || { echo "BLOCKED: cannot mount size-limited scratch" >&2; exit 97; }
 cp -a --no-dereference ./. "$S"/ 2>/dev/null || { echo "BLOCKED: scratch contents exceed the disk quota" >&2; exit 97; }
 mkdir -p "$S/home" "$S/tmp" && chmod -R a+rwX "$S" && chmod 1777 "$S/home" "$S/tmp"
+# Hide credentials and local sockets (fail closed: a hide that cannot be made blocks the run). d: = directory
+# replaced by an empty tmpfs, f: = file replaced by /dev/null. The remount-read-only loop below covers them too.
+while IFS= read -r h; do
+  [ -n "$h" ] || continue
+  case "$h" in
+    d:*) mount -t tmpfs -o size=4k,mode=0555,nosuid,nodev sandbox-hidden "${h#d:}" 2>/dev/null \
+           || { echo "BLOCKED: cannot hide ${h#d:}" >&2; exit 97; } ;;
+    f:*) mount --bind /dev/null "${h#f:}" 2>/dev/null \
+           || { echo "BLOCKED: cannot hide ${h#f:}" >&2; exit 97; } ;;
+  esac
+done <<HIDE_EOF
+$HIDE
+HIDE_EOF
 for m in $(awk '{print $5}' /proc/self/mountinfo | sort -u); do
   [ "$m" = "$S" ] && continue
   mount -o remount,bind,ro "$m" 2>/dev/null || { echo "BLOCKED: cannot make $m read-only" >&2; exit 97; }
@@ -89,6 +107,68 @@ def check_scratch(path):
     return real, None
 
 
+WHOLE_DIRS = ("/home", "/root", "/run", "/var/run", "/mnt", "/media")
+HOME_CREDENTIALS = (".ssh", ".aws", ".gnupg", ".kube", ".docker", ".azure", ".config/gcloud", ".config/gh",
+                    ".config/git", ".config/op", ".terraform.d", ".local/share/keyrings", ".mozilla",
+                    ".config/google-chrome", ".config/chromium", ".netrc", ".git-credentials", ".npmrc", ".yarnrc",
+                    ".pypirc", ".gem/credentials", ".cargo/credentials", ".cargo/credentials.toml",
+                    ".bash_history", ".zsh_history", ".python_history", ".node_repl_history", ".psql_history")
+TMP_SOCKETS = ("ssh-*", ".X11-unix", ".ICE-unix", "tmux-*", "gpg-*")
+
+
+def _homes():
+    homes = {os.path.realpath(os.path.expanduser("~")), "/root"}
+    try:
+        homes.update(os.path.join("/home", d) for d in os.listdir("/home"))
+    except OSError:
+        pass
+    return sorted(h for h in homes if os.path.isdir(h))
+
+
+def hide_spec(scratch, cwd, paths):
+    """Newline-separated 'd:<dir>' / 'f:<file>' entries to hide inside the sandbox (see module docstring)."""
+    import glob
+    needed = [os.path.realpath(p) for p in [scratch, cwd] + list(paths) if p]
+
+    def holds_needed(d):
+        d = os.path.realpath(d)
+        return any(n == d or n.startswith(d.rstrip("/") + "/") for n in needed)
+
+    entries, seen = [], set()
+
+    def add(kind, path):
+        real = os.path.realpath(path)
+        if "\n" in real or (kind, real) in seen or not os.path.exists(real):
+            return
+        seen.add((kind, real))
+        entries.append("%s:%s" % (kind, real))
+
+    for d in WHOLE_DIRS:
+        if os.path.isdir(d) and not holds_needed(d):
+            add("d", d)
+    for home in _homes():
+        if not holds_needed(home):
+            add("d", home)
+            continue
+        for rel in HOME_CREDENTIALS:
+            target = os.path.join(home, rel)
+            if holds_needed(target):
+                continue
+            if os.path.isdir(target):
+                add("d", target)
+            elif os.path.isfile(target):
+                add("f", target)
+    for pat in TMP_SOCKETS:
+        for target in glob.glob(os.path.join("/tmp", pat)):
+            if holds_needed(target):
+                continue
+            add("d" if os.path.isdir(target) else "f", target)
+    # a hidden directory must not hide something that is also listed later; deeper entries first is wrong, so
+    # drop entries that sit inside another hidden directory
+    dirs = [e[2:] for e in entries if e.startswith("d:")]
+    return "\n".join(e for e in entries if not any(e[2:] != d and e[2:].startswith(d.rstrip("/") + "/") for d in dirs))
+
+
 def build_argv(args, scratch, cmd):
     home = os.path.join(scratch, "home")
     tmp = os.path.join(scratch, "tmp")
@@ -101,8 +181,9 @@ def build_argv(args, scratch, cmd):
               "--nofile=%d" % args.open_files, "--core=0", "--"]
     inner_cmd = limits + ["timeout", "-k", "5", str(args.wall_seconds), "env", "-i", "-C", args.cwd or scratch] \
         + env + list(cmd)
+    hide = hide_spec(scratch, args.cwd, args.path)
     return ["unshare", "-r", "-n", "-m", "--fork", "--", "sh", "-c", INNER, "sandbox", scratch,
-            "1" if args.loopback else "0", str(args.disk_mb)] + inner_cmd
+            "1" if args.loopback else "0", str(args.disk_mb), hide] + inner_cmd
 
 
 def preflight(args):

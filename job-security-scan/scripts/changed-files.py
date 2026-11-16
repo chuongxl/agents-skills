@@ -31,8 +31,7 @@ def valid_ref(ref):
 
 
 def _git(path, *args):
-    r = subprocess.run(safegit.argv(path, *args), stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                       env=safegit.env(), timeout=60)
+    r = safegit.run(path, *args)
     if r.returncode != 0:
         raise RuntimeError(r.stderr.decode("utf-8", "replace").strip().splitlines()[-1:] or ["git failed"])
     return [p for p in r.stdout.decode("utf-8", "surrogateescape").split("\0") if p]

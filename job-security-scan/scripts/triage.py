@@ -16,9 +16,11 @@
   python3 -I scripts/triage.py next RUN_DIR
       Prints the next queued item that has no recorded verdict, or {"done": true}.
 
-  python3 -I scripts/triage.py record RUN_DIR FILE|- [--replace]
+  python3 -I scripts/triage.py record RUN_DIR FILE|- [--replace] [--allow-reject-critical]
       Checks one verdict object (see references/verification.md) and saves it as
       triage/verdicts/<fingerprint>.json. A second verdict for the same finding needs --replace.
+      A "rejected" verdict for a secret or Shai-Hulud finding is refused unless --allow-reject-critical is given
+      (a person's decision, never a verifier's).
 
   python3 -I scripts/triage.py apply RUN_DIR [VERDICTS.json]
       Checks every verdict (the recorded ones in triage/verdicts/, or the given file), then merges them
@@ -261,7 +263,29 @@ def cmd_next(run_dir):
     return fail("%s does not hold %s - run: triage.py queue %s" % (batch, head["fingerprint"], run_dir))
 
 
-def cmd_record(run_dir, source, replace):
+def _queue_item(run_dir, index, fp):
+    """The queued item for a fingerprint (looked up through the index), or None."""
+    for entry in index["items"]:
+        if isinstance(entry, dict) and entry.get("fingerprint") == fp:
+            batch = str(entry.get("batch") or "")
+            if not re.match(r"^batch-[0-9]{3,}\.json$", batch):
+                return None
+            try:
+                items = json.loads((Path(run_dir) / "triage" / batch).read_text(encoding="utf-8"))["items"]
+            except (OSError, ValueError, KeyError, TypeError):
+                return None
+            for item in items:
+                if isinstance(item, dict) and item.get("fingerprint") == fp:
+                    return item
+    return None
+
+
+def _protected(item):
+    """Findings a rejection must never silently clear: live-credential and worm findings."""
+    return bool(item) and (item.get("type") == "secret" or item.get("scanner") in ("shai-hulud", "trufflehog", "gitleaks"))
+
+
+def cmd_record(run_dir, source, replace, allow_reject_critical=False):
     index = _queue_index(run_dir)
     try:
         if source == "-":
@@ -291,6 +315,9 @@ def cmd_record(run_dir, source, replace):
     fp = obj["fingerprint"]
     if not FINGERPRINT.match(fp):
         return fail("fingerprint %r is not 16 hex characters" % fp)
+    if obj.get("verdict") == "rejected" and not allow_reject_critical and _protected(_queue_item(run_dir, index, fp)):
+        return fail("%s is a secret or Shai-Hulud finding: a verifier cannot reject it. Record needs_validation, or "
+                    "a person re-runs with --allow-reject-critical" % fp)
     path = _verdict_path(run_dir, fp)
     if path.exists() and not replace:
         return fail("%s already recorded (%s); use --replace to change it" % (fp, path))
@@ -435,8 +462,9 @@ def main(argv):
         return cmd_queue(a.run_dir, None if a.all else a.limit, set(a.repo), not a.no_group)
     if len(argv) == 3 and argv[1] == "next":
         return cmd_next(argv[2])
-    if len(argv) in (4, 5) and argv[1] == "record" and (len(argv) == 4 or argv[4] == "--replace"):
-        return cmd_record(argv[2], argv[3], len(argv) == 5)
+    if len(argv) >= 4 and argv[1] == "record" and set(argv[4:]) <= {"--replace", "--allow-reject-critical"} \
+            and len(argv[4:]) == len(set(argv[4:])):
+        return cmd_record(argv[2], argv[3], "--replace" in argv[4:], "--allow-reject-critical" in argv[4:])
     if len(argv) in (3, 4) and argv[1] == "apply":
         return cmd_apply(argv[2], argv[3] if len(argv) == 4 else None)
     print(__doc__, file=sys.stderr)

@@ -109,11 +109,61 @@ def resolve_path(path=None):
     return DEFAULT_IOCS
 
 
+def merge(base, extra):
+    """Union of two indicator files. The extra file can only ADD indicators, never remove or weaken one."""
+    out = json.loads(json.dumps(base))
+    if extra.get("version"):
+        out["version"] = "%s+%s" % (base.get("version", ""), extra["version"])
+    for wid, w in (extra.get("waves") or {}).items():
+        out["waves"].setdefault(wid, w)
+    index = dict(((p.get("ecosystem"), normalize_name(p.get("ecosystem", ""), p.get("name", ""))), p)
+                 for p in out["packages"] if isinstance(p, dict))
+    for p in extra.get("packages", []):
+        if not isinstance(p, dict):
+            continue
+        key = (p.get("ecosystem"), normalize_name(p.get("ecosystem", ""), p.get("name", "")))
+        if key in index:
+            have = index[key].setdefault("versions", [])
+            have.extend(v for v in p.get("versions", []) if v not in have)
+        else:
+            out["packages"].append(json.loads(json.dumps(p)))
+            index[key] = out["packages"][-1]
+    by_name = dict((f.get("name"), f) for f in out["files"] if isinstance(f, dict))
+    for f in extra.get("files", []):
+        if not isinstance(f, dict):
+            continue
+        if f.get("name") in by_name:        # same payload name: keep the committed entry, add any new hashes
+            have = by_name[f["name"]].setdefault("sha256", [])
+            have.extend(h for h in f.get("sha256", []) if h not in have)
+        else:
+            out["files"].append(json.loads(json.dumps(f)))
+            by_name[f.get("name")] = out["files"][-1]
+    for section, ident in (("paths", "pattern"), ("markers", "text")):
+        seen = set(i.get(ident) for i in out[section] if isinstance(i, dict))
+        out[section].extend(i for i in extra.get(section, []) if isinstance(i, dict) and i.get(ident) not in seen)
+    return out
+
+
 def load(path=None):
-    """Load, validate and index the indicator file. Raises ValueError when invalid."""
+    """Load, validate and index the indicators: the committed file always, plus (merged on top) an explicit file,
+    $SHAI_HULUD_IOCS or the refreshed cache. Extra files can add indicators but never replace or drop the
+    committed ones, so a stale, truncated or tampered cache cannot blind the check. Raises ValueError when invalid."""
     p = resolve_path(path)
-    with open(p, "r", encoding="utf-8") as fh:
+    with open(str(DEFAULT_IOCS), "r", encoding="utf-8") as fh:
         data = json.load(fh)
+    if os.path.realpath(str(p)) != os.path.realpath(str(DEFAULT_IOCS)):
+        with open(p, "r", encoding="utf-8") as fh:
+            extra = json.load(fh)
+        if not isinstance(extra, dict):
+            raise ValueError("invalid indicator file %s: must be a JSON object" % p)
+        errors = validate(extra)            # the extra file must be a complete, valid indicator file on its own
+        if errors:
+            raise ValueError("invalid indicator file %s:\n  %s" % (p, "\n  ".join(errors)))
+        merged = merge(data, extra)
+        errors = validate(merged)
+        if errors:
+            raise ValueError("invalid indicator file %s:\n  %s" % (p, "\n  ".join(errors)))
+        data = merged
     errors = validate(data)
     if errors:
         raise ValueError("invalid indicator file %s:\n  %s" % (p, "\n  ".join(errors)))

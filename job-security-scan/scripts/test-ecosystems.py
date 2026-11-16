@@ -219,7 +219,8 @@ class ScannerWiringTests(unittest.TestCase):
 
     def test_sbom_fallback_only_for_unmapped_repo(self):
         r, calls = self.scan("sbom")
-        sbom_calls = [c for c in calls.splitlines() if c.startswith("trivy")]
+        # `trivy --version` is run-scan's one-time check that the installed Trivy is not a malicious release
+        sbom_calls = [c for c in calls.splitlines() if c.startswith("trivy") and c != "trivy --version"]
         self.assertEqual(len(sbom_calls), 1, calls)
         self.assertIn("unmapped-swift", sbom_calls[0])
         self.assertIn("--format cyclonedx", sbom_calls[0])

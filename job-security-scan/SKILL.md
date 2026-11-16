@@ -20,7 +20,7 @@ compatibility: >
 license: MIT
 metadata:
   author: one-om-ddm-team
-  version: "3.2.2"
+  version: "3.3.0"
   config-file: assets/repository.md
 allowed-tools: bash glob grep view create edit
 ---
@@ -157,8 +157,11 @@ CycloneDX SBOM and OSV-Scanner matches it (`sbom.cdx.json`, `osv-sbom.json`).
 
 ## Phase 6 — Verified Secret Detection (TruffleHog)
 
-Scans git history and **actively verifies** whether found credentials are
-still valid via live API calls. Reports `VERIFIED ACTIVE` vs `unverified`.
+Scans git history for credentials. By default it does **not** verify them: verification sends each found
+credential to its vendor's API, and some detectors contact hosts named in the scanned repo, so a hostile repo
+could make this machine issue requests. Findings are reported as `unverified`. Set
+`JOB_SECURITY_SCAN_VERIFY_SECRETS=1` (only on a repo you trust, where sending credentials out is allowed) to
+verify live; verified findings are then `VERIFIED ACTIVE` and CRITICAL.
 
 ## Phase 7 — Vendor Advisories (any language or runtime)
 
@@ -167,7 +170,8 @@ Catches issues the CVE databases lag on, such as a runtime security release anno
 enrichment into the advisory cache (`~/.cache/job-security-scan/advisories`), and matches them against the repository's runtimes, images and dependencies
 (`scripts/fetch-advisories.py`, `scripts/match.py`). Results appear in the report as "Vendor advisories".
 It also checks the runtime itself: Dockerfile base images (probed with `node -v` and equivalents **only when
-`JOB_SECURITY_SCAN_PROBE_IMAGES=1`** - the probe pulls and runs the image the scanned repo names, in a sandbox:
+`JOB_SECURITY_SCAN_PROBE_IMAGES=1`** - the probe pulls and runs the image the scanned repo names, in a sandbox (Docker Hub official images only;
+add more with `JOB_SECURITY_SCAN_PROBE_REGISTRIES="ghcr.io/myorg ..."`):
 no network, read-only, no capabilities, `nobody` user, resource limits), compose files, CI `setup-*` actions and version files; end-of-life lines and unpinned tags (`node:22-alpine`, `latest`) are reported.
 Set `ADVISORY_OFFLINE=1` to skip the fetch and use the cache. Details: `references/advisory-data.md`.
 
@@ -189,7 +193,8 @@ never runs npm/node/pip. `run-scan.sh --scanner shai-hulud` (also part of `all`)
 
 Benign hooks (`node-gyp rebuild`, `prebuild-install`, `husky`, esbuild's installer...) are allowlisted in
 `assets/ioc/hook-allowlist.json`. Indicators live in `assets/ioc/shai-hulud.json`; refresh with
-`python3 -I scripts/fetch-iocs.py --out ~/.cache/job-security-scan/ioc` (used automatically when present).
+`python3 -I scripts/fetch-iocs.py --out ~/.cache/job-security-scan/ioc` (used automatically when present; it is merged
+on top of the committed indicators, so a stale, truncated or tampered cache can add indicators but never remove one).
 Data provenance: `references/ioc-data.md`. If affected: the runbook in `references/remediation.md`.
 Standalone: `python3 -I scripts/shai-hulud-scan.py --repo PATH` or `--host` (exit 0 clean / 1 suspicious / 2 affected).
 
@@ -247,8 +252,10 @@ scanners and to Phase 9; it does not replace them.
 
 Safety: source-only by default — nothing from the target runs. Sandboxed local checks need
 `JOB_SECURITY_SCAN_AUDIT_EXEC=1` and go only through `scripts/audit-sandbox.py` (no network, read-only
-filesystem except the agent's scratch folder, empty environment, CPU/memory/process/time limits; it refuses
-to run if any control is missing). Evidence leaves scratch only through `scripts/audit-promote.py`.
+filesystem except the agent's scratch folder, empty environment, CPU/memory/process/time limits, `$HOME`,
+`/root`, `/run` (docker.sock, ssh-agent) hidden - or, when the workspace lives inside `$HOME`, its credential
+paths such as `~/.ssh`, `~/.aws`, `~/.netrc`; it refuses to run if any control is missing). For the strongest
+isolation keep audited workspaces outside your home directory. Evidence leaves scratch only through `scripts/audit-promote.py`.
 
 ## Reports — one folder per run
 
@@ -281,15 +288,7 @@ If the previous report cannot be read, the report says "Change tracking unavaila
 Every finding is located to **file + line + one line of code**. Secrets show file and line only — never the
 value or the line. Caches (vendor advisories, refreshed indicators) live outside the workspace in
 `~/.cache/job-security-scan` (`cache-dir:` or `JOB_SECURITY_SCAN_CACHE` to move them, e.g. for CI).
-`SECURITY_RUN_ROOT` puts run folders somewhere else (CI/tests only; agents never set it). Reports are always
-saved in the workspace folder: run `run-scan.sh` from the workspace root, never from `/tmp` or the skill folder
-(the script refuses the latter), and never copy results elsewhere.
-
-**Browser.** No script or agent step opens `security-report.html` in a visible browser while a scan, Phase 9 or
-Phase 10 is running — the report is rewritten several times. After everything has finished, open it at most
-once, only if rendering must be checked, with a headless browser, e.g.
-`"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --headless --disable-gpu --screenshot=security-run-<datetime>/report.png file://$PWD/security-run-<datetime>/security-report.html`
-(or `chromium --headless ...`). Otherwise leave the file for the user to open.
+`SECURITY_RUN_ROOT` puts run folders somewhere else. On macOS the HTML report opens automatically.
 
 **HTML report features:**
 - **Summary cards** — CRITICAL / HIGH / MEDIUM / LOW counts at a glance
@@ -327,7 +326,7 @@ python3 .github/skills/job-security-scan/scripts/generate-report.py \
 # Step 1 — install tools (once per machine)
 bash .github/skills/job-security-scan/scripts/install-tools.sh
 
-# Step 2 — full scan; reports in ./security-run-<datetime>/ (HTML is never auto-opened)
+# Step 2 — full scan; reports in ./security-run-<datetime>/ (HTML auto-opens on macOS)
 bash .github/skills/job-security-scan/scripts/run-scan.sh
 
 # Scope to one repo
@@ -363,11 +362,18 @@ python3 .github/skills/job-security-scan/scripts/generate-report.py \
 The scanner reads untrusted repositories, so it is built not to be an attack path:
 
 - **Nothing from a scanned repo runs.** Install hooks, scripts and lockfiles are only read. Docker base images
-  are probed only on opt-in (`JOB_SECURITY_SCAN_PROBE_IMAGES=1`) and then sandboxed.
+  are probed only on opt-in (`JOB_SECURITY_SCAN_PROBE_IMAGES=1`) and then sandboxed. Every `git` call on a
+  scanned repo goes through `scripts/lib/safegit.py` (and `run-scan.sh` exports the same settings to Gitleaks and
+  TruffleHog), which overrides the repo's own `.git/config` for `core.fsmonitor`, `core.hooksPath`,
+  `core.sshCommand`, `core.pager`, `diff.external`, credential helpers and `gpg.program`. Residual: a
+  `diff.<driver>.textconv` command chosen by the repo's `.gitattributes` cannot be disabled globally and can be
+  reached by a history scan - scan untrusted repos from a fresh clone (`git clone --no-local`), not a
+  checkout that arrived with its own `.git/`.
 - **Config is data, not code.** Values from `repository.md` are shell-quoted before `run-scan.sh` loads them;
   repo names may only use letters, digits, `.`, `_`, `-` (no `/`, no `..`), or the config is rejected.
 - **No secret values are kept.** Gitleaks runs with `--redact`; TruffleHog's raw values are stripped from its
-  output; secret findings (Gitleaks, TruffleHog, Trivy, Semgrep secret rules) show file and line only.
+  output; Semgrep secret-rule matches and Trivy secret `Match`/code lines are blanked in the raw JSON; the run folder
+  is created `umask 077`; secret findings (Gitleaks, TruffleHog, Trivy, Semgrep secret rules) show file and line only.
 - **Network input is constrained.** Fetchers use HTTPS to allowlisted hosts only; advisory feeds with DTDs or
   entity declarations are refused; text copied into GitHub issues cannot @-mention people or inject HTML.
 - **Deep audit is source-only by default.** Target code runs only with `JOB_SECURITY_SCAN_AUDIT_EXEC=1`,
@@ -389,8 +395,7 @@ The scanner reads untrusted repositories, so it is built not to be an attack pat
    and what was checked; say plainly if it errored or did not run), the changes since the last run, the confirmed
    Critical and High findings as `file:line` with their rule, how many need validation, were dismissed or are
    still pending, any deep-audit findings (`file:line`, severity) and leads, and the paths of the report files.
-4. Do not open the report in a visible browser (see **Browser** above).
-5. Stop there. Do not offer, propose or ask to fix anything, and do not edit any scanned file — the
+4. Stop there. Do not offer, propose or ask to fix anything, and do not edit any scanned file — the
    remediation guidance in the report is for the reader.
 
 Secrets: never print secret values or the code line of a secret finding, only `file:line` and the rule.

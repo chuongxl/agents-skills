@@ -1,0 +1,16 @@
+# SHA-256 of every Linux release asset install-tools.sh may download, for the versions pinned in that script.
+# The installer compares a download against THIS file - never against a checksum file fetched from the same
+# release, which a compromised release would replace together with the binary.
+# Recorded 2026-11-15 from each project's published checksums. When you bump a version in install-tools.sh,
+# check the release and its advisories, then replace the matching lines here in the same commit.
+# Format: <sha256><two spaces><asset name>
+1816b632dfe529869c740c0913e36bd1629cb7688bd5634f4a858c1d57c88b75  trivy_0.69.3_Linux-64bit.tar.gz
+7e3924a974e912e57b4a99f65ece7931f8079584dae12eb7845024f97087bdfd  trivy_0.69.3_Linux-ARM64.tar.gz
+551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb  gitleaks_8.30.1_linux_x64.tar.gz
+e4a487ee7ccd7d3a7f7ec08657610aa3606637dab924210b3aee62570fb4b080  gitleaks_8.30.1_linux_arm64.tar.gz
+bdbea0508e439b144f49de14e775908de5f902f3d14ea7ae8354bae72b0b72ef  trufflehog_3.99.7_linux_amd64.tar.gz
+3060f7c9f18c70afdc432984cacabdd1e9103729b5d5fee7fb6755a90d1c59d4  trufflehog_3.99.7_linux_arm64.tar.gz
+c7187db94eeeeca956519a6af171adc31453941a1e777961f6e680f697c8c507  hadolint-linux-x86_64
+f6198ef8090f404dbb771abfee086eb8c48ac177f30da7fd3510aca35b344b5d  hadolint-linux-arm64
+160c6253e2922e9e0a6a9771c5c4c40a4b3c6090b34a3cdd5e80c96cc2e4218b  osv-scanner_linux_amd64
+4061ef4c021ed3c47f203b818f337e351336cc5cd67c0274fc36bd1dfc728dd7  osv-scanner_linux_arm64

@@ -303,6 +303,29 @@ function parseEventFile(filePath) {
   return parsed;
 }
 
+// The run directory can come from a checkout that someone else controls: a tracked symlink at .speckit or
+// .speckit/events.jsonl would redirect appends (and the discovery file) to any file the user can write.
+function assertNotSymlink(target, label) {
+  let stat;
+  try {
+    stat = fs.lstatSync(target);
+  } catch (error) {
+    if (error.code === 'ENOENT') return;
+    throw error;
+  }
+  if (stat.isSymbolicLink()) fail(`${label} is a symlink: ${target}`);
+}
+
+function assertSafeEventsPaths(speckitPath, eventsPath) {
+  assertNotSymlink(speckitPath, '.speckit directory');
+  assertNotSymlink(eventsPath, 'events.jsonl');
+  try {
+    if (!fs.lstatSync(eventsPath).isFile()) fail(`events.jsonl is not a regular file: ${eventsPath}`);
+  } catch (error) {
+    if (error.code !== 'ENOENT') throw error;
+  }
+}
+
 function writeEvent(eventsPath, event) {
   writeEvents(eventsPath, [event]);
 }
@@ -319,7 +342,11 @@ function writeEvents(eventsPath, events) {
     parts.push(bytes);
   }
   const payload = Buffer.concat(parts);
-  const descriptor = fs.openSync(eventsPath, 'a', 0o600);
+  const descriptor = fs.openSync(
+    eventsPath,
+    fs.constants.O_WRONLY | fs.constants.O_APPEND | fs.constants.O_CREAT | (fs.constants.O_NOFOLLOW ?? 0),
+    0o600,
+  );
   try {
     let offset = 0;
     while (offset < payload.length) offset += fs.writeSync(descriptor, payload, offset, payload.length - offset);
@@ -552,9 +579,11 @@ function init({ values }) {
   const issueKey = values.get('--issue-key');
   if (issueKey !== undefined && !ISSUE_KEY.test(issueKey)) fail('--issue-key must be a Jira issue key');
   const speckitPath = path.join(worktreePath, '.speckit');
+  assertNotSymlink(speckitPath, '.speckit directory');
   fs.mkdirSync(speckitPath, { recursive: true });
   return withLock(speckitPath, () => {
     const eventsPath = path.join(speckitPath, 'events.jsonl');
+    assertSafeEventsPaths(speckitPath, eventsPath);
     repairTornTail(eventsPath);
     const allEvents = parseEventFile(eventsPath);
     const runEvents = allEvents.filter((event) => event.run_id === runId);
@@ -622,8 +651,10 @@ function emit({ values }) {
   if (!UUID.test(runId)) fail('--run-id must be a UUID');
   const speckitPath = path.join(worktreePath, '.speckit');
   if (!fs.existsSync(speckitPath)) fail('run is not initialized; .speckit directory is missing');
+  assertNotSymlink(speckitPath, '.speckit directory');
   return withLock(speckitPath, () => {
     const eventsPath = path.join(speckitPath, 'events.jsonl');
+    assertSafeEventsPaths(speckitPath, eventsPath);
     repairTornTail(eventsPath);
     const events = parseEventFile(eventsPath);
     const runEvents = events.filter((event) => event.run_id === runId);

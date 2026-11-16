@@ -65,6 +65,12 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+# --repo becomes a directory under monorepo-root and under the run folder: same rule as config repo names.
+if [[ -n "$REPO_FILTER" && ! "$REPO_FILTER" =~ ^[A-Za-z0-9_][A-Za-z0-9._-]{0,99}$ ]]; then
+  echo "Invalid --repo: $REPO_FILTER (letters, digits, '.', '_', '-'; no '/' and no leading '.' or '-')"
+  exit 1
+fi
+
 # ─── Locate skill root & config ────────────────────────────────────────────
 SKILL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
@@ -100,6 +106,17 @@ else
   REPOS_TO_SCAN=("${ACTIVE_REPOS[@]}")
 fi
 
+# A scanned repo may carry its own .git/config (core.fsmonitor, sshCommand, pager ...). Force safe values through
+# the environment so every git process we or the scanners start ignores them (scripts/lib/safegit.py).
+while IFS='=' read -r _k _v; do export "$_k=$_v"; done < <(python3 -I -c '
+import os, sys
+sys.path.insert(0, sys.argv[1])
+import safegit
+e = safegit.env({})
+for k in sorted(e):
+    print("%s=%s" % (k, e[k]))' "$SKILL_DIR/scripts/lib")
+unset _k _v
+
 # ─── Helpers ──────────────────────────────────────────────────────────────
 GLOBAL_EXIT=0
 
@@ -109,7 +126,23 @@ _warn() { echo "  🟡 [$1] $2: $3"; [[ $GLOBAL_EXIT -lt 1 ]] && GLOBAL_EXIT=1; 
 _fail() { echo "  🔴 [$1] $2: $3"; GLOBAL_EXIT=2; }
 _skip() { echo "  ⏭️  [$1] $2: $3 — skipped"; }
 
-has_tool() { command -v "$1" &>/dev/null; }
+# A tool is usable when it is on PATH - except the Trivy releases that shipped malware (GHSA-69fq-xp46-6x23):
+# those are never run, whoever installed them.
+TRIVY_STATE=""
+has_tool() {
+  command -v "$1" &>/dev/null || return 1
+  [[ "$1" == "trivy" ]] || return 0
+  if [[ -z "$TRIVY_STATE" ]]; then
+    TRIVY_STATE="ok"
+    if trivy --version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -n1 | grep -qE '^0\.69\.[456]$'; then
+      TRIVY_STATE="malicious"
+      echo "  🔴 [trivy] the installed Trivy is a known-malicious release (0.69.4-0.69.6) - NOT run. Remove it," \
+           "install the pinned version (scripts/install-tools.sh) and rotate any secret it could reach."
+      GLOBAL_EXIT=2
+    fi
+  fi
+  [[ "$TRIVY_STATE" == "ok" ]]
+}
 
 # osv-scanner flag names changed across v2 releases (--output -> --output-file, --sbom -> -L).
 OSV_OUT_FLAG=""
@@ -214,6 +247,8 @@ run_trivy() {
     --no-progress --quiet \
     2>/dev/null || true
 
+  [[ -s "$out_json" ]] && { python3 -I "$SKILL_DIR/scripts/lib/sanitize.py" trivy "$out_json" >/dev/null 2>&1 || : > "$out_json"; }
+
   local crits highs
   crits=$(grep -c "CRITICAL" "$out_table" 2>/dev/null || true)
   highs=$(grep -c "HIGH"     "$out_table" 2>/dev/null || true)
@@ -251,8 +286,12 @@ run_semgrep() {
   semgrep scan \
     "${config_args[@]}" \
     --json --output "$out" \
+    --metrics=off \
     --no-rewrite-rule-ids --quiet \
     "$path" 2>"$OUTPUT_BASE/$repo/semgrep.err" || true
+
+  # Secret-rule matches carry the secret itself in extra.lines/metavars: blank them before the file stays on disk.
+  [[ -s "$out" ]] && { python3 -I "$SKILL_DIR/scripts/lib/sanitize.py" semgrep "$out" >/dev/null 2>&1 || rm -f "$out"; }
 
   local count
   count=$(python3 -I -c \
@@ -442,9 +481,17 @@ run_trufflehog() {
 
   if ! has_tool trufflehog; then _skip trufflehog "$repo" "tool not installed"; return; fi
 
-  _log trufflehog "$repo" "Scanning git history — verifying active credentials..."
+  # Verification sends each found credential to the vendor API it belongs to, and some detectors contact hosts
+  # named in the scanned repo - so a hostile repo could make this machine issue requests. Off by default.
+  local verify_args=(--no-verification)
+  if [[ "${JOB_SECURITY_SCAN_VERIFY_SECRETS:-}" == "1" ]]; then
+    verify_args=()
+    _log trufflehog "$repo" "Scanning git history - VERIFYING credentials against live APIs (JOB_SECURITY_SCAN_VERIFY_SECRETS=1)..."
+  else
+    _log trufflehog "$repo" "Scanning git history (credentials not verified live; set JOB_SECURITY_SCAN_VERIFY_SECRETS=1 to verify)..."
+  fi
   trufflehog git "file://$path" \
-    --json --no-update \
+    --json --no-update ${verify_args[@]+"${verify_args[@]}"} \
     2>/dev/null | grep -v "^$" > "$out" || true
   # TruffleHog has no redact flag: drop the secret values before the raw file stays in the run folder.
   python3 -I "$SKILL_DIR/scripts/lib/sanitize.py" trufflehog "$out" >/dev/null 2>&1 || : > "$out"
@@ -466,10 +513,10 @@ run_trufflehog() {
 }
 
 # Shai-Hulud worm check (offline): known indicators = affected, worm-like install hooks = suspicious.
-shai_hulud_iocs_args() {
-  local cache="$CACHE_BASE/ioc/shai-hulud.json"
-  [[ -s "$cache" ]] && echo "--iocs $cache"
-}
+# The refreshed cache is merged ON TOP of the committed indicators (it can add, never remove), and is passed as an
+# array so a path with spaces stays one argument.
+IOC_ARGS=()
+[[ -s "$CACHE_BASE/ioc/shai-hulud.json" ]] && IOC_ARGS=(--iocs "$CACHE_BASE/ioc/shai-hulud.json")
 
 _shai_hulud_result() {  # _shai_hulud_result <label> <rc> <txt>
   local label="$1" rc="$2" txt="$3"
@@ -486,9 +533,8 @@ run_shai_hulud() {
   local out="$OUTPUT_BASE/$repo/shai-hulud.json" txt="$OUTPUT_BASE/$repo/shai-hulud.txt"
   mkdir -p "$(dirname "$out")"
   _log shai-hulud "$repo" "Checking for Shai-Hulud worm indicators and install-hook behaviour..."
-  # shellcheck disable=SC2046
   python3 -I "$SKILL_DIR/scripts/shai-hulud-scan.py" --repo "$path" --output "$out" --format text \
-    $(shai_hulud_iocs_args) >"$txt" 2>&1
+    ${IOC_ARGS[@]+"${IOC_ARGS[@]}"} >"$txt" 2>&1
   _shai_hulud_result "$repo" $? "$txt"
 }
 
@@ -498,9 +544,8 @@ run_shai_hulud_host() {
   echo ""
   echo "  ── this machine ($HOME) ──"
   _log shai-hulud "host" "Checking projects, global installs, npm cache and credential stores..."
-  # shellcheck disable=SC2046
   python3 -I "$SKILL_DIR/scripts/shai-hulud-scan.py" --host --output "$out" --format text \
-    $(shai_hulud_iocs_args) >"$txt" 2>&1
+    ${IOC_ARGS[@]+"${IOC_ARGS[@]}"} >"$txt" 2>&1
   _shai_hulud_result "host" $? "$txt"
 }
 
@@ -612,6 +657,7 @@ RUN_STAMP="$(date +%Y%m%d-%H%M%S)"
 OUTPUT_BASE="$RUN_ROOT/security-run-$RUN_STAMP"
 n=2
 while [[ -e "$OUTPUT_BASE" ]]; do OUTPUT_BASE="$RUN_ROOT/security-run-$RUN_STAMP-$n"; n=$((n+1)); done
+umask 077   # raw scanner output stays readable by this user only
 mkdir -p "$OUTPUT_BASE" "$CACHE_BASE"
 printf '*\n' > "$OUTPUT_BASE/.gitignore"   # keeps the run folder out of git without touching the repo's .gitignore
 RUN_DIR="$OUTPUT_BASE"
@@ -623,6 +669,7 @@ echo "  Profile  : ${PROFILE}$([[ $SCANNER_SET -eq 1 ]] && echo " (scanner: ${SC
 [[ -n "$SINCE" ]] && echo "  Scope    : files changed since ${SINCE} (partial run)"
 [[ $AUDIT_MODE -eq 1 || "$SCANNER" == "audit" ]] && echo "  Audit    : deep audit, profile ${PROFILE}${AUDIT_BUDGET:+, budget $AUDIT_BUDGET}"
 [[ -n "$BASELINE_PATH" ]] && echo "  Baseline : ${BASELINE_PATH}"
+[[ ${#IOC_ARGS[@]} -gt 0 ]] && echo "  IOC cache: ${IOC_ARGS[1]} (merged onto the committed indicators)"
 echo "  Repos    : ${REPOS_TO_SCAN[*]:-(none)}"
 [[ $HOST_MODE -eq 1 ]] && echo "  Host     : this machine (Shai-Hulud check)"
 echo "  Run      : ${OUTPUT_BASE}/"

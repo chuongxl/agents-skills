@@ -55,7 +55,7 @@ only — it is not an authorization to publish.
   Immediately before the ask emit `gate_waiting` with `stage: "06-finish"` and
   `gate: "pr-publish"`; immediately after the response emit `gate_answered` with the same
   stage/gate and no answer text. Show the branch, the base branch, the title, and the full body
-  that would be published. Options: `Open draft PR` / `Skip PR`.
+  that would be published, and state whether `ticket.md` (Jira content) is part of the branch. Options: `Open draft PR` / `Skip PR`.
   `Skip PR` → log the skip, create nothing, emit no `pr_opened`, and continue; the pipeline still
   succeeds.
 - **YOLO mode** — create the draft PR with no wait. `--yolo` is the explicit authorization for
@@ -76,7 +76,10 @@ only — it is not an authorization to publish.
    `gh pr create --draft --base <base> --head <branch> --title <t> --body-file <f>`. Title:
    the implementation commit subject, or `feat(<artifact_id>): <spec summary>` when that subject
    is not a conventional-commit line. Body, written to a file under the run's temp directory:
-   - **Why**: the requirement or Jira summary, with the Jira link in `--issue` mode.
+   - **Why**: the requirement summary, and in `--issue` mode only the Jira key, the Jira link and the
+     one-line title. Never paste the ticket description, comments, attachments or customer data into the
+     body: the full snapshot is `ticket.md` in the branch (when it is committed), and the PR must not
+     republish it somewhere with a wider audience.
    - **What changed**: a short summary from the spec, and the spec path.
    - **Quality evidence**: `speckit-code-review` status; the Stage 03 `checks` list (name and
      result, `pre-existing` and `skipped` ones marked); the verification outcome with the Stage 05

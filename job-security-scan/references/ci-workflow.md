@@ -12,6 +12,14 @@ Copy this file to each service repo as `.github/workflows/job-security-scan.yaml
 > v0.69.3 binary. When you bump an action, resolve the new tag to its commit SHA yourself
 > (`git ls-remote --tags https://github.com/OWNER/REPO`) and check its advisories first.
 
+> **Trust model (self-hosted runners).** A pull request can edit any file it contains, so a job that runs
+> `parse-config.py`/`detect-ecosystems.py` or reads `repository.md`, `.trivyignore`, `gitleaks.toml` or
+> `hadolint.yaml` from the PR checkout lets the PR run code on the runner and weaken the scan that judges it.
+> Every job below therefore checks out the skill from the **base commit** into `.trusted/` and uses that copy
+> for scripts and configuration; the PR tree is only ever scanned as data. Fork pull requests are skipped
+> (`if:` guard): never run untrusted fork code on a self-hosted runner. Needs the skill committed on the base
+> branch - a PR that adds the skill for the first time is scanned from the next run.
+
 ---
 
 ```yaml
@@ -36,8 +44,9 @@ permissions:
   contents: read          # jobs that upload SARIF add security-events: write for themselves
 
 env:
-  SKILL_DIR: .github/skills/job-security-scan
-  CONFIG:    .github/skills/job-security-scan/assets/repository.md
+  # Run from the trusted (base-commit) copy, never from the tree under scan.
+  SKILL_DIR: .trusted/.github/skills/job-security-scan
+  CONFIG:    .trusted/.github/skills/job-security-scan/assets/repository.md
 
 jobs:
   # ── Read config ───────────────────────────────────────────────────────────
@@ -47,6 +56,7 @@ jobs:
   # ── 1. Secret Detection (Gitleaks) ────────────────────────────────────────
   secret-scan:
     name: "🔑 Gitleaks — ${{ github.repository }}"
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ${{ fromJson(vars.CI_RUNNER || '["ubuntu-latest"]') }}
     permissions:
       contents: read
@@ -55,6 +65,14 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0
+          persist-credentials: false
+
+      # Scripts and config come from the BASE commit, never from the PR being scanned (see "Trust model" above).
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha || github.sha }}
+          path: .trusted
+          sparse-checkout: .github/skills/job-security-scan
           persist-credentials: false
 
       - uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2
@@ -66,6 +84,7 @@ jobs:
   # ── 2. CVE + Dockerfile + Misconfig (Trivy) ───────────────────────────────
   dependency-scan:
     name: "📦 Trivy — ${{ github.repository }}"
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ${{ fromJson(vars.CI_RUNNER || '["ubuntu-latest"]') }}
     permissions:
       contents: read
@@ -73,6 +92,14 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
+          persist-credentials: false
+
+      # Scripts and config come from the BASE commit, never from the PR being scanned (see "Trust model" above).
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha || github.sha }}
+          path: .trusted
+          sparse-checkout: .github/skills/job-security-scan
           persist-credentials: false
 
       - name: Read fail-on-severity from repository.md
@@ -104,12 +131,24 @@ jobs:
   # ── 3. SAST (Semgrep) ─────────────────────────────────────────────────────
   sast-scan:
     name: "🔍 Semgrep — ${{ github.repository }}"
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ${{ fromJson(vars.CI_RUNNER || '["ubuntu-latest"]') }}
+    permissions:
+      contents: read
+      security-events: write
     container:
-      image: semgrep/semgrep:1.183.0   # pinned; prefer @sha256:<digest> once you have resolved it
+      image: semgrep/semgrep:1.183.0@sha256:2e45517a85e13a9cca14a2a00df6bb48affd66b8ebfae1b0991cd57578362fb0   # 1.183.0, pinned by digest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
+          persist-credentials: false
+
+      # Scripts and config come from the BASE commit, never from the PR being scanned (see "Trust model" above).
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha || github.sha }}
+          path: .trusted
+          sparse-checkout: .github/skills/job-security-scan
           persist-credentials: false
 
       - name: Build Semgrep config args from repository.md
@@ -127,6 +166,7 @@ jobs:
           # shellcheck disable=SC2086  # CONFIG_ARGS is a list of --config flags
           semgrep scan \
             $CONFIG_ARGS \
+            --metrics=off \
             --sarif --output semgrep.sarif \
             --error --quiet .
 
@@ -139,6 +179,7 @@ jobs:
   # ── 4. Dockerfile Lint (Hadolint) ─────────────────────────────────────────
   dockerfile-lint:
     name: "🐳 Hadolint — ${{ github.repository }}"
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ${{ fromJson(vars.CI_RUNNER || '["ubuntu-latest"]') }}
     permissions:
       contents: read
@@ -146,6 +187,14 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
+          persist-credentials: false
+
+      # Scripts and config come from the BASE commit, never from the PR being scanned (see "Trust model" above).
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha || github.sha }}
+          path: .trusted
+          sparse-checkout: .github/skills/job-security-scan
           persist-credentials: false
 
       - name: Check if Dockerfile exists
@@ -172,6 +221,7 @@ jobs:
   # ── 5. Transitive CVE Scan (OSV-Scanner) ──────────────────────────────────
   osv-scan:
     name: "🔗 OSV-Scanner — ${{ github.repository }}"
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ${{ fromJson(vars.CI_RUNNER || '["ubuntu-latest"]') }}
     permissions:
       contents: read
@@ -179,6 +229,14 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
+          persist-credentials: false
+
+      # Scripts and config come from the BASE commit, never from the PR being scanned (see "Trust model" above).
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha || github.sha }}
+          path: .trusted
+          sparse-checkout: .github/skills/job-security-scan
           persist-credentials: false
 
       - name: Detect lockfiles of every supported ecosystem
@@ -198,6 +256,7 @@ jobs:
   # ── 6. Verified Secret Detection (TruffleHog) ─────────────────────────────
   trufflehog-scan:
     name: "🕵️ TruffleHog — ${{ github.repository }}"
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ${{ fromJson(vars.CI_RUNNER || '["ubuntu-latest"]') }}
     permissions:
       contents: read
@@ -206,6 +265,14 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0
+          persist-credentials: false
+
+      # Scripts and config come from the BASE commit, never from the PR being scanned (see "Trust model" above).
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha || github.sha }}
+          path: .trusted
+          sparse-checkout: .github/skills/job-security-scan
           persist-credentials: false
 
       - uses: trufflesecurity/trufflehog@31ce31ee1abbcc7dc8eee5764c17121c3044c8b2 # v3.99.7
