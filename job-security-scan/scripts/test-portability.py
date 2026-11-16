@@ -10,6 +10,9 @@ Static checks over scripts/**/*.py (stdlib only):
 import ast
 import os
 import shutil
+
+# Windows CreateProcess finds System32\bash.exe (the WSL launcher) before PATH; resolve Git Bash explicitly.
+BASH = shutil.which("bash") or "bash"
 import subprocess
 import sys
 import tempfile
@@ -73,11 +76,12 @@ class FindPythonTests(unittest.TestCase):
     """scripts/lib/find-python.sh: skips a python3 that does not run (Windows Store stub), finds `python`,
     and strips Windows line endings from py() output while keeping Python's exit status."""
 
-    def sh(self, script, path_dirs, env_extra=None):
-        env = dict(os.environ, PATH=os.pathsep.join(path_dirs) + os.pathsep + os.path.dirname(shutil.which("bash")) + os.pathsep + "/usr/bin" + os.pathsep + "/bin")
+    def sh(self, script, path_dirs, system=True):
+        # system=False: PATH holds only path_dirs, so no real python can be found (CI images ship one in /usr/bin)
+        extra = [os.path.dirname(BASH), "/usr/bin", "/bin"] if system else []
+        env = dict(os.environ, PATH=os.pathsep.join(list(path_dirs) + extra))
         env.pop("PY", None)
-        env.update(env_extra or {})
-        return subprocess.run(["bash", "-c", '. "%s"; %s' % (SKILL_DIR / "scripts" / "lib" / "find-python.sh", script)],
+        return subprocess.run([BASH, "-c", '. "%s"; %s' % (SKILL_DIR / "scripts" / "lib" / "find-python.sh", script)],
                               stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True, env=env)
 
     def stub(self, d, name, body):
@@ -97,7 +101,7 @@ class FindPythonTests(unittest.TestCase):
     def test_no_python_gives_a_clear_error(self):
         with tempfile.TemporaryDirectory() as d:
             self.stub(d, "python3", "exit 1")
-            r = self.sh("true", [d])
+            r = self.sh("true", [d], system=False)
         self.assertNotEqual(r.returncode, 0)
         self.assertIn("Python 3.8+ not found", r.stderr)
 

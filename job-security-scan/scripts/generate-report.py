@@ -777,6 +777,9 @@ def load_source_refs(results_dir):
 
 
 def main():
+    for _s in (sys.stdout, sys.stderr):   # Windows consoles default to a legacy code page; the output has emoji
+        if hasattr(_s, "reconfigure"):
+            _s.reconfigure(encoding="utf-8", errors="replace")
     ap = argparse.ArgumentParser(description="Generate the security reports for one scan run")
     ap.add_argument("--results-dir", required=True,   help="Directory containing scanner outputs ({repo}/...)")
     ap.add_argument("--config",      required=True,   help="Path to repository.md config file")

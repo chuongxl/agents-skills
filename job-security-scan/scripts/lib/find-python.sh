@@ -1,7 +1,7 @@
 # find-python.sh - sourced by run-scan.sh and install-tools.sh (bash 3.2+; macOS, Linux, Windows Git Bash/WSL).
 #
 # Sets PY to a working Python 3.8+ and defines:
-#   py <args>   run "$PY" -I <args>. Output has any Windows "\r\n" turned into "\n", so command substitutions and
+#   py <args>   run "$PY" -X utf8 -I <args>. Output has any Windows "\r\n" turned into "\n", so command substitutions and
 #               `read` loops behave the same on every platform. The exit status is Python's own.
 #   native_path <p> a path as native Python/Windows tools expect it (cygpath -m on Git Bash/MSYS, unchanged elsewhere)
 #   abs_dir <d> absolute path of a directory; on Windows Git Bash the C:/... form that both bash and Python accept
@@ -18,7 +18,7 @@ if [[ -z "${PY:-}" ]]; then
 fi
 [[ -n "${PY:-}" ]] || { echo "❌ Python 3.8+ not found (tried python3, python, py). Install it from https://www.python.org/downloads/ and re-run." >&2; exit 1; }
 
-py() { "$PY" -I "$@" | tr -d '\r'; return "${PIPESTATUS[0]}"; }
+py() { "$PY" -X utf8 -I "$@" | tr -d '\r'; return "${PIPESTATUS[0]}"; }   # -X utf8: UTF-8 files/streams even on a legacy Windows code page
 
 abs_dir() { (cd "$1" 2>/dev/null && { pwd -W 2>/dev/null || pwd; }); }
 

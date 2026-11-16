@@ -58,6 +58,8 @@ jobs:
           python-version: "3.11"
 
       - name: Run the skill's self-tests
+        env:
+          PYTHONUTF8: "1"   # the test harness itself reads fixtures with the default encoding; the skill does not rely on this
         run: |
           status=0
           for t in job-security-scan/scripts/test-*.py; do
