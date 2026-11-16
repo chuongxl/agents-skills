@@ -408,7 +408,7 @@ class RunFolderTests(TempDirCase):
         hit = [f for f in doc["findings"] if f["rule_id"] == "known-package"][0]
         self.assertEqual((hit["file"], hit["line"]), ("package-lock.json", 6))
         self.assertIn("node_modules/@accordproject/concerto-linter", hit["code"])
-        self.assertIn("Run folder: %s" % runs[0], r.stdout)
+        self.assertIn("Run folder: %s" % str(runs[0]).replace("\\", "/"), r.stdout.replace("\\", "/"))
 
     def test_workspace_has_only_run_folder(self):
         r = self.run_scan("--config", self.config(), "--scanner", "shai-hulud", run_root=False)

@@ -9,6 +9,7 @@ the scope cannot judge. Stdlib only; Python 3.8+.
 
 import json
 import os
+import posixpath
 
 import report_locate
 
@@ -32,7 +33,7 @@ def load_changed(path):
 def _norm(path):
     if not path:
         return ""
-    p = os.path.normpath(str(path).replace("\\", "/"))
+    p = posixpath.normpath(str(path).replace("\\", "/"))   # repo-relative paths always use "/"
     return "" if p == "." else p
 
 

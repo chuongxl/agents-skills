@@ -84,7 +84,7 @@ class CheckedTests(TempDirCase):
         shutil.copy(str(FIX / "infected-lockfile" / "package-lock.json"), str(proj / "package-lock.json"))
         shutil.copy(str(FIX / "infected-lockfile" / "package.json"), str(proj / "package.json"))
         (home / ".npmrc").write_text("//registry.npmjs.org/:_authToken=%s\n" % NPM_TOKEN)
-        env = dict(os.environ, HOME=str(home), npm_config_cache=str(home / ".npm"))
+        env = dict(os.environ, HOME=str(home), USERPROFILE=str(home), npm_config_cache=str(home / ".npm"))
         doc = self.scan("--host", "--root", home, env=env)
         c = doc["checked"]
         self.assertEqual(doc["mode"], "host")

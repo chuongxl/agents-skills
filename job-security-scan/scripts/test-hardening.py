@@ -243,6 +243,7 @@ class SecretLeakTests(TempDirCase):
         self.assertEqual(res["Secrets"][0]["StartLine"], 3)
         self.assertEqual(res["Vulnerabilities"][0]["VulnerabilityID"], "CVE-1")
 
+    @unittest.skipIf(os.name == "nt", "POSIX permission bits do not exist on Windows (NTFS ACLs on the user profile apply)")
     def test_run_folder_is_private(self):
         self.run_trufflehog_scan()
         run = sorted((self.tmp / "ws").glob("security-run-*"))[-1]
@@ -363,6 +364,7 @@ class ImageProbeTests(TempDirCase):
         self.assertFalse(self.calls.exists() and "docker run" in self.calls.read_text(), r.stdout)
         self.assertIn("JOB_SECURITY_SCAN_PROBE_IMAGES", r.stdout)
 
+    @unittest.skipIf(os.name == "nt", "the stub docker is a shell script; CreateProcess cannot run it without .exe")
     def test_opt_in_probe_is_sandboxed(self):
         self.run_scan(JOB_SECURITY_SCAN_PROBE_IMAGES="1")
         runs = [l for l in self.calls.read_text().splitlines() if l.startswith("docker run")]
@@ -494,6 +496,7 @@ class HostileGitConfigTests(TempDirCase):
         g("-c", "user.email=a@b", "-c", "user.name=n", "commit", "-q", "--allow-empty", "-m", "x")
         self.marker = self.tmp / "PWNED"
         cmd = "touch %s" % self.marker
+        cmd = cmd.replace("\\", "/")   # backslashes are escapes inside a git config string (Windows temp paths)
         with open(str(repo / ".git" / "config"), "a") as fh:
             fh.write('[core]\n\tfsmonitor = "%s; echo"\n\tsshCommand = "%s"\n\tpager = "%s"\n' % (cmd, cmd, cmd))
         (repo / "untracked.txt").write_text("x")

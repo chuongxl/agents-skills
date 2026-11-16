@@ -113,7 +113,8 @@ class TempDirCase(unittest.TestCase):
     def put(self, rel, text):
         p = self.tmp / rel
         p.parent.mkdir(parents=True, exist_ok=True)
-        p.write_text(text)
+        with open(str(p), "w", encoding="utf-8", newline="\n") as fh:   # byte-exact: hashes are compared
+            fh.write(text)
         return p
 
 
@@ -193,7 +194,7 @@ class InventoryTests(TempDirCase):
 
     def test_iter_manifests_includes_root_and_installed(self):
         from shaihulud import inventory
-        found = sorted(str(p.relative_to(FIX / "infected-node-modules")) for p, _ in
+        found = sorted(p.relative_to(FIX / "infected-node-modules").as_posix() for p, _ in
                        inventory.iter_manifests(FIX / "infected-node-modules"))
         self.assertEqual(found, [".", "node_modules/@accordproject/concerto-linter"])
 
@@ -458,6 +459,7 @@ class HostTests(TempDirCase):
         found = host.scan_host(roots or [home], home, ioc, iocs.load_allowlist(), max_depth=max_depth)
         return findings.to_document("host", str(home), ioc.version, found)
 
+    @unittest.skipIf(os.name == "nt", "file-mode checks are POSIX-only (skipped by the scanner on Windows)")
     def test_infected_home(self):
         home = self.build_infected_home()
         doc = self.host_scan(home)

@@ -519,6 +519,7 @@ def load_sandbox():
     return mod
 
 
+@unittest.skipUnless(sys.platform.startswith("linux"), "the sandbox is Linux-only")
 class SandboxHidingTests(unittest.TestCase):
     """The sandbox hides credentials and local sockets: $HOME wholesale, or its credential paths when the
     workspace lives inside it."""

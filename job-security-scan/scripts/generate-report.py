@@ -506,6 +506,9 @@ def file_link(finding, org, repo_name):
     # Absolute path for vscode:// link
     abs_path = os.path.join(workspace, repo_name, f) if not os.path.isabs(f) else f
 
+    abs_path = abs_path.replace("\\", "/")           # Windows: vscode://file/C:/Users/... (forward slashes, leading /)
+    if not abs_path.startswith("/"):
+        abs_path = "/" + abs_path
     if line:
         vscode_url = f"vscode://file{abs_path}:{line}"
         label = html.escape(f"{f}:{line}")
@@ -532,6 +535,10 @@ def cve_link(rule_id, url):
 # ─── HTML Template ────────────────────────────────────────────────────────────
 # CSS and JS now live in assets/report-template.html — edit that file to
 # customise the report's look & feel without touching Python.
+
+for _s in (sys.stdout, sys.stderr):   # Windows consoles default to a legacy code page; reports print emoji
+    if hasattr(_s, "reconfigure"):   # (also reached when triage.py imports this module)
+        _s.reconfigure(encoding="utf-8", errors="replace")
 
 SCRIPT_DIR    = Path(__file__).parent.resolve()
 TEMPLATE_PATH = SCRIPT_DIR.parent / "assets" / "report-template.html"
@@ -777,9 +784,6 @@ def load_source_refs(results_dir):
 
 
 def main():
-    for _s in (sys.stdout, sys.stderr):   # Windows consoles default to a legacy code page; the output has emoji
-        if hasattr(_s, "reconfigure"):
-            _s.reconfigure(encoding="utf-8", errors="replace")
     ap = argparse.ArgumentParser(description="Generate the security reports for one scan run")
     ap.add_argument("--results-dir", required=True,   help="Directory containing scanner outputs ({repo}/...)")
     ap.add_argument("--config",      required=True,   help="Path to repository.md config file")
