@@ -558,7 +558,8 @@ test('security hardening instructions stay in place', () => {
 
   assert.match(readSkill('references/pipeline/stage-04-finish.md'), /YOLO publish guard/);
   const verify = readSkill('references/pipeline/stage-05-verification.md');
-  assert.match(verify, /verification_yolo/);
+  assert.match(verify, /verification_yolo.*absent or `true`/s);
+  assert.doesNotMatch(verify, /not authorized for verification/);
   assert.match(verify, /env -i/);
   assert.match(readSkill('references/pipeline/stage-06-finish.md'), /never paste the ticket description/i);
 });

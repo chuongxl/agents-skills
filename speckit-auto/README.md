@@ -150,8 +150,8 @@ repaired by this setup command, per provider.
 Provider installs are **pinned to verified commits** in
 [references/providers/pins.md](references/providers/pins.md) (spec-kit v1.4.0, superpowers v7.0.2 as of
 2026-11-16); bumping them is a reviewed change, never a run-time lookup. Other keys in
-`.speckit/integration.json`: `verification_yolo` (default `false`: `--yolo` skips Stage 05 unless you allow the
-app to be launched unattended) and `commit_ticket` (default `true`: set `false` to keep the Jira snapshot
+`.speckit/integration.json`: `verification_yolo` (default `true`: `--yolo` runs Stage 05 unattended with a scrubbed environment;
+set `false` to make `--yolo` skip it) and `commit_ticket` (default `true`: set `false` to keep the Jira snapshot
 `ticket.md` out of commits). Commits stage explicit paths and stop on credential-like files; under `--yolo`
 a diff touching CI/release config the spec does not name stops the run before the push.
 

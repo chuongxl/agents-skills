@@ -15,9 +15,11 @@ Read `verification` (and, in `--yolo`, `verification_yolo`) from the mirrored
 on every entry). Missing file, or the field absent entirely (a repo that ran `--integration` before
 this field existed) → treat as `false`. Never default a pre-existing repo into unexpected new behavior.
 
-Stage 05 **runs code generated from the ticket on the host**. Under `--yolo` that happens with nobody watching,
-so it needs its own opt-in: `--yolo` with `verification_yolo` not `true` → treat `verification` as `false` and
-note `verification: skipped (yolo not authorized for verification)` for the final report and PR body.
+Stage 05 **runs code generated from the ticket on the host**, and under `--yolo` nobody is watching. Unattended
+verification is **on by default**: `verification_yolo` absent or `true` → `--yolo` runs Stage 05 like default mode
+(with the scrubbed environment in step 3). Only an explicit `"verification_yolo": false` opts out: then `--yolo`
+treats `verification` as `false` and notes `verification: skipped (yolo verification disabled)` for the final
+report and PR body.
 
 - `false` → skip this stage entirely. Load [stage-06-finish.md](stage-06-finish.md) and enter
   Stage 06 in the same turn, noting `verification: skipped` for the final report.

@@ -25,10 +25,11 @@ TURN (the one legitimate no-pipeline turn end in the whole skill). Never enter t
    ask tool ([host-adaptation.md](host-adaptation.md)). No answer → default `false` and say so;
    never block setup waiting on this answer the way step 1's provider value can.
 
-   `verification_yolo` is `false` unless `verification` is `true` **and** the user answers Yes to a second
-   question, asked right after: **"Allow verification to launch the app unattended under `--yolo`?"** (Stage 05
-   runs code generated from the ticket on this machine; without this, `--yolo` skips Stage 05). No answer →
-   `false`. `commit_ticket` is `true` unless the user already set it to `false` in the existing file — keep
+   `verification_yolo` defaults to `true`: when `verification` is `true`, ask a second question right after,
+   **"Allow verification to launch the app unattended under `--yolo`? (default: Yes)"** (Stage 05 runs code
+   generated from the ticket on this machine, with a scrubbed environment; answering No makes `--yolo` skip
+   Stage 05). No answer → `true`. Write `true` whenever `verification` is `true`; when `verification` is
+   `false` the key is irrelevant, still write `true`. `commit_ticket` is `true` unless the user already set it to `false` in the existing file — keep
    an existing `false`; it keeps the Jira snapshot (`ticket.md`) out of commits (Stage 01, "Ticket snapshot
    rules"). Preserve both existing values when re-running setup without a new answer.
 
