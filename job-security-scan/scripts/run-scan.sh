@@ -278,10 +278,17 @@ run_semgrep() {
 
   _log semgrep "$repo" "Running SAST (${#rulesets[@]} rulesets: ${rulesets[*]})..."
 
+  # Registry rulesets (p/...) are downloaded on every run and are not pinned. JOB_SECURITY_SCAN_SEMGREP_RULES=<dir>
+  # replaces them with a reviewed, vendored rules directory (no registry fetch).
   local config_args=()
-  for r in "${rulesets[@]}"; do
-    config_args+=(--config "$r")
-  done
+  if [[ -n "${JOB_SECURITY_SCAN_SEMGREP_RULES:-}" ]]; then
+    [[ -d "$JOB_SECURITY_SCAN_SEMGREP_RULES" ]] || { _fail semgrep "$repo" "JOB_SECURITY_SCAN_SEMGREP_RULES is not a directory"; return; }
+    config_args=(--config "$JOB_SECURITY_SCAN_SEMGREP_RULES" --disable-version-check)
+  else
+    for r in "${rulesets[@]}"; do
+      config_args+=(--config "$r")
+    done
+  fi
 
   semgrep scan \
     "${config_args[@]}" \
@@ -301,7 +308,7 @@ run_semgrep() {
   # No readable output means semgrep did not run (e.g. registry rulesets unreachable) - never report that as clean.
   if [[ "$count" == "x" ]]; then
     rm -f "$out"
-    _warn semgrep "$repo" "semgrep produced no results file (rulesets unreachable?) - NOT scanned; see $OUTPUT_BASE/$repo/semgrep.err"
+    _fail semgrep "$repo" "semgrep produced no results file (rulesets unreachable?) - NOT scanned; see $OUTPUT_BASE/$repo/semgrep.err"
   elif [[ "$count" -eq 0 ]]; then
     _pass semgrep "$repo" "No findings"
   else

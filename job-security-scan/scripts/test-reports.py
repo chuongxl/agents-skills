@@ -463,9 +463,24 @@ class RunFolderTests(TempDirCase):
         r = self.run_scan("--config", self.config(repos=("clean",)), "--scanner", "semgrep")
         self.assertIn("NOT scanned", r.stdout)
         self.assertNotIn("No findings", r.stdout)
-        self.assertEqual(r.returncode, 1, r.stdout)
+        self.assertEqual(r.returncode, 2, r.stdout)   # a scanner that never ran must fail the run, not warn
         run = run_dirs(self.ws)[-1]
         self.assertFalse((run / "clean" / "semgrep.json").exists())   # so the diff never treats it as re-checked
+
+    def test_vendored_semgrep_rules_replace_registry(self):
+        rules = self.tmp / "rules"
+        rules.mkdir()
+        fake = self.bin / "semgrep"
+        fake.write_text('#!/usr/bin/env bash\necho "$@" >> "%s"\n'
+                        'while [ $# -gt 0 ]; do [ "$1" = --output ] && echo \'{"results":[]}\' > "$2"; shift; done\n'
+                        % (self.tmp / "semgrep.calls"))
+        fake.chmod(0o755)
+        self.run_scan("--config", self.config(repos=("clean",)), "--scanner", "semgrep",
+                      env={"JOB_SECURITY_SCAN_SEMGREP_RULES": str(rules)})
+        calls = (self.tmp / "semgrep.calls").read_text()
+        self.assertIn(str(rules), calls)
+        self.assertNotIn("p/owasp-top-ten", calls)
+        self.assertIn("--metrics=off", calls)
 
     def test_unknown_scanner_creates_no_folder(self):
         r = self.run_scan("--config", self.config(), "--scanner", "nope")
