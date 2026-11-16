@@ -523,3 +523,42 @@ test('refuses to write events through a symlinked events.jsonl or .speckit direc
   assert.match(dir.stderr, /symlink/i);
   assert.deepEqual(fs.readdirSync(elsewhere), [], 'nothing may be written through a symlinked .speckit');
 });
+
+test('security hardening instructions stay in place', () => {
+  const rules = readSkill('references/shared/operating-rules.md');
+  assert.match(rules, /9\. a security stop/);
+  assert.match(rules, /repo guidance.*tracked skill files/s);
+
+  const commit = readSkill('references/shared/commit.md');
+  assert.match(commit, /Staging Safety Check/);
+  assert.doesNotMatch(commit, /→ `git add -A`/);
+  assert.match(commit, /git add -- <path>/);
+
+  const pins = readSkill('references/providers/pins.md');
+  const shas = [...pins.matchAll(/\|\s*`(v[\d.]+)`\s*\|\s*`([0-9a-f]{40})`/g)];
+  assert.equal(shas.length, 2, 'both providers are pinned to a tag and a full commit');
+  for (const file of ['github-speckit-install.md', 'superpowers-install.md']) {
+    const text = readSkill(`references/providers/${file}`);
+    assert.doesNotMatch(text, /v0\.16\.4|newest release tag|sort=-v:refname/);
+    assert.match(text, /pins\.md/);
+  }
+  assert.ok(readSkill('references/providers/github-speckit-install.md').includes(shas[0][2]));
+  assert.ok(readSkill('references/providers/pins.md').includes('rev-parse HEAD'));
+  assert.doesNotMatch(readSkill('references/shared/integration-setup.md'), /vX\.Y\.Z|v0\.16\.4/);
+
+  const intake = readSkill('references/pipeline/stage-01-intake.md');
+  assert.doesNotMatch(intake, /submodule update --init --recursive/);
+  assert.match(intake, /protocol\.file\.allow=never/);
+  assert.match(intake, /host equals the host of `JIRA_URL`/);
+  assert.match(intake, /commit_ticket/);
+
+  const fallback = readSkill('references/pipeline/jira-fallback.md');
+  assert.match(fallback, /starts with `https:\/\//);
+  assert.match(fallback, /\^\[A-Z\]\[A-Z0-9\]\*-\[0-9\]\+\$/);
+
+  assert.match(readSkill('references/pipeline/stage-04-finish.md'), /YOLO publish guard/);
+  const verify = readSkill('references/pipeline/stage-05-verification.md');
+  assert.match(verify, /verification_yolo/);
+  assert.match(verify, /env -i/);
+  assert.match(readSkill('references/pipeline/stage-06-finish.md'), /never paste the ticket description/i);
+});

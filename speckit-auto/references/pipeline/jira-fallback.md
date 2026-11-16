@@ -4,7 +4,14 @@ Load **only** if the `jira-to-speckit` skill is unavailable in this session. The
 path never loads this file.
 
 1. Read the project-root `.env`: `JIRA_URL`, `JIRA_USERNAME`, `JIRA_API_TOKEN`. Any missing → stop
-   and ask the user to complete it, **without printing any value**.
+   and ask the user to complete it, **without printing any value**. Then validate, and stop on any
+   failure without printing the value:
+   - `JIRA_URL` starts with `https://` (a token is never sent over plain HTTP), has no userinfo, and
+     its host equals the host of the `--issue` browse URL — a ticket link to another host is never
+     fetched with these credentials;
+   - `issueKey` matches `^[A-Z][A-Z0-9]*-[0-9]+$` (it goes into the request URL);
+   - `JIRA_USERNAME` and `JIRA_API_TOKEN` contain no `"`, `\`, newline or carriage return (they are
+     written into a quoted curl config line).
 2. Fetch. Never pass the token on the curl command line (`-u user:$JIRA_API_TOKEN`); it would show
    up in `ps` for any other process on the host. Pass credentials through a curl config file read
    from stdin through a `printf` pipe. Not a heredoc: zsh and bash before 5.1 back it with a temp

@@ -12,8 +12,8 @@ TURN (the one legitimate no-pipeline turn end in the whole skill). Never enter t
    Unsupported value → report the two valid providers (`github-speckit`, `superpowers`) and stop,
    writing nothing. No value → ask the user once, then continue in the same turn.
 
-2. **Persist** `{"integration": "<value>", "verification": <bool>, "updated_at": "<ISO-8601>",
-   "set_by": "speckit-auto"}` to `<repo-root>/.speckit/integration.json` (`mkdir -p` first; root
+2. **Persist** `{"integration": "<value>", "verification": <bool>, "verification_yolo": <bool>,
+   "commit_ticket": <bool>, "updated_at": "<ISO-8601>", "set_by": "speckit-auto"}` to `<repo-root>/.speckit/integration.json` (`mkdir -p` first; root
    from `git rev-parse --show-toplevel`). This repo-local file is the **only** provider and
    verification-opt-in source — there is no global state. If the cwd is not inside a git repo,
    stop and tell the user to re-run from the target repository. Overwrite silently; report the
@@ -24,6 +24,13 @@ TURN (the one legitimate no-pipeline turn end in the whole skill). Never enter t
    persisting: **"Enable implementation verification for this project?"** (Yes/No), via the host
    ask tool ([host-adaptation.md](host-adaptation.md)). No answer → default `false` and say so;
    never block setup waiting on this answer the way step 1's provider value can.
+
+   `verification_yolo` is `false` unless `verification` is `true` **and** the user answers Yes to a second
+   question, asked right after: **"Allow verification to launch the app unattended under `--yolo`?"** (Stage 05
+   runs code generated from the ticket on this machine; without this, `--yolo` skips Stage 05). No answer →
+   `false`. `commit_ticket` is `true` unless the user already set it to `false` in the existing file — keep
+   an existing `false`; it keeps the Jira snapshot (`ticket.md`) out of commits (Stage 01, "Ticket snapshot
+   rules"). Preserve both existing values when re-running setup without a new answer.
 
 2a. **If verification = true, generate the project's verification skill now:**
    1. Invoke the `skill` tool with name `create-verification-skill`, in **create mode** (no

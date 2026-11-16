@@ -10,10 +10,14 @@ stage is skipped.
 
 ## 1. Read the opt-in
 
-Read `verification` from the mirrored `<worktree>/.speckit/integration.json` (the same file Stage
-01 §1.4 already copies into the worktree on every entry). Missing file, or the field absent
-entirely (a repo that ran `--integration` before this field existed) → treat as `false`. Never
-default a pre-existing repo into unexpected new behavior.
+Read `verification` (and, in `--yolo`, `verification_yolo`) from the mirrored
+`<worktree>/.speckit/integration.json` (the same file Stage 01 §1.4 already copies into the worktree
+on every entry). Missing file, or the field absent entirely (a repo that ran `--integration` before
+this field existed) → treat as `false`. Never default a pre-existing repo into unexpected new behavior.
+
+Stage 05 **runs code generated from the ticket on the host**. Under `--yolo` that happens with nobody watching,
+so it needs its own opt-in: `--yolo` with `verification_yolo` not `true` → treat `verification` as `false` and
+note `verification: skipped (yolo not authorized for verification)` for the final report and PR body.
 
 - `false` → skip this stage entirely. Load [stage-06-finish.md](stage-06-finish.md) and enter
   Stage 06 in the same turn, noting `verification: skipped` for the final report.
@@ -41,7 +45,12 @@ silently.
 
 Run the (now current) `verify-<app>` skill's own instructions, scoped to only this run's feature:
 launch, doctor, drive using the harness recipe from `features/<feature-slug>.md`, capture
-evidence, per its own Evidence section — but do **not** run cleanup yet; that happens once, in
+evidence, per its own Evidence section. **Launch every process with a scrubbed environment**, never the
+agent's own: `env -i` plus `PATH`, `HOME` set to a fresh temp directory, and only the variables the
+`verify-<app>` Launch section declares as required (with throwaway values such as a local test database).
+Never pass `JIRA_*`, `GH_TOKEN`/`GITHUB_TOKEN`, cloud or API credentials, or any variable whose name contains
+`TOKEN`, `SECRET`, `PASSWORD` or `KEY` unless that section names it and the human approved it. Do not run
+the app from a directory that holds the project's real `.env` — but do **not** run cleanup yet; that happens once, in
 Stage 06, after the human confirms verification passed (a failed confirmation may mean rerunning
 the drive against the same still-launched instance).
 
