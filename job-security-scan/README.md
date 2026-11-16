@@ -490,7 +490,17 @@ in the summary is the work left; pending findings are not clean.
 
 ## Version History
 
-- **v3.2.1** (current) — Docs hardening: removed the `eval` of the parsed config from the agent
+- **v3.3.0** (current) — Security review follow-up: every tool must report its pinned version (Homebrew
+  and pre-installed binaries included; malicious Trivy 0.69.4-0.69.6 refused at install and at scan time);
+  Linux downloads are checked against `assets/tool-checksums.txt`, not a checksum file from the same release;
+  Semgrep installs from a hash-locked set and runs with `--metrics=off`; TruffleHog live verification is opt-in
+  (`JOB_SECURITY_SCAN_VERIFY_SECRETS=1`); `--repo` is validated; git runs on scanned repos with the repo's own
+  config overridden (`scripts/lib/safegit.py`); the audit sandbox hides `$HOME` credentials, `/run` and other
+  local sockets; verifier prompts treat repo text as data and verifiers cannot reject secret/worm findings; the
+  CI template runs the base-commit skill and skips forks; indicator caches only add to the committed set; Semgrep
+  and Trivy secret matches are blanked in raw output and the run folder is `umask 077`; the image probe pulls
+  Docker Hub official images only unless allowed
+- **v3.2.1** — Docs hardening: removed the `eval` of the parsed config from the agent
   instructions, the pipe-to-shell and `sudo` install commands and the unpinned scanner container images;
   manual install now points at the pinned, checksum-verified installer
 - **v3.2** — Large reports no longer break: `security-report.json` is a schema v3 index with the
