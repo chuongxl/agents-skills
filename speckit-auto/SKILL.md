@@ -91,6 +91,7 @@ load only that stage's file — never block asking the user to re-run the skill.
 | `references/shared/host-adaptation.md` | a step needs an ask-tool name, skill dir, or install host key |
 | `references/shared/integration-setup.md` | `--integration` present (setup runs; no stage file loads) |
 | `references/providers/<provider>-install.md` | provider validation fails — never on a healthy run |
+| `references/providers/pins.md` | an install flow or `--integration` setup installs a provider — the only source of provider versions |
 | `references/pipeline/jira-fallback.md` | `--issue` run and `jira-to-speckit` is unavailable |
 | `assets/execution-report-template.md` | `--issue` run, at execution-report init |
 

@@ -64,18 +64,19 @@ TURN (the one legitimate no-pipeline turn end in the whole skill). Never enter t
       4. Run the install commands **inline from here** — do NOT load the pipeline install-recovery
          files (`../providers/*-install.md`); those are scoped to a pipeline run and assume a
          worktree and a live Stage 01, neither of which exists in setup mode:
-         - **github-speckit:** install the Spec Kit CLI from the official GitHub source at a
-           pinned release tag (`uv tool install specify-cli --from
-           git+https://github.com/github/spec-kit.git@vX.Y.Z`; no tag resolvable → `@v0.16.4`;
-           never PyPI, never a branch; `uv` missing → stop and ask the user to install it) → `specify version` sanity check →
-           `specify init . --integration <host-key> --integration-options="--skills" --force` in
-           `<repo-root>` only → verify all nine skill files exist.
+         - **github-speckit:** install the Spec Kit CLI from the official GitHub source at the **pinned
+           commit** in [../providers/pins.md](../providers/pins.md) (`uv tool install specify-cli --from
+           git+https://github.com/github/spec-kit.git@<pinned-commit>`; never PyPI, never a branch, never a tag
+           resolved at run time; `uv` missing → stop and ask the user to install it) → `specify version` must
+           print the pinned version → `specify init . --integration <host-key>
+           --integration-options="--skills" --force` in `<repo-root>` only → verify all nine skill files exist.
          - **superpowers:** run the host's plugin/clone+copy command (Copilot:
            `copilot plugin marketplace add obra/superpowers-marketplace` then
            `copilot plugin install superpowers@superpowers-marketplace`; Claude Code: the
-           equivalent `/plugin` commands; OpenCode and Hermes Agent: clone `obra/superpowers`
-           at its newest release tag into a fresh `mktemp -d` directory and copy `skills/*` into
-           the host skill dir — never the default branch, never a fixed `/tmp` path) → verify on-disk skills.
+           equivalent `/plugin` commands — marketplace installs cannot be pinned, say so; OpenCode and Hermes
+           Agent: the pinned, commit-verified, non-overwriting clone in
+           [../providers/pins.md](../providers/pins.md) "Superpowers clone" — use that snippet, do not
+           improvise one) → verify on-disk skills.
 
          Never invoke `speckit-constitution` or any other provider skill here — the host session
          has not been restarted yet, so an unresolvable skill in setup mode is expected, not a
