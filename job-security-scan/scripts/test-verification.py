@@ -935,7 +935,7 @@ CHANGED = SKILL_DIR / "scripts" / "changed-files.py"
 
 @unittest.skipUnless(shutil.which("git"), "git required")
 class ChangedFilesTests(TempDirCase):
-    def test_repo_config_cannot_run_commands(self):
+    def evil_repo(self):
         repo = self.tmp / "evil"
         repo.mkdir()
         git(repo, "init", "-q")
@@ -949,6 +949,28 @@ class ChangedFilesTests(TempDirCase):
         with open(str(repo / ".git" / "config"), "a") as fh:
             fh.write("[core]\n\tfsmonitor = %s\n[diff]\n\texternal = %s\n" % (hook, hook))
         (repo / "b.js").write_text("y\n")
+        return repo, marker
+
+    def test_run_metadata_cannot_run_repo_commands(self):
+        repo, marker = self.evil_repo()
+        r = run_proc(SKILL_DIR / "scripts" / "write-run-metadata.py", "--run-dir", self.tmp, "--scanner", "all",
+                     "--repo", "evil=%s" % repo)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        ref = json.loads((self.tmp / "run-metadata.json").read_text())["source_refs"]["evil"]
+        self.assertEqual((ref["vcs"], ref["dirty"]), ("git", True))
+        self.assertFalse(marker.exists(), "repo-controlled command ran")
+
+    def test_audit_prepare_cannot_run_repo_commands(self):
+        repo, marker = self.evil_repo()
+        run_dir = self.tmp / "security-run-20260101-000000"
+        run_dir.mkdir()
+        r = run_proc(SKILL_DIR / "scripts" / "audit-prepare.py", "--repo", "evil", "--path", repo, "--run-dir",
+                     run_dir, "--runs-root", self.tmp, "--since", "HEAD")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertFalse(marker.exists(), "repo-controlled command ran")
+
+    def test_repo_config_cannot_run_commands(self):
+        repo, marker = self.evil_repo()
         out = self.tmp / "changed.json"
         r = run_proc(CHANGED, "--since", "HEAD", "--repos-root", self.tmp, "--out", out, "evil")
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)

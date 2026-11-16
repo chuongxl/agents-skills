@@ -648,6 +648,11 @@ fi
 
 # One self-contained folder per run, in the workspace folder; never overwrite an earlier run.
 RUN_ROOT="${SECURITY_RUN_ROOT:-$PWD}"
+# Reports belong in the workspace, never inside the skill folder (which is copied/replaced on update).
+if [[ -z "${SECURITY_RUN_ROOT:-}" && ( "$PWD" == "$SKILL_DIR" || "$PWD" == "$SKILL_DIR"/* ) ]]; then
+  echo "❌ Run from the workspace folder, not from inside the skill folder ($SKILL_DIR)."
+  exit 1
+fi
 RUN_STAMP="$(date +%Y%m%d-%H%M%S)"
 OUTPUT_BASE="$RUN_ROOT/security-run-$RUN_STAMP"
 n=2
@@ -729,9 +734,6 @@ generate_reports() {
     echo "  ✅ Markdown → $RUN_DIR/security-report.md"
     echo "  ✅ JSON     → $RUN_DIR/security-report.json (+ findings/)"
     echo "  ✅ HTML     → $RUN_DIR/security-report.html"
-    if [[ "$(uname -s)" == "Darwin" && -z "${CI:-}" ]]; then
-      open "$RUN_DIR/security-report.html" 2>/dev/null || true
-    fi
   else
     echo "  🟡 Report generation failed - see $RUN_DIR/report.log"
     [[ $GLOBAL_EXIT -lt 1 ]] && GLOBAL_EXIT=1
