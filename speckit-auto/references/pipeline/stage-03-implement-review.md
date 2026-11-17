@@ -5,25 +5,13 @@ Discard Stage 02 interview context at entry. This stage is a NO-STOP ZONE.
 
 ## Existing PR routing (`--pr-fix` only)
 
-This section replaces feature-specific implementation and review assumptions below. Emit the
-normal stage start. Implement the requested fix and regression tests in the validated worktree,
-using the selected provider where applicable and without requiring a new spec or tasks file.
-Use the fetched PR base SHA to find the merge base and review the **full** PR change set plus
-this run's staged and unstaged changes; exclude and preserve unrelated initial dirty changes.
-
-When Stage 02 identified a relevant spec, invoke `speckit-code-review` inline with that spec and
-the merge-base `base_ref`. Also check that the fix request is addressed. With no matching spec,
-perform a direct line-by-line review against the PR description, request and existing behavior,
-including correctness, security and regression tests. Record `review: direct` and its actual
-findings; never claim `speckit-code-review` passed. Fix blocking findings and repeat the same
-review and checks until clear or the existing circuit breaker fires. Do not treat an unchanged
-fix as successful without evidence that the requested behavior already works.
-
-Run the existing R2c project checks and changed-file formatting checks for the fix. A full
-repository check failure is `pre-existing` only when the same command reproduces the same
-unrelated failure against the baseline in an isolated checkout; record the evidence. A failure
-introduced by this run remains blocking. Preserve and report unavailable checks honestly.
-Emit the normal stage finish only after the applicable review and checks pass, and enter Stage 04.
+Load [../pr-fix/stage-03-implement-review.md](../pr-fix/stage-03-implement-review.md) and
+follow its review loop instead of the feature-specific loop below. Retain the no-stop rule,
+R2c project checks, circuit breaker and exit events. On a check failure return to the PR-fix
+loop, not the feature loop's R6 and R1. A direct review does not invoke or require a pass from
+`speckit-code-review`; its invocation and spec path are required only for spec-based review.
+When no matching spec or tasks exist, use the PR reference's implementation context and
+workspace pre-flight instead of the artifact-specific requirements below.
 
 Implementation identity, convergence step, and fix-application style come from the adapter:
 github-speckit runs `speckit-implement → speckit-converge`; superpowers runs its implementation
@@ -88,8 +76,8 @@ changes first, then the parent pointer update.
 For the entire duration of this stage, in **both** modes: no human approval gates, no interview
 questions, no pauses, no report-and-stop on failed results.
 
-- The **only** success exit is `status = pass` from `speckit-code-review` followed by a clean
-  R2c project-checks gate.
+- The **only** success exit is the applicable review passing followed by a clean R2c
+  project-checks gate.
 - The **only** other permitted exit is the circuit breaker: the exact same failure repeating 5
   consecutive iterations with no file change between them, or a git/filesystem error that
   prevents writing code. Report the stuck state and stop. A differing failure, or one followed by
@@ -204,7 +192,7 @@ PHASE 2 — Code review loop
 
 ## Exit Routing
 
-`status = pass` plus a clean R2c is the **only** normal exit. When it fires, load and execute
+The applicable review passing plus a clean R2c is the **only** normal exit. When it fires, load and execute
 [stage-04-finish.md](stage-04-finish.md) **in the same turn** — no summary, no turn end, no user
 question first. Default mode → Stage 04 human review + commit (mandatory); `--yolo` → Stage 04
 auto-commit path. No PR, merge, branch deletion, or workspace deletion happens here.

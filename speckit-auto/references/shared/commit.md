@@ -18,19 +18,10 @@ For a PR fix use the PR number as the message scope; no artifact folder is requi
 
 ## Existing PR push (`--pr-fix` only)
 
-The staging and conditional-commit rules still apply, but stage only paths created or changed by
-this run; never stage an initial dirty or staged path. If an initial path cannot be separated
-safely, stop with `policy_blocked`. At Stage 02, Stage 04 and the Stage 06 verification-artifact
-commit, commit locally and **defer the push**. Stage 06 performs the only required push after its
-authorization gate. This replaces Branch Sync + Push below; never pull, rebase or force-push.
-
-Immediately before that push, re-query the open PR and verify its head repository and ref still
-match intake. Fetch that exact head into a private temporary ref, confirm the fetched SHA matches
-the API head, and require it to be an ancestor of local HEAD. If it is not, stop with `git_error`;
-do not overwrite remote work. Push `HEAD` to `refs/heads/<pr_head_branch>` at the authenticated
-resolved head-repository URL using an ordinary non-force push, then fetch again and verify its
-SHA equals local HEAD. A concurrent update or rejected push is a terminal `git_error`, never a
-success. Use argument-vector commands and do not print authenticated URLs or credentials.
+Apply staging and conditional-commit rules to this run's paths only. If initial changes cannot be
+separated safely, stop with `policy_blocked`. Defer all pushes at commit gates; Stage 06 uses
+[../pr-fix/stage-06-finish.md](../pr-fix/stage-06-finish.md) after authorization instead of
+Branch Sync + Push below. Never pull, rebase or force-push a PR head.
 
 ## Conditional Commit (Critical)
 
@@ -57,8 +48,9 @@ repo:
    `.superpowers/`, `.worktrees/` or a Stage 05 evidence folder. Do not "fix" it by deleting or
    ignoring the file yourself; say what it is and let the human decide.
 3. Stage **by explicit path** (`git add -- <path> ...`) taken from the listing: the artifact folder
-   plus the files the plan and tasks name. A changed path nothing in the spec, plan or tasks accounts
-   for is surfaced, not staged (default mode: ask; `--yolo`: stop with the paths quoted).
+   plus the files the plan and tasks name. For a PR fix, use the PR request and identified fix
+   scope when there is no spec or plan. A changed path not accounted for is surfaced, not staged
+   (default mode: ask; `--yolo`: stop with the paths quoted).
 4. When `gitleaks` is installed, run `gitleaks protect --staged --redact --no-banner`; a finding
    stops the commit with the file and line only, never the value.
 

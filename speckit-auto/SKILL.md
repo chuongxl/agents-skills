@@ -95,6 +95,7 @@ load only that stage's file — never block asking the user to re-run the skill.
 | `references/pipeline/stage-04-finish.md` | the applicable spec-based or direct review passes and project checks succeed |
 | `references/pipeline/stage-05-verification.md` | Stage 04 implementation commit succeeds (or is skipped as already-clean) |
 | `references/pipeline/stage-06-finish.md` | Stage 05 hands off (whether it ran or was skipped) |
+| `references/pr-fix/stage-*.md` | only for `--pr-fix`, when the current stage directs; Stage 05 only if verification runs |
 | `references/shared/commit.md` | first commit gate reached (Stage 02 → 03) |
 | `references/shared/host-adaptation.md` | a step needs an ask-tool name, skill dir, or install host key |
 | `references/shared/integration-setup.md` | `--integration` present (setup runs; no stage file loads) |

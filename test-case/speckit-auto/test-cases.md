@@ -59,6 +59,10 @@ all three host agents (GitHub Copilot, Claude Code, OpenCode).
 | PF11 | Verification and gates | Repeat with default/YOLO and verification enabled/disabled/unavailable | Run PR fix | Preserve applicable approval and verification behavior, record actual review/check outcomes, update only the existing PR | Both |
 | PF12 | Provider config in source checkout | Fresh supplied worktree has no `.speckit/integration.json`; primary checkout has a valid config | Run PR fix from the supplied worktree | Resolve the existing provider from the primary checkout before intake, then mirror config without overwriting | Both |
 | PF13 | Delivery evidence | PR fix pushes a new commit successfully | Inspect the events with an existing client | The confirmed existing PR URL is recorded after the verified push and before completion, so the client reports delivery; no `pr_opened` is emitted for a no-change run | Both |
+| PF14 | Normal pipeline loading | Run a feature or Jira request without `--pr-fix` | Trace each loaded reference through all stages | No detailed PR-fix reference is loaded; ordinary stage behavior is unchanged | Both |
+| PF15 | PR-fix stage loading | Run `--pr-fix` through each pipeline stage | Trace each loaded reference at stage entry | Each PR-specific reference is loaded only for its own stage or commit gate; no future PR-fix reference is loaded early | Both |
+| PF16 | Conditional safety routing | Run a PR fix with a supplied worktree, no matching spec and a non-ancestor concurrent remote update | Follow the loaded stage references | Preserve the worktree, use direct review, reject unsafe push and report failure without creating a PR | Both |
+| PF17 | Shared gates after split | Run a PR fix in default and YOLO modes, with verification enabled and disabled | Trace approvals, checks and structured events | Applicable common stages, cleanup, approvals and event ordering remain unchanged | Both |
 
 ## Host-specific checks
 

@@ -8,10 +8,7 @@ shared JSON stdin invocation, not on context-only resume. Emit
 `{type: "stage_finished", stage: "05-verification"}` at the handoff (step 5), including when the
 stage is skipped.
 
-For `--pr-fix`, apply the same opt-in, mode, retry, cleanup and approval rules. When there is no
-matching spec, pass the PR description, fix request and actual changed paths in place of spec/plan
-to the verification skill, and assess evidence against the requested behavior rather than
-inventing spec criteria. Report unavailable or unexercised behavior honestly.
+For `--pr-fix`, apply the same opt-in, mode, retry, cleanup and approval rules.
 
 ## 1. Read the opt-in
 
@@ -28,7 +25,8 @@ report and PR body.
 
 - `false` → skip this stage entirely. Load [stage-06-finish.md](stage-06-finish.md) and enter
   Stage 06 in the same turn, noting `verification: skipped` for the final report.
-- `true` → continue with steps 2-5 below.
+- `true` → for `--pr-fix`, load [../pr-fix/stage-05-verification.md](../pr-fix/stage-05-verification.md)
+  and apply it to steps 2-5; then continue with those steps.
 
 ## 2. Update the project verification skill for this feature
 
@@ -111,7 +109,7 @@ Run `verify-<app>`'s Cleanup first if you will change code. Route back exactly l
 "Request changes" path: collect the feedback (YOLO: use the `not met` findings), restart through
 the earliest affected step (requirement/architecture/task/code-level), re-run every downstream
 Stage 02 step and its self-review gate if regenerated, re-enter the full Stage 03 flow if code
-changed (this is the fix step: implementation plus the `speckit-code-review` loop until `pass`),
+changed (implementation plus the applicable review loop until it passes),
 re-enter Stage 04 (human approval gate in default mode; auto-commit in YOLO), then re-enter this
 stage (Stage 05) from the top — including a fresh `create-verification-skill` update-mode call,
 since the feature's behavior may have changed.
