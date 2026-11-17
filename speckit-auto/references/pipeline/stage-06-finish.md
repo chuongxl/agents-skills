@@ -17,9 +17,13 @@ or fan out new PRs in this mode.
 
 Push using the PR-specific procedure in shared/commit.md. Verify the resolved remote head equals
 the intended local HEAD after the push, including a no-change run. On failure emit `run_failed`
-as directed there and do not emit completion. Report the existing PR URL, actual review type,
-checks, verification outcome and pushed SHA; distinguish a verified no-change result. Emit
-`stage_finished` then `run_completed` only after the required push verification succeeds.
+as directed there and do not emit completion. If this run pushed a new commit, emit `pr_opened`
+with the confirmed existing PR URL after push verification, unless that URL was already recorded
+on resume. This existing event also records delivery evidence; it does not mean a new PR was
+created. For a verified no-change run, do not emit `pr_opened` or claim delivery. Report the
+existing PR URL, actual review type, checks, verification outcome and pushed SHA; distinguish a
+verified no-change result. Emit `stage_finished` then `run_completed` only after the required
+push verification succeeds.
 
 ## 1. Clean (only if Stage 05 launched something)
 

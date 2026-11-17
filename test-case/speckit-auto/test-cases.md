@@ -58,6 +58,7 @@ all three host agents (GitHub Copilot, Claude Code, OpenCode).
 | PF10 | Existing format failure | Full format check fails before the run on unrelated files | Run changed-file and full checks | Changed files must pass; classify a full-check failure as pre-existing only after reproducing at baseline | Both |
 | PF11 | Verification and gates | Repeat with default/YOLO and verification enabled/disabled/unavailable | Run PR fix | Preserve applicable approval and verification behavior, record actual review/check outcomes, update only the existing PR | Both |
 | PF12 | Provider config in source checkout | Fresh supplied worktree has no `.speckit/integration.json`; primary checkout has a valid config | Run PR fix from the supplied worktree | Resolve the existing provider from the primary checkout before intake, then mirror config without overwriting | Both |
+| PF13 | Delivery evidence | PR fix pushes a new commit successfully | Inspect the events with an existing client | The confirmed existing PR URL is recorded after the verified push and before completion, so the client reports delivery; no `pr_opened` is emitted for a no-change run | Both |
 
 ## Host-specific checks
 
