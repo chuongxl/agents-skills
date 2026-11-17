@@ -447,9 +447,10 @@ in the summary is the work left; pending findings are not clean.
 
 ## Version History
 
+- **v4.0.1** — Version metadata update.
 - **v4.0.0** — Removed the dedicated worm detector, host mode, and its report section.
 
-- **v3.3.0** (current) — Security review follow-up: every tool must report its pinned version (Homebrew
+- **v3.3.0** — Security review follow-up: every tool must report its pinned version (Homebrew
   and pre-installed binaries included; malicious Trivy 0.69.4-0.69.6 refused at install and at scan time);
   Linux downloads are checked against `assets/tool-checksums.txt`, not a checksum file from the same release;
   Semgrep installs from a hash-locked set and runs with `--metrics=off`; TruffleHog live verification is opt-in
