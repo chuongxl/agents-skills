@@ -15,6 +15,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 SKILL_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(SKILL_DIR / "scripts" / "lib"))
@@ -22,7 +23,6 @@ sys.path.insert(0, str(SKILL_DIR / "scripts"))
 
 PARSE_CONFIG = SKILL_DIR / "scripts" / "parse-config.py"
 RUN_SCAN = SKILL_DIR / "scripts" / "run-scan.sh"
-FETCH_IOCS = SKILL_DIR / "scripts" / "fetch-iocs.py"
 PROBE = SKILL_DIR / "scripts" / "probe-runtime.py"
 FIX = SKILL_DIR / "tests" / "fixtures"
 SECRET = "AKIA" + "HARDENINGTEST0000"
@@ -172,30 +172,15 @@ class XmlTests(unittest.TestCase):
         self.assertTrue(leads)
 
 
-class FetchSchemeTests(TempDirCase):
-    def fetch(self, url):
-        src = self.put("sources.json", json.dumps({"sources": [
-            {"id": "s", "wave": "sh-2.0", "ecosystem": "npm", "format": "csv-name-versions", "url": url}]}))
-        return subprocess.run([sys.executable, "-I", str(FETCH_IOCS), "--out", str(self.tmp / "o"), "--sources", str(src)],
-                              stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
-
-    def test_insecure_schemes_refused(self):
-        for url in ("http://raw.githubusercontent.com/x.csv", "ftp://e.invalid/x.csv", "gopher://e.invalid/x"):
-            r = self.fetch(url)
-            self.assertEqual(r.returncode, 3, url)
-            self.assertIn("refused", r.stderr, url)
-
-    def test_https_host_must_be_allowlisted(self):
-        r = self.fetch("https://evil.example/x.csv")
-        self.assertEqual(r.returncode, 3)
-        self.assertIn("not allowlisted", r.stderr)
-
-    def test_local_file_still_allowed(self):
-        p = self.put("l.csv", "package_name,package_version\nlocal-evil,1.0.0\n")
-        self.assertEqual(self.fetch(p.as_uri()).returncode, 0)
-
-
 class SecretLeakTests(TempDirCase):
+    def test_report_redaction_masks_token_families(self):
+        import sanitize
+        for secret in ("github_pat_" + "a" * 25, "ghp_" + "b" * 25, "npm_" + "c" * 25,
+                       "AKIA" + "A" * 16, "-----BEGIN PRIVATE KEY-----\nabc\n-----END PRIVATE KEY-----"):
+            self.assertNotIn(secret, sanitize.redact("token: " + secret))
+        self.assertEqual(sanitize.redact("ordinary text"), "ordinary text")
+        self.assertLessEqual(len(sanitize.redact("x " * 200)), 120)
+
     def test_trufflehog_raw_values_stripped(self):
         import sanitize
         out = self.put("trufflehog.json", "\n".join(json.dumps(d) for d in [
@@ -255,7 +240,7 @@ class SecretLeakTests(TempDirCase):
                       '"SourceMetadata":{"Data":{"Git":{"file":".env","line":3}}}}\'\n' % SECRET)
         th.chmod(0o755)
         cfg = self.put("repository.md", '---\nteam: t\norg: o\nmonorepo-root: "%s"\nrepos:\n'
-                       '  - name: clean\n    active: true\n---\n' % (FIX / "shai-hulud"))
+                       '  - name: node-lodash\n    active: true\n---\n' % FIX)
         (self.tmp / "ws").mkdir()
         env = dict(os.environ, PATH=str(bin_dir) + os.pathsep + os.environ["PATH"],
                    JOB_SECURITY_SCAN_CACHE=str(self.tmp / "c"), SECURITY_RUN_ROOT=str(self.tmp / "ws"))
@@ -276,7 +261,7 @@ class SecretLeakTests(TempDirCase):
         th.write_text('#!/usr/bin/env bash\necho "$@" > "%s"\n' % (self.tmp / "args.txt"))
         th.chmod(0o755)
         cfg = self.put("repository.md", '---\nteam: t\norg: o\nmonorepo-root: "%s"\nrepos:\n'
-                       '  - name: clean\n    active: true\n---\n' % (FIX / "shai-hulud"))
+                       '  - name: node-lodash\n    active: true\n---\n' % FIX)
         (self.tmp / "ws").mkdir(exist_ok=True)
         env = dict(os.environ, PATH=str(bin_dir) + os.pathsep + os.environ["PATH"],
                    JOB_SECURITY_SCAN_CACHE=str(self.tmp / "c"), SECURITY_RUN_ROOT=str(self.tmp / "ws"))
@@ -372,11 +357,11 @@ class ImageProbeTests(TempDirCase):
 class RepoArgumentTests(TempDirCase):
     def test_repo_flag_cannot_leave_the_workspace(self):
         cfg = self.put("repository.md", '---\nteam: t\norg: o\nmonorepo-root: "%s"\nrepos:\n'
-                       '  - name: clean\n    active: true\n---\n' % (FIX / "shai-hulud"))
+                       '  - name: node-lodash\n    active: true\n---\n' % FIX)
         (self.tmp / "ws").mkdir()
         env = dict(os.environ, JOB_SECURITY_SCAN_CACHE=str(self.tmp / "c"), SECURITY_RUN_ROOT=str(self.tmp / "ws"))
         for bad in ("../clean", "a/b", "..", "-x", ".git"):
-            r = subprocess.run(["bash", str(RUN_SCAN), "--config", str(cfg), "--scanner", "shai-hulud", "--repo", bad],
+            r = subprocess.run(["bash", str(RUN_SCAN), "--config", str(cfg), "--scanner", "gitleaks", "--repo", bad],
                                stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True,
                                cwd=str(self.tmp / "ws"), env=env)
             self.assertEqual(r.returncode, 1, bad + r.stdout)
@@ -467,7 +452,7 @@ class VersionGateTests(TempDirCase):
         ran = self.tmp / "TRIVY_RAN"
         self.stub("trivy", 'case "$*" in *--version*) echo "Version: 0.69.5";; *) touch "%s";; esac' % ran)
         cfg = self.put("repository.md", '---\nteam: t\norg: o\nmonorepo-root: "%s"\nrepos:\n'
-                       '  - name: clean\n    active: true\n---\n' % (FIX / "shai-hulud"))
+                       '  - name: node-lodash\n    active: true\n---\n' % FIX)
         (self.tmp / "ws").mkdir()
         env = dict(os.environ, PATH=str(self.tmp / "bin") + os.pathsep + os.environ["PATH"],
                    JOB_SECURITY_SCAN_CACHE=str(self.tmp / "c"), SECURITY_RUN_ROOT=str(self.tmp / "ws"))
@@ -481,6 +466,12 @@ class VersionGateTests(TempDirCase):
 @unittest.skipUnless(shutil.which("git"), "git required")
 class HostileGitConfigTests(TempDirCase):
     """A scanned repo's own .git/config must not get to run commands through our git calls."""
+
+    def setUp(self):
+        super(HostileGitConfigTests, self).setUp()
+        patcher = mock.patch.dict(os.environ, {"GIT_CONFIG_COUNT": "0"})
+        patcher.start()
+        self.addCleanup(patcher.stop)
 
     def hostile_repo(self):
         repo = self.tmp / "repo"
@@ -520,7 +511,7 @@ class HostileGitConfigTests(TempDirCase):
         g.write_text('#!/usr/bin/env bash\nenv | grep "^GIT_" | sort > "%s"\nexit 0\n' % out)
         g.chmod(0o755)
         cfg = self.put("repository.md", '---\nteam: t\norg: o\nmonorepo-root: "%s"\nrepos:\n'
-                       '  - name: clean\n    active: true\n---\n' % (FIX / "shai-hulud"))
+                       '  - name: node-lodash\n    active: true\n---\n' % FIX)
         (self.tmp / "ws").mkdir()
         env = dict(os.environ, PATH=str(bin_dir) + os.pathsep + os.environ["PATH"],
                    JOB_SECURITY_SCAN_CACHE=str(self.tmp / "c"), SECURITY_RUN_ROOT=str(self.tmp / "ws"))
@@ -530,48 +521,6 @@ class HostileGitConfigTests(TempDirCase):
         self.assertIn("GIT_CONFIG_KEY_0=core.fsmonitor", text)
         self.assertIn("GIT_CONFIG_VALUE_0=false", text)
         self.assertIn("GIT_TERMINAL_PROMPT=0", text)
-
-class IocMergeTests(TempDirCase):
-    """A refreshed or overridden indicator file adds to the committed indicators; it never replaces them."""
-
-    def setUp(self):
-        super(IocMergeTests, self).setUp()
-        from shaihulud import iocs
-        self.iocs = iocs
-        self.base = json.loads(Path(iocs.DEFAULT_IOCS).read_text())
-        self.wave = next(iter(self.base["waves"]))
-
-    def extra(self, **kw):
-        doc = {"version": "cache-1", "waves": self.base["waves"], "packages": [], "files": [], "paths": [], "markers": []}
-        doc.update(kw)
-        return self.put("extra.json", json.dumps(doc))
-
-    def test_cache_adds_without_dropping_committed_indicators(self):
-        f = self.extra(packages=[{"ecosystem": "npm", "name": "brand-new-evil", "versions": ["1.0.0"], "wave": self.wave}])
-        loaded = self.iocs.load(str(f))
-        self.assertEqual(loaded.package_wave("npm", "brand-new-evil", "1.0.0"), self.wave)
-        pkg = self.base["packages"][0]
-        self.assertEqual(loaded.package_wave(pkg["ecosystem"], pkg["name"], pkg["versions"][0]), pkg["wave"])
-        self.assertEqual(len(loaded.files), len(self.base["files"]))
-
-    def test_empty_or_stale_cache_cannot_blind_the_check(self):
-        loaded = self.iocs.load(str(self.extra()))
-        for pkg in self.base["packages"][:50]:
-            self.assertTrue(loaded.package_wave(pkg["ecosystem"], pkg["name"], pkg["versions"][0]))
-
-    def test_versions_of_a_known_package_are_unioned(self):
-        pkg = self.base["packages"][0]
-        f = self.extra(packages=[{"ecosystem": pkg["ecosystem"], "name": pkg["name"], "versions": ["9.9.9-new"],
-                                  "wave": pkg["wave"]}])
-        loaded = self.iocs.load(str(f))
-        self.assertTrue(loaded.package_wave(pkg["ecosystem"], pkg["name"], "9.9.9-new"))
-        self.assertTrue(loaded.package_wave(pkg["ecosystem"], pkg["name"], pkg["versions"][0]))
-
-    def test_invalid_extra_file_is_refused(self):
-        bad = self.extra(packages=[{"ecosystem": "npm", "name": "x", "versions": [], "wave": "nope"}])
-        with self.assertRaises(ValueError):
-            self.iocs.load(str(bad))
-
 
 class ProbeRegistryTests(unittest.TestCase):
     def test_default_allows_docker_hub_official_images_only(self):

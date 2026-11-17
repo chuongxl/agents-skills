@@ -9,7 +9,6 @@ Stdlib only; Python 3.8+.
 import audit_report
 import baseline
 import report_model
-import report_shaihulud
 from report_model import SEVERITIES, SCHEMA_VERSION, FINDING_KEYS, effective_severity  # noqa: F401 (re-export)
 
 STATUS_EMOJI = {"red": "🔴", "yellow": "🟡", "green": "🟢"}
@@ -170,7 +169,6 @@ def render_markdown(doc):
             _text(r["name"]), c["CRITICAL"], c["HIGH"], c["MEDIUM"], c["LOW"] + c["INFO"], r["secrets"],
             STATUS_EMOJI[r["status"]]))
     out.append("")
-    out += report_shaihulud.render_markdown(doc, _text, _code)
     out += audit_report.render_markdown(doc, _text, _code)
     out += baseline.render_markdown(doc, _text, _code)
     out += _changes_section(doc)
@@ -232,7 +230,6 @@ def render_summary(doc, max_bytes=20 * 1024):
         head.append("| %s | %d | %d | %d | %d | %d | %s |" % (
             _text(r["name"]), c["CRITICAL"], c["HIGH"], c["MEDIUM"], c["LOW"] + c["INFO"], r["secrets"],
             STATUS_EMOJI[r["status"]]))
-    head += report_shaihulud.render_markdown(doc, _text, _code)
     head += ["", "## Changes", ""]
     if run.get("previous_error"):
         head.append("Change tracking unavailable: %s" % _text(run["previous_error"]))

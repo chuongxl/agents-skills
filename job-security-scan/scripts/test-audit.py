@@ -10,7 +10,9 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from argparse import Namespace
 from pathlib import Path
+from unittest import mock
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE / "lib"))
@@ -424,7 +426,7 @@ def namespaces_available():
 
 class SandboxAndPromotionTests(unittest.TestCase):
     def setUp(self):
-        self.tmp = Path(tempfile.mkdtemp())
+        self.tmp = Path(tempfile.mkdtemp()).resolve()
         self.agent = self.tmp / "audit" / "agents" / "v1"
         self.scratch = self.agent / "scratch"
         self.scratch.mkdir(parents=True)
@@ -447,13 +449,24 @@ class SandboxAndPromotionTests(unittest.TestCase):
         self.assertIn("JOB_SECURITY_SCAN_AUDIT_EXEC", r.stderr)
 
     def test_argument_guards(self):
-        self.assertEqual(self.sandbox("--env", "NPM_TOKEN=x", "--", "true").returncode, 98)
-        self.assertEqual(self.sandbox("--env", "LD_PRELOAD=x", "--", "true").returncode, 98)
+        sandbox = load_sandbox()
         bad = self.tmp / "elsewhere"
         bad.mkdir()
-        r = subprocess.run([PY, "-I", str(HERE / "audit-sandbox.py"), "--scratch", str(bad), "--", "true"],
-                           env=dict(os.environ, JOB_SECURITY_SCAN_AUDIT_EXEC="1"), capture_output=True)
-        self.assertEqual(r.returncode, 98)
+        args = Namespace(scratch=str(self.scratch), env=[], cwd=None, record=None, loopback=False)
+        with mock.patch.object(sandbox.sys, "platform", "linux"), \
+             mock.patch.object(sandbox.shutil, "which", return_value="/usr/bin/test"):
+            for value in ("NPM_TOKEN=x", "LD_PRELOAD=x"):
+                args.env = [value]
+                self.assertEqual(sandbox.preflight(args)[1], 98, value)
+            args.env = []
+            args.scratch = str(bad)
+            self.assertEqual(sandbox.preflight(args)[1], 98)
+
+    @unittest.skipIf(sys.platform.startswith("linux"), "Linux sandbox availability varies")
+    def test_unsupported_platform_blocks_execution(self):
+        r = self.sandbox("--", "true")
+        self.assertEqual(r.returncode, 97)
+        self.assertIn("needs Linux namespaces", r.stderr)
 
     @unittest.skipUnless(sys.platform.startswith("linux") and namespaces_available(), "needs Linux namespaces")
     def test_self_test_and_controls(self):

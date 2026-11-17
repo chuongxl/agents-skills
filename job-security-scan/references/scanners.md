@@ -20,10 +20,9 @@ No single tool covers the whole job. A secret scanner can't read a lockfile, and
 | SBOM fallback | Same as OSV, for unknown ecosystems | CycloneDX SBOM from Trivy | `sbom.cdx.json`, `osv-sbom.json` | standard, deep | OSV.dev API |
 | TruffleHog | Secrets that still work | Full git history | `trufflehog.json` | standard, deep | provider APIs |
 | Vendor advisories | Runtime, image and EOL issues | Version files, images, CI, SBOM | `advisories.json` | standard, deep | advisory feeds (cached) |
-| Shai-Hulud | npm/PyPI worm infection | Repo, or the host with `--host` | `shai-hulud.json` | all | no |
 | Deep audit | Logic flaws scanners can't see | Source code, read by the agent | `audit/` | opt-in `--audit` | no |
 
-Profiles are set in `run-scan.sh`. `quick` runs Gitleaks, OSV-Scanner and Shai-Hulud. `standard` and `deep` run everything except the deep audit. `deep` also lowers the Trivy threshold to LOW.
+Profiles are set in `run-scan.sh`. `quick` runs Gitleaks and OSV-Scanner. `standard` and `deep` run everything except the deep audit. `deep` also lowers the Trivy threshold to LOW.
 
 Tool versions are pinned in `scripts/install-tools.sh`. On Linux each download is checked against a SHA-256 hash. Trivy is pinned to 0.69.3 because 0.69.4 and the 0.69.4 to 0.69.6 images were published with malicious code.
 
@@ -105,16 +104,6 @@ Phase 7. Package databases track libraries. They often miss the runtime and plat
 - Match states: `affected`, `possibly-affected`, `affected-end-of-life`, `affected-if-condition-holds`, `end-of-life`, `unpinned`, `pending` (LOW), `unknown-version`. Unknown severity becomes MEDIUM.
 - `ADVISORY_OFFLINE=1` skips the fetch and uses the cache. `JOB_SECURITY_SCAN_PROBE_IMAGES=1` probes base images in a sandbox to read the real runtime version.
 - Details: [advisory-data.md](advisory-data.md).
-
-## Shai-Hulud
-
-Phase 8. An offline check for the Shai-Hulud worm family, which spread through hijacked npm and PyPI packages and installed hooks that steal tokens.
-
-It looks for known bad package versions, payload files, planted paths and marker strings from the IOC list in `assets/ioc/shai-hulud.json`. It also flags install hooks that behave like the worm, for example piping a download into a shell or sending data out. Known-safe hooks are listed in `assets/ioc/hook-allowlist.json`. `scripts/fetch-iocs.py` writes a refreshed IOC list to the cache, and the scan uses that copy when it exists. With `--host` it also checks the developer's machine and writes results under `_host/`.
-
-- Verdicts: AFFECTED (CRITICAL, exit 2), SUSPICIOUS (HIGH or MEDIUM, exit 1), clean (exit 0). Type `supply-chain`.
-- Limits: it only knows the IOCs in the list. A new variant needs an IOC refresh.
-- Details: [ioc-data.md](ioc-data.md), cleanup steps in [remediation.md](remediation.md).
 
 ## Deep audit
 

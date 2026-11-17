@@ -2,17 +2,15 @@
 # run-scan.sh — Generic security scanner for any team/repo workspace.
 #
 # Usage:
-#   run-scan.sh [--config path/to/repository.md] [--repo REPO_NAME] [--scanner SCANNER] [--host]
+#   run-scan.sh [--config path/to/repository.md] [--repo REPO_NAME] [--scanner SCANNER]
 #               [--profile quick|standard|deep] [--since GIT_REF] [--audit] [--budget N] [--baseline FILE]
 #
 # Flags:
 #   --config   Path to repository.md config file (default: auto-discover)
 #   --repo     Scan one repo by name only (default: all active repos)
-#   --scanner  Run one scanner only: gitleaks|trivy|semgrep|hadolint|osv|sbom|advisories|trufflehog|shai-hulud|audit|all
+#   --scanner  Run one scanner only: gitleaks|trivy|semgrep|hadolint|osv|sbom|advisories|trufflehog|audit|all
 #              (`audit` prepares the agent-driven deep audit; `all` does not include it - add --audit)
-#   --host     Also check THIS computer for the Shai-Hulud worm (projects under $HOME, global installs,
-#              npm cache, credential stores). Alone (no --scanner), only the host check runs.
-#   --profile  quick    = Gitleaks (working tree only), OSV, Shai-Hulud; nothing queued for verification
+#   --profile  quick    = Gitleaks (working tree only), OSV; nothing queued for verification
 #              standard = every scanner; CRITICAL+HIGH queued for verification (default)
 #              deep     = every scanner, Trivy also reports LOW; CRITICAL+HIGH+MEDIUM queued
 #              --scanner still picks one scanner and overrides the profile's list.
@@ -40,7 +38,6 @@ SINCE=""
 AUDIT_MODE=0
 AUDIT_BUDGET=""
 BASELINE_PATH=""
-HOST_MODE=0
 REPO_FILTER=""
 CONFIG_PATH=""
 
@@ -50,7 +47,6 @@ while [[ $# -gt 0 ]]; do
     --repo)     REPO_FILTER="$2"; shift 2 ;;
     --scanner)  SCANNER="$2"; SCANNER_SET=1; shift 2 ;;
     -s)         SCANNER="$2"; SCANNER_SET=1; shift 2 ;;
-    --host)     HOST_MODE=1;      shift ;;
     -r)         REPO_FILTER="$2"; shift 2 ;;
     --profile)  [[ $# -ge 2 ]] || { echo "--profile needs quick, standard or deep"; exit 1; }
                 PROFILE="$2"; shift 2 ;;
@@ -89,7 +85,7 @@ CONFIG_SH="$(python3 -I "$SKILL_DIR/scripts/parse-config.py" "$CONFIG_PATH")" ||
 eval "$CONFIG_SH"   # values are shell-quoted by parse-config.py
 
 WORKSPACE="${MONOREPO_ROOT:-.}"
-# Shared caches (vendor advisories, refreshed Shai-Hulud indicators) - never in the workspace by default.
+# Shared advisory cache - never in the workspace by default.
 CACHE_BASE="${JOB_SECURITY_SCAN_CACHE:-${CACHE_DIR:-${OUTPUT_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/job-security-scan}}}"
 # The run folder is created in MAIN, once the arguments are known to be valid.
 OUTPUT_BASE=""
@@ -98,9 +94,7 @@ ASSET_DIR="$SKILL_DIR/assets"
 
 # ─── Determine repos to scan ───────────────────────────────────────────────
 declare -a REPOS_TO_SCAN
-if [[ $HOST_MODE -eq 1 && $SCANNER_SET -eq 0 && -z "$REPO_FILTER" ]]; then
-  REPOS_TO_SCAN=()                      # --host alone: check this computer only
-elif [[ -n "$REPO_FILTER" ]]; then
+if [[ -n "$REPO_FILTER" ]]; then
   REPOS_TO_SCAN=("$REPO_FILTER")
 else
   REPOS_TO_SCAN=("${ACTIVE_REPOS[@]}")
@@ -519,43 +513,6 @@ run_trufflehog() {
   fi
 }
 
-# Shai-Hulud worm check (offline): known indicators = affected, worm-like install hooks = suspicious.
-# The refreshed cache is merged ON TOP of the committed indicators (it can add, never remove), and is passed as an
-# array so a path with spaces stays one argument.
-IOC_ARGS=()
-[[ -s "$CACHE_BASE/ioc/shai-hulud.json" ]] && IOC_ARGS=(--iocs "$CACHE_BASE/ioc/shai-hulud.json")
-
-_shai_hulud_result() {  # _shai_hulud_result <label> <rc> <txt>
-  local label="$1" rc="$2" txt="$3"
-  case "$rc" in
-    0) _pass shai-hulud "$label" "No Shai-Hulud indicator or worm-like install hook" ;;
-    1) _warn shai-hulud "$label" "SUSPICIOUS worm-like install behaviour - see $txt" ;;
-    2) _fail shai-hulud "$label" "AFFECTED - known Shai-Hulud indicator - see $txt (runbook: references/remediation.md)" ;;
-    *) _warn shai-hulud "$label" "scan error (exit $rc) - see $txt" ;;
-  esac
-}
-
-run_shai_hulud() {
-  local repo="$1" path="$2"
-  local out="$OUTPUT_BASE/$repo/shai-hulud.json" txt="$OUTPUT_BASE/$repo/shai-hulud.txt"
-  mkdir -p "$(dirname "$out")"
-  _log shai-hulud "$repo" "Checking for Shai-Hulud worm indicators and install-hook behaviour..."
-  python3 -I "$SKILL_DIR/scripts/shai-hulud-scan.py" --repo "$path" --output "$out" --format text \
-    ${IOC_ARGS[@]+"${IOC_ARGS[@]}"} >"$txt" 2>&1
-  _shai_hulud_result "$repo" $? "$txt"
-}
-
-run_shai_hulud_host() {
-  local out="$OUTPUT_BASE/_host/shai-hulud.json" txt="$OUTPUT_BASE/_host/shai-hulud.txt"
-  mkdir -p "$(dirname "$out")"
-  echo ""
-  echo "  ── this machine ($HOME) ──"
-  _log shai-hulud "host" "Checking projects, global installs, npm cache and credential stores..."
-  python3 -I "$SKILL_DIR/scripts/shai-hulud-scan.py" --host --output "$out" --format text \
-    ${IOC_ARGS[@]+"${IOC_ARGS[@]}"} >"$txt" 2>&1
-  _shai_hulud_result "host" $? "$txt"
-}
-
 # Deep audit (Phase 10): deterministic preparation only. The agent-driven method runs afterwards
 # (references/audit/WORKFLOW.md) and the reports are regenerated when it finishes.
 run_audit() {
@@ -596,13 +553,11 @@ run_scanner_for_repo() {
     sbom)       run_sbom       "$repo" "$path" ;;
     advisories) run_advisories "$repo" "$path" ;;
     trufflehog) run_trufflehog "$repo" "$path" ;;
-    shai-hulud) run_shai_hulud "$repo" "$path" ;;
     audit)      run_audit      "$repo" "$path" ;;
     all)
       if [[ "$PROFILE" == "quick" ]]; then
         run_gitleaks    "$repo" "$path"
         run_osv         "$repo" "$path"
-        run_shai_hulud  "$repo" "$path"
       else
         run_gitleaks   "$repo" "$path"
         run_trivy      "$repo" "$path"
@@ -612,12 +567,11 @@ run_scanner_for_repo() {
         run_sbom       "$repo" "$path"
         run_advisories "$repo" "$path"
         run_trufflehog "$repo" "$path"
-        run_shai_hulud "$repo" "$path"
       fi
       ;;
     *)
       echo "Unknown scanner: $SCANNER"
-      echo "Valid: gitleaks | trivy | semgrep | hadolint | osv | sbom | advisories | trufflehog | shai-hulud | audit | all"
+      echo "Valid: gitleaks | trivy | semgrep | hadolint | osv | sbom | advisories | trufflehog | audit | all"
       exit 1
       ;;
   esac
@@ -626,10 +580,10 @@ run_scanner_for_repo() {
 
 # ─── MAIN ─────────────────────────────────────────────────────────────────
 case "$SCANNER" in
-  gitleaks|trivy|semgrep|hadolint|osv|sbom|advisories|trufflehog|shai-hulud|audit|all) ;;
+  gitleaks|trivy|semgrep|hadolint|osv|sbom|advisories|trufflehog|audit|all) ;;
   *)
     echo "Unknown scanner: $SCANNER"
-    echo "Valid: gitleaks | trivy | semgrep | hadolint | osv | sbom | advisories | trufflehog | shai-hulud | audit | all"
+    echo "Valid: gitleaks | trivy | semgrep | hadolint | osv | sbom | advisories | trufflehog | audit | all"
     exit 1
     ;;
 esac
@@ -676,9 +630,7 @@ echo "  Profile  : ${PROFILE}$([[ $SCANNER_SET -eq 1 ]] && echo " (scanner: ${SC
 [[ -n "$SINCE" ]] && echo "  Scope    : files changed since ${SINCE} (partial run)"
 [[ $AUDIT_MODE -eq 1 || "$SCANNER" == "audit" ]] && echo "  Audit    : deep audit, profile ${PROFILE}${AUDIT_BUDGET:+, budget $AUDIT_BUDGET}"
 [[ -n "$BASELINE_PATH" ]] && echo "  Baseline : ${BASELINE_PATH}"
-[[ ${#IOC_ARGS[@]} -gt 0 ]] && echo "  IOC cache: ${IOC_ARGS[1]} (merged onto the committed indicators)"
 echo "  Repos    : ${REPOS_TO_SCAN[*]:-(none)}"
-[[ $HOST_MODE -eq 1 ]] && echo "  Host     : this machine (Shai-Hulud check)"
 echo "  Run      : ${OUTPUT_BASE}/"
 echo "  Cache    : ${CACHE_BASE}/"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -687,13 +639,10 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 # What was scanned, at which commit (shown in the report; lets later runs be compared honestly).
 META_ARGS=()
 for repo in ${REPOS_TO_SCAN[@]+"${REPOS_TO_SCAN[@]}"}; do META_ARGS+=(--repo "$repo=$WORKSPACE/$repo"); done
-[[ $HOST_MODE -eq 1 ]] && META_ARGS+=(--host)
 [[ $AUDIT_MODE -eq 1 ]] && META_ARGS+=(--audit)
 python3 -I "$SKILL_DIR/scripts/write-run-metadata.py" --run-dir "$OUTPUT_BASE" --scanner "$SCANNER" \
   --profile "$PROFILE" --since "$SINCE" --budget "$AUDIT_BUDGET" ${META_ARGS[@]+"${META_ARGS[@]}"} \
   2>/dev/null || echo "  ⚠️  could not write run-metadata.json"
-
-[[ $HOST_MODE -eq 1 ]] && run_shai_hulud_host
 
 for repo in ${REPOS_TO_SCAN[@]+"${REPOS_TO_SCAN[@]}"}; do
   echo ""

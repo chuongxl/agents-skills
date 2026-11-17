@@ -104,7 +104,7 @@ Return exactly one JSON object and nothing else:
 
 A `rejected` verdict removes a finding from the counts and carries over to later runs, so a verifier that was
 steered by hostile repo text could clear the worst classes. `triage.py record` therefore refuses a `rejected`
-verdict for a secret finding or a Shai-Hulud finding unless `--allow-reject-critical` is given; the person
+verdict for a secret finding unless `--allow-reject-critical` is given; the person
 running the scan decides that, not the verifier. Prompt rules are advisory: the hard limits (no network, no
 execution of repo code) are only enforced for the audit sandbox, so run Phase 9 verifiers on a host without
 production credentials.
@@ -129,5 +129,4 @@ The high/medium discriminator: does the demonstrated result fully defeat an expl
 real consequences, or only weaken it? If you cannot state the concrete damage, the severity is lower than it
 feels.
 
-For this skill: a secret that is live and grants access stays CRITICAL; a known-compromised package (Shai-Hulud
-AFFECTED) is not downgraded by reachability — installing it is the attack.
+For this skill, a secret that is live and grants access stays CRITICAL.

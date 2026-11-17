@@ -19,7 +19,7 @@
   python3 -I scripts/triage.py record RUN_DIR FILE|- [--replace] [--allow-reject-critical]
       Checks one verdict object (see references/verification.md) and saves it as
       triage/verdicts/<fingerprint>.json. A second verdict for the same finding needs --replace.
-      A "rejected" verdict for a secret or Shai-Hulud finding is refused unless --allow-reject-critical is given
+      A "rejected" verdict for a secret finding is refused unless --allow-reject-critical is given
       (a person's decision, never a verifier's).
 
   python3 -I scripts/triage.py apply RUN_DIR [VERDICTS.json]
@@ -48,7 +48,7 @@ import report_locate   # noqa: E402
 import report_model    # noqa: E402
 import report_store    # noqa: E402
 import report_schema   # noqa: E402
-from shaihulud.findings import redact  # noqa: E402
+from sanitize import redact  # noqa: E402
 
 CONTEXT = 15
 MAX_LINE = 400
@@ -281,8 +281,8 @@ def _queue_item(run_dir, index, fp):
 
 
 def _protected(item):
-    """Findings a rejection must never silently clear: live-credential and worm findings."""
-    return bool(item) and (item.get("type") == "secret" or item.get("scanner") in ("shai-hulud", "trufflehog", "gitleaks"))
+    """Findings a rejection must never silently clear: secret findings."""
+    return bool(item) and (item.get("type") == "secret" or item.get("scanner") in ("trufflehog", "gitleaks"))
 
 
 def cmd_record(run_dir, source, replace, allow_reject_critical=False):
@@ -316,7 +316,7 @@ def cmd_record(run_dir, source, replace, allow_reject_critical=False):
     if not FINGERPRINT.match(fp):
         return fail("fingerprint %r is not 16 hex characters" % fp)
     if obj.get("verdict") == "rejected" and not allow_reject_critical and _protected(_queue_item(run_dir, index, fp)):
-        return fail("%s is a secret or Shai-Hulud finding: a verifier cannot reject it. Record needs_validation, or "
+        return fail("%s is a secret finding: a verifier cannot reject it. Record needs_validation, or "
                     "a person re-runs with --allow-reject-critical" % fp)
     path = _verdict_path(run_dir, fp)
     if path.exists() and not replace:

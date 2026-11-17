@@ -3,13 +3,12 @@ name: job-security-scan
 description: >
   Free, report-only security scan of a team's repos, configured by one repository.md file. Runs Gitleaks
   (secrets in git history), Trivy (CVEs, Dockerfile misconfig), Semgrep (SAST), Hadolint, OSV-Scanner,
-  TruffleHog (live credential check), vendor advisories and an offline Shai-Hulud worm check (repos and,
-  with --host, this computer). Optional deep audit (--audit): an agent-driven, coverage-led review for
-  logic flaws scanners miss (authorization, tenant isolation, CI trust, injection); every finding is
+  TruffleHog (live credential check), and vendor advisories. Optional deep audit (--audit): an agent-driven,
+  coverage-led review for logic flaws scanners miss (authorization, tenant isolation, CI trust, injection); every finding is
   independently re-verified. Every run writes md/json/html reports with file:line, what is new or fixed since
   earlier runs, verifier verdicts, and a baseline for accepted findings. Use to scan for vulnerabilities,
   secrets, malware or misconfigurations, for a security audit or pen-test of code, to set up a CI security
-  pipeline, or to check for Shai-Hulud. Supports --repo, --scanner, --profile quick|standard|deep, --since.
+  pipeline. Supports --repo, --scanner, --profile quick|standard|deep, --since.
 compatibility: >
   Requires bash, git, Python 3.8+ (pre-installed on most systems — used
   only to parse repository.md, no pip packages needed). Security tools
@@ -20,7 +19,7 @@ compatibility: >
 license: MIT
 metadata:
   author: one-om-ddm-team
-  version: "3.3.1"
+  version: "4.0.0"
   config-file: assets/repository.md
 allowed-tools: bash glob grep view create edit
 ---
@@ -38,8 +37,8 @@ Generic, config-driven security scanner for any multi-repo workspace.
 - **Guidance** — a security question, a focused review of one file or lead, or triage: answer from the
   references (`references/audit/ATTACK-CLASSES.md` and its companion files for code-level questions). Do not
   run the scan or write files.
-- **Scan** — "scan", "check for secrets/vulnerabilities/Shai-Hulud", CI setup: run `run-scan.sh`
-  (Phases 1–8), then Phase 9 verification.
+- **Scan** — "scan", "check for secrets/vulnerabilities", CI setup: run `run-scan.sh`
+  (Phases 1–7), then Phase 9 verification.
 - **Deep audit** — "audit / pen-test this code", "full / deep security review": run the scan with `--audit`
   (or `--scanner audit` alone), then follow `references/audit/WORKFLOW.md` (Phase 10).
 
@@ -84,8 +83,7 @@ bash .github/skills/job-security-scan/scripts/run-scan.sh \
 | `--config PATH` | `--config ./repo.md` | Use a custom config file |
 | `--repo NAME` | `--repo om-ddm-backend` | Scan one repo only |
 | `--scanner NAME` | `--scanner trivy` | Run one scanner only (`audit` = the deep audit alone; `all` does not include it) |
-| `--host` | `--host` | Also check this computer for Shai-Hulud; alone, only the host check runs |
-| `--profile P` | `--profile quick` | `quick`: Gitleaks (working tree), OSV, Shai-Hulud, no verification. `standard` (default): every scanner, verify CRITICAL+HIGH. `deep`: also Trivy LOW, verify MEDIUM too |
+| `--profile P` | `--profile quick` | `quick`: Gitleaks (working tree), OSV, no verification. `standard` (default): every scanner, verify CRITICAL+HIGH. `deep`: also Trivy LOW, verify MEDIUM too |
 | `--since REF` | `--since origin/main` | Report only files changed since `REF` (plus uncommitted changes). Partial run: no "fixed" list |
 | `--audit` | `--audit` | Also prepare the deep audit (Phase 10) for each repo; `--profile` and `--since` scope it too |
 | `--budget N` | `--budget 40` | Deep audit: cap on agent invocations |
@@ -179,32 +177,6 @@ To ingest a new bulletin: `python3 -I scripts/fetch-advisories.py --advisory <ur
 complete the drafted JSON from the saved page text, and set `source.approved_by` after human review;
 unapproved LLM-assisted data is ignored by the matcher.
 
-## Phase 8 — Shai-Hulud Worm Check (repo and laptop)
-
-Answers "has this repo, or this computer, been hit by the Shai-Hulud npm/PyPI worm?" Offline, seconds,
-never runs npm/node/pip. `run-scan.sh --scanner shai-hulud` (also part of `all`) writes
-`<repo>/shai-hulud.json`; `--host` writes `_host/shai-hulud.json` and shows as "this machine" in the report.
-
-| Verdict | Means | Run exit |
-|---|---|---|
-| **AFFECTED** (CRITICAL) | Known indicator: a compromised release in a lockfile / `node_modules` / PyPI pin / global install / npm cache, a payload or stager file in a package, a planted workflow or persistence file, or a worm marker string | 🔴 |
-| **SUSPICIOUS** (HIGH/MEDIUM) | No known indicator, but an install hook reads credentials *and* sends data out, pipes a download into a shell, runs heavy obfuscated code, or downloads `bun`/TruffleHog | 🟡 |
-| clean | Neither; host mode still lists credential stores to rotate *if* affected (values never read out) | ✅ |
-
-Benign hooks (`node-gyp rebuild`, `prebuild-install`, `husky`, esbuild's installer...) are allowlisted in
-`assets/ioc/hook-allowlist.json`. Indicators live in `assets/ioc/shai-hulud.json`; refresh with
-`python3 -I scripts/fetch-iocs.py --out ~/.cache/job-security-scan/ioc` (used automatically when present; it is merged
-on top of the committed indicators, so a stale, truncated or tampered cache can add indicators but never remove one).
-Data provenance: `references/ioc-data.md`. If affected: the runbook in `references/remediation.md`.
-Standalone: `python3 -I scripts/shai-hulud-scan.py --repo PATH` or `--host` (exit 0 clean / 1 suspicious / 2 affected).
-
-**In the reports:** every report has a "🪱 Shai-Hulud check" section with one row per repo (and "this machine"
-with `--host`): the verdict (AFFECTED / SUSPICIOUS / CLEAN / ERROR / not run), what the check looked at
-(dependency files, packages compared, `package.json` files, install hooks, workflows; for the host: projects,
-global installs, Python packages, npm cache entries, credential stores), the indicator data version and a link to
-the raw output. A CLEAN row with "nothing to check" means the repo had no lockfile, requirements file or
-`package.json`. A failed check shows as ERROR with its message and never marks earlier findings fixed.
-
 ## Phase 9 — Verify Findings (agent step)
 
 After `run-scan.sh`, the serious findings are checked by **independent verifiers** before you report. Follow
@@ -271,7 +243,7 @@ security-run-YYYYMMDD-HHMMSS/
 ├── SUMMARY.md             # what to read first: status, changes, top findings (always under 20 KB)
 ├── security-report.md     # CRITICAL/HIGH in full with file:line and code; MEDIUM and below counted per rule
 ├── security-report.json   # index: run info, counts, repos, shard list (schema_version 3,
-│                          #   assets/report.schema.json; shai_hulud block = per-target verdict and checks)
+│                          #   assets/report.schema.json)
 ├── findings/              # the findings, in compact JSON shards of at most 2,000 rows / 4 MB, sha256 in the index
 ├── security-report.html   # interactive report (filters, VS Code links, NEW badges, verdicts)
 ├── run-metadata.json      # what ran, and each repo's commit + dirty flag
@@ -345,12 +317,6 @@ bash .github/skills/job-security-scan/scripts/run-scan.sh --profile quick --sinc
 # Deepest pass (Trivy LOW, MEDIUM findings verified too)
 bash .github/skills/job-security-scan/scripts/run-scan.sh --profile deep
 
-# Was this computer hit by Shai-Hulud? (no config needed)
-bash .github/skills/job-security-scan/scripts/run-scan.sh --host
-
-# Shai-Hulud check on every repo plus this computer
-bash .github/skills/job-security-scan/scripts/run-scan.sh --scanner shai-hulud --host
-
 # Use a different team's config
 bash .github/skills/job-security-scan/scripts/run-scan.sh \
   --config /path/to/other-team/repository.md
@@ -398,8 +364,7 @@ The scanner reads untrusted repositories, so it is built not to be an attack pat
    was prepared, run it now (Phase 10) and regenerate the report with `--keep-verdicts`, as `AGENT-TASK.md` says.
 2. Read `security-run-<datetime>/SUMMARY.md` (the last console line names the folder). Do not open
    `security-report.json` or `findings/` directly; they can be many megabytes.
-3. Reply with a short summary: the per-repo status table, the Shai-Hulud check row for every target (verdict
-   and what was checked; say plainly if it errored or did not run), the changes since the last run, the confirmed
+3. Reply with a short summary: the per-repo status table, the changes since the last run, the confirmed
    Critical and High findings as `file:line` with their rule, how many need validation, were dismissed or are
    still pending, any deep-audit findings (`file:line`, severity) and leads, and the paths of the report files.
 4. Stop there. Do not offer, propose or ask to fix anything, and do not edit any scanned file — the

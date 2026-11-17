@@ -39,7 +39,6 @@ import sanitize        # noqa: E402
 import report_model    # noqa: E402
 import report_schema   # noqa: E402
 import report_scope    # noqa: E402
-import report_shaihulud  # noqa: E402
 
 
 # ─── Config Parser ────────────────────────────────────────────────────────────
@@ -415,52 +414,6 @@ def parse_advisories(repo, results_dir, workspace):
     return findings
 
 
-HOST_RESULTS = "_host"        # run-scan.sh --host writes here
-HOST_LABEL = "this machine"
-
-
-def parse_shai_hulud(repo, results_dir, workspace):
-    """Parse shai-hulud-scan.py JSON (repo mode, or host mode under _host/)."""
-    findings = []
-    json_path = Path(results_dir) / repo / "shai-hulud.json"
-    if not json_path.exists():
-        return findings
-    try:
-        data = json.loads(json_path.read_text())
-    except Exception:
-        return findings
-    tier_label = {"affected": "AFFECTED", "suspicious": "Suspicious", "exposure": "Rotate if affected"}
-    for f in data.get("findings", []):
-        sev = f.get("severity", "LOW").upper()
-        if sev == "INFO":
-            sev = "LOW"
-        parts = [tier_label.get(f.get("tier"), f.get("tier", ""))]
-        if f.get("wave"):
-            parts.append("wave " + f["wave"])
-        if f.get("evidence"):
-            parts.append("evidence: " + f["evidence"])
-        if f.get("remediation"):
-            parts.append(f["remediation"])
-        findings.append({
-            "repo": HOST_LABEL if repo == HOST_RESULTS else repo,
-            "scanner": "shai-hulud",
-            "type": "supply-chain",
-            "severity": sev,
-            "file": f.get("location", ""),
-            "line": None,
-            "package": f.get("package", ""),
-            "installed_version": f.get("version", ""),
-            "fixed_version": "",
-            "rule_id": f.get("category", ""),
-            "title": f.get("title", ""),
-            "description": " - ".join(parts)[:300],
-            "url": "",
-            "evidence": f.get("evidence", ""),
-            "workspace": workspace,
-        })
-    return findings
-
-
 def collect_audit(results_dir, repos, workspace):
     """(confirmed audit findings, {repo: audit summary}) for repos that have a deep-audit folder."""
     findings, summaries = [], {}
@@ -479,7 +432,7 @@ def collect_audit(results_dir, repos, workspace):
 
 def collect_findings(results_dir, repos, workspace):
     parsers = [parse_gitleaks, parse_trufflehog, parse_trivy, parse_semgrep, parse_hadolint, parse_osv,
-               parse_advisories, parse_shai_hulud]
+               parse_advisories]
     all_findings = []
     for repo in repos:
         for parser in parsers:
@@ -700,7 +653,6 @@ def build_html(doc, config, results_dir, output_path, org, workspace="."):
             .replace("{{TOTAL}}",       str(total))
             .replace("{{CARDS}}",       cards_html)
             .replace("{{RUNINFO}}",     _runinfo_html(doc))
-            .replace("{{SHAIHULUD}}",   report_shaihulud.render_html(doc))
             .replace("{{AUDIT}}",       audit_report.render_html(doc) + baseline.render_html(doc))
             .replace("{{FILTERS}}",     filters_html)
             .replace("{{ROWS}}",        rows_html))
@@ -762,7 +714,7 @@ def scanner_coverage(results_dir, repos, profile="standard"):
         if "osv" in modes:  # lockfile scan and SBOM fallback both report as "osv" but cover different inputs
             modes["osv"] = "+".join(m for m, f in (("lockfile", "osv.json"), ("sbom", "osv-sbom.json"))
                                     if (d / f).is_file())
-        cov[HOST_LABEL if r == HOST_RESULTS else r] = modes
+        cov[r] = modes
     return cov
 
 
@@ -842,18 +794,17 @@ def main():
     coverage = scanner_coverage(args.results_dir, repos, args.profile)
     for repo, summary in audit_summaries.items():
         if summary["valid"]:       # an unfinished or invalid audit did not review the code: it can fix nothing
-            coverage.setdefault(HOST_LABEL if repo == HOST_RESULTS else repo, {})["audit"] = \
+            coverage.setdefault(repo, {})["audit"] = \
                 report_model.scanner_modes(["audit"], summary.get("profile") or args.profile)["audit"]
     meta = {
         "team": team, "org": org, "config": os.path.abspath(args.config),
         "run_dir": str(out_dir.resolve()),
         "scanners": sorted({f["scanner"] for f in findings} | {s for v in coverage.values() for s in v}),
-        "repos": [HOST_LABEL if r == HOST_RESULTS else r for r in repos],
+        "repos": list(repos),
         "skipped": [],
         "generated_at": datetime.now().astimezone().isoformat(timespec="seconds"),
         "profile": args.profile, "since": args.since, "partial": args.partial,
         "coverage": coverage,
-        "shai_hulud": report_shaihulud.build(args.results_dir, repos),
         "baseline": baseline.load(args.baseline) if args.baseline else None,
         "audit": audit_report.build(audit_summaries),
         "source_refs": load_source_refs(args.results_dir),

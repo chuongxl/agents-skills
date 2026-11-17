@@ -12,9 +12,34 @@ Stdlib only; Python 3.8+.
 
 import json
 import os
+import re
 import sys
 
 TRUFFLEHOG_SECRET_KEYS = ("Raw", "RawV2")
+
+_REDACTIONS = [
+    (re.compile(r"-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----.*?(?:-----END [A-Z0-9 ]*PRIVATE KEY-----|$)", re.S),
+     "[private key redacted]"),
+    (re.compile(r"\bgithub_pat_[A-Za-z0-9_]{20,}"), "github_pat_***"),
+    (re.compile(r"\bgh[pousr]_[A-Za-z0-9]{20,}"), "gh_***"),
+    (re.compile(r"\bnpm_[A-Za-z0-9]{20,}"), "npm_***"),
+    (re.compile(r"\b(?:AKIA|ASIA)[0-9A-Z]{16}\b"), "AKIA***"),
+    (re.compile(r"(_authToken|_auth|_password)\s*=\s*\S+"), r"\1=***"),
+    (re.compile(r"(?i)((?:secret|token|passw(?:or)?d|api[_-]?key|access[_-]?key|credential)[\w.-]{0,30}\s*[=:]\s*)"
+                r"[\"']?[^\s\"',;]{8,}"), r"\1***"),
+    (re.compile(r"([=:]\s*[\"']?)[A-Za-z0-9+/=_-]{32,}"), r"\1***"),
+    (re.compile(r"[A-Za-z0-9+/=_-]{40,}"), "***"),
+]
+
+
+def redact(text):
+    """Mask token-shaped text, collapse whitespace and cap the result."""
+    if not text:
+        return ""
+    for pattern, replacement in _REDACTIONS:
+        text = pattern.sub(replacement, text)
+    text = " ".join(text.split())
+    return text if len(text) <= 120 else text[:117] + "..."
 
 
 def strip_trufflehog(path):
