@@ -15,7 +15,7 @@
 # (GHSA-69fq-xp46-6x23). Bump a version only after checking the release and its advisories.
 #
 # Usage: bash scripts/install-tools.sh [--config path/to/repository.md]
-#        INSTALL_DIR=~/.local/bin bash scripts/install-tools.sh     (default /usr/local/bin)
+#        INSTALL_DIR=/usr/local/bin bash scripts/install-tools.sh   (default ~/.local/bin; put it on PATH)
 set -euo pipefail
 
 TRIVY_VERSION="0.69.3"
@@ -29,7 +29,7 @@ SKILL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 CONFIG="$SKILL_DIR/assets/repository.md"
 [[ "${1:-}" == "--config" && -n "${2:-}" ]] && CONFIG="$2"
 OS="$(uname -s)"
-INSTALL_DIR="${INSTALL_DIR:-/usr/local/bin}"
+INSTALL_DIR="${INSTALL_DIR:-$HOME/.local/bin}"   # user-writable: no sudo, nothing system-wide by default
 GH="https://github.com"
 CHECKSUMS="${JOB_SECURITY_SCAN_CHECKSUMS:-$SKILL_DIR/assets/tool-checksums.txt}"
 ALLOW_DRIFT="${JOB_SECURITY_SCAN_ALLOW_VERSION_DRIFT:-}"
