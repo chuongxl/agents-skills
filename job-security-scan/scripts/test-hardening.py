@@ -632,5 +632,30 @@ class CiTemplateTests(unittest.TestCase):
         self.assertIn("--metrics=off", self.yaml)
 
 
+class TokenAndSymlinkTests(TempDirCase):
+    def test_github_token_is_never_forwarded_by_a_redirect(self):
+        import urllib.request
+        watch = load_script("advisory-watch.py")
+        req = urllib.request.Request("https://api.github.com/repos/o/r/issues", headers={"Authorization": "Bearer t"})
+        handler = next(h for h in watch._OPENER.handlers if isinstance(h, watch._NoRedirect))
+        self.assertIsNone(handler.redirect_request(req, None, 307, "Temporary Redirect", {}, "https://evil.example/x"))
+
+    def test_label_is_url_quoted(self):
+        watch = load_script("advisory-watch.py")
+        seen = []
+        watch.api = lambda method, path, token, body=None: seen.append(path) or []
+        watch.known_markers("o/r", "a&state=closed#x", "t")
+        self.assertIn("labels=a%26state%3Dclosed%23x&", seen[0])
+
+    @unittest.skipIf(os.name == "nt", "symlinks need privileges on Windows")
+    def test_symlinked_lockfile_is_not_read(self):
+        sys.path.insert(0, str(SKILL_DIR / "scripts" / "lib"))
+        from shaihulud import inventory
+        secret = self.put("outside/secret.json", '{"name": "x", "version": "1"}')
+        (self.tmp / "repo").mkdir()
+        os.symlink(str(secret), str(self.tmp / "repo" / "package.json"))
+        self.assertIsNone(inventory._read_json(str(self.tmp / "repo" / "package.json")))
+
+
 if __name__ == "__main__":
     unittest.main()

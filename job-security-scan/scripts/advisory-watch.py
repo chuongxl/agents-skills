@@ -21,6 +21,7 @@ import re
 import subprocess
 import sys
 import urllib.error
+import urllib.parse
 import urllib.request
 
 SKILL_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -29,12 +30,22 @@ ACTIONABLE = ("affected", "affected-end-of-life", "end-of-life", "affected-if-co
 MARK_RE = re.compile(r"<!-- jss-advisory:(.+?) -->")
 
 
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    """The GitHub API answers directly; never follow a redirect (urllib would forward the bearer token to the new host)."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
+_OPENER = urllib.request.build_opener(_NoRedirect())
+
+
 def api(method, path, token, body=None):
     req = urllib.request.Request(API + path, method=method, data=json.dumps(body).encode() if body is not None else None,
                                  headers={"Accept": "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28",
                                           "Authorization": "Bearer " + token, "User-Agent": "job-security-scan-watch"})
     try:
-        with urllib.request.urlopen(req, timeout=30) as resp:
+        with _OPENER.open(req, timeout=30) as resp:
             return json.loads(resp.read().decode("utf-8") or "null")
     except urllib.error.HTTPError as exc:
         raise RuntimeError("GitHub API %s %s -> HTTP %d: %s" % (method, path, exc.code, exc.read()[:200].decode("utf-8", "replace")))
@@ -45,7 +56,7 @@ def api(method, path, token, body=None):
 def known_markers(repo, label, token):
     marks, page = set(), 1
     while page <= 10:
-        items = api("GET", "/repos/%s/issues?labels=%s&state=all&per_page=100&page=%d" % (repo, label, page), token)
+        items = api("GET", "/repos/%s/issues?labels=%s&state=all&per_page=100&page=%d" % (repo, urllib.parse.quote(label, safe=""), page), token)
         for it in items:
             if "pull_request" in it:
                 continue

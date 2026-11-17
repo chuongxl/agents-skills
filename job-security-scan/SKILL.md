@@ -21,7 +21,7 @@ compatibility: >
 license: MIT
 metadata:
   author: one-om-ddm-team
-  version: "3.4.0"
+  version: "3.4.1"
   config-file: assets/repository.md
 allowed-tools: bash glob grep view create edit
 ---

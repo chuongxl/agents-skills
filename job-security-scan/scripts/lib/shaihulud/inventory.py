@@ -21,7 +21,7 @@ _VERSION = re.compile(r"^\d+\.\d+")
 
 def _read_text(path):
     try:
-        if os.path.getsize(path) > MAX_LOCK_BYTES:
+        if os.path.islink(path) or os.path.getsize(path) > MAX_LOCK_BYTES:   # a symlinked lockfile could point at a secret file
             return None
         with open(path, "r", encoding="utf-8", errors="strict") as fh:
             text = fh.read()
