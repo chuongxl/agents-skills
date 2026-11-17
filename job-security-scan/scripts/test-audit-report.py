@@ -258,9 +258,9 @@ class RunScanTests(Env):
         self.assertIn("agent phase", r.stdout)
 
     def test_all_does_not_include_audit_without_the_flag(self):
-        r, run = self.scan("--scanner", "shai-hulud")
+        r, run = self.scan("--scanner", "gitleaks")
         self.assertFalse((run / "api" / "audit").exists())
-        r2, run2 = self.scan("--scanner", "shai-hulud", "--audit")
+        r2, run2 = self.scan("--scanner", "gitleaks", "--audit")
         self.assertTrue((run2 / "api" / "audit" / "AGENT-TASK.md").is_file())
 
     def test_bad_arguments(self):
@@ -270,21 +270,28 @@ class RunScanTests(Env):
         self.assertEqual(list(self.ws.glob("security-run-*")), [])
 
     def test_baseline_downgrades_a_failing_exit(self):
-        shutil.copytree(str(HERE.parent / "tests" / "fixtures" / "shai-hulud" / "infected-lockfile"),
-                        str(self.ws / "api"), dirs_exist_ok=True)
-        r, run = self.scan("--scanner", "shai-hulud")
+        bin_dir = self.tmp / "bin"
+        bin_dir.mkdir()
+        scanner = bin_dir / "trufflehog"
+        scanner.write_text('#!/bin/sh\nprintf \'%s\\n\' '
+                           '\'{"DetectorName":"test","Verified":true,'
+                           '"SourceMetadata":{"Data":{"Git":{"file":".env","line":1}}}}\'\n')
+        scanner.chmod(0o755)
+        env = {"PATH": str(bin_dir) + os.pathsep + os.environ["PATH"]}
+        r, run = self.scan("--scanner", "trufflehog", env_extra=env)
         self.assertEqual(r.returncode, 2, r.stdout + r.stderr)
         doc = load_doc(run)
         crit = [f["fingerprint"] for f in doc["findings"] if f["severity"] in ("CRITICAL", "HIGH")]
         self.assertTrue(crit)
         (self.ws / "security-baseline.json").write_text(json.dumps({"version": 1, "entries": [
-            {"fingerprint": fp, "reason": "fixture"} for fp in crit]}))   # found next to the config
-        r2, run2 = self.scan("--scanner", "shai-hulud")
+            {"fingerprint": fp, "reason": "fixture"} for fp in crit]}))
+        r2, run2 = self.scan("--scanner", "trufflehog", env_extra=env)
         self.assertEqual(r2.returncode, 1, r2.stdout + r2.stderr)
         self.assertIn("downgraded to warning", r2.stdout)
         doc2 = load_doc(run2)
         self.assertEqual(doc2["counts"]["CRITICAL"] + doc2["counts"]["HIGH"], 0)
         self.assertEqual(report_schema.validate(doc2), [])
+
 
 
 if __name__ == "__main__":

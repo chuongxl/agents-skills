@@ -28,7 +28,7 @@ VERDICT_KEYS = ("fingerprint", "change", "verdict", "verified_severity", "verdic
 # raw output file -> scanner name, used to know which scanners actually ran for a repo
 RAW_FILES = {"gitleaks.json": "gitleaks", "trivy.json": "trivy", "semgrep.json": "semgrep",
              "hadolint.txt": "hadolint", "osv.json": "osv", "osv-sbom.json": "osv", "advisories.json": "advisory",
-             "trufflehog.json": "trufflehog", "shai-hulud.json": "shai-hulud"}
+             "trufflehog.json": "trufflehog"}
 # the deep audit is a scanner only when its results validated (see audit_report.load); its coverage mode is
 # "audit:<profile>" so a quick audit never marks findings of a deep audit as fixed
 AUDIT_SCANNER = "audit"
@@ -210,7 +210,6 @@ def build_document(findings, meta, previous=None):
         "repos": repo_summaries(rows, meta.get("repos", [])),
         "skipped": list(meta.get("skipped", [])),
         "fixed": fixed,
-        "shai_hulud": meta.get("shai_hulud") or {"ran": False, "ioc_version": None, "targets": []},
         "verification": verification_summary(rows, profile),
         "findings": rows,
     }

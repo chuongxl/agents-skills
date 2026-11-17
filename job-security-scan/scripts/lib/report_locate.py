@@ -1,18 +1,18 @@
 """Locate every finding to a file, a line and one line of code, for the reports.
 
 Scanners that report a line keep it (the code excerpt is read from that line). For findings that point at a
-lockfile or manifest without a line (Trivy dependency CVEs, OSV, vendor advisories, Shai-Hulud), the line is
+lockfile or manifest without a line (Trivy dependency CVEs, OSV, vendor advisories), the line is
 the package's own entry. Other file findings use their evidence text, else line 1.
 
 Secrets never get an excerpt, and credential files are never opened. Every excerpt passes through the
-Shai-Hulud redact() as a second guard. Stdlib only; Python 3.8+.
+redaction as a second guard. Stdlib only; Python 3.8+.
 """
 
 import os
 import re
 from pathlib import Path
 
-from shaihulud.findings import redact
+from sanitize import redact
 
 MAX_BYTES = 25 * 1024 * 1024
 WINDOW = 6                                       # lines after a key in which its version must appear

@@ -117,24 +117,6 @@ class LocateTests(TempDirCase):
         p = self.put("deep/go.mod", "module x\n\nrequire golang.org/x/text v0.3.2\n")
         self.assertEqual(self.locate(finding(file=str(p), package="golang.org/x/text", installed_version="0.3.2"))[0], 3)
 
-    def test_marker_evidence_line(self):
-        self.put(".github/workflows/discussion.yaml",
-                 "name: d\non:\n  discussion:\njobs:\n  p:\n    steps: []\n    runs-on: [self-hosted, SHA1HULUD]\n")
-        f = finding(scanner="shai-hulud", type="supply-chain", file=".github/workflows/discussion.yaml",
-                    rule_id="marker", evidence="SHA1HULUD")
-        self.assertEqual(self.locate(f), (7, "runs-on: [self-hosted, SHA1HULUD]"))
-
-    def test_file_finding_without_anchor_is_line_1(self):
-        self.put("node_modules/p/setup_bun.js", "// stand-in\n")
-        f = finding(scanner="shai-hulud", type="supply-chain", file="node_modules/p/setup_bun.js", rule_id="payload-file")
-        self.assertEqual(self.locate(f), (1, "// stand-in"))
-
-    def test_non_manifest_file_with_package_falls_back_to_line_1(self):
-        self.put("node_modules/p/bun_environment.js", "// stand-in payload\n")
-        f = finding(scanner="shai-hulud", type="supply-chain", file="node_modules/p/bun_environment.js",
-                    rule_id="payload-file", package="@scope/victim-lib", installed_version="1.0.0")
-        self.assertEqual(self.locate(f), (1, "// stand-in payload"))
-
     def test_lockfile_without_the_package_stays_null(self):
         self.put("package-lock.json", NPM_LOCK)
         self.assertEqual(self.locate(finding(file="package-lock.json", package="absent", installed_version="1.0.0")),
@@ -143,13 +125,6 @@ class LocateTests(TempDirCase):
     def test_secret_row_gets_line_but_no_code(self):
         self.put(".env", "API_KEY=%s\n" % NPM_TOKEN)
         self.assertEqual(self.locate(finding(file=".env", line=1, type="secret", scanner="gitleaks")), (1, ""))
-
-    def test_credential_rows_never_opened(self):
-        home = self.tmp / "home"
-        self.put("home/.npmrc", "//registry.npmjs.org/:_authToken=%s\n" % NPM_TOKEN)
-        for rule in ("credential-store", "credential-permissions"):
-            f = finding(repo="this machine", scanner="shai-hulud", type="supply-chain", file="~/.npmrc", rule_id=rule)
-            self.assertEqual(self.locate(f, home), (None, ""), rule)
 
     def test_home_relative_path(self):
         home = self.tmp / "home"
@@ -179,15 +154,15 @@ class LocateTests(TempDirCase):
 
 
 META = {"team": "acme", "org": "acme-org", "config": "repository.md", "run_dir": "/w/security-run-20261102-153600",
-        "scanners": ["osv", "shai-hulud", "gitleaks"], "repos": ["api", "web", "worker"], "skipped": [],
+        "scanners": ["osv", "gitleaks"], "repos": ["api", "web", "worker"], "skipped": [],
         "generated_at": "2026-11-02T15:36:00+07:00"}
 
 
 def rows():
     return [
-        finding(repo="api", scanner="shai-hulud", type="supply-chain", severity="CRITICAL", file="package-lock.json",
+        finding(repo="api", scanner="osv", type="vulnerability", severity="CRITICAL", file="package-lock.json",
                 line=14, code='"node_modules/posthog-node": {', package="posthog-node", installed_version="5.11.3",
-                rule_id="known-package", title="Known compromised npm release"),
+                rule_id="CVE-2026-1234", title="Vulnerable npm release"),
         finding(repo="api", scanner="gitleaks", type="secret", severity="HIGH", file=".env", line=3, code="",
                 rule_id="generic-api-key", title="Secret | in `.env`"),
         finding(repo="web", scanner="osv", type="vulnerability", severity="MEDIUM", file="yarn.lock", line=6,
@@ -352,9 +327,6 @@ class GenerateTests(TempDirCase):
         self.assertNotEqual(r.returncode, 0)
 
 
-SH_FIX = FIX / "shai-hulud"
-
-
 def run_dirs(root):
     return sorted(p for p in Path(root).glob("security-run-*") if p.is_dir())
 
@@ -375,7 +347,7 @@ class RunFolderTests(TempDirCase):
         g.write_text(gitleaks)
         g.chmod(0o755)
 
-    def config(self, extra="", repos=("infected-lockfile", "clean"), root=SH_FIX):
+    def config(self, extra="", repos=("node-lodash", "python-django"), root=FIX):
         body = "".join("  - name: %s\n    active: true\n    has-dockerfile: false\n" % n for n in repos)
         return self.put("ws/repository.md", '---\nteam: t\norg: o\nmonorepo-root: "%s"\nci-runner: x\n'
                         'fail-on-severity: HIGH\n%srepos:\n%s---\n' % (root, extra, body))
@@ -392,24 +364,25 @@ class RunFolderTests(TempDirCase):
                               stderr=subprocess.PIPE, universal_newlines=True, cwd=str(self.ws), env=e)
 
     def test_run_folder_with_three_reports_and_raw(self):
-        r = self.run_scan("--config", self.config(), "--scanner", "shai-hulud")
-        self.assertEqual(r.returncode, 2, r.stdout + r.stderr)
+        r = self.run_scan("--config", self.config(), "--scanner", "gitleaks")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         runs = run_dirs(self.ws)
         self.assertEqual(len(runs), 1)
         self.assertRegex(runs[0].name, r"^security-run-\d{8}-\d{6}$")
         for name in ("security-report.md", "security-report.json", "security-report.html", ".gitignore",
-                     "infected-lockfile/shai-hulud.json", "clean/shai-hulud.json"):
+                     "node-lodash/gitleaks.json", "python-django/gitleaks.json"):
             self.assertTrue((runs[0] / name).is_file(), name)
         self.assertEqual((runs[0] / ".gitignore").read_text().strip(), "*")
         doc = load_doc(runs[0])
-        hit = [f for f in doc["findings"] if f["rule_id"] == "known-package"][0]
-        self.assertEqual((hit["file"], hit["line"]), ("package-lock.json", 6))
-        self.assertIn("node_modules/@accordproject/concerto-linter", hit["code"])
+        self.assertEqual(doc["findings"], [])
+        self.assertNotIn("shai_hulud", doc)
+        for name in ("SUMMARY.md", "security-report.md", "security-report.html"):
+            self.assertNotIn("Shai-Hulud", (runs[0] / name).read_text())
         self.assertIn("Run folder: %s" % runs[0], r.stdout)
 
     def test_workspace_has_only_run_folder(self):
-        r = self.run_scan("--config", self.config(), "--scanner", "shai-hulud", run_root=False)
-        self.assertEqual(r.returncode, 2, r.stdout + r.stderr)
+        r = self.run_scan("--config", self.config(), "--scanner", "gitleaks", run_root=False)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         names = sorted(p.name for p in self.ws.iterdir() if p.name != "repository.md")
         self.assertEqual(len(names), 1, names)
         self.assertTrue(names[0].startswith("security-run-"))
@@ -436,36 +409,34 @@ class RunFolderTests(TempDirCase):
         date.chmod(0o755)
         (self.ws / "security-run-20261102-153600").mkdir()
         (self.ws / "security-run-20261102-153600" / "keep.txt").write_text("first run")
-        self.run_scan("--config", self.config(repos=("clean",)), "--scanner", "shai-hulud")
+        self.run_scan("--config", self.config(repos=("node-lodash",)), "--scanner", "gitleaks")
         self.assertTrue((self.ws / "security-run-20261102-153600-2" / "security-report.md").is_file())
         self.assertEqual(sorted(p.name for p in (self.ws / "security-run-20261102-153600").iterdir()), ["keep.txt"])
 
-    def test_host_only_and_clean_run_still_write_reports(self):
-        r = self.run_scan("--host")
-        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
-        r = self.run_scan("--config", self.config(repos=("clean",)), "--scanner", "shai-hulud")
+    def test_clean_run_still_writes_reports(self):
+        r = self.run_scan("--config", self.config(repos=("node-lodash",)), "--scanner", "gitleaks")
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         runs = run_dirs(self.ws)
-        self.assertEqual(len(runs), 2)
+        self.assertEqual(len(runs), 1)
         for run in runs:
             for name in ("security-report.md", "security-report.json", "security-report.html"):
                 self.assertTrue((run / name).is_file(), (run, name))
         self.assertIn("No findings", (runs[-1] / "security-report.md").read_text())
 
     def test_gitleaks_called_with_redact(self):
-        self.run_scan("--config", self.config(repos=("clean",)), "--scanner", "gitleaks")
+        self.run_scan("--config", self.config(repos=("node-lodash",)), "--scanner", "gitleaks")
         self.assertIn("--redact", self.calls.read_text())
 
     def test_semgrep_without_output_is_not_reported_clean(self):
         fake = self.bin / "semgrep"
         fake.write_text("#!/usr/bin/env bash\necho 'registry unreachable' >&2\nexit 2\n")
         fake.chmod(0o755)
-        r = self.run_scan("--config", self.config(repos=("clean",)), "--scanner", "semgrep")
+        r = self.run_scan("--config", self.config(repos=("node-lodash",)), "--scanner", "semgrep")
         self.assertIn("NOT scanned", r.stdout)
         self.assertNotIn("No findings", r.stdout)
         self.assertEqual(r.returncode, 2, r.stdout)   # a scanner that never ran must fail the run, not warn
         run = run_dirs(self.ws)[-1]
-        self.assertFalse((run / "clean" / "semgrep.json").exists())   # so the diff never treats it as re-checked
+        self.assertFalse((run / "node-lodash" / "semgrep.json").exists())   # so the diff never treats it as re-checked
 
     def test_vendored_semgrep_rules_replace_registry(self):
         rules = self.tmp / "rules"
@@ -475,7 +446,7 @@ class RunFolderTests(TempDirCase):
                         'while [ $# -gt 0 ]; do [ "$1" = --output ] && echo \'{"results":[]}\' > "$2"; shift; done\n'
                         % (self.tmp / "semgrep.calls"))
         fake.chmod(0o755)
-        self.run_scan("--config", self.config(repos=("clean",)), "--scanner", "semgrep",
+        self.run_scan("--config", self.config(repos=("node-lodash",)), "--scanner", "semgrep",
                       env={"JOB_SECURITY_SCAN_SEMGREP_RULES": str(rules)})
         calls = (self.tmp / "semgrep.calls").read_text()
         self.assertIn(str(rules), calls)
@@ -486,6 +457,12 @@ class RunFolderTests(TempDirCase):
         r = self.run_scan("--config", self.config(), "--scanner", "nope")
         self.assertEqual(r.returncode, 1)
         self.assertEqual(run_dirs(self.ws), [])
+
+    def test_removed_scanner_and_host_flag_are_rejected(self):
+        for args in (("--scanner", "shai-hulud"), ("--host",)):
+            r = self.run_scan("--config", self.config(), *args)
+            self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
+            self.assertEqual(run_dirs(self.ws), [])
 
 
 SEV_CYCLE = ("CRITICAL", "HIGH", "MEDIUM", "LOW")

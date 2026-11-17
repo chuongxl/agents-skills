@@ -101,7 +101,7 @@ security-run-20261102-153600/
 ├── findings/              # every finding, in compact JSON shards
 ├── security-report.html   # interactive report
 ├── .gitignore             # "*" - never committed by accident
-└── <repo-name>/           # raw tool output: gitleaks.json, trivy.json, semgrep.json, osv.json, shai-hulud.json ...
+└── <repo-name>/           # raw tool output: gitleaks.json, trivy.json, semgrep.json, osv.json ...
 ```
 
 Secrets are reported with file and line only, never the value. The skill only reports — it never changes code.
@@ -176,27 +176,7 @@ hosts it names); set `JOB_SECURITY_SCAN_VERIFY_SECRETS=1` on repos you trust:
 
 **Output:** `trufflehog.json` with verified/unverified status (everything is `unverified` unless verification is on)
 
-### 7. Shai-Hulud — Supply-Chain Worm Check (repo and laptop)
-
-A fast, offline answer to "were we hit by the Shai-Hulud npm/PyPI worm?":
-- **Affected** (CRITICAL): a known compromised release (lockfiles, `node_modules`, PyPI pins, global
-  installs, npm cache), the worm's payload/stager file in a package, a planted workflow or persistence
-  file, or a worm marker string
-- **Suspicious** (HIGH/MEDIUM): an install hook that reads credentials *and* sends data out, pipes a
-  download into a shell, runs heavily obfuscated code, or downloads `bun`/TruffleHog
-- **Laptop mode** (`--host`): projects under your home directory, global installs, the npm cache, and a
-  list of credential stores to rotate if affected (values are never read or printed)
-- Never runs npm/node/pip; benign hooks (`node-gyp`, `husky`, esbuild...) are allowlisted
-
-**Output:** `shai-hulud.json` per repo, `_host/shai-hulud.json` for this computer (report: "this machine").
-Every report has a **🪱 Shai-Hulud check** section: one row per repo and for this machine with the verdict
-(AFFECTED / SUSPICIOUS / CLEAN / ERROR / not run), what was checked (dependency files, packages, install hooks,
-workflows; projects, global installs and npm cache for the host), the indicator data version and a link to the raw
-output, so a clean result can be checked and a failed check is never silent.
-Indicator data and sources: [references/ioc-data.md](references/ioc-data.md). If affected:
-[references/remediation.md](references/remediation.md#-shai-hulud-if-affected).
-
-### 8. Independent Verification, Run-to-Run Changes, Report Schema
+### 7. Independent Verification, Run-to-Run Changes, Report Schema
 
 - **Verification (agent step, Phase 9):** `scripts/triage.py queue` lists the findings to check (`standard`:
   CRITICAL + HIGH, `deep`: also MEDIUM) with a redacted ±15-line context, one item per root cause (same advisory
@@ -212,7 +192,7 @@ Indicator data and sources: [references/ioc-data.md](references/ioc-data.md). If
   ([assets/report.schema.json](assets/report.schema.json)); `python3 -I scripts/validate-report.py <run>` checks
   the index and every shard (exit 0 valid, 1 invalid, 2 unreadable). v2 single-file reports are still read.
 
-### 9. Deep Audit — Logic Flaws Scanners Miss (opt-in, Phase 10)
+### 8. Deep Audit — Logic Flaws Scanners Miss (opt-in, Phase 10)
 
 Scanners match known-bad patterns. They cannot see that one route checks the note's owner and its
 sibling does not, that a tenant ID comes from the request body, or that a CI workflow runs pull-request code
@@ -244,7 +224,7 @@ need `JOB_SECURITY_SCAN_AUDIT_EXEC=1` and run only through `scripts/audit-sandbo
 no network, read-only filesystem except scratch, empty environment, resource limits — it refuses to run
 if any control is missing).
 
-### 10. Baseline (accepted findings)
+### 9. Baseline (accepted findings)
 
 Known, accepted findings go in `security-baseline.json` next to `repository.md` (or `--baseline FILE`):
 `{"version": 1, "entries": [{"fingerprint": "<16 hex from security-report.json>", "reason": "...",
@@ -379,33 +359,10 @@ bash job-security-scan/scripts/run-scan.sh --repo backend-api
 bash job-security-scan/scripts/run-scan.sh --scanner semgrep
 ```
 
-### Example 5: Was This Repo or Laptop Hit by Shai-Hulud?
+### Example 5: Fast PR Check and Deep Audit
 
 ```bash
-# This computer only (no repository.md needed)
-bash job-security-scan/scripts/run-scan.sh --host
-
-# Every configured repo plus this computer
-bash job-security-scan/scripts/run-scan.sh --scanner shai-hulud --host
-
-# Standalone, any folder; exit 0 clean, 1 suspicious, 2 affected
-python3 -I job-security-scan/scripts/shai-hulud-scan.py --repo ./my-service
-
-# Refresh indicators from the published lists (optional; used automatically)
-python3 -I job-security-scan/scripts/fetch-iocs.py --out ~/.cache/job-security-scan/ioc
-```
-
-In CI, add a step before `npm ci` so a compromised release fails the build before its install hook runs:
-
-```yaml
-- name: Shai-Hulud check
-  run: python3 -I .github/skills/job-security-scan/scripts/shai-hulud-scan.py --repo . --format text
-```
-
-### Example 6: Fast PR Check and Deep Audit
-
-```bash
-# Only files changed since main; Gitleaks on the working tree, OSV, Shai-Hulud; no verification queue
+# Only files changed since main; Gitleaks on the working tree, OSV; no verification queue
 bash job-security-scan/scripts/run-scan.sh --profile quick --since origin/main
 
 # Scanners plus the deep audit of changed code only
@@ -490,13 +447,16 @@ in the summary is the work left; pending findings are not clean.
 
 ## Version History
 
-- **v3.3.0** (current) — Security review follow-up: every tool must report its pinned version (Homebrew
+- **v4.0.1** — Version metadata update.
+- **v4.0.0** — Removed the dedicated worm detector, host mode, and its report section.
+
+- **v3.3.0** — Security review follow-up: every tool must report its pinned version (Homebrew
   and pre-installed binaries included; malicious Trivy 0.69.4-0.69.6 refused at install and at scan time);
   Linux downloads are checked against `assets/tool-checksums.txt`, not a checksum file from the same release;
   Semgrep installs from a hash-locked set and runs with `--metrics=off`; TruffleHog live verification is opt-in
   (`JOB_SECURITY_SCAN_VERIFY_SECRETS=1`); `--repo` is validated; git runs on scanned repos with the repo's own
   config overridden (`scripts/lib/safegit.py`); the audit sandbox hides `$HOME` credentials, `/run` and other
-  local sockets; verifier prompts treat repo text as data and verifiers cannot reject secret/worm findings; the
+  local sockets; verifier prompts treat repo text as data and verifiers cannot reject secret findings; the
   CI template runs the base-commit skill and skips forks; indicator caches only add to the committed set; Semgrep
   and Trivy secret matches are blanked in raw output and the run folder is `umask 077`; the image probe pulls
   Docker Hub official images only unless allowed
@@ -519,14 +479,11 @@ in the summary is the work left; pending findings are not clean.
   validators, optional sandbox and evidence promotion; confirmed audit findings join the report as verified
   findings; baseline of accepted findings (`security-baseline.json`); commit and dirty flag per repo
   (`run-metadata.json`); a semgrep run that writes no output is reported as not scanned instead of clean
-- **v2.6** — Shai-Hulud check section in every report (per-target verdict, what was checked,
-  indicator version, raw-output link, error / not-run states); the scanner records what it checked
 - **v2.5** — Independent verification of findings (confirmed / needs validation / dismissed, calibrated
   severity, `triage.py`), changes since the last run (fingerprints, fixed list, carried verdicts), `--profile`
   and `--since`, report schema v2 with `validate-report.py`; ideas adapted from Cloudflare's security-audit skill (MIT)
 - **v2.4** — Security hardening of the skill itself: pinned and checksum-verified tool installs, SHA-pinned CI actions (template moved off hijacked `trivy-action` tags), config/repo-name injection fixed, secret values stripped from raw output, opt-in sandboxed image probe, verified TruffleHog secrets fail the scan
 - **v2.3** — Per-run `security-run-<datetime>/` folder with Markdown, JSON and HTML reports; every finding located to file, line and code; caches moved out of the workspace; report-only rule
-- **v2.2** — Shai-Hulud supply-chain worm check (`--scanner shai-hulud`, `--host` laptop mode)
 - **v2.1** — Runtime and image checks
 - **v2.0** — Multi-tool unified pipeline, config-driven, zero-install for free tools
 - **v1.0** — Gitleaks-only security scan

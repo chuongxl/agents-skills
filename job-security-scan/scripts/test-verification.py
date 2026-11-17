@@ -234,6 +234,15 @@ class ChangesTests(unittest.TestCase):
         cur = build([finding()], previous=prev, scanners=["semgrep"], coverage={"api": ["semgrep"]})
         self.assertEqual(cur["fixed"], [])
 
+    def test_removed_scanner_findings_are_not_marked_fixed(self):
+        import report_schema
+        prev = build([finding(scanner="shai-hulud", type="supply-chain")],
+                     coverage={"api": ["shai-hulud"]})
+        prev["shai_hulud"] = {"ran": True, "ioc_version": "old", "targets": []}
+        self.assertEqual(report_schema.validate(prev), [])
+        cur = build([], previous=prev, coverage={"api": ["semgrep"]})
+        self.assertEqual(cur["fixed"], [])
+
     def test_repo_not_scanned_now_is_not_fixed(self):
         prev = build([finding(), finding(repo="web")], repos=["api", "web"],
                      coverage={"api": ["semgrep"], "web": ["semgrep"]})
@@ -491,7 +500,6 @@ class ProfileTests(TempDirCase):
         self.assertIn("--no-git", self.calls())
         self.assertNotIn("trivy", self.calls())
         self.assertIn("[osv]", out)
-        self.assertIn("[shai-hulud]", out)
         self.assertNotIn("[semgrep]", out)
         doc = self.report(run_dir)
         self.assertEqual((doc["run"]["profile"], doc["verification"]["queued"]), ("quick", 0))
