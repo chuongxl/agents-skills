@@ -46,6 +46,18 @@ all three host agents (GitHub Copilot, Claude Code, OpenCode).
 | T39 | Project checks gate | Review returns `pass`; a repo test/lint/typecheck/build check fails | Reach Stage 03 R2c | Failure routes to R6 then R1 (no exit, no question); a failure that also fails at `BASE_SHA` is `pre-existing` and does not block; unrunnable checks are `skipped`; Stage 04 loads only after all checks pass or none are detected | Both |
 | T40 | PR body quality | Stage 06 PR step, verification passed | Open or reuse the PR | Body has Why, What changed, Quality evidence (review status, checks, criteria table), Authorization; an existing PR gets its body refreshed, not duplicated | Both |
 | T41 | PR base | Feature branch cut from `develop`, repo default is `main`, `develop` is on origin | Reach Stage 06 PR step | PR targets `develop`; with `develop` absent on origin it targets the default branch | Both |
+| PF01 | Required PR inputs | Missing `--pr-fix` URL or empty fix request | Start pipeline | Stop with actionable error before worktree or file changes | Both |
+| PF02 | Open fork PR | Open PR has a head in a fork | Start PR fix | Resolve and verify the actual head repository and writable destination; if unavailable stop without guessing | Both |
+| PF03 | Closed PR | PR is closed or merged | Start PR fix | Stop without modifying the checkout or creating a PR | Both |
+| PF04 | Relevant spec | PR changes identify one relevant existing spec; fix does not change requirements | Run PR fix | Reuse the spec; review the full PR and fix against it without generating a new feature | Both |
+| PF05 | Changed requirements | Existing spec matches PR; request changes its requirements | Run PR fix | Update that spec and dependent artifacts through the configured provider and preserve approvals | Both |
+| PF06 | No relevant spec | No matching spec exists | Run PR fix | Review the PR diff and request directly; never invent a spec or claim a spec-based review passed | Both |
+| PF07 | Concurrent update | Another clone advances the PR head during the run | Reach a push | Never force push or discard commits; stop if the current remote head is not an ancestor of local HEAD | Both |
+| PF08 | Push denied | Remote rejects a required push | Finish PR fix | Emit `run_failed` with `git_error`; never emit completion or create another PR | Both |
+| PF09 | Existing dirty changes | Supplied worktree has unrelated edits | Run PR fix | Preserve them, never stage them; stop if edits cannot be separated safely | Both |
+| PF10 | Existing format failure | Full format check fails before the run on unrelated files | Run changed-file and full checks | Changed files must pass; classify a full-check failure as pre-existing only after reproducing at baseline | Both |
+| PF11 | Verification and gates | Repeat with default/YOLO and verification enabled/disabled/unavailable | Run PR fix | Preserve applicable approval and verification behavior, record actual review/check outcomes, update only the existing PR | Both |
+| PF12 | Provider config in source checkout | Fresh supplied worktree has no `.speckit/integration.json`; primary checkout has a valid config | Run PR fix from the supplied worktree | Resolve the existing provider from the primary checkout before intake, then mirror config without overwriting | Both |
 
 ## Host-specific checks
 

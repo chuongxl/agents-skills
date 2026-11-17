@@ -8,6 +8,11 @@ shared JSON stdin invocation, not on context-only resume. Emit
 `{type: "stage_finished", stage: "05-verification"}` at the handoff (step 5), including when the
 stage is skipped.
 
+For `--pr-fix`, apply the same opt-in, mode, retry, cleanup and approval rules. When there is no
+matching spec, pass the PR description, fix request and actual changed paths in place of spec/plan
+to the verification skill, and assess evidence against the requested behavior rather than
+inventing spec criteria. Report unavailable or unexercised behavior honestly.
+
 ## 1. Read the opt-in
 
 Read `verification` (and, in `--yolo`, `verification_yolo`) from the mirrored
@@ -133,8 +138,8 @@ anything launched; trouble is a warning), then:
 1. Cleanup already ran above; confirm nothing launched is still running.
 2. Emit `run_failed` with `reason.code: "crashed"` (a one-line, composed message — never raw tool
    output) before reporting. On an event write error, stop and never emit `run_completed`.
-3. Report the exact error, and tell the user: the implementation is already committed and pushed
-   (Stage 04), but the spec is not marked completed and no PR was opened. They can fix the
+3. Report the exact error, and tell the user: the implementation is committed; feature runs pushed
+   it in Stage 04, while PR-fix runs have not pushed it. No spec was marked completed or new PR opened. They can fix the
    problem and re-run, or disable verification via `/speckit-auto --integration <value>` and
    re-run.
 

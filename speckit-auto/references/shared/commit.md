@@ -14,6 +14,23 @@ completion). The procedure is identical; only the commit message source differs:
 
 `artifact_id` is always defined: the Jira issue key in `--issue` runs, otherwise the artifact
 folder's prefix-slug (e.g. `007-user-export`). Never emit a literal `<issue_id>` placeholder.
+For a PR fix use the PR number as the message scope; no artifact folder is required.
+
+## Existing PR push (`--pr-fix` only)
+
+The staging and conditional-commit rules still apply, but stage only paths created or changed by
+this run; never stage an initial dirty or staged path. If an initial path cannot be separated
+safely, stop with `policy_blocked`. At Stage 02, Stage 04 and the Stage 06 verification-artifact
+commit, commit locally and **defer the push**. Stage 06 performs the only required push after its
+authorization gate. This replaces Branch Sync + Push below; never pull, rebase or force-push.
+
+Immediately before that push, re-query the open PR and verify its head repository and ref still
+match intake. Fetch that exact head into a private temporary ref, confirm the fetched SHA matches
+the API head, and require it to be an ancestor of local HEAD. If it is not, stop with `git_error`;
+do not overwrite remote work. Push `HEAD` to `refs/heads/<pr_head_branch>` at the authenticated
+resolved head-repository URL using an ordinary non-force push, then fetch again and verify its
+SHA equals local HEAD. A concurrent update or rejected push is a terminal `git_error`, never a
+success. Use argument-vector commands and do not print authenticated URLs or credentials.
 
 ## Conditional Commit (Critical)
 

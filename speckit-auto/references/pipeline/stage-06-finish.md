@@ -5,6 +5,22 @@ Load right after Stage 05 hands off (whether it ran or was skipped). Final stage
 At actual entry or re-entry emit `{type: "stage_started", stage: "06-finish"}` using the shared
 JSON stdin invocation, not on context-only resume.
 
+## Existing PR routing (`--pr-fix` only)
+
+This section replaces steps 3–4 and the feature-specific final report below. Perform cleanup and
+commit verification artifacts as in steps 1–2, scoped to this run. Never mark an unrelated spec
+completed. Default mode asks the existing `pr-publish` gate to authorize updating the resolved
+existing PR head, showing its URL, repository, branch and commits; declining stops without a
+push or completion event and emits `run_failed` with `policy_blocked`. Bracket the ask with the
+normal `pr-publish` gate events. YOLO authorizes the update without a wait. Never call `gh pr create`
+or fan out new PRs in this mode.
+
+Push using the PR-specific procedure in shared/commit.md. Verify the resolved remote head equals
+the intended local HEAD after the push, including a no-change run. On failure emit `run_failed`
+as directed there and do not emit completion. Report the existing PR URL, actual review type,
+checks, verification outcome and pushed SHA; distinguish a verified no-change result. Emit
+`stage_finished` then `run_completed` only after the required push verification succeeds.
+
 ## 1. Clean (only if Stage 05 launched something)
 
 If Stage 05 was skipped, go straight to step 2. Otherwise, run the generated `verify-<app>`
