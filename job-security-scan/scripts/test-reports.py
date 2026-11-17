@@ -9,6 +9,9 @@ No network and no scanner binaries (scanners are stubbed on PATH). Stdlib only; 
 import json
 import os
 import shutil
+
+# Windows CreateProcess finds System32\bash.exe (the WSL launcher) before PATH; resolve Git Bash explicitly.
+BASH = shutil.which("bash") or "bash"
 import subprocess
 import sys
 import tempfile
@@ -388,7 +391,7 @@ class RunFolderTests(TempDirCase):
             e["SECURITY_RUN_ROOT"] = str(self.ws)
         e.update(env or {})
         (self.tmp / "home").mkdir(exist_ok=True)
-        return subprocess.run(["bash", str(RUN_SCAN)] + [str(a) for a in args], stdout=subprocess.PIPE,
+        return subprocess.run([BASH, str(RUN_SCAN)] + [str(a) for a in args], stdout=subprocess.PIPE,
                               stderr=subprocess.PIPE, universal_newlines=True, cwd=str(self.ws), env=e)
 
     def test_run_folder_with_three_reports_and_raw(self):
@@ -405,7 +408,7 @@ class RunFolderTests(TempDirCase):
         hit = [f for f in doc["findings"] if f["rule_id"] == "known-package"][0]
         self.assertEqual((hit["file"], hit["line"]), ("package-lock.json", 6))
         self.assertIn("node_modules/@accordproject/concerto-linter", hit["code"])
-        self.assertIn("Run folder: %s" % runs[0], r.stdout)
+        self.assertIn("Run folder: %s" % str(runs[0]).replace("\\", "/"), r.stdout.replace("\\", "/"))
 
     def test_workspace_has_only_run_folder(self):
         r = self.run_scan("--config", self.config(), "--scanner", "shai-hulud", run_root=False)

@@ -46,7 +46,7 @@ import report_shaihulud  # noqa: E402
 
 def parse_config(config_path):
     """Parse repository.md frontmatter into a dict."""
-    text = Path(config_path).read_text()
+    text = Path(config_path).read_text(encoding="utf-8")
     match = re.match(r"^---\n(.*?)\n---", text, re.DOTALL)
     if not match:
         return {}
@@ -74,7 +74,7 @@ def parse_trivy(repo, results_dir, workspace):
         return findings
 
     try:
-        data = json.loads(json_path.read_text())
+        data = json.loads(json_path.read_text(encoding="utf-8"))
     except Exception:
         return findings
 
@@ -146,7 +146,7 @@ def parse_gitleaks(repo, results_dir, workspace):
     if not json_path.exists():
         return findings
     try:
-        data = json.loads(json_path.read_text())
+        data = json.loads(json_path.read_text(encoding="utf-8"))
         if not isinstance(data, list):
             return findings
     except Exception:
@@ -184,7 +184,7 @@ def parse_semgrep(repo, results_dir, workspace):
     if not json_path.exists():
         return findings
     try:
-        data = json.loads(json_path.read_text())
+        data = json.loads(json_path.read_text(encoding="utf-8"))
     except Exception:
         return findings
 
@@ -220,7 +220,7 @@ def parse_hadolint(repo, results_dir, workspace):
 
     pattern = re.compile(r"^(.+?):(\d+)\s+(DL\d+|SC\d+)\s+(\w+):\s+(.+)$")
     sev_map = {"error": "HIGH", "warning": "MEDIUM", "info": "LOW", "style": "LOW"}
-    for line in txt_path.read_text().splitlines():
+    for line in txt_path.read_text(encoding="utf-8").splitlines():
         m = pattern.match(line.strip())
         if m:
             filepath, lineno, rule_id, level, message = m.groups()
@@ -294,7 +294,7 @@ def parse_osv(repo, results_dir, workspace):
     if not json_path.exists():
         return findings
     try:
-        data = json.loads(json_path.read_text())
+        data = json.loads(json_path.read_text(encoding="utf-8"))
     except Exception:
         return findings
 
@@ -331,7 +331,7 @@ def parse_trufflehog(repo, results_dir, workspace):
     if not json_path.exists():
         return findings
 
-    for raw_line in json_path.read_text().splitlines():
+    for raw_line in json_path.read_text(encoding="utf-8").splitlines():
         raw_line = raw_line.strip()
         if not raw_line:
             continue
@@ -369,7 +369,7 @@ def parse_advisories(repo, results_dir, workspace):
     if not json_path.exists():
         return findings
     try:
-        data = json.loads(json_path.read_text())
+        data = json.loads(json_path.read_text(encoding="utf-8"))
     except Exception:
         return findings
     labels = {
@@ -426,7 +426,7 @@ def parse_shai_hulud(repo, results_dir, workspace):
     if not json_path.exists():
         return findings
     try:
-        data = json.loads(json_path.read_text())
+        data = json.loads(json_path.read_text(encoding="utf-8"))
     except Exception:
         return findings
     tier_label = {"affected": "AFFECTED", "suspicious": "Suspicious", "exposure": "Rotate if affected"}
@@ -506,6 +506,9 @@ def file_link(finding, org, repo_name):
     # Absolute path for vscode:// link
     abs_path = os.path.join(workspace, repo_name, f) if not os.path.isabs(f) else f
 
+    abs_path = abs_path.replace("\\", "/")           # Windows: vscode://file/C:/Users/... (forward slashes, leading /)
+    if not abs_path.startswith("/"):
+        abs_path = "/" + abs_path
     if line:
         vscode_url = f"vscode://file{abs_path}:{line}"
         label = html.escape(f"{f}:{line}")
@@ -532,6 +535,10 @@ def cve_link(rule_id, url):
 # ─── HTML Template ────────────────────────────────────────────────────────────
 # CSS and JS now live in assets/report-template.html — edit that file to
 # customise the report's look & feel without touching Python.
+
+for _s in (sys.stdout, sys.stderr):   # Windows consoles default to a legacy code page; reports print emoji
+    if hasattr(_s, "reconfigure"):   # (also reached when triage.py imports this module)
+        _s.reconfigure(encoding="utf-8", errors="replace")
 
 SCRIPT_DIR    = Path(__file__).parent.resolve()
 TEMPLATE_PATH = SCRIPT_DIR.parent / "assets" / "report-template.html"

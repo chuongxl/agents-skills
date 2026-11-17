@@ -57,6 +57,9 @@ def changed(path, ref):
 
 
 def main(argv=None):
+    for _s in (sys.stdout, sys.stderr):   # Windows consoles default to a legacy code page; the output has emoji
+        if hasattr(_s, "reconfigure"):
+            _s.reconfigure(encoding="utf-8", errors="replace")
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--since", required=True)
     ap.add_argument("--repos-root", required=True)

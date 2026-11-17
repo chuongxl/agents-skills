@@ -71,8 +71,11 @@ if [[ -n "$REPO_FILTER" && ! "$REPO_FILTER" =~ ^[A-Za-z0-9_][A-Za-z0-9._-]{0,99}
   exit 1
 fi
 
+_HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+. "$_HERE/lib/find-python.sh"   # sets PY; defines py() and abs_dir()
+
 # ─── Locate skill root & config ────────────────────────────────────────────
-SKILL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+SKILL_DIR="$(abs_dir "$(dirname "${BASH_SOURCE[0]}")/..")"
 
 if [[ -z "$CONFIG_PATH" ]]; then
   CONFIG_PATH="$SKILL_DIR/assets/repository.md"
@@ -85,12 +88,12 @@ if [[ ! -f "$CONFIG_PATH" ]]; then
 fi
 
 # ─── Load config ──────────────────────────────────────────────────────────
-CONFIG_SH="$(python3 -I "$SKILL_DIR/scripts/parse-config.py" "$CONFIG_PATH")" || { echo "❌ Invalid config: $CONFIG_PATH"; exit 1; }
+CONFIG_SH="$(py "$SKILL_DIR/scripts/parse-config.py" "$CONFIG_PATH")" || { echo "❌ Invalid config: $CONFIG_PATH"; exit 1; }
 eval "$CONFIG_SH"   # values are shell-quoted by parse-config.py
 
 WORKSPACE="${MONOREPO_ROOT:-.}"
 # Shared caches (vendor advisories, refreshed Shai-Hulud indicators) - never in the workspace by default.
-CACHE_BASE="${JOB_SECURITY_SCAN_CACHE:-${CACHE_DIR:-${OUTPUT_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/job-security-scan}}}"
+CACHE_BASE="$(native_path "${JOB_SECURITY_SCAN_CACHE:-${CACHE_DIR:-${OUTPUT_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/job-security-scan}}}")"
 # The run folder is created in MAIN, once the arguments are known to be valid.
 OUTPUT_BASE=""
 
@@ -108,7 +111,7 @@ fi
 
 # A scanned repo may carry its own .git/config (core.fsmonitor, sshCommand, pager ...). Force safe values through
 # the environment so every git process we or the scanners start ignores them (scripts/lib/safegit.py).
-while IFS='=' read -r _k _v; do export "$_k=$_v"; done < <(python3 -I -c '
+while IFS='=' read -r _k _v; do export "$_k=$_v"; done < <(py -c '
 import os, sys
 sys.path.insert(0, sys.argv[1])
 import safegit
@@ -155,7 +158,7 @@ osv_out_flag() {
 
 # Ecosystem detection (descriptors in ecosystems/*.json).
 detect_cached() {  # detect_cached <path> <format>  -> prints detection output
-  python3 -I "$SKILL_DIR/scripts/detect-ecosystems.py" "$1" --format "$2" \
+  py "$SKILL_DIR/scripts/detect-ecosystems.py" "$1" --format "$2" \
     || echo "  ⚠️  ecosystem detection failed for $1 (see error above) - results may be incomplete" >&2
 }
 
@@ -191,10 +194,10 @@ run_gitleaks() {
     return
   fi
   local count
-  count=$(python3 -I -c 'import json, sys; print(len(json.load(open(sys.argv[1]))))' "$out" 2>/dev/null)
+  count=$(py -c 'import json, sys; print(len(json.load(open(sys.argv[1], encoding="utf-8"))))' "$out" 2>/dev/null)
   if [[ -z "$count" ]]; then
     rm -f "$out"
-    _fail gitleaks "$repo" "scanner error (exit $rc), no report written: $(sed -e 's/\x1b\[[0-9;]*m//g' "$err" | grep -m1 -E 'FTL|ERR|fatal' | cut -c1-200) - see $err"
+    _fail gitleaks "$repo" "scanner error (exit $rc), no report written: $(sed -e $'s/\033\\[[0-9;]*m//g' "$err" | grep -m1 -E 'FTL|ERR|fatal' | cut -c1-200) - see $err"
   else
     _fail gitleaks "$repo" "$count secret(s) — see $out (values masked in report)"
   fi
@@ -247,7 +250,7 @@ run_trivy() {
     --no-progress --quiet \
     2>/dev/null || true
 
-  [[ -s "$out_json" ]] && { python3 -I "$SKILL_DIR/scripts/lib/sanitize.py" trivy "$out_json" >/dev/null 2>&1 || : > "$out_json"; }
+  [[ -s "$out_json" ]] && { py "$SKILL_DIR/scripts/lib/sanitize.py" trivy "$out_json" >/dev/null 2>&1 || : > "$out_json"; }
 
   local crits highs
   crits=$(grep -c "CRITICAL" "$out_table" 2>/dev/null || true)
@@ -298,11 +301,11 @@ run_semgrep() {
     "$path" 2>"$OUTPUT_BASE/$repo/semgrep.err" || true
 
   # Secret-rule matches carry the secret itself in extra.lines/metavars: blank them before the file stays on disk.
-  [[ -s "$out" ]] && { python3 -I "$SKILL_DIR/scripts/lib/sanitize.py" semgrep "$out" >/dev/null 2>&1 || rm -f "$out"; }
+  [[ -s "$out" ]] && { py "$SKILL_DIR/scripts/lib/sanitize.py" semgrep "$out" >/dev/null 2>&1 || rm -f "$out"; }
 
   local count
-  count=$(python3 -I -c \
-    'import json, sys; d=json.load(open(sys.argv[1])); print(len(d.get("results",[])))' "$out" \
+  count=$(py -c \
+    'import json, sys; d=json.load(open(sys.argv[1], encoding="utf-8")); print(len(d.get("results",[])))' "$out" \
     2>/dev/null || echo "x")
 
   # No readable output means semgrep did not run (e.g. registry rulesets unreachable) - never report that as clean.
@@ -365,8 +368,8 @@ run_osv() {
   fi
 
   local count
-  count=$(python3 -I -c \
-    'import json, sys; d=json.load(open(sys.argv[1])); print(sum(len(r.get("packages",[])) for r in d.get("results",[])))' "$out" \
+  count=$(py -c \
+    'import json, sys; d=json.load(open(sys.argv[1], encoding="utf-8")); print(sum(len(r.get("packages",[])) for r in d.get("results",[])))' "$out" \
     2>/dev/null || echo 0)
 
   if [[ "$count" -eq 0 ]]; then
@@ -393,7 +396,7 @@ run_sbom() {
   if [[ ! -s "$sbom" ]]; then _warn sbom "$repo" "could not generate SBOM - see $OUTPUT_BASE/$repo/sbom.stderr"; return; fi
 
   local comps
-  comps=$(python3 -I -c 'import json, sys; print(len(json.load(open(sys.argv[1])).get("components",[])))' "$sbom" 2>/dev/null || echo 0)
+  comps=$(py -c 'import json, sys; print(len(json.load(open(sys.argv[1], encoding="utf-8")).get("components",[])))' "$sbom" 2>/dev/null || echo 0)
   if [[ "$comps" -eq 0 ]]; then _skip sbom "$repo" "SBOM has no components"; return; fi
 
   if ! has_tool osv-scanner; then _pass sbom "$repo" "SBOM written ($comps components) - osv-scanner missing, not matched"; return; fi
@@ -409,8 +412,8 @@ run_sbom() {
     _warn sbom "$repo" "SBOM match failed (exit $rc) - see $OUTPUT_BASE/$repo/osv-sbom.stderr"; return
   fi
   local count
-  count=$(python3 -I -c \
-    'import json, sys; d=json.load(open(sys.argv[1])); print(sum(len(r.get("packages",[])) for r in d.get("results",[])))' "$out" \
+  count=$(py -c \
+    'import json, sys; d=json.load(open(sys.argv[1], encoding="utf-8")); print(sum(len(r.get("packages",[])) for r in d.get("results",[])))' "$out" \
     2>/dev/null || echo 0)
   if [[ "$count" -eq 0 ]]; then
     _pass sbom "$repo" "SBOM ($comps components) - no OSV vulnerabilities"
@@ -427,7 +430,7 @@ fetch_advisories_once() {
   mkdir -p "$ADVISORY_CACHE"
   [[ -n "${ADVISORY_OFFLINE:-}" ]] && return   # use committed advisories only (tests, air-gapped runs)
   # Network trouble must not break the scan: committed advisories (assets/advisories) still apply.
-  python3 -I "$SKILL_DIR/scripts/fetch-advisories.py" --out "$ADVISORY_CACHE" \
+  py "$SKILL_DIR/scripts/fetch-advisories.py" --out "$ADVISORY_CACHE" \
     --only nodejs nextjs go cisa-kev endoflife ghsa \
     >"$OUTPUT_BASE/advisory-fetch.log" 2>&1 \
     || echo "  🟡 [advisories] some sources could not be fetched - see $OUTPUT_BASE/advisory-fetch.log"
@@ -446,7 +449,7 @@ run_advisories() {
   local probed="$OUTPUT_BASE/$repo/runtime-probe.json"
   rm -f "$probed"
   if [[ "${JOB_SECURITY_SCAN_PROBE_IMAGES:-}" == "1" ]]; then
-    python3 -I "$SKILL_DIR/scripts/probe-runtime.py" --repo "$path" --output "$probed" 2>&1 | sed 's/^/  /' || true
+    py "$SKILL_DIR/scripts/probe-runtime.py" --repo "$path" --output "$probed" 2>&1 | sed 's/^/  /' || true
   else
     echo "  [advisories] $repo: Dockerfile base images not probed (set JOB_SECURITY_SCAN_PROBE_IMAGES=1 to run them, sandboxed)"
   fi
@@ -458,16 +461,16 @@ run_advisories() {
   fi
 
   _log advisories "$repo" "Matching vendor and aggregator advisories..."
-  python3 -I "$SKILL_DIR/scripts/match.py" "${args[@]}" >"$OUTPUT_BASE/$repo/advisories.txt" 2>&1
+  py "$SKILL_DIR/scripts/match.py" "${args[@]}" >"$OUTPUT_BASE/$repo/advisories.txt" 2>&1
   local rc=$?
   if [[ $rc -ne 0 ]]; then
     _warn advisories "$repo" "advisory matching failed - see $OUTPUT_BASE/$repo/advisories.txt"; return
   fi
 
   local crit_high actionable
-  read -r crit_high actionable < <(python3 -I -c '
+  read -r crit_high actionable < <(py -c '
 import json, sys
-d = json.load(open(sys.argv[1]))
+d = json.load(open(sys.argv[1], encoding="utf-8"))
 act = [f for f in d["findings"] if f["state"] != "pending"]
 hard = ("affected", "affected-end-of-life", "end-of-life", "affected-if-condition-holds", "possibly-affected")
 print(sum(1 for f in act if f["state"] in hard and f["severity"] in ("critical", "high")), len(act))
@@ -501,7 +504,7 @@ run_trufflehog() {
     --json --no-update ${verify_args[@]+"${verify_args[@]}"} \
     2>/dev/null | grep -v "^$" > "$out" || true
   # TruffleHog has no redact flag: drop the secret values before the raw file stays in the run folder.
-  python3 -I "$SKILL_DIR/scripts/lib/sanitize.py" trufflehog "$out" >/dev/null 2>&1 || : > "$out"
+  py "$SKILL_DIR/scripts/lib/sanitize.py" trufflehog "$out" >/dev/null 2>&1 || : > "$out"
 
   local count verified
   # Use wc for total line count and tolerate grep's non-zero exit on zero matches.
@@ -540,7 +543,7 @@ run_shai_hulud() {
   local out="$OUTPUT_BASE/$repo/shai-hulud.json" txt="$OUTPUT_BASE/$repo/shai-hulud.txt"
   mkdir -p "$(dirname "$out")"
   _log shai-hulud "$repo" "Checking for Shai-Hulud worm indicators and install-hook behaviour..."
-  python3 -I "$SKILL_DIR/scripts/shai-hulud-scan.py" --repo "$path" --output "$out" --format text \
+  py "$SKILL_DIR/scripts/shai-hulud-scan.py" --repo "$path" --output "$out" --format text \
     ${IOC_ARGS[@]+"${IOC_ARGS[@]}"} >"$txt" 2>&1
   _shai_hulud_result "$repo" $? "$txt"
 }
@@ -551,7 +554,7 @@ run_shai_hulud_host() {
   echo ""
   echo "  ── this machine ($HOME) ──"
   _log shai-hulud "host" "Checking projects, global installs, npm cache and credential stores..."
-  python3 -I "$SKILL_DIR/scripts/shai-hulud-scan.py" --host --output "$out" --format text \
+  py "$SKILL_DIR/scripts/shai-hulud-scan.py" --host --output "$out" --format text \
     ${IOC_ARGS[@]+"${IOC_ARGS[@]}"} >"$txt" 2>&1
   _shai_hulud_result "host" $? "$txt"
 }
@@ -563,9 +566,9 @@ run_audit() {
   mkdir -p "$OUTPUT_BASE/$repo"
   _log audit "$repo" "Preparing deep audit (profile $PROFILE)..."
   local out rc
-  out=$(python3 -I "$SKILL_DIR/scripts/audit-prepare.py" --repo "$repo" --path "$path" \
+  out=$(py "$SKILL_DIR/scripts/audit-prepare.py" --repo "$repo" --path "$path" \
           --run-dir "$OUTPUT_BASE" --runs-root "$RUN_ROOT" --profile "$PROFILE" \
-          --since "$SINCE" --budget "$AUDIT_BUDGET" --config "$CONFIG_PATH" --workspace "$PWD" \
+          --since "$SINCE" --budget "$AUDIT_BUDGET" --config "$CONFIG_PATH" --workspace "$WORK_DIR" \
           ${BASELINE_PATH:+--baseline "$BASELINE_PATH"} 2>&1)
   rc=$?
   if [[ $rc -eq 0 ]]; then
@@ -654,9 +657,10 @@ if [[ -n "$SINCE" ]] && ! [[ "$SINCE" =~ ^[A-Za-z0-9._/~^@{}+-]{1,200}$ && "$SIN
 fi
 
 # One self-contained folder per run, in the workspace folder; never overwrite an earlier run.
-RUN_ROOT="${SECURITY_RUN_ROOT:-$PWD}"
+WORK_DIR="$(abs_dir .)"   # the folder run-scan.sh was started from, in a form Python can open on Windows
+RUN_ROOT="${SECURITY_RUN_ROOT:-$WORK_DIR}"
 # Reports belong in the workspace, never inside the skill folder (which is copied/replaced on update).
-if [[ -z "${SECURITY_RUN_ROOT:-}" && ( "$PWD" == "$SKILL_DIR" || "$PWD" == "$SKILL_DIR"/* ) ]]; then
+if [[ -z "${SECURITY_RUN_ROOT:-}" && ( "$WORK_DIR" == "$SKILL_DIR" || "$WORK_DIR" == "$SKILL_DIR"/* ) ]]; then
   echo "❌ Run from the workspace folder, not from inside the skill folder ($SKILL_DIR)."
   exit 1
 fi
@@ -689,7 +693,7 @@ META_ARGS=()
 for repo in ${REPOS_TO_SCAN[@]+"${REPOS_TO_SCAN[@]}"}; do META_ARGS+=(--repo "$repo=$WORKSPACE/$repo"); done
 [[ $HOST_MODE -eq 1 ]] && META_ARGS+=(--host)
 [[ $AUDIT_MODE -eq 1 ]] && META_ARGS+=(--audit)
-python3 -I "$SKILL_DIR/scripts/write-run-metadata.py" --run-dir "$OUTPUT_BASE" --scanner "$SCANNER" \
+py "$SKILL_DIR/scripts/write-run-metadata.py" --run-dir "$OUTPUT_BASE" --scanner "$SCANNER" \
   --profile "$PROFILE" --since "$SINCE" --budget "$AUDIT_BUDGET" ${META_ARGS[@]+"${META_ARGS[@]}"} \
   2>/dev/null || echo "  ⚠️  could not write run-metadata.json"
 
@@ -719,21 +723,21 @@ generate_reports() {
   echo "  Generating reports..."
   local scope=()
   if [[ -n "$SINCE" ]]; then
-    python3 -I "$SKILL_DIR/scripts/changed-files.py" --since "$SINCE" --repos-root "$WORKSPACE" \
+    py "$SKILL_DIR/scripts/changed-files.py" --since "$SINCE" --repos-root "$WORKSPACE" \
       --out "$RUN_DIR/changed-files.json" ${REPOS_TO_SCAN[@]+"${REPOS_TO_SCAN[@]}"} \
       && scope=(--since "$SINCE" --changed-files "$RUN_DIR/changed-files.json") \
       || scope=(--since "$SINCE")
   fi
   local baseline_args=()
   [[ -n "$BASELINE_PATH" ]] && baseline_args=(--baseline "$BASELINE_PATH")
-  if python3 -I "$SKILL_DIR/scripts/generate-report.py" \
+  if py "$SKILL_DIR/scripts/generate-report.py" \
       --results-dir "$RUN_DIR" \
       --profile     "$PROFILE" \
       ${scope[@]+"${scope[@]}"} \
       ${baseline_args[@]+"${baseline_args[@]}"} \
       --out-dir     "$RUN_DIR" \
       --config      "$CONFIG_PATH" \
-      --workspace   "$PWD" \
+      --workspace   "$WORK_DIR" \
       --repos-root  "$WORKSPACE" \
       --home        "$HOME" \
       >"$RUN_DIR/report.log" 2>&1; then
@@ -751,7 +755,7 @@ generate_reports
 
 # A baseline can only lower a failing exit: if every CRITICAL/HIGH finding is accepted, report a warning.
 if [[ -n "$BASELINE_PATH" && $GLOBAL_EXIT -eq 2 && -f "$RUN_DIR/security-report.json" ]]; then
-  open_ch=$(python3 -I -c 'import json,sys; c=json.load(open(sys.argv[1]))["counts"]; print(c["CRITICAL"]+c["HIGH"])' \
+  open_ch=$(py -c 'import json,sys; c=json.load(open(sys.argv[1], encoding="utf-8"))["counts"]; print(c["CRITICAL"]+c["HIGH"])' \
             "$RUN_DIR/security-report.json" 2>/dev/null || echo "x")
   if [[ "$open_ch" == "0" ]]; then
     echo "  🤝 Every CRITICAL/HIGH finding is accepted in the baseline - exit downgraded to warning"

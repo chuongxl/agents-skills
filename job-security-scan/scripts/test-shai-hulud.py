@@ -11,6 +11,9 @@ Stdlib only; Python 3.8+.
 import json
 import os
 import shutil
+
+# Windows CreateProcess finds System32\bash.exe (the WSL launcher) before PATH; resolve Git Bash explicitly.
+BASH = shutil.which("bash") or "bash"
 import stat
 import subprocess
 import sys
@@ -110,7 +113,8 @@ class TempDirCase(unittest.TestCase):
     def put(self, rel, text):
         p = self.tmp / rel
         p.parent.mkdir(parents=True, exist_ok=True)
-        p.write_text(text)
+        with open(str(p), "w", encoding="utf-8", newline="\n") as fh:   # byte-exact: hashes are compared
+            fh.write(text)
         return p
 
 
@@ -190,7 +194,7 @@ class InventoryTests(TempDirCase):
 
     def test_iter_manifests_includes_root_and_installed(self):
         from shaihulud import inventory
-        found = sorted(str(p.relative_to(FIX / "infected-node-modules")) for p, _ in
+        found = sorted(p.relative_to(FIX / "infected-node-modules").as_posix() for p, _ in
                        inventory.iter_manifests(FIX / "infected-node-modules"))
         self.assertEqual(found, [".", "node_modules/@accordproject/concerto-linter"])
 
@@ -455,6 +459,7 @@ class HostTests(TempDirCase):
         found = host.scan_host(roots or [home], home, ioc, iocs.load_allowlist(), max_depth=max_depth)
         return findings.to_document("host", str(home), ioc.version, found)
 
+    @unittest.skipIf(os.name == "nt", "file-mode checks are POSIX-only (skipped by the scanner on Windows)")
     def test_infected_home(self):
         home = self.build_infected_home()
         doc = self.host_scan(home)
@@ -590,7 +595,7 @@ class IntegrationTests(TempDirCase):
     def run_scan(self, *args, env=None):
         e = dict(os.environ, JOB_SECURITY_SCAN_CACHE=str(self.tmp / "cache"))
         e.update(env or {})
-        return subprocess.run(["bash", str(RUN_SCAN)] + [str(a) for a in args], stdout=subprocess.PIPE,
+        return subprocess.run([BASH, str(RUN_SCAN)] + [str(a) for a in args], stdout=subprocess.PIPE,
                               stderr=subprocess.PIPE, universal_newlines=True, cwd=str(self.tmp), env=e)
 
     def run_dir(self):

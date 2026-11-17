@@ -10,6 +10,9 @@ No network, no scanner binaries (docker is stubbed on PATH). Stdlib only; Python
 import json
 import os
 import shutil
+
+# Windows CreateProcess finds System32\bash.exe (the WSL launcher) before PATH; resolve Git Bash explicitly.
+BASH = shutil.which("bash") or "bash"
 import subprocess
 import sys
 import tempfile
@@ -61,7 +64,7 @@ class ConfigInjectionTests(TempDirCase):
         r = self.parse('---\nteam: %s\norg: $(touch %s/PWNED2)\nci-branches:\n  - "a`touch %s/PWNED3`"\n'
                        'repos:\n  - name: svc\n    active: true\n---\n' % (evil, self.tmp, self.tmp))
         self.assertEqual(r.returncode, 0, r.stderr)
-        sh = subprocess.run(["bash", "-c", 'eval "$1"; printf "%s" "$TEAM"', "_", r.stdout],
+        sh = subprocess.run([BASH, "-c", 'eval "$1"; printf "%s" "$TEAM"', "_", r.stdout],
                             stdout=subprocess.PIPE, universal_newlines=True)
         self.assertEqual(sh.stdout, evil.strip().strip('"').strip())  # the YAML reader trims outer quotes
         for f in ("PWNED", "PWNED2", "PWNED3"):
@@ -144,7 +147,7 @@ class InstallerVerificationTests(TempDirCase):
         import tarfile
         with tarfile.open(str(self.tmp / "releases" / "trufflehog_3.99.7_linux_amd64.tar.gz"), "w:gz") as tf:
             tf.add(str(self.tmp / "src" / "trivy"), arcname="trufflehog")
-        r = subprocess.run(["bash", str(SKILL_DIR / "scripts" / "install-tools.sh"), "--config", str(cfg)],
+        r = subprocess.run([BASH, str(SKILL_DIR / "scripts" / "install-tools.sh"), "--config", str(cfg)],
                            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True,
                            env=dict(os.environ, PATH=path, INSTALL_DIR=str(dest),
                                     JOB_SECURITY_SCAN_CHECKSUMS=str(self.tmp / "pinned.txt")))
@@ -240,6 +243,7 @@ class SecretLeakTests(TempDirCase):
         self.assertEqual(res["Secrets"][0]["StartLine"], 3)
         self.assertEqual(res["Vulnerabilities"][0]["VulnerabilityID"], "CVE-1")
 
+    @unittest.skipIf(os.name == "nt", "POSIX permission bits do not exist on Windows (NTFS ACLs on the user profile apply)")
     def test_run_folder_is_private(self):
         self.run_trufflehog_scan()
         run = sorted((self.tmp / "ws").glob("security-run-*"))[-1]
@@ -259,7 +263,7 @@ class SecretLeakTests(TempDirCase):
         (self.tmp / "ws").mkdir()
         env = dict(os.environ, PATH=str(bin_dir) + os.pathsep + os.environ["PATH"],
                    JOB_SECURITY_SCAN_CACHE=str(self.tmp / "c"), SECURITY_RUN_ROOT=str(self.tmp / "ws"))
-        r = subprocess.run(["bash", str(RUN_SCAN), "--config", str(cfg), "--scanner", "trufflehog"],
+        r = subprocess.run([BASH, str(RUN_SCAN), "--config", str(cfg), "--scanner", "trufflehog"],
                            stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True,
                            cwd=str(self.tmp / "ws"), env=env)
         self.assertEqual(r.returncode, 2, r.stdout + r.stderr)
@@ -282,7 +286,7 @@ class SecretLeakTests(TempDirCase):
                    JOB_SECURITY_SCAN_CACHE=str(self.tmp / "c"), SECURITY_RUN_ROOT=str(self.tmp / "ws"))
         env.pop("JOB_SECURITY_SCAN_VERIFY_SECRETS", None)
         env.update(extra_env)
-        subprocess.run(["bash", str(RUN_SCAN), "--config", str(cfg), "--scanner", "trufflehog"],
+        subprocess.run([BASH, str(RUN_SCAN), "--config", str(cfg), "--scanner", "trufflehog"],
                        stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True,
                        cwd=str(self.tmp / "ws"), env=env)
         return (self.tmp / "args.txt").read_text()
@@ -351,7 +355,7 @@ class ImageProbeTests(TempDirCase):
         (self.tmp / "ws").mkdir(exist_ok=True)
         cfg = self.put("repository.md", '---\nteam: t\norg: o\nmonorepo-root: "%s"\nrepos:\n'
                        '  - name: node-22-14-demo\n    active: true\n    has-dockerfile: true\n---\n' % FIX)
-        return subprocess.run(["bash", str(RUN_SCAN), "--config", str(cfg), "--scanner", "advisories"],
+        return subprocess.run([BASH, str(RUN_SCAN), "--config", str(cfg), "--scanner", "advisories"],
                               stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True,
                               cwd=str(self.tmp / "ws"), env=self.env(**env))
 
@@ -360,6 +364,7 @@ class ImageProbeTests(TempDirCase):
         self.assertFalse(self.calls.exists() and "docker run" in self.calls.read_text(), r.stdout)
         self.assertIn("JOB_SECURITY_SCAN_PROBE_IMAGES", r.stdout)
 
+    @unittest.skipIf(os.name == "nt", "the stub docker is a shell script; CreateProcess cannot run it without .exe")
     def test_opt_in_probe_is_sandboxed(self):
         self.run_scan(JOB_SECURITY_SCAN_PROBE_IMAGES="1")
         runs = [l for l in self.calls.read_text().splitlines() if l.startswith("docker run")]
@@ -376,7 +381,7 @@ class RepoArgumentTests(TempDirCase):
         (self.tmp / "ws").mkdir()
         env = dict(os.environ, JOB_SECURITY_SCAN_CACHE=str(self.tmp / "c"), SECURITY_RUN_ROOT=str(self.tmp / "ws"))
         for bad in ("../clean", "a/b", "..", "-x", ".git"):
-            r = subprocess.run(["bash", str(RUN_SCAN), "--config", str(cfg), "--scanner", "shai-hulud", "--repo", bad],
+            r = subprocess.run([BASH, str(RUN_SCAN), "--config", str(cfg), "--scanner", "shai-hulud", "--repo", bad],
                                stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True,
                                cwd=str(self.tmp / "ws"), env=env)
             self.assertEqual(r.returncode, 1, bad + r.stdout)
@@ -442,7 +447,7 @@ class VersionGateTests(TempDirCase):
                  INSTALL_DIR=str(self.tmp / "dest"))
         e.pop("JOB_SECURITY_SCAN_ALLOW_VERSION_DRIFT", None)
         e.update(env)
-        return subprocess.run(["bash", str(INSTALLER), "--config", str(cfg)], stdout=subprocess.PIPE,
+        return subprocess.run([BASH, str(INSTALLER), "--config", str(cfg)], stdout=subprocess.PIPE,
                               stderr=subprocess.STDOUT, universal_newlines=True, env=e).stdout
 
     def test_pinned_versions_pass(self):
@@ -471,7 +476,7 @@ class VersionGateTests(TempDirCase):
         (self.tmp / "ws").mkdir()
         env = dict(os.environ, PATH=str(self.tmp / "bin") + os.pathsep + os.environ["PATH"],
                    JOB_SECURITY_SCAN_CACHE=str(self.tmp / "c"), SECURITY_RUN_ROOT=str(self.tmp / "ws"))
-        r = subprocess.run(["bash", str(RUN_SCAN), "--config", str(cfg), "--scanner", "trivy"],
+        r = subprocess.run([BASH, str(RUN_SCAN), "--config", str(cfg), "--scanner", "trivy"],
                            stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True,
                            cwd=str(self.tmp / "ws"), env=env)
         self.assertFalse(ran.exists(), r.stdout)
@@ -491,6 +496,7 @@ class HostileGitConfigTests(TempDirCase):
         g("-c", "user.email=a@b", "-c", "user.name=n", "commit", "-q", "--allow-empty", "-m", "x")
         self.marker = self.tmp / "PWNED"
         cmd = "touch %s" % self.marker
+        cmd = cmd.replace("\\", "/")   # backslashes are escapes inside a git config string (Windows temp paths)
         with open(str(repo / ".git" / "config"), "a") as fh:
             fh.write('[core]\n\tfsmonitor = "%s; echo"\n\tsshCommand = "%s"\n\tpager = "%s"\n' % (cmd, cmd, cmd))
         (repo / "untracked.txt").write_text("x")
@@ -524,7 +530,7 @@ class HostileGitConfigTests(TempDirCase):
         (self.tmp / "ws").mkdir()
         env = dict(os.environ, PATH=str(bin_dir) + os.pathsep + os.environ["PATH"],
                    JOB_SECURITY_SCAN_CACHE=str(self.tmp / "c"), SECURITY_RUN_ROOT=str(self.tmp / "ws"))
-        subprocess.run(["bash", str(RUN_SCAN), "--config", str(cfg), "--scanner", "gitleaks"],
+        subprocess.run([BASH, str(RUN_SCAN), "--config", str(cfg), "--scanner", "gitleaks"],
                        stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=str(self.tmp / "ws"), env=env)
         text = out.read_text()
         self.assertIn("GIT_CONFIG_KEY_0=core.fsmonitor", text)

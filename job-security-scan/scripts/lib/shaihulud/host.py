@@ -73,7 +73,7 @@ def global_module_dirs(home):
         prefixes.append(os.environ["NPM_CONFIG_PREFIX"])
     npmrc = home / ".npmrc"
     try:
-        for line in npmrc.read_text(errors="replace").splitlines():
+        for line in npmrc.read_text(encoding="utf-8", errors="replace").splitlines():
             if line.strip().startswith("prefix") and "=" in line:
                 prefixes.append(os.path.expanduser(line.split("=", 1)[1].strip()))
     except OSError:
@@ -205,7 +205,7 @@ def credential_inventory(home, projects):
         evidence = "present"
         if path.name == ".npmrc" and path.parent == home:
             try:
-                evidence = "has auth token: %s" % ("yes" if _NPMRC_AUTH.search(path.read_text(errors="replace")) else "no")
+                evidence = "has auth token: %s" % ("yes" if _NPMRC_AUTH.search(path.read_text(encoding="utf-8", errors="replace")) else "no")
             except OSError:
                 evidence = "present (unreadable)"
         out.append(make_finding("exposure", "INFO", "credential-store", loc,

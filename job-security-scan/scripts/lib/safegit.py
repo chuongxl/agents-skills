@@ -59,7 +59,7 @@ def run(path, *args, **kw):
 def text(path, *args):
     """stdout of a successful git command, else None (git missing, timeout or non-zero exit)."""
     try:
-        r = run(path, *args, universal_newlines=True)
+        r = run(path, *args, encoding="utf-8", errors="replace")
     except (OSError, subprocess.TimeoutExpired):
         return None
     return r.stdout if r.returncode == 0 else None

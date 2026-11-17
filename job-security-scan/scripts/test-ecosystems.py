@@ -11,6 +11,9 @@ Stdlib only; Python 3.8+.
 import json
 import os
 import shutil
+
+# Windows CreateProcess finds System32\bash.exe (the WSL launcher) before PATH; resolve Git Bash explicitly.
+BASH = shutil.which("bash") or "bash"
 import subprocess
 import sys
 import tempfile
@@ -204,7 +207,7 @@ class ScannerWiringTests(unittest.TestCase):
 
     def scan(self, scanner):
         env = dict(os.environ, PATH=self.bin + os.pathsep + os.environ["PATH"])
-        r = subprocess.run(["bash", RUN_SCAN, "--config", self.config, "--scanner", scanner],
+        r = subprocess.run([BASH, RUN_SCAN, "--config", self.config, "--scanner", scanner],
                            capture_output=True, text=True, env=env, cwd=self.work)
         calls = open(self.calls).read() if os.path.exists(self.calls) else ""
         return r, calls

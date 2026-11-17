@@ -261,7 +261,7 @@ print(json.dumps(r))
 def self_test(args, scratch):
     py = shutil.which("python3")
     argv = build_argv(args, scratch, [py, "-I", "-c", SELF_TEST])
-    proc = subprocess.run(argv, capture_output=True, text=True, timeout=args.wall_seconds + 30)
+    proc = subprocess.run(argv, capture_output=True, encoding="utf-8", errors="replace", timeout=args.wall_seconds + 30)
     if proc.returncode != 0:
         sys.stderr.write(proc.stderr)
         return blocked("self-test could not run inside the sandbox (exit %d)" % proc.returncode)

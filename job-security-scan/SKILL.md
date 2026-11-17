@@ -14,13 +14,14 @@ compatibility: >
   Requires bash, git, Python 3.8+ (pre-installed on most systems — used
   only to parse repository.md, no pip packages needed). Security tools
   installed on first run at pinned versions: Homebrew (macOS) or SHA-256-verified
-  GitHub release downloads (Linux); nothing downloaded is piped into a shell.
+  GitHub release downloads (Linux, Windows x64 via Git Bash); nothing downloaded is piped into a shell.
+  Runs on macOS, Linux and Windows (Git Bash or WSL; Semgrep and the audit sandbox need Linux/WSL).
   Network access required for tool install and CVE DB download on first run.
   Subsequent runs use cached DB and installed binaries.
 license: MIT
 metadata:
   author: one-om-ddm-team
-  version: "3.3.1"
+  version: "3.4.0"
   config-file: assets/repository.md
 allowed-tools: bash glob grep view create edit
 ---
@@ -113,8 +114,25 @@ bash scripts/install-tools.sh
 
 Every tool is **pinned to an exact version** (Trivy `0.69.3`, the immutable release after the March 2026
 compromise; Gitleaks, TruffleHog, Hadolint, OSV-Scanner, Semgrep likewise) and on Linux each download is
-**checked against the release's SHA-256 sums** before it is installed. Nothing is piped into a shell.
-`INSTALL_DIR=~/.local/bin` installs without sudo. See "Security of the skill itself" below.
+**checked against the SHA-256 pinned in `assets/tool-checksums.txt`** before it is installed. Nothing is piped
+into a shell. Tools go to `~/.local/bin` by default (no sudo); set `INSTALL_DIR` to change it. See "Security of the skill itself" below.
+
+## Platforms
+
+| | macOS | Linux | Windows (Git Bash) | Windows (WSL) |
+|---|---|---|---|---|
+| `run-scan.sh`, reports, Shai-Hulud check | yes | yes | yes | yes (same as Linux) |
+| Tool install (`install-tools.sh`) | Homebrew | pinned release binaries | pinned release binaries (x64) | pinned release binaries |
+| Semgrep (SAST) | yes | yes | no native build: skipped, say so in the report | yes |
+| Deep audit, source-only (default) | yes | yes | yes | yes |
+| Deep audit sandboxed local checks | no | yes | no | yes |
+
+- Windows needs [Git for Windows](https://git-scm.com/download/win) (provides bash) and Python 3.8+; start the
+  scan from a Git Bash window. When in doubt, use WSL: it is a Linux environment and everything works.
+- `python3` is found automatically (`python3`, `python`, then `py`); set `PY=/path/to/python` to force one.
+  The command examples in this file say `python3`; use `python` where that name is not available.
+- Windows line endings never reach the scripts: `.gitattributes` pins `*.sh` and `*.py` to LF.
+- Skipped capabilities are reported as skipped (never as "clean"), so a Windows run is honest about what it covered.
 
 ## Phase 1 — Secret Detection (Gitleaks)
 

@@ -10,6 +10,9 @@ import copy
 import json
 import os
 import shutil
+
+# Windows CreateProcess finds System32\bash.exe (the WSL launcher) before PATH; resolve Git Bash explicitly.
+BASH = shutil.which("bash") or "bash"
 import subprocess
 import sys
 import tempfile
@@ -348,7 +351,7 @@ class GenerateChangesTests(TempDirCase):
         f = load_doc(run_dir)["findings"][0]
         self.assertEqual((f["file"], f["line"], f["code"]), ("src/db.js", 1, "const q = 'SELECT ' + id;"))
         page = (run_dir / "security-report.html").read_text()
-        self.assertIn("vscode://file%s" % (self.tmp / "repos" / "api" / "src" / "db.js"), page)
+        self.assertIn("vscode://file/" + (self.tmp / "repos" / "api" / "src" / "db.js").as_posix().lstrip("/"), page)
 
     def test_previous_none_disables_comparison(self):
         first = self.tmp / "ws" / "security-run-20261102-090000"
@@ -415,7 +418,7 @@ class GenerateChangesTests(TempDirCase):
         empty.mkdir()
         r = self.generate(second, "--previous", empty)
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
-        self.assertIn(str(empty), r.stderr)
+        self.assertIn(empty.name, r.stderr)   # not the full path: Windows prints 8.3 and long forms of the temp dir
         self.assertIn("does not exist", report_store.load_full(second)["run"]["previous_error"])
 
 
@@ -472,7 +475,7 @@ class ProfileTests(TempDirCase):
         e.pop("JOB_SECURITY_SCAN_CACHE", None)
         e.update(env)
         (self.tmp / "home").mkdir(exist_ok=True)
-        r = subprocess.run(["bash", str(RUN_SCAN), "--config", str(self.cfg)] + [str(a) for a in args],
+        r = subprocess.run([BASH, str(RUN_SCAN), "--config", str(self.cfg)] + [str(a) for a in args],
                            stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True,
                            cwd=str(self.ws), env=e)
         runs = sorted(self.ws.glob("security-run-*"))
@@ -946,6 +949,7 @@ class ChangedFilesTests(TempDirCase):
         hook = self.tmp / "hook.sh"
         hook.write_text("#!/bin/sh\ntouch '%s'\n" % marker)
         hook.chmod(0o755)
+        hook = hook.as_posix()   # backslashes would be escapes in a git config value (Windows temp paths)
         with open(str(repo / ".git" / "config"), "a") as fh:
             fh.write("[core]\n\tfsmonitor = %s\n[diff]\n\texternal = %s\n" % (hook, hook))
         (repo / "b.js").write_text("y\n")

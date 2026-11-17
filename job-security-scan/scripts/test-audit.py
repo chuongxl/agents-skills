@@ -446,6 +446,7 @@ class SandboxAndPromotionTests(unittest.TestCase):
         self.assertEqual(r.returncode, 97)
         self.assertIn("JOB_SECURITY_SCAN_AUDIT_EXEC", r.stderr)
 
+    @unittest.skipUnless(sys.platform.startswith("linux"), "the sandbox (and its argument checks) is Linux-only")
     def test_argument_guards(self):
         self.assertEqual(self.sandbox("--env", "NPM_TOKEN=x", "--", "true").returncode, 98)
         self.assertEqual(self.sandbox("--env", "LD_PRELOAD=x", "--", "true").returncode, 98)
@@ -490,11 +491,12 @@ class SandboxAndPromotionTests(unittest.TestCase):
                               + [a for f in files for a in ("--file", f)] + ["--max-file-bytes", "64"],
                               stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
 
+    @unittest.skipIf(os.name == "nt", "promotion needs POSIX descriptors (Linux/macOS)")
     def test_promotion(self):
         (self.scratch / "d").mkdir()
         (self.scratch / "d" / "ok.txt").write_text("status 200\n")
         (self.scratch / "big.txt").write_text("x" * 100)
-        os.symlink("/etc/hostname", str(self.scratch / "link"))
+        os.symlink(str(self.tmp), str(self.scratch / "link"))   # any symlink: /etc/hostname does not exist on macOS
         (self.scratch / "h").write_text("a")
         os.link(str(self.scratch / "h"), str(self.scratch / "h2"))
         r = self.promote("d/ok.txt", "big.txt", "link", "h", "../escape", "missing")
@@ -517,6 +519,7 @@ def load_sandbox():
     return mod
 
 
+@unittest.skipUnless(sys.platform.startswith("linux"), "the sandbox is Linux-only")
 class SandboxHidingTests(unittest.TestCase):
     """The sandbox hides credentials and local sockets: $HOME wholesale, or its credential paths when the
     workspace lives inside it."""

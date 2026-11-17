@@ -1,4 +1,4 @@
-# SHA-256 of every Linux release asset install-tools.sh may download, for the versions pinned in that script.
+# SHA-256 of every Linux and Windows x64 release asset install-tools.sh may download, for the versions pinned in that script.
 # The installer compares a download against THIS file - never against a checksum file fetched from the same
 # release, which a compromised release would replace together with the binary.
 # Recorded 2026-11-15 from each project's published checksums. When you bump a version in install-tools.sh,
@@ -14,3 +14,8 @@ c7187db94eeeeca956519a6af171adc31453941a1e777961f6e680f697c8c507  hadolint-linux
 f6198ef8090f404dbb771abfee086eb8c48ac177f30da7fd3510aca35b344b5d  hadolint-linux-arm64
 160c6253e2922e9e0a6a9771c5c4c40a4b3c6090b34a3cdd5e80c96cc2e4218b  osv-scanner_linux_amd64
 4061ef4c021ed3c47f203b818f337e351336cc5cd67c0274fc36bd1dfc728dd7  osv-scanner_linux_arm64
+74362dc711383255308230ecbeb587eb1e4e83a8d332be5b0259afac6e0c2224  trivy_0.69.3_windows-64bit.zip
+d29144deff3a68aa93ced33dddf84b7fdc26070add4aa0f4513094c8332afc4e  gitleaks_8.30.1_windows_x64.zip
+16e85ace8d7724774559d418e1bd876ae410a684321c1c44a34c499b03703d9d  trufflehog_3.99.7_windows_amd64.tar.gz
+01d927294962b5387f9ead4f18679158452be4f17c765ad0bdffe5264b9c7b0a  hadolint-windows-x86_64.exe
+9964ed64ec9a387391eb4cc006ad5c531154821aef29b793e02c448de4686438  osv-scanner_windows_amd64.exe
