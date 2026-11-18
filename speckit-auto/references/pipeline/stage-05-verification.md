@@ -8,6 +8,8 @@ shared JSON stdin invocation, not on context-only resume. Emit
 `{type: "stage_finished", stage: "05-verification"}` at the handoff (step 5), including when the
 stage is skipped.
 
+For `--pr-fix`, apply the same opt-in, mode, retry, cleanup and approval rules.
+
 ## 1. Read the opt-in
 
 Read `verification` (and, in `--yolo`, `verification_yolo`) from the mirrored
@@ -23,7 +25,8 @@ report and PR body.
 
 - `false` → skip this stage entirely. Load [stage-06-finish.md](stage-06-finish.md) and enter
   Stage 06 in the same turn, noting `verification: skipped` for the final report.
-- `true` → continue with steps 2-5 below.
+- `true` → for `--pr-fix`, load [../pr-fix/stage-05-verification.md](../pr-fix/stage-05-verification.md)
+  and apply it to steps 2-5; then continue with those steps.
 
 ## 2. Update the project verification skill for this feature
 
@@ -106,7 +109,7 @@ Run `verify-<app>`'s Cleanup first if you will change code. Route back exactly l
 "Request changes" path: collect the feedback (YOLO: use the `not met` findings), restart through
 the earliest affected step (requirement/architecture/task/code-level), re-run every downstream
 Stage 02 step and its self-review gate if regenerated, re-enter the full Stage 03 flow if code
-changed (this is the fix step: implementation plus the `speckit-code-review` loop until `pass`),
+changed (implementation plus the applicable review loop until it passes),
 re-enter Stage 04 (human approval gate in default mode; auto-commit in YOLO), then re-enter this
 stage (Stage 05) from the top — including a fresh `create-verification-skill` update-mode call,
 since the feature's behavior may have changed.
@@ -133,8 +136,8 @@ anything launched; trouble is a warning), then:
 1. Cleanup already ran above; confirm nothing launched is still running.
 2. Emit `run_failed` with `reason.code: "crashed"` (a one-line, composed message — never raw tool
    output) before reporting. On an event write error, stop and never emit `run_completed`.
-3. Report the exact error, and tell the user: the implementation is already committed and pushed
-   (Stage 04), but the spec is not marked completed and no PR was opened. They can fix the
+3. Report the exact error, and tell the user: the implementation is committed; feature runs pushed
+   it in Stage 04, while PR-fix runs have not pushed it. No spec was marked completed or new PR opened. They can fix the
    problem and re-run, or disable verification via `/speckit-auto --integration <value>` and
    re-run.
 

@@ -4,6 +4,11 @@ The `obra/superpowers` skills library. Every step is invoked through the `skill`
 hosts — superpowers ships no agents, slash commands, or prompt files. Adds to
 [../shared/operating-rules.md](../shared/operating-rules.md); never weakens it.
 
+For `--pr-fix`, the shared PR-specific Stage 02 and 03 routes override the feature-only artifact
+path guard and plan assumptions below. Reuse an identified existing spec at its actual path;
+when none exists, implement and review the fix without fabricating artifacts. Do not run a
+provider command that creates, renames or switches the validated worktree or branch.
+
 ## Skill Map
 
 | Pipeline step | Skill |

@@ -1,11 +1,15 @@
 # Stage 04: Human Review / Implementation Commit (Provider-Agnostic)
 
-Load after `speckit-code-review` returns `pass`. Two paths: **default mode** (human review gate is
-mandatory, never skipped) and **YOLO** (no human interactions). Both paths end at the same place:
-the implementation is committed and pushed, and control passes to Stage 05.
+Load after the applicable spec-based or direct review and project checks pass. Two paths:
+**default mode** (human review gate is
+mandatory, never skipped) and **YOLO** (no human interactions). Both paths commit the
+implementation and pass control to Stage 05. Feature runs push here; PR fixes defer the push.
 
 At actual entry or re-entry emit `{type: "stage_started", stage: "04-finish"}` using the shared
 JSON stdin invocation, not on context-only resume.
+
+For `--pr-fix`, load [../pr-fix/stage-04-finish.md](../pr-fix/stage-04-finish.md) and apply
+its overrides to the shared approval and commit steps.
 
 ## Default Mode — Human Manual Review Gate
 
@@ -70,7 +74,7 @@ After the implementation commit succeeded (or was skipped because nothing needed
 completion, the final push, the pull request, and the terminal `run_completed`. Stage 04 never
 emits `run_completed`.
 
-The implementation is already pushed at this point, before any verification. That is deliberate:
+For feature runs the implementation is already pushed at this point, before any verification. That is deliberate:
 it has passed `speckit-code-review` and human approval, and nothing is *published* (no PR) until
 Stage 06.
 

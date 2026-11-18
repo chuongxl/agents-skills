@@ -71,10 +71,11 @@ payload fields. The emitter adds identity, sequence, and timestamp fields.
 Always pass arguments as an argument vector; never interpolate event content
 into shell commands. It JSON-serializes data, appends one complete line, and
 fails if validation or a write fails.
-Check the process exit status before the next pipeline action. A failed init/emit is an
-instrumentation error: stop, report the diagnostic, and never claim completion. Do not
-swallow it, continue without events, or recursively attempt another event on the broken
-writer. Resume only after repairing the cause and inspecting the recorded history.
+Check the tool result and process exit status before the next pipeline action. A denied tool
+call or failed init/emit is an instrumentation error: stop immediately and report the
+diagnostic. Do not edit implementation files, commit, push, claim completion, retry through
+another tool, or recursively attempt another event on the broken writer. This applies in YOLO
+mode and in Stage 03. Resume only after repairing the cause and inspecting the recorded history.
 
 `init` writes `run_started` and `stage_started` (`01-intake`) once for a new
 attempt. Both records go out in a single append and a single fsync, so an

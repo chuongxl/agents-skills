@@ -14,6 +14,14 @@ completion). The procedure is identical; only the commit message source differs:
 
 `artifact_id` is always defined: the Jira issue key in `--issue` runs, otherwise the artifact
 folder's prefix-slug (e.g. `007-user-export`). Never emit a literal `<issue_id>` placeholder.
+For a PR fix use the PR number as the message scope; no artifact folder is required.
+
+## Existing PR push (`--pr-fix` only)
+
+Apply staging and conditional-commit rules to this run's paths only. If initial changes cannot be
+separated safely, stop with `policy_blocked`. Defer all pushes at commit gates; Stage 06 uses
+[../pr-fix/stage-06-finish.md](../pr-fix/stage-06-finish.md) after authorization instead of
+Branch Sync + Push below. Never pull, rebase or force-push a PR head.
 
 ## Conditional Commit (Critical)
 
@@ -40,8 +48,9 @@ repo:
    `.superpowers/`, `.worktrees/` or a Stage 05 evidence folder. Do not "fix" it by deleting or
    ignoring the file yourself; say what it is and let the human decide.
 3. Stage **by explicit path** (`git add -- <path> ...`) taken from the listing: the artifact folder
-   plus the files the plan and tasks name. A changed path nothing in the spec, plan or tasks accounts
-   for is surfaced, not staged (default mode: ask; `--yolo`: stop with the paths quoted).
+   plus the files the plan and tasks name. For a PR fix, use the PR request and identified fix
+   scope when there is no spec or plan. A changed path not accounted for is surfaced, not staged
+   (default mode: ask; `--yolo`: stop with the paths quoted).
 4. When `gitleaks` is installed, run `gitleaks protect --staged --redact --no-banner`; a finding
    stops the commit with the file and line only, never the value.
 

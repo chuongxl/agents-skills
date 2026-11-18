@@ -40,7 +40,8 @@ a safety guardrail, and a security stop under rule 12 or the Staging Safety Chec
 
 1. **Worktree first.** No pipeline step (framework check, install, intake, provider call) runs
    before the Stage 01 worktree + branch gate completes. All execution happens inside the
-   worktree, never the base checkout.
+   worktree, never the base checkout. PR-fix identity resolution is the read-only precondition
+   for its worktree gate; reuse a validated supplied worktree without renaming or switching it.
 
 2. **Provider is fixed for the run.** Resolved once from `<repo-root>/.speckit/integration.json`
    — the only source; no global state, no first-run prompt. Never re-read or change it mid-run,
@@ -67,12 +68,14 @@ a safety guardrail, and a security stop under rule 12 or the Staging Safety Chec
 7. **The Stage 02 → 03 handoff is never a stop.** Finishing Stage 02 is not by itself a reason to
    end the turn.
 
-8. **Stage 03 is a NO-STOP ZONE** in both modes. The only success exit is `status = pass` from
-   `speckit-code-review` plus a clean project-checks gate (R2c); the only other exit is the circuit breaker. A `failed` review is the
-   input for the next fix iteration, never a stop.
+8. **Stage 03 is a NO-STOP ZONE** in both modes. The success exit is a passing spec-based review,
+   or the explicitly documented direct review for a PR fix with no matching spec, plus the
+   project-checks gate (R2c); the circuit breaker and the hard stops in the Turn-End Whitelist
+   still apply. A `failed` review is the input for the next fix iteration, never a stop.
 
 9. **Every commit is conditional**: check `git status --porcelain` first; an already-clean tree is
-   a success path, not a failure. Sync before push, and push the feature branch to origin.
+   a success path, not a failure. Sync before push; PR fixes use the resolved PR head destination
+   and the PR-specific safe push procedure, never the feature-branch push procedure.
 
 10. **Failure ordering.** Provider validation runs before any runtime stage error is reported. Any
     stage failure, failed required commit, or failed push stops the run with the exact error
@@ -134,11 +137,13 @@ budget stop; `crashed` for other unrecoverable tool/runtime/filesystem failures.
 budget enforcement or new review-loop exits. An uncatchable host crash cannot emit and is
 diagnosed by the client session lifecycle. Pre-init errors have no event file.
 
-Failed event validation/write is itself a hard instrumentation error: report it and stop.
+An event tool call denied by the host, or a failed event initialization, validation or write,
+is a hard instrumentation error: report it and stop immediately, even in YOLO or Stage 03.
 Never recurse trying to emit failure on the same broken writer, fall back to prose, or claim
 completion after a write error. A warning, recoverable failure, clean-tree commit skip, or
 Request changes is not `run_failed`. Only successful Stage 06 may emit `run_completed`, after
-required commits/push and spec completion; do not emit any event after a terminal record.
+required commits/push and, for feature runs, spec completion; do not emit any event after a
+terminal record.
 
 A lock conflict is an instrumentation error, not a `run_failed`. The emitter reclaims a lock
 only when its owner is provably gone; a lock that still has a live owner, no readable owner, or
