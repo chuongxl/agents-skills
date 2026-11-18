@@ -70,8 +70,8 @@ a safety guardrail, and a security stop under rule 12 or the Staging Safety Chec
 
 8. **Stage 03 is a NO-STOP ZONE** in both modes. The success exit is a passing spec-based review,
    or the explicitly documented direct review for a PR fix with no matching spec, plus the
-   project-checks gate (R2c); the only other exit is the circuit breaker. A `failed` review is the
-   input for the next fix iteration, never a stop.
+   project-checks gate (R2c); the circuit breaker and the hard stops in the Turn-End Whitelist
+   still apply. A `failed` review is the input for the next fix iteration, never a stop.
 
 9. **Every commit is conditional**: check `git status --porcelain` first; an already-clean tree is
    a success path, not a failure. Sync before push; PR fixes use the resolved PR head destination
@@ -137,7 +137,8 @@ budget stop; `crashed` for other unrecoverable tool/runtime/filesystem failures.
 budget enforcement or new review-loop exits. An uncatchable host crash cannot emit and is
 diagnosed by the client session lifecycle. Pre-init errors have no event file.
 
-Failed event validation/write is itself a hard instrumentation error: report it and stop.
+An event tool call denied by the host, or a failed event initialization, validation or write,
+is a hard instrumentation error: report it and stop immediately, even in YOLO or Stage 03.
 Never recurse trying to emit failure on the same broken writer, fall back to prose, or claim
 completion after a write error. A warning, recoverable failure, clean-tree commit skip, or
 Request changes is not `run_failed`. Only successful Stage 06 may emit `run_completed`, after

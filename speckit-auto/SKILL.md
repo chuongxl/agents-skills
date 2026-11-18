@@ -25,6 +25,13 @@ Entry point only: parse the invocation, resolve the provider, then run the stage
 ahead of time. Never load a stage you are not in, a provider you did not resolve, an install-
 recovery file on a healthy run, or a file already in context. See the loading map below.
 
+**Event initialization is a hard gate.** After the Stage 01 worktree gate, initialize run
+events and confirm the tool call succeeded before provider validation, implementation edits,
+tests, commits, pushes, or loading Stage 02 or later. Stage 01 may make only the setup changes
+needed for that gate. If initialization is denied or fails, stop and report the error; do not
+continue without events, retry through another tool, or claim success. This also applies in YOLO
+mode. A later event-call failure likewise stops the run, including inside the NO-STOP ZONE.
+
 ## Entry Dispatch (every invocation)
 
 1. **Parse the invocation text** (slash-command body on Copilot/Claude Code; the natural-language

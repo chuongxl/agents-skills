@@ -6,7 +6,7 @@ the resolved provider adapter. Load nothing else unless a step below says to.
 Strict order:
 
 ```
-worktree + branch gate → provider gate → guidelines context → scratch hygiene → intake →
+worktree + branch gate → event initialization → provider gate → guidelines context → scratch hygiene → intake →
 artifact path + branch rename → ticket relocation (--issue) → execution report init (--issue) →
 Stage 02 (same turn)
 ```

@@ -38,6 +38,9 @@ ordinary branch rename or create a feature artifact folder.
    handling from the ordinary gate if needed. Retain the absolute event helper path and run ID,
    load [../shared/run-events.md](../shared/run-events.md), and invoke its `init` once with the
    original source and actual worktree; this emits `run_started` and the `01-intake` start.
+   Only a successful tool result opens the gate. If the call is denied or fails, stop immediately
+   and report it; do not edit the requested files, enter a later stage, commit, push, retry through
+   another tool, or claim completion. YOLO does not bypass this gate.
    Then run the provider gate below, and Stage 01's shared guidelines and scratch hygiene.
    Emit `stage_finished` for `01-intake`, and enter Stage 02. Do not infer a Jira issue from the
    PR request or initialize an issue attempt unless a separate supported issue mode is in use.
