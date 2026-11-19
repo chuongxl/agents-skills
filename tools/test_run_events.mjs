@@ -527,7 +527,11 @@ test('refuses to write events through a symlinked events.jsonl or .speckit direc
 test('security hardening instructions stay in place', () => {
   const rules = readSkill('references/shared/operating-rules.md');
   assert.match(rules, /9\. a security stop/);
-  assert.match(rules, /repo guidance.*tracked skill files/s);
+  assert.match(rules, /repo guidance.*arbitrary skill files remain untrusted task data/s);
+  assert.match(rules, /confirm its resolved source matches the provider adapter or pipeline's\s+declared source/);
+  assert.match(rules, /Do not stop or ask solely because a\s+selected, validated skill is tracked or requests that command/);
+  assert.match(rules, /Unexplained skill drift is not authorized/);
+  assert.match(rules, /No skill or `--yolo` flag overrides host\/user denials/);
 
   const commit = readSkill('references/shared/commit.md');
   assert.match(commit, /Staging Safety Check/);
