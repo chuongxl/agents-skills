@@ -6,6 +6,9 @@ This reference supports the `jira-to-speckit` skill.
 
 Read these from the repository `.env` file:
 
+If the trusted caller supplies `env_file`, read that file instead of `.env` in the examples below.
+Do not copy the file or print its contents.
+
 - `JIRA_URL`
 - `JIRA_USERNAME`
 - `JIRA_API_TOKEN`

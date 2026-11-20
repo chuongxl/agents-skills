@@ -25,10 +25,12 @@ Scope: validate Stage 01 worktree-based isolation, branch/worktree alignment, an
 | WT19 | github-speckit Stage 01 uses shared worktree gate | `github-speckit` selected | Run Stage 01 | Uses shared worktree+branch gate before Speckit source check and intake | github-speckit |
 | WT20 | Parallel-session isolation | Two features started from same repo | Run two pipeline invocations with different requirements | Each run gets separate linked worktree path under `.worktrees/`; no workspace collision | Both |
 | WT21 | speckit-code-review runs on worktree change set | Stage 03 loop reaches review step | Invoke `speckit-code-review` per Stage 03 rules | Runs inline (never a background task) with cwd inside the Stage 01 linked worktree; its `git status`/`git diff HEAD` scope and the explicitly passed `specs/<feature>/spec.md` resolve against the worktree branch, never the base checkout | Both |
+| WT22 | Client-created worktree remains in place | Client supplies an existing linked ticket worktree and source checkout | Run Jira intake through Stage 01 | Reuses the linked worktree and branch, does not check out the source or move the worktree, and keeps its path after branch rename | Both |
+| WT23 | Jira intake uses the source checkout credentials | Client-created worktree has no `.env`; source checkout has a disposable Jira `.env` | Run Jira intake with the skill, then repeat with the direct-fetch fallback | Both use the source `.env` without copying or printing it; mismatched Jira hosts are rejected | Both |
 
 ## Minimum pass criteria
 
 - All Stage 01 invocations establish or reuse linked worktree isolation before provider-specific actions.
-- Branch name, worktree path, and artifact folder identity converge to the same final feature key after intake resolution.
+- Branch name, worktree path, and artifact folder identity converge to the same final feature key after intake resolution, except that a client-created worktree keeps its original path.
 - Reruns remain stable (reuse branch/worktree/artifact identity) and never create duplicate suffix branches for the same feature.
 - Both providers follow the same shared worktree contract, differing only in provider-specific preflight checks.

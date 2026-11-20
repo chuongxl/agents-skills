@@ -18,6 +18,13 @@ Capture the canonical source checkout root as `source_repo_path` before changing
 creating the linked worktree. On resume, retain/recover that original source identity from
 run state/discovery, never replace it with the current linked worktree's root.
 
+When the ticket client supplies an already-created ticket worktree and its source checkout, use
+those paths as `worktree_path` and `source_repo_path`. Verify the current checkout is that linked
+worktree, use its existing branch, and skip creating or moving a worktree and checking out a
+branch in the source checkout. Resolve `base_branch` using step 1 and mirror the run config as in
+step 4. Rename the branch after intake as in step 5, but keep the worktree path throughout the
+running session; do not move it.
+
 1. Base branch priority `develop → main → master` (local first, then remote-tracking). None
    exists → stop with a missing-base-branch error. Retain the chosen branch as `base_branch` in
    run state; Stage 06 targets the pull request at it.
@@ -157,7 +164,9 @@ issue_url, ticket_path, requirement_text }`.
 `branch_created` must be true before any provider call, `jira-to-speckit` call, or intake step.
 
 **Jira intake** (`--issue`): invoke the `skill` tool with name `jira-to-speckit`, passing the URL
-and `ticket_output_path = .speckit/intake/<issue_id>-ticket.md`. **Scope constraint:** instruct it
+and `ticket_output_path = .speckit/intake/<issue_id>-ticket.md`. If the client supplied a source
+checkout for a pre-created worktree, also pass `env_file = <source_repo_path>/.env`; never copy
+that file into the worktree. **Scope constraint:** instruct it
 to perform only Jira fetch + compaction (its workflow steps 1–5, including the snapshot write) and
 to return compact brief + Jira key + open questions + snapshot path — no downstream framework
 stages; `speckit-auto` owns everything after intake. Extract exactly those four values and carry

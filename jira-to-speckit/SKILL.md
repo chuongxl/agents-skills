@@ -63,6 +63,9 @@ skill's output.
 
 - `ticket_output_path` — a file path to write the full ticket snapshot to (see step 5b). When
   omitted, no file is written and `Ticket snapshot:` reports `not requested`.
+- `env_file` — the source checkout's `.env`, supplied by a trusted caller when running inside an
+  already-created linked worktree. Otherwise use the repository root `.env`. Never copy it into
+  the worktree or include its contents in output.
 
 Optional `.env` tuning for large Jira tickets:
 - `JIRA_MAX_INPUT_CHARS` (default `12000`)
@@ -103,7 +106,8 @@ Optional `.env` tuning for large Jira tickets:
 
 ### 2. Read Jira credentials from `.env`
 
-Load the repository `.env` file and confirm these values exist:
+Load `env_file` when supplied by the trusted caller, otherwise the repository `.env` file, and
+confirm these values exist:
 
 - `JIRA_URL`
 - `JIRA_USERNAME`

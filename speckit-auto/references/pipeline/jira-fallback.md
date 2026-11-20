@@ -3,7 +3,8 @@
 Load **only** if the `jira-to-speckit` skill is unavailable in this session. The normal `--issue`
 path never loads this file.
 
-1. Read the project-root `.env`: `JIRA_URL`, `JIRA_USERNAME`, `JIRA_API_TOKEN`. Any missing → stop
+1. Read the project-root `.env` (or `<source_repo_path>/.env` for a client-created worktree):
+   `JIRA_URL`, `JIRA_USERNAME`, `JIRA_API_TOKEN`. Any missing → stop
    and ask the user to complete it, **without printing any value**. Then validate, and stop on any
    failure without printing the value:
    - `JIRA_URL` starts with `https://` (a token is never sent over plain HTTP), has no userinfo, and
@@ -15,13 +16,14 @@ path never loads this file.
 2. Fetch. Never pass the token on the curl command line (`-u user:$JIRA_API_TOKEN`); it would show
    up in `ps` for any other process on the host. Pass credentials through a curl config file read
    from stdin through a `printf` pipe. Not a heredoc: zsh and bash before 5.1 back it with a temp
-   file, so the token would touch disk. Load `.env` as shown: the loop reads only `JIRA_*` lines as
+   file, so the token would touch disk. Set `env_file` to the chosen `.env` path and load it as shown:
+   the loop reads only `JIRA_*` lines as
    data (never `source` or `eval` `.env`, which would run any shell code in it) and strips Windows
    CRLF; never `export $(... | xargs)`, which puts each value in argv. Load and
    fetch in one command: agent shell tools usually start a fresh shell per call. Use bash/zsh (Git
    Bash or WSL on Windows), not PowerShell.
    ```bash
-   while IFS='=' read -r k v || [ -n "$k" ]; do case $k in JIRA_*) v=${v%$'\r'}; v=${v#[\"\']}; v=${v%[\"\']}; export "$k=$v";; esac; done < .env
+   while IFS='=' read -r k v || [ -n "$k" ]; do case $k in JIRA_*) v=${v%$'\r'}; v=${v#[\"\']}; v=${v%[\"\']}; export "$k=$v";; esac; done < "$env_file"
    printf 'user = "%s:%s"\n' "$JIRA_USERNAME" "$JIRA_API_TOKEN" | curl -K - \
      -H "Accept: application/json" \
      "$JIRA_URL/rest/api/2/issue/$issueKey?fields=summary,description,issuetype,status,priority,labels,assignee,fixVersions"
