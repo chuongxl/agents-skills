@@ -31,6 +31,9 @@ jobs:
       - name: PR-fix push safety fixture
         run: python3 tools/test_pr_fix_push.py
 
+      - name: PR-fix end-to-end flow fixture
+        run: python3 tools/test_pr_fix_flow.py
+
       - name: Shell script syntax check
         run: find . -name '*.sh' -not -path './.git/*' -exec bash -n {} +
 
