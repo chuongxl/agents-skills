@@ -5,6 +5,12 @@ Load right after Stage 05 hands off (whether it ran or was skipped). Final stage
 At actual entry or re-entry emit `{type: "stage_started", stage: "06-finish"}` using the shared
 JSON stdin invocation, not on context-only resume.
 
+## Existing PR routing (`--pr-fix` only)
+
+Load [../pr-fix/stage-06-finish.md](../pr-fix/stage-06-finish.md). Follow its procedure
+after shared cleanup and verification-artifact commit steps 1–2 instead of feature steps 3–4
+and the feature-specific final report.
+
 ## 1. Clean (only if Stage 05 launched something)
 
 If Stage 05 was skipped, go straight to step 2. Otherwise, run the generated `verify-<app>`

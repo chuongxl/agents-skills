@@ -25,10 +25,15 @@ Scope: validate Stage 01 worktree-based isolation, branch/worktree alignment, an
 | WT19 | github-speckit Stage 01 uses shared worktree gate | `github-speckit` selected | Run Stage 01 | Uses shared worktree+branch gate before Speckit source check and intake | github-speckit |
 | WT20 | Parallel-session isolation | Two features started from same repo | Run two pipeline invocations with different requirements | Each run gets separate linked worktree path under `.worktrees/`; no workspace collision | Both |
 | WT21 | speckit-code-review runs on worktree change set | Stage 03 loop reaches review step | Invoke `speckit-code-review` per Stage 03 rules | Runs inline (never a background task) with cwd inside the Stage 01 linked worktree; its `git status`/`git diff HEAD` scope and the explicitly passed `specs/<feature>/spec.md` resolve against the worktree branch, never the base checkout | Both |
+| PF-WT01 | Supplied PR worktree | Open PR; supplied linked worktree on a differently named local branch contains its fetched head | Run with `--pr-fix <PR URL>` and a fix request | Reuse that exact worktree and branch; no checkout, rename, move, or second worktree | Both |
+| PF-WT02 | Manual PR fix | Open PR; no worktree supplied; local PR head branch already checked out elsewhere | Run with `--pr-fix <PR URL>` and a fix request | Create an isolated linked worktree with a distinct local branch at the fetched PR head; leave the occupied branch alone | Both |
+| PF-WT03 | Invalid identity | Missing URL or request, closed PR, mismatched supplied worktree, inaccessible fork or unwritable head | Run PR-fix intake | Stop with a diagnostic before modifying files or creating a worktree; never guess a push destination | Both |
+| PF-WT04 | Feature regression | No `--pr-fix` | Run feature and Jira intake | Existing feature branch and worktree behavior remains unchanged | Both |
 
 ## Minimum pass criteria
 
 - All Stage 01 invocations establish or reuse linked worktree isolation before provider-specific actions.
-- Branch name, worktree path, and artifact folder identity converge to the same final feature key after intake resolution.
+- Feature/Jira branch name, worktree path, and artifact folder identity converge to the same final
+  feature key; PR-fix runs retain their resolved worktree and branch instead.
 - Reruns remain stable (reuse branch/worktree/artifact identity) and never create duplicate suffix branches for the same feature.
 - Both providers follow the same shared worktree contract, differing only in provider-specific preflight checks.

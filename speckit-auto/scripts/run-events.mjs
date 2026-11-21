@@ -35,6 +35,7 @@ const TYPES = {
   gate_answered: ['stage', 'gate'],
   question_waiting: ['stage', 'question', 'options'],
   pr_opened: ['pr_url'],
+  pr_updated: ['pr_url'],
   run_completed: [],
   run_failed: ['reason'],
 };
@@ -132,7 +133,8 @@ export function validateRunEvent(value) {
       if (value.type === 'question_waiting') text(value.question, 'question', 500);
       if (value.options !== undefined) validateOptions(value.options, 'options');
       break;
-    case 'pr_opened': {
+    case 'pr_opened':
+    case 'pr_updated': {
       const url = text(value.pr_url, 'pr_url', 500);
       let parsed;
       try {

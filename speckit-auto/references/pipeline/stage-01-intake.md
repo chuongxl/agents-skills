@@ -6,10 +6,14 @@ the resolved provider adapter. Load nothing else unless a step below says to.
 Strict order:
 
 ```
-worktree + branch gate → provider gate → guidelines context → scratch hygiene → intake →
+worktree + branch gate → event initialization → provider gate → guidelines context → scratch hygiene → intake →
 artifact path + branch rename → ticket relocation (--issue) → execution report init (--issue) →
 Stage 02 (same turn)
 ```
+
+For `--pr-fix`, load [../pr-fix/stage-01-intake.md](../pr-fix/stage-01-intake.md) now and
+follow it instead of the ordinary worktree gate and sections 5–7. Keep the shared provider,
+guidelines and scratch gates.
 
 ## 1. Worktree + Branch Gate (hard gate — runs first)
 
@@ -76,6 +80,8 @@ the parent pointer update.
 
 ## 2. Provider Gate
 
+- **PR fix:** follow the provider gate in the loaded PR-fix reference instead of the
+  feature-mode provider instructions below.
 - **github-speckit** — before calling any other `speckit-*` skill, check
   `.specify/memory/constitution.md` in the **worktree**. It is **outdated** if it is missing,
   empty, under 100 words, or older than the newest commit on the base branch.
@@ -85,7 +91,7 @@ the parent pointer update.
 - **superpowers** — run the adapter's availability check, then invoke `using-superpowers` once
   (skip if superpowers' session hook already injected it).
 
-Failure in either case (skill unresolvable, tool error, or artifact still missing) is a provider
+For feature mode, failure in either case (skill unresolvable, tool error, or artifact still missing) is a provider
 validation failure → load the adapter's install-recovery file and follow it. Only if that flow
 also fails do you stop, with its restart-session message.
 
