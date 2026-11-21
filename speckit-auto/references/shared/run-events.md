@@ -126,8 +126,9 @@ runs also contain `issue_key` (`PROJECT-123`). Exact event-specific fields:
 | `pr_opened`, `pr_updated` | `pr_url` (`pr_updated`: an existing PR received a verified push) |
 | `run_completed` | optional `delivery: {outcome, commit_sha, pr_url, ci_status}` |
 | `run_failed` | `reason: {code, message}` |
-| `run_blocked` | `reason` (string); optional `blocked_by` (a different Jira key) |
+| `run_blocked` | `reason` (string); optional `blocked_by` (a Jira key other than this run's `issue_key`) |
 
+`run_blocked` is not terminal: the run may resume and emit further events.
 `pr_updated` is emitted only by `--pr-fix` and never together with `pr_opened` in one run.
 `delivery.outcome` is `delivered` (needs `commit_sha` or `pr_url`) or `no_changes` (no evidence).
 

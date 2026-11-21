@@ -105,8 +105,7 @@ function validateOptions(value, label) {
 
 function validateHttpsUrl(value, label) {
   const url = text(value, label, 500);
-  const errorMessage =
-    label === 'pr_url' ? 'pr_url must be a valid HTTPS URL without credentials' : `${label} must be a valid HTTPS URL`;
+  const errorMessage = `${label} must be a valid HTTPS URL without credentials`;
   let parsed;
   try {
     parsed = new URL(url);
@@ -186,7 +185,7 @@ export function validateRunEvent(value) {
         value.blocked_by !== undefined &&
         (typeof value.blocked_by !== 'string' || !ISSUE_KEY.test(value.blocked_by) || value.blocked_by === value.issue_key)
       ) {
-        fail('blocked_by must be a Jira issue key different from issue_key');
+        fail('blocked_by must be a Jira issue key, and not the run\'s own issue_key');
       }
       text(value.reason, 'reason', 500);
       if (value.reason.length === 0) fail('reason must not be empty');

@@ -607,6 +607,20 @@ test('run_blocked needs a reason and only a different Jira key as blocker', () =
   assert.throws(() => validateRunEvent({ ...blocked, blocked_by: 'us-1' }), /blocked_by/);
   assert.throws(() => validateRunEvent({ ...blocked, blocked_by: 'US-18' }), /blocked_by/);
   assert.throws(() => validateRunEvent({ ...blocked, reason: '' }), /reason/);
+  // a run without issue_key can name any blocker
+  const { issue_key, ...noKey } = blocked;
+  assert.equal(validateRunEvent(noKey).type, 'run_blocked');
+});
+
+test('run_blocked is not terminal: the run keeps emitting events', (t) => {
+  const { repo, worktree } = makeWorkspace(t);
+  const runId = '123e4567-e89b-42d3-a456-426614174120';
+  const emit = (event) => run(['emit', '--worktree', worktree, '--run-id', runId], JSON.stringify(event));
+  assert.equal(run(['init', '--repo', repo, '--worktree', worktree, '--run-id', runId, '--issue-key', 'US-18']).status, 0);
+  for (const event of [{ type: 'run_blocked', blocked_by: 'AD-3', reason: 'Needs the auth API' }, { type: 'stage_started', stage: '01-intake' }]) {
+    const result = emit(event);
+    assert.equal(result.status, 0, result.stderr);
+  }
 });
 
 test('pr_updated carries only a pr_url', () => {
