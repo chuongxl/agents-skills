@@ -580,3 +580,37 @@ test('pr_updated carries a PR URL like pr_opened', () => {
   assert.doesNotThrow(() => validateRunEvent({ ...base, type: 'pr_updated', pr_url: 'https://github.com/o/r/pull/1' }));
   assert.throws(() => validateRunEvent({ ...base, type: 'pr_updated', pr_url: 'http://github.com/o/r/pull/1' }));
 });
+
+test('run_completed accepts an optional delivery report and rejects inconsistent ones', () => {
+  const done = JSON.parse(fixtures[7]);
+  const sha = 'a'.repeat(40);
+  const pr = 'https://github.com/example/project/pull/18';
+  assert.equal(validateRunEvent({ ...done, delivery: { outcome: 'delivered', commit_sha: sha, pr_url: pr, ci_status: 'passed' } }).type, 'run_completed');
+  assert.equal(validateRunEvent({ ...done, delivery: { outcome: 'no_changes' } }).type, 'run_completed');
+  for (const delivery of [
+    { outcome: 'delivered' },
+    { outcome: 'no_changes', commit_sha: sha },
+    { outcome: 'delivered', commit_sha: 'abc' },
+    { outcome: 'delivered', pr_url: 'http://example.com/pull/1' },
+    { outcome: 'delivered', pr_url: pr, ci_status: 'green' },
+    { outcome: 'other' },
+  ]) {
+    assert.throws(() => validateRunEvent({ ...done, delivery }), /delivery|delivered|no_changes/);
+  }
+});
+
+test('run_blocked needs a reason and only a different Jira key as blocker', () => {
+  const blocked = { ...JSON.parse(fixtures[0]), type: 'run_blocked', blocked_by: 'AD-3', reason: 'Needs the auth API' };
+  assert.equal(validateRunEvent(blocked).type, 'run_blocked');
+  const { blocked_by, ...noBlocker } = blocked;
+  assert.equal(validateRunEvent(noBlocker).type, 'run_blocked');
+  assert.throws(() => validateRunEvent({ ...blocked, blocked_by: 'us-1' }), /blocked_by/);
+  assert.throws(() => validateRunEvent({ ...blocked, blocked_by: 'US-18' }), /blocked_by/);
+  assert.throws(() => validateRunEvent({ ...blocked, reason: '' }), /reason/);
+});
+
+test('pr_updated carries only a pr_url', () => {
+  const updated = { ...JSON.parse(fixtures[6]), type: 'pr_updated' };
+  assert.equal(validateRunEvent(updated).type, 'pr_updated');
+  assert.throws(() => validateRunEvent({ ...updated, pr_url: 'http://example.com/pull/1' }), /pr_url/);
+});
