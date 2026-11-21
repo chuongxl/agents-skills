@@ -8,7 +8,8 @@ description: |
   pass, human review (default) or YOLO commit and push, optional Stage 05 verification, and a
   Stage 06 that completes the spec and opens a draft pull request behind its own approval gate
   (default mode) or authorized by --yolo. Use when a feature must go from requirement to
-  committed, PR-ready implementation in one run.
+  committed, PR-ready implementation in one run, or to push a fix to an existing open PR
+  (--pr-fix).
 compatibility: "Runs on GitHub Copilot, Claude Code, OpenCode, and Hermes Agent. Discovered from ~/.agents/skills/, ~/.claude/skills/, ~/.config/opencode/skills/, or ~/.hermes/skills/ (/opt/data/skills/ in Docker). Requires git, bash, and Node.js >=22.13; network access for Jira intake via --issue. Default mode also needs the host's ask/question tool (Copilot ask_user, Claude AskUser, OpenCode question; Hermes uses a plain chat message) for the Stage 02, 04, 05 and 06 checkpoints; see references/shared/host-adaptation.md."
 license: MIT
 allowed-tools: bash glob grep view create edit skill ask_user

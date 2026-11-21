@@ -2,7 +2,7 @@
 """Self-test: drive the deterministic parts of `speckit-auto --pr-fix` (pr-fix/stage-01 + stage-06) against a
 disposable project: a bare repo plays GitHub, a dict plays `gh api`, the REAL run-events.mjs emits.
 This proves the procedure is safe when followed; test_run_events.mjs guards that the prose still says it."""
-import json, os, shutil, subprocess, sys, tempfile, uuid
+import json, shutil, subprocess, sys, tempfile, uuid
 from pathlib import Path
 
 EMIT = str(Path(__file__).resolve().parent.parent / "speckit-auto/scripts/run-events.mjs")
@@ -88,7 +88,7 @@ def finish(w, st):
         emit(wt, run, {"type": "pr_updated", "pr_url": "https://github.com/o/r/pull/42"})
     emit(wt, run, {"type": "stage_finished", "stage": "06-finish"}); emit(wt, run, {"type": "run_completed"})
 
-def run_case(name, setup=None, change=True, supplied=False, expect="ok", expect_types=None, expect_code=None, check=None):
+def run_case(name, setup=None, change=True, supplied=None, expect="ok", expect_types=None, check=None):
     w = World(); st = None; res = "ok"
     try:
         if setup: setup(w)
