@@ -564,3 +564,20 @@ test('security hardening instructions stay in place', () => {
   assert.match(verify, /env -i/);
   assert.match(readSkill('references/pipeline/stage-06-finish.md'), /never paste the ticket description/i);
 });
+
+test('pr-fix push stays non-force and emits pr_updated, not pr_opened', () => {
+  const stage6 = readSkill('references/pr-fix/stage-06-finish.md');
+  assert.doesNotMatch(stage6, /--force|--force-with-lease/);
+  assert.match(stage6, /ordinary non-force push/);
+  assert.match(stage6, /emit `pr_updated`/);
+  assert.match(stage6, /Never emit `pr_opened`/);
+  assert.match(stage6, /Never call `gh pr create`/);
+  assert.match(stage6, /ancestor of local HEAD/);
+  assert.match(stage6, /fetch again and verify/);
+});
+
+test('pr_updated carries a PR URL like pr_opened', () => {
+  const base = { schema_version: 1, run_id: '123e4567-e89b-42d3-a456-426614174000', issue_key: 'US-18', seq: 5, ts: '2026-10-07T20:00:06+07:00' };
+  assert.doesNotThrow(() => validateRunEvent({ ...base, type: 'pr_updated', pr_url: 'https://github.com/o/r/pull/1' }));
+  assert.throws(() => validateRunEvent({ ...base, type: 'pr_updated', pr_url: 'http://github.com/o/r/pull/1' }));
+});

@@ -3,6 +3,16 @@
 Already in context: `SKILL.md`, the run contract, the provider adapter, the Stage 02 artifacts.
 Discard Stage 02 interview context at entry. This stage is a NO-STOP ZONE.
 
+## Existing PR routing (`--pr-fix` only)
+
+Load [../pr-fix/stage-03-implement-review.md](../pr-fix/stage-03-implement-review.md) and
+follow its review loop instead of the feature-specific loop below. Retain the no-stop rule,
+R2c project checks, circuit breaker and exit events. On a check failure return to the PR-fix
+loop, not the feature loop's R6 and R1. A direct review does not invoke or require a pass from
+`speckit-code-review`; its invocation and spec path are required only for spec-based review.
+When no matching spec or tasks exist, use the PR reference's implementation context and
+workspace pre-flight instead of the artifact-specific requirements below.
+
 Implementation identity, convergence step, and fix-application style come from the adapter:
 github-speckit runs `speckit-implement → speckit-converge`; superpowers runs its implementation
 skill (`subagent-driven-development` preferred, `executing-plans` fallback, chosen once at entry)
@@ -66,8 +76,8 @@ changes first, then the parent pointer update.
 For the entire duration of this stage, in **both** modes: no human approval gates, no interview
 questions, no pauses, no report-and-stop on failed results.
 
-- The **only** success exit is `status = pass` from `speckit-code-review` followed by a clean
-  R2c project-checks gate.
+- The **only** success exit is the applicable review passing followed by a clean R2c
+  project-checks gate.
 - The **only** other permitted exit is the circuit breaker: the exact same failure repeating 5
   consecutive iterations with no file change between them, or a git/filesystem error that
   prevents writing code. Report the stuck state and stop. A differing failure, or one followed by
@@ -182,7 +192,7 @@ PHASE 2 — Code review loop
 
 ## Exit Routing
 
-`status = pass` plus a clean R2c is the **only** normal exit. When it fires, load and execute
+The applicable review passing plus a clean R2c is the **only** normal exit. When it fires, load and execute
 [stage-04-finish.md](stage-04-finish.md) **in the same turn** — no summary, no turn end, no user
 question first. Default mode → Stage 04 human review + commit (mandatory); `--yolo` → Stage 04
 auto-commit path. No PR, merge, branch deletion, or workspace deletion happens here.

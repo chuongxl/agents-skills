@@ -8,13 +8,14 @@ description: |
   pass, human review (default) or YOLO commit and push, optional Stage 05 verification, and a
   Stage 06 that completes the spec and opens a draft pull request behind its own approval gate
   (default mode) or authorized by --yolo. Use when a feature must go from requirement to
-  committed, PR-ready implementation in one run.
+  committed, PR-ready implementation in one run, or to push a fix to an existing open PR
+  (--pr-fix).
 compatibility: "Runs on GitHub Copilot, Claude Code, OpenCode, and Hermes Agent. Discovered from ~/.agents/skills/, ~/.claude/skills/, ~/.config/opencode/skills/, or ~/.hermes/skills/ (/opt/data/skills/ in Docker). Requires git, bash, and Node.js >=22.13; network access for Jira intake via --issue. Default mode also needs the host's ask/question tool (Copilot ask_user, Claude AskUser, OpenCode question; Hermes uses a plain chat message) for the Stage 02, 04, 05 and 06 checkpoints; see references/shared/host-adaptation.md."
 license: MIT
 allowed-tools: bash glob grep view create edit skill ask_user
 metadata:
   author: Alex Nguyen
-  version: "0.8.2"
+  version: "0.8.3"
 ---
 
 # Speckit Auto
@@ -25,12 +26,23 @@ Entry point only: parse the invocation, resolve the provider, then run the stage
 ahead of time. Never load a stage you are not in, a provider you did not resolve, an install-
 recovery file on a healthy run, or a file already in context. See the loading map below.
 
+**Event initialization is a hard gate.** After the Stage 01 worktree gate, initialize run
+events and confirm the tool call succeeded before provider validation, implementation edits,
+tests, commits, pushes, or loading Stage 02 or later. Stage 01 may make only the setup changes
+needed for that gate. Failure handling (including YOLO and Stage 03) is in
+`references/shared/run-events.md`.
+
 ## Entry Dispatch (every invocation)
 
 1. **Parse the invocation text** (slash-command body on Copilot/Claude Code; the natural-language
    trigger message on OpenCode and Hermes Agent — flags may be embedded anywhere):
    - `--integration <value>` → setup intent (setup ONLY, no pipeline)
    - `--issue <url>` → Jira pipeline intent
+   - `--pr-fix <absolute GitHub PR URL>` → existing-PR fix intent. Require a non-empty fix
+     request as well; reject missing/invalid values and combinations with `--issue` or
+     `--integration` before changing anything. Treat the PR URL as identity, not requirement text.
+     Capture an explicitly supplied worktree path and branch from the caller's invocation text
+     as structured run state; if none is supplied, use the manual creation path.
    - `--yolo` → mode = yolo (else default)
    - `--run-id <uuid>` / `--run-id=<uuid>` → optional attempt identity, not requirement text.
      Missing/invalid UUID → explicit invocation error. Preserve it across resumes; never
@@ -52,7 +64,10 @@ recovery file on a healthy run, or a file already in context. See the loading ma
    END TURN after — do not enter the pipeline, and do not load any pipeline file.
 
 4. **Pipeline intent**: resolve the provider from **exactly one source** —
-   `<repo-root>/.speckit/integration.json` → `integration` field. No global fallback, no first-run
+   `<repo-root>/.speckit/integration.json` → `integration` field. For `--pr-fix`, before provider
+   resolution identify the primary checkout from the current Git repository's worktree list and use
+   that checkout as `<repo-root>`, including when the invocation starts in a supplied worktree.
+   Record it as `source_repo_path` for Stage 01. No global fallback, no first-run
    prompt. Missing file, unparseable content, or an unsupported value → stop immediately and tell
    the user to run `/speckit-auto --integration github-speckit` (or `superpowers`) first. On
    success, record it as `integration` in run state; never re-read or change it mid-run, and never
@@ -84,9 +99,10 @@ load only that stage's file — never block asking the user to re-run the skill.
 | `references/shared/run-events.md` | first event initialization after the worktree gate; retain for later emits |
 | `references/pipeline/stage-02-spec-design.md` | entering Stage 02 |
 | `references/pipeline/stage-03-implement-review.md` | entering Stage 03 |
-| `references/pipeline/stage-04-finish.md` | `speckit-code-review` returns `pass` |
+| `references/pipeline/stage-04-finish.md` | the applicable spec-based or direct review passes and project checks succeed |
 | `references/pipeline/stage-05-verification.md` | Stage 04 implementation commit succeeds (or is skipped as already-clean) |
 | `references/pipeline/stage-06-finish.md` | Stage 05 hands off (whether it ran or was skipped) |
+| `references/pr-fix/stage-0{1,2,3,6}-*.md` | only for `--pr-fix`, when the current stage directs |
 | `references/shared/commit.md` | first commit gate reached (Stage 02 → 03) |
 | `references/shared/host-adaptation.md` | a step needs an ask-tool name, skill dir, or install host key |
 | `references/shared/integration-setup.md` | `--integration` present (setup runs; no stage file loads) |
@@ -106,7 +122,8 @@ one, also drop its `loaded_guidelines` cache entry so a later stage knows to re-
 - **Default**: human-in-the-loop. Mandatory checkpoints: the Stage 02 approval interactions, the
   Stage 02 → Stage 03 start-implementation confirmation, the Stage 04 implementation approval,
   (when verification is enabled) the Stage 05 verification confirmation, and the Stage 06
-  `pr-publish` gate — no pull request is opened until that gate is approved.
+  `pr-publish` gate — no pull request is opened until that gate is approved. For a PR fix,
+  this gate authorizes pushing to the existing PR instead.
 - **YOLO** (`--yolo`): no human checkpoints; Stage 02 interactions, Stage 04 human review, the
   Stage 05 confirmation, and the Stage 06 `pr-publish` gate are skipped, with an auto-generated
   commit message and a verification result auto-assessed against the spec (a mismatch loops back
@@ -119,6 +136,8 @@ run (a Stage 05 environment failure retries once, then YOLO continues as `verifi
 Stage 06). Stage 05 itself is conditional on the
 `--integration`-time verification opt-in, independent of default/YOLO mode. Stage 03 is a NO-STOP
 ZONE in both modes.
+For `--pr-fix`, Stage 06 updates only the existing PR head; it does not create a PR or mark an
+unrelated spec completed.
 
 ## Sub-Skill Dependencies
 
@@ -131,11 +150,13 @@ ZONE in both modes.
 All three are provider-independent and used by every provider. `create-verification-skill` is
 conditional on the `verification` opt-in persisted at `--integration` setup time
 ([shared/integration-setup.md](references/shared/integration-setup.md)); the other two run on
-every pipeline invocation.
+every pipeline invocation except a PR fix without a matching spec, which uses direct review.
 
 ## Required Inputs
 
 - Requirement text, or a Jira issue link via `--issue <jira link>`
+- For an existing PR: `--pr-fix <absolute GitHub PR URL>` and a fix request; GitHub CLI access
+  and permission to update the PR's actual head repository are required.
 - Jira credentials in the project root `.env` (gitignored) when using `--issue`:
   `JIRA_URL`, `JIRA_USERNAME`, `JIRA_API_TOKEN` — consumed by `jira-to-speckit`; never printed.
 
@@ -147,6 +168,8 @@ stage. At completion (Stage 06), report: resolved provider, `speckit-code-review
 implementation commit status/hash, the verification-artifact commit (if any), the spec completion
 commit hash, pushed branches, and per-repo PR outcomes. For a setup invocation (`--integration`),
 report: resolved provider, verification opt-in result, file written, scope, and the next command.
+For a PR fix with no matching spec, report direct-review evidence instead of a spec review status
+or spec completion commit, and report the existing PR URL and verified head SHA.
 
 ## Portability Note
 

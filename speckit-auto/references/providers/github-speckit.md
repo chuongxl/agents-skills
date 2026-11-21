@@ -4,6 +4,11 @@ Repo-installed GitHub Spec Kit skills under `.github/skills/speckit-<command>/SK
 via the `skill` tool on all hosts. Adds to [../shared/operating-rules.md](../shared/operating-rules.md);
 never weakens it.
 
+For `--pr-fix`, the shared PR-specific Stage 02 and 03 routes override the feature-only artifact
+paths and implementation rules below. Reuse an identified existing spec at its actual path;
+when none exists, implement and review the fix directly without fabricating artifacts. Do not
+run a provider command that creates, renames or switches the validated worktree or branch.
+
 ## Stage Skill Map
 
 | Pipeline step | Skill(s) |

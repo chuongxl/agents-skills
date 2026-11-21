@@ -3,6 +3,13 @@
 Already in context: `SKILL.md`, the run contract, the provider adapter, Stage 01 output. Load
 nothing else unless a step says to.
 
+## Existing PR routing (`--pr-fix` only)
+
+Load [../pr-fix/stage-02-spec-design.md](../pr-fix/stage-02-spec-design.md) and follow it
+instead of the feature-creation steps, artifact-specific self-review and Entry Gate criteria.
+Retain the structured boundaries, applicable approvals and project context wiring below.
+When updating existing artifacts, apply their normal self-review; never require absent artifacts.
+
 Stage order and per-step identity come from the adapter's Stage Skill Map: github-speckit runs
 `specify → clarify → plan → checklist → tasks → analyze` in fixed order; superpowers runs
 `brainstorming` (= specify + clarify) then `writing-plans` (= plan + checklist + tasks + analyze).
