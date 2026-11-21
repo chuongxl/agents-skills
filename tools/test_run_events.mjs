@@ -225,6 +225,61 @@ test('rejects unknown reason codes, fields, and schema versions', () => {
   assert.throws(() => validateRunEvent({ ...base, schema_version: 2 }), /schema_version/);
 });
 
+test('validates delivered and blocked terminal event payloads', () => {
+  const base = JSON.parse(fixtures[0]);
+  assert.equal(validateRunEvent({
+    ...base,
+    seq: 8,
+    type: 'run_completed',
+    delivery: {
+      outcome: 'delivered',
+      commit_sha: 'a'.repeat(40),
+      pr_url: 'https://github.com/example/project/pull/18',
+      ci_status: 'passed',
+    },
+  }).type, 'run_completed');
+
+  assert.equal(validateRunEvent({
+    ...base,
+    seq: 9,
+    type: 'run_blocked',
+    blocked_by: 'US-17',
+    reason: 'Waiting for the dependency issue',
+  }).type, 'run_blocked');
+});
+
+test('rejects inconsistent delivery and blocked terminal payloads', () => {
+  const base = JSON.parse(fixtures[0]);
+  assert.throws(() => validateRunEvent({
+    ...base,
+    seq: 8,
+    type: 'run_completed',
+    delivery: { outcome: 'delivered' },
+  }), /requires a commit SHA or PR URL/);
+  assert.throws(() => validateRunEvent({
+    ...base,
+    seq: 8,
+    type: 'run_completed',
+    delivery: {
+      outcome: 'no_changes',
+      commit_sha: 'a'.repeat(40),
+    },
+  }), /no_changes cannot include change evidence/);
+  assert.throws(() => validateRunEvent({
+    ...base,
+    seq: 9,
+    type: 'run_blocked',
+    blocked_by: 'US-18',
+    reason: 'Waiting',
+  }), /different from issue_key/);
+  assert.throws(() => validateRunEvent({
+    ...base,
+    seq: 9,
+    type: 'run_blocked',
+    reason: '',
+  }), /reason must not be empty/);
+});
+
 test('keeps a maximum UTF-8 payload within the JSONL line limit', () => {
   const base = JSON.parse(fixtures[5]);
   const event = validateRunEvent({

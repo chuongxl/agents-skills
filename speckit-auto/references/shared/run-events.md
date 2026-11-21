@@ -123,14 +123,22 @@ runs also contain `issue_key` (`PROJECT-123`). Exact event-specific fields:
 | `gate_answered` | `stage`, `gate` |
 | `question_waiting` | `stage`, `question`; optional `options` |
 | `pr_opened` | `pr_url` |
-| `run_completed` | none |
+| `run_completed` | optional `delivery` |
 | `run_failed` | `reason: {code, message}` |
+| `run_blocked` | optional `blocked_by`; `reason` |
 
 Stages are `01-intake`, `02-spec-design`, `03-implement-review`,
 `04-finish`, `05-verification`, and `06-finish`. Failure codes are `review_loop_stuck`, `tests_failing`,
 `git_error`, `budget_exceeded`, `policy_blocked`, and `crashed`. A reason
 message is a one-line summary, not raw process output. Only absolute HTTPS PR
 URLs without embedded credentials are accepted.
+
+`delivery` is an object with `outcome`, and may include `commit_sha`, `pr_url`,
+and `ci_status`. `outcome` is `delivered` or `no_changes`; `delivered` requires
+a full commit SHA or PR URL, while `no_changes` cannot include change evidence.
+`ci_status` is `passed`, `failed`, `pending`, or `unavailable`. `blocked_by`
+must be a Jira issue key different from the run issue, and `reason` must be
+single-line text.
 
 The strict consumer limit is 32 option labels, 100 characters per label,
 64-character lowercase gate identifiers, 500-character questions and failure
