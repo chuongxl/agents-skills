@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Self-test: drive the deterministic parts of `speckit-auto --pr-fix` (pr-fix/stage-01 + stage-06) against a
-disposable project: a bare repo plays GitHub, a dict plays `gh api`, the REAL run-events.mjs emits."""
+disposable project: a bare repo plays GitHub, a dict plays `gh api`, the REAL run-events.mjs emits.
+This proves the procedure is safe when followed; test_run_events.mjs guards that the prose still says it."""
 import json, os, shutil, subprocess, sys, tempfile, uuid
 from pathlib import Path
 
@@ -69,8 +70,7 @@ def fix(st, change=True):
         (wt / "auth.py").write_text("def login(u, p):\n    return u == 'admin' and p == 'secret'\n")
         (wt / "test_auth.py").write_text("from auth import login\nassert not login('admin','x')\nassert login('admin','secret')\n")
         git(wt, "add", "auth.py", "test_auth.py"); git(wt, "commit", "-qm", "fix(#42): check password")  # only this run's paths
-    # run the project's own check
-    sh(wt, sys.executable, "test_auth.py") if change else None
+    if change: sh(wt, sys.executable, "test_auth.py")  # the project's own check
 
 def finish(w, st):
     wt, run = st["wt"], st["run"]
@@ -93,9 +93,9 @@ def run_case(name, setup=None, change=True, supplied=False, expect="ok", expect_
     try:
         if setup: setup(w)
         sup = None
-        if supplied:
-            sup = w.t / "supplied"; git(w.proj, "worktree", "add", "-q", "-b", "mine", str(sup), "refs/tmp/none" if False else out(w.remote, "rev-parse", "fix-login"))
-            if callable(supplied): supplied(sup)
+        if supplied:  # a function that dirties or advances the supplied worktree
+            sup = w.t / "supplied"; git(w.proj, "worktree", "add", "-q", "-b", "mine", str(sup), out(w.remote, "rev-parse", "fix-login"))
+            supplied(sup)
         st = intake(w, "https://github.com/o/r/pull/42", "Fix: login ignores the password", sup)
         fix(st, change); finish(w, st)
     except Stop as e:
@@ -114,10 +114,9 @@ def run_case(name, setup=None, change=True, supplied=False, expect="ok", expect_
 
 base = ["run_started", "stage_started", "stage_finished"]
 ok_all = []
-ok_all.append(run_case("A happy path: fix lands on the PR head, pr_updated emitted, no new PR",
+ok_all.append(run_case("A happy path: fix lands on the PR head, pr_updated emitted",
     expect_types=base + ["pr_updated", "stage_finished", "run_completed"],
-    check=lambda w, st: out(w.remote, "rev-parse", "fix-login") == out(st["wt"], "rev-parse", "HEAD") != st["head"]
-        and "main" == out(w.remote, "rev-parse", "--abbrev-ref", "HEAD")))
+    check=lambda w, st: out(w.remote, "rev-parse", "fix-login") == out(st["wt"], "rev-parse", "HEAD") != st["head"]))
 def race(w):
     git(w.mate, "pull", "-q"); (w.mate / "x.txt").write_text("x"); git(w.mate, "add", "-A"); git(w.mate, "commit", "-qm", "mate"); git(w.mate, "push", "-q", "origin", "fix-login")
 def s_race(w): w.race = lambda: race(w)

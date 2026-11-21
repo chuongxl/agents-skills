@@ -570,6 +570,9 @@ test('pr-fix push stays non-force and emits pr_updated, not pr_opened', () => {
   assert.match(stage6, /ordinary non-force push/);
   assert.match(stage6, /emit `pr_updated`/);
   assert.match(stage6, /Never emit `pr_opened`/);
+  assert.match(stage6, /Never call `gh pr create`/);
+  assert.match(stage6, /ancestor of local HEAD/);
+  assert.match(stage6, /fetch again and verify/);
 });
 
 test('pr_updated carries a PR URL like pr_opened', () => {

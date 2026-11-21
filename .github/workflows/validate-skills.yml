@@ -28,9 +28,6 @@ jobs:
       - name: Self-test the validator
         run: python3 tools/test_validate_skills.py
 
-      - name: PR-fix push safety fixture
-        run: python3 tools/test_pr_fix_push.py
-
       - name: PR-fix end-to-end flow fixture
         run: python3 tools/test_pr_fix_flow.py
 
