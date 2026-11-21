@@ -581,3 +581,51 @@ test('pr_updated carries a PR URL like pr_opened', () => {
   assert.doesNotThrow(() => validateRunEvent({ ...base, type: 'pr_updated', pr_url: 'https://github.com/o/r/pull/1' }));
   assert.throws(() => validateRunEvent({ ...base, type: 'pr_updated', pr_url: 'http://github.com/o/r/pull/1' }));
 });
+
+test('run_completed accepts an optional delivery report and rejects inconsistent ones', () => {
+  const done = JSON.parse(fixtures[7]);
+  const sha = 'a'.repeat(40);
+  const pr = 'https://github.com/example/project/pull/18';
+  assert.equal(validateRunEvent({ ...done, delivery: { outcome: 'delivered', commit_sha: sha, pr_url: pr, ci_status: 'passed' } }).type, 'run_completed');
+  assert.equal(validateRunEvent({ ...done, delivery: { outcome: 'no_changes' } }).type, 'run_completed');
+  for (const delivery of [
+    { outcome: 'delivered' },
+    { outcome: 'no_changes', commit_sha: sha },
+    { outcome: 'delivered', commit_sha: 'abc' },
+    { outcome: 'delivered', pr_url: 'http://example.com/pull/1' },
+    { outcome: 'delivered', pr_url: pr, ci_status: 'green' },
+    { outcome: 'other' },
+  ]) {
+    assert.throws(() => validateRunEvent({ ...done, delivery }), /delivery|delivered|no_changes/);
+  }
+});
+
+test('run_blocked needs a reason and only a different Jira key as blocker', () => {
+  const blocked = { ...JSON.parse(fixtures[0]), type: 'run_blocked', blocked_by: 'AD-3', reason: 'Needs the auth API' };
+  assert.equal(validateRunEvent(blocked).type, 'run_blocked');
+  const { blocked_by, ...noBlocker } = blocked;
+  assert.equal(validateRunEvent(noBlocker).type, 'run_blocked');
+  assert.throws(() => validateRunEvent({ ...blocked, blocked_by: 'us-1' }), /blocked_by/);
+  assert.throws(() => validateRunEvent({ ...blocked, blocked_by: 'US-18' }), /blocked_by/);
+  assert.throws(() => validateRunEvent({ ...blocked, reason: '' }), /reason/);
+  // a run without issue_key can name any blocker
+  const { issue_key, ...noKey } = blocked;
+  assert.equal(validateRunEvent(noKey).type, 'run_blocked');
+});
+
+test('run_blocked is not terminal: the run keeps emitting events', (t) => {
+  const { repo, worktree } = makeWorkspace(t);
+  const runId = '123e4567-e89b-42d3-a456-426614174120';
+  const emit = (event) => run(['emit', '--worktree', worktree, '--run-id', runId], JSON.stringify(event));
+  assert.equal(run(['init', '--repo', repo, '--worktree', worktree, '--run-id', runId, '--issue-key', 'US-18']).status, 0);
+  for (const event of [{ type: 'run_blocked', blocked_by: 'AD-3', reason: 'Needs the auth API' }, { type: 'stage_started', stage: '01-intake' }, { type: 'stage_finished', stage: '01-intake' }]) {
+    const result = emit(event);
+    assert.equal(result.status, 0, result.stderr);
+  }
+});
+
+test('pr_updated carries only a pr_url', () => {
+  const updated = { ...JSON.parse(fixtures[6]), type: 'pr_updated' };
+  assert.equal(validateRunEvent(updated).type, 'pr_updated');
+  assert.throws(() => validateRunEvent({ ...updated, pr_url: 'http://example.com/pull/1' }), /pr_url/);
+});

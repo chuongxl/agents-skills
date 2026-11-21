@@ -124,10 +124,13 @@ runs also contain `issue_key` (`PROJECT-123`). Exact event-specific fields:
 | `gate_answered` | `stage`, `gate` |
 | `question_waiting` | `stage`, `question`; optional `options` |
 | `pr_opened`, `pr_updated` | `pr_url` (`pr_updated`: an existing PR received a verified push) |
-| `run_completed` | none |
-
-`pr_updated` is emitted only by `--pr-fix` and never together with `pr_opened` in one run.
+| `run_completed` | optional `delivery: {outcome, commit_sha, pr_url, ci_status}` |
 | `run_failed` | `reason: {code, message}` |
+| `run_blocked` | `reason` (string); optional `blocked_by` (a Jira key other than this run's `issue_key`) |
+
+`run_blocked` is not terminal: the run may resume and emit further events.
+`pr_updated` is emitted only by `--pr-fix` and never together with `pr_opened` in one run.
+`delivery.outcome` is `delivered` (needs `commit_sha` or `pr_url`) or `no_changes` (no evidence).
 
 Stages are `01-intake`, `02-spec-design`, `03-implement-review`,
 `04-finish`, `05-verification`, and `06-finish`. Failure codes are `review_loop_stuck`, `tests_failing`,

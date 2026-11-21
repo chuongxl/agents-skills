@@ -18,6 +18,7 @@ export const REASON_CODES = [
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const ISSUE_KEY = /^[A-Z][A-Z0-9]*-\d+$/;
+const COMMIT_SHA = /^[0-9a-f]{40}$/i;
 const GATE_ID = /^[a-z0-9][a-z0-9_-]{0,63}$/;
 const OFFSET_ISO = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/;
 const ISO_CALENDAR_DATE = /^(\d{4})-(\d{2})-(\d{2})T/;
@@ -36,9 +37,11 @@ const TYPES = {
   question_waiting: ['stage', 'question', 'options'],
   pr_opened: ['pr_url'],
   pr_updated: ['pr_url'],
-  run_completed: [],
+  run_completed: ['delivery'],
   run_failed: ['reason'],
+  run_blocked: ['blocked_by', 'reason'],
 };
+const TERMINAL = ['run_completed', 'run_failed'];
 const BASE_FIELDS = ['schema_version', 'run_id', 'issue_key', 'seq', 'ts', 'type'];
 
 function fail(message) {
@@ -101,6 +104,38 @@ function validateOptions(value, label) {
   return value.map((option, index) => text(option, `${label}[${index}]`, 100));
 }
 
+function validateHttpsUrl(value, label) {
+  const url = text(value, label, 500);
+  const errorMessage = `${label} must be a valid HTTPS URL without credentials`;
+  let parsed;
+  try {
+    parsed = new URL(url);
+  } catch {
+    fail(errorMessage);
+  }
+  if (parsed.protocol !== 'https:' || !parsed.hostname || parsed.username || parsed.password) {
+    fail(errorMessage);
+  }
+}
+
+function validateDelivery(value) {
+  if (!isRecord(value)) fail('delivery must be an object');
+  exactKeys(value, ['outcome', 'commit_sha', 'pr_url', 'ci_status'], 'delivery');
+  if (value.outcome !== 'delivered' && value.outcome !== 'no_changes') {
+    fail('delivery.outcome is not supported');
+  }
+  if (value.commit_sha !== undefined && (typeof value.commit_sha !== 'string' || !COMMIT_SHA.test(value.commit_sha))) {
+    fail('delivery.commit_sha must be a full commit SHA');
+  }
+  if (value.pr_url !== undefined) validateHttpsUrl(value.pr_url, 'delivery.pr_url');
+  if (value.ci_status !== undefined && !['passed', 'failed', 'pending', 'unavailable'].includes(value.ci_status)) {
+    fail('delivery.ci_status is not supported');
+  }
+  const hasChangeEvidence = value.commit_sha !== undefined || value.pr_url !== undefined;
+  if (value.outcome === 'delivered' && !hasChangeEvidence) fail('delivered requires a commit SHA or PR URL');
+  if (value.outcome === 'no_changes' && hasChangeEvidence) fail('no_changes cannot include change evidence');
+}
+
 export function validateRunEvent(value) {
   if (!isRecord(value)) fail('event must be an object');
   exactKeys(value, [...BASE_FIELDS, ...Object.values(TYPES).flat()], 'event');
@@ -118,7 +153,9 @@ export function validateRunEvent(value) {
 
   switch (value.type) {
     case 'run_started':
+      break;
     case 'run_completed':
+      if (value.delivery !== undefined) validateDelivery(value.delivery);
       break;
     case 'stage_started':
     case 'stage_finished':
@@ -135,16 +172,7 @@ export function validateRunEvent(value) {
       break;
     case 'pr_opened':
     case 'pr_updated': {
-      const url = text(value.pr_url, 'pr_url', 500);
-      let parsed;
-      try {
-        parsed = new URL(url);
-      } catch {
-        fail('pr_url must be a valid HTTPS URL');
-      }
-      if (parsed.protocol !== 'https:' || !parsed.hostname || parsed.username || parsed.password) {
-        fail('pr_url must be a valid HTTPS URL without credentials');
-      }
+      validateHttpsUrl(value.pr_url, 'pr_url');
       break;
     }
     case 'run_failed':
@@ -152,6 +180,16 @@ export function validateRunEvent(value) {
       exactKeys(value.reason, ['code', 'message'], 'reason');
       if (!REASON_CODES.includes(value.reason.code)) fail('reason.code is not a supported failure code');
       text(value.reason.message, 'reason.message', 500);
+      break;
+    case 'run_blocked':
+      if (
+        value.blocked_by !== undefined &&
+        (typeof value.blocked_by !== 'string' || !ISSUE_KEY.test(value.blocked_by) || value.blocked_by === value.issue_key)
+      ) {
+        fail('blocked_by must be a Jira issue key, and not the run\'s own issue_key');
+      }
+      text(value.reason, 'reason', 500);
+      if (value.reason.length === 0) fail('reason must not be empty');
       break;
     default: {
       const exhaustive = value.type;
@@ -193,13 +231,19 @@ function validatePayload(raw) {
     });
   }
   if (fields.includes('pr_url')) result.pr_url = raw.pr_url;
+  if (fields.includes('blocked_by') && raw.blocked_by !== undefined) result.blocked_by = raw.blocked_by;
+  if (fields.includes('delivery') && raw.delivery !== undefined) result.delivery = raw.delivery;
   if (fields.includes('reason')) {
-    if (!isRecord(raw.reason)) fail('reason must be an object');
-    exactKeys(raw.reason, ['code', 'message'], 'reason');
-    result.reason = {
-      code: raw.reason.code,
-      message: typeof raw.reason.message === 'string' ? [...sanitizeText(raw.reason.message)].slice(0, 500).join('') : raw.reason.message,
-    };
+    if (raw.type === 'run_blocked') {
+      result.reason = typeof raw.reason === 'string' ? [...sanitizeText(raw.reason)].slice(0, 500).join('') : raw.reason;
+    } else {
+      if (!isRecord(raw.reason)) fail('reason must be an object');
+      exactKeys(raw.reason, ['code', 'message'], 'reason');
+      result.reason = {
+        code: raw.reason.code,
+        message: typeof raw.reason.message === 'string' ? [...sanitizeText(raw.reason.message)].slice(0, 500).join('') : raw.reason.message,
+      };
+    }
   }
   return result;
 }
@@ -290,7 +334,7 @@ function parseEventFile(filePath) {
     if (expected === 2 && (event.type !== 'stage_started' || event.stage !== STAGES[0])) {
       fail(`events.jsonl line ${index + 1}: sequence 2 must start stage ${STAGES[0]}`);
     }
-    if (event.type === 'run_completed' || event.type === 'run_failed') terminalRuns.add(event.run_id);
+    if (TERMINAL.includes(event.type)) terminalRuns.add(event.run_id);
     const priorIssueKey = issueKeyByRun.get(event.run_id);
     if (issueKeyByRun.has(event.run_id) && priorIssueKey !== event.issue_key) {
       fail(`events.jsonl line ${index + 1}: issue_key changed within a run`);
@@ -607,7 +651,7 @@ function init({ values }) {
     } else {
       if (runEvents[0].type !== 'run_started') fail('existing run does not begin with run_started');
       if (issueKey !== undefined && issueKey !== runEvents[0].issue_key) fail('issue_key does not match the existing run');
-      if (previous.type === 'run_completed' || previous.type === 'run_failed') {
+      if (TERMINAL.includes(previous.type)) {
         fail(`cannot resume terminal run ${runId}`);
       }
       if (runEvents.length === 1) {
@@ -665,7 +709,7 @@ function emit({ values }) {
     // completed by init instead.
     if (runEvents.length < 2) fail(`run ${runId} is not initialized; run init to complete it`);
     const latest = runEvents.at(-1);
-    if (latest.type === 'run_completed' || latest.type === 'run_failed') fail(`run ${runId} is already terminal`);
+    if (TERMINAL.includes(latest.type)) fail(`run ${runId} is already terminal`);
     const payload = validatePayload(readInput());
     const issueKey = runEvents[0].issue_key;
     const event = makeEvent(runId, issueKey, latest.seq + 1, payload);
