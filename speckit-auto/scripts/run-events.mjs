@@ -41,6 +41,7 @@ const TYPES = {
   run_failed: ['reason'],
   run_blocked: ['blocked_by', 'reason'],
 };
+const TERMINAL = ['run_completed', 'run_failed'];
 const BASE_FIELDS = ['schema_version', 'run_id', 'issue_key', 'seq', 'ts', 'type'];
 
 function fail(message) {
@@ -333,7 +334,7 @@ function parseEventFile(filePath) {
     if (expected === 2 && (event.type !== 'stage_started' || event.stage !== STAGES[0])) {
       fail(`events.jsonl line ${index + 1}: sequence 2 must start stage ${STAGES[0]}`);
     }
-    if (event.type === 'run_completed' || event.type === 'run_failed') terminalRuns.add(event.run_id);
+    if (TERMINAL.includes(event.type)) terminalRuns.add(event.run_id);
     const priorIssueKey = issueKeyByRun.get(event.run_id);
     if (issueKeyByRun.has(event.run_id) && priorIssueKey !== event.issue_key) {
       fail(`events.jsonl line ${index + 1}: issue_key changed within a run`);
@@ -650,7 +651,7 @@ function init({ values }) {
     } else {
       if (runEvents[0].type !== 'run_started') fail('existing run does not begin with run_started');
       if (issueKey !== undefined && issueKey !== runEvents[0].issue_key) fail('issue_key does not match the existing run');
-      if (previous.type === 'run_completed' || previous.type === 'run_failed') {
+      if (TERMINAL.includes(previous.type)) {
         fail(`cannot resume terminal run ${runId}`);
       }
       if (runEvents.length === 1) {
@@ -708,7 +709,7 @@ function emit({ values }) {
     // completed by init instead.
     if (runEvents.length < 2) fail(`run ${runId} is not initialized; run init to complete it`);
     const latest = runEvents.at(-1);
-    if (latest.type === 'run_completed' || latest.type === 'run_failed') fail(`run ${runId} is already terminal`);
+    if (TERMINAL.includes(latest.type)) fail(`run ${runId} is already terminal`);
     const payload = validatePayload(readInput());
     const issueKey = runEvents[0].issue_key;
     const event = makeEvent(runId, issueKey, latest.seq + 1, payload);

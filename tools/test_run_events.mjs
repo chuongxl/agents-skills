@@ -617,7 +617,7 @@ test('run_blocked is not terminal: the run keeps emitting events', (t) => {
   const runId = '123e4567-e89b-42d3-a456-426614174120';
   const emit = (event) => run(['emit', '--worktree', worktree, '--run-id', runId], JSON.stringify(event));
   assert.equal(run(['init', '--repo', repo, '--worktree', worktree, '--run-id', runId, '--issue-key', 'US-18']).status, 0);
-  for (const event of [{ type: 'run_blocked', blocked_by: 'AD-3', reason: 'Needs the auth API' }, { type: 'stage_started', stage: '01-intake' }]) {
+  for (const event of [{ type: 'run_blocked', blocked_by: 'AD-3', reason: 'Needs the auth API' }, { type: 'stage_started', stage: '01-intake' }, { type: 'stage_finished', stage: '01-intake' }]) {
     const result = emit(event);
     assert.equal(result.status, 0, result.stderr);
   }
