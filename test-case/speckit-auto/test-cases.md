@@ -65,6 +65,7 @@ all three host agents (GitHub Copilot, Claude Code, OpenCode).
 | PF17 | Shared gates after split | Run a PR fix in default and YOLO modes, with verification enabled and disabled | Trace approvals, checks and structured events | Applicable common stages, cleanup, approvals and event ordering remain unchanged | Both |
 | PF18 | Event initialization denied | Use a clean supplied PR worktree and deny the event `init` tool call in an unattended YOLO run | Run a fix whose fixture and PR head are still unchanged; inspect the tool trace, worktree and remote head | No implementation edit or later stage before successful `init`; on denial stop immediately, report the error, and do not commit, push or claim completion | Both |
 | PF19 | Event emission denied | Start an initialized PR-fix run and deny a required `emit` call in Stage 03 | Inspect the tool trace and PR head after the denial | Stop despite the NO-STOP ZONE; do not retry through another tool, commit, push, emit completion or claim success | Both |
+| PF20 | Init failure cleanup | Run PR fix with no supplied worktree, then deny or fail event `init` | Inspect `git worktree list` and local branches | Only the worktree and branch this run created are removed; a supplied worktree/branch is never removed; a cleanup failure is reported with path and reason | Both |
 
 ## Host-specific checks
 

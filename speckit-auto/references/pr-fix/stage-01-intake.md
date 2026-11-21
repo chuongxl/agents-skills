@@ -41,6 +41,10 @@ ordinary branch rename or create a feature artifact folder.
    Only a successful tool result opens the gate. If the call is denied or fails, stop immediately
    and report it; do not edit the requested files, enter a later stage, commit, push, retry through
    another tool, or claim completion. YOLO does not bypass this gate.
+   On any stop after step 3 creates a worktree, first remove only the worktree and local branch
+   this run created (`git worktree remove` without `--force`, then `git branch -d`), run from the
+   source repository and verify each is gone. Never remove a supplied worktree or branch. If cleanup
+   fails or the worktree holds changes, keep it and report its path and the reason.
    Then run the provider gate below, and Stage 01's shared guidelines and scratch hygiene.
    Emit `stage_finished` for `01-intake`, and enter Stage 02. Do not infer a Jira issue from the
    PR request or initialize an issue attempt unless a separate supported issue mode is in use.
