@@ -28,9 +28,8 @@ recovery file on a healthy run, or a file already in context. See the loading ma
 **Event initialization is a hard gate.** After the Stage 01 worktree gate, initialize run
 events and confirm the tool call succeeded before provider validation, implementation edits,
 tests, commits, pushes, or loading Stage 02 or later. Stage 01 may make only the setup changes
-needed for that gate. If initialization is denied or fails, stop and report the error; do not
-continue without events, retry through another tool, or claim success. This also applies in YOLO
-mode. A later event-call failure likewise stops the run, including inside the NO-STOP ZONE.
+needed for that gate. Failure handling (including YOLO and Stage 03) is in
+`references/shared/run-events.md`.
 
 ## Entry Dispatch (every invocation)
 
@@ -102,7 +101,7 @@ load only that stage's file — never block asking the user to re-run the skill.
 | `references/pipeline/stage-04-finish.md` | the applicable spec-based or direct review passes and project checks succeed |
 | `references/pipeline/stage-05-verification.md` | Stage 04 implementation commit succeeds (or is skipped as already-clean) |
 | `references/pipeline/stage-06-finish.md` | Stage 05 hands off (whether it ran or was skipped) |
-| `references/pr-fix/stage-*.md` | only for `--pr-fix`, when the current stage directs; Stage 05 only if verification runs |
+| `references/pr-fix/stage-0{1,2,3,6}-*.md` | only for `--pr-fix`, when the current stage directs |
 | `references/shared/commit.md` | first commit gate reached (Stage 02 → 03) |
 | `references/shared/host-adaptation.md` | a step needs an ask-tool name, skill dir, or install host key |
 | `references/shared/integration-setup.md` | `--integration` present (setup runs; no stage file loads) |

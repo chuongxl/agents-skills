@@ -3,7 +3,7 @@
 Perform cleanup and commit verification artifacts as in the shared Stage 06 steps 1–2, scoped to
 this run. Never mark an unrelated spec completed. Default mode asks the existing `pr-publish` gate
 to authorize updating the resolved existing PR head, showing its URL, repository, branch and
-commits; declining stops without a push or completion event and emits `run_failed` with
+commits, marking any commit that is neither in the fetched PR head nor made by this run as extra; declining stops without a push or completion event and emits `run_failed` with
 `policy_blocked`. Bracket the ask with the normal `pr-publish` gate events. YOLO authorizes the
 update without a wait. Never call `gh pr create` or fan out new PRs in this mode.
 
@@ -17,9 +17,8 @@ terminal `git_error`, never a success. Use argument-vector commands and do not p
 URLs or credentials. On failure emit `run_failed` as directed by shared/commit.md and do not emit
 completion.
 
-If this run pushed a new commit, emit `pr_opened` with the confirmed existing PR URL after push
-verification, unless that URL was already recorded on resume. This existing event also records
-delivery evidence; it does not mean a new PR was created. For a verified no-change run, do not
-emit `pr_opened` or claim delivery. Report the existing PR URL, actual review type, checks,
+If this run pushed a new commit, emit `pr_updated` with the confirmed existing PR URL after push
+verification, unless it was already recorded on resume. Never emit `pr_opened` here. For a
+verified no-change run, emit neither and do not claim delivery. Report the existing PR URL, actual review type, checks,
 verification outcome and pushed SHA; distinguish a verified no-change result. Emit `stage_finished`
 then `run_completed` only after the required push verification succeeds.

@@ -137,8 +137,7 @@ budget stop; `crashed` for other unrecoverable tool/runtime/filesystem failures.
 budget enforcement or new review-loop exits. An uncatchable host crash cannot emit and is
 diagnosed by the client session lifecycle. Pre-init errors have no event file.
 
-An event tool call denied by the host, or a failed event initialization, validation or write,
-is a hard instrumentation error: report it and stop immediately, even in YOLO or Stage 03.
+A denied or failed event call is a hard instrumentation error: stop as run-events.md directs.
 Never recurse trying to emit failure on the same broken writer, fall back to prose, or claim
 completion after a write error. A warning, recoverable failure, clean-tree commit skip, or
 Request changes is not `run_failed`. Only successful Stage 06 may emit `run_completed`, after

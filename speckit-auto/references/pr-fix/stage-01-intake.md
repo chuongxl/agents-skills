@@ -19,8 +19,8 @@ ordinary branch rename or create a feature artifact folder.
    Never change existing remotes.
 3. If a worktree and branch were supplied, confirm that path is a registered linked worktree in
    this repository, its current branch equals the supplied branch, and the fetched head SHA is
-   an ancestor of its HEAD. If it contains additional unpublished commits, stop unless their
-   publication was explicitly authorized for this PR. Otherwise stop on mismatch. Reuse it exactly:
+   an ancestor of its HEAD. If it contains additional unpublished commits, stop unless the invocation
+   explicitly says to include them; Stage 06 lists them at the `pr-publish` gate. Otherwise stop on mismatch. Reuse it exactly:
    never checkout, rename or move its branch or worktree. If no worktree was supplied, create a
    new linked worktree at a safe unused path on a distinct unused local branch from the fetched
    head SHA; do not check out or alter an already occupied branch. Never overwrite an existing
@@ -38,9 +38,7 @@ ordinary branch rename or create a feature artifact folder.
    handling from the ordinary gate if needed. Retain the absolute event helper path and run ID,
    load [../shared/run-events.md](../shared/run-events.md), and invoke its `init` once with the
    original source and actual worktree; this emits `run_started` and the `01-intake` start.
-   Only a successful tool result opens the gate. If the call is denied or fails, stop immediately
-   and report it; do not edit the requested files, enter a later stage, commit, push, retry through
-   another tool, or claim completion. YOLO does not bypass this gate.
+   Only a successful tool result opens the gate; on denial or failure stop as run-events.md directs.
    On any stop after step 3 creates a worktree, first remove only the worktree and local branch
    this run created (`git worktree remove` without `--force`, then `git branch -d`), run from the
    source repository and verify each is gone. Never remove a supplied worktree or branch. If cleanup

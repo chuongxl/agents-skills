@@ -25,8 +25,11 @@ report and PR body.
 
 - `false` → skip this stage entirely. Load [stage-06-finish.md](stage-06-finish.md) and enter
   Stage 06 in the same turn, noting `verification: skipped` for the final report.
-- `true` → for `--pr-fix`, load [../pr-fix/stage-05-verification.md](../pr-fix/stage-05-verification.md)
-  and apply it to steps 2-5; then continue with those steps.
+- `true` → continue with steps 2-5 below. For `--pr-fix` with no matching spec, pass the PR
+  description, fix request and actual changed paths in place of spec/plan, and assess evidence
+  against the requested behavior without inventing spec criteria. Report unexercised behavior
+  honestly. On an investigation or mismatch, return through the PR-fix Stage 02/03 routes and
+  repeat direct review (not `speckit-code-review`) when no matching spec exists.
 
 ## 2. Update the project verification skill for this feature
 

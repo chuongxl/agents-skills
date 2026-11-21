@@ -123,8 +123,10 @@ runs also contain `issue_key` (`PROJECT-123`). Exact event-specific fields:
 | `gate_waiting` | `stage`, `gate`; optional `question`, `options` |
 | `gate_answered` | `stage`, `gate` |
 | `question_waiting` | `stage`, `question`; optional `options` |
-| `pr_opened` | `pr_url` |
+| `pr_opened`, `pr_updated` | `pr_url` (`pr_updated`: an existing PR received a verified push) |
 | `run_completed` | none |
+
+`pr_updated` is emitted only by `--pr-fix` and never together with `pr_opened` in one run.
 | `run_failed` | `reason: {code, message}` |
 
 Stages are `01-intake`, `02-spec-design`, `03-implement-review`,

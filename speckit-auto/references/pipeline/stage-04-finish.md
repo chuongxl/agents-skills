@@ -8,8 +8,9 @@ implementation and pass control to Stage 05. Feature runs push here; PR fixes de
 At actual entry or re-entry emit `{type: "stage_started", stage: "04-finish"}` using the shared
 JSON stdin invocation, not on context-only resume.
 
-For `--pr-fix`, load [../pr-fix/stage-04-finish.md](../pr-fix/stage-04-finish.md) and apply
-its overrides to the shared approval and commit steps.
+For `--pr-fix`: with no spec, present the actual PR/request and review basis at the approval
+gate (same approval or YOLO guard). Commit only this run's changes; shared/commit.md defers the
+PR push until Stage 06. Report the actual review type and do not claim a push here.
 
 ## Default Mode — Human Manual Review Gate
 
