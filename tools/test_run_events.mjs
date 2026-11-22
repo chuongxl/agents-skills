@@ -606,7 +606,10 @@ test('run_blocked needs a reason and only a different Jira key as blocker', () =
   const { blocked_by, ...noBlocker } = blocked;
   assert.equal(validateRunEvent(noBlocker).type, 'run_blocked');
   assert.throws(() => validateRunEvent({ ...blocked, blocked_by: 'us-1' }), /blocked_by/);
-  assert.throws(() => validateRunEvent({ ...blocked, blocked_by: 'US-18' }), /blocked_by/);
+  assert.throws(
+    () => validateRunEvent({ ...blocked, blocked_by: 'US-18' }),
+    /blocked_by must be a Jira issue key different from issue_key/,
+  );
   assert.throws(() => validateRunEvent({ ...blocked, reason: '' }), /reason/);
   // a run without issue_key can name any blocker
   const { issue_key, ...noKey } = blocked;

@@ -186,7 +186,7 @@ export function validateRunEvent(value) {
         value.blocked_by !== undefined &&
         (typeof value.blocked_by !== 'string' || !ISSUE_KEY.test(value.blocked_by) || value.blocked_by === value.issue_key)
       ) {
-        fail('blocked_by must be a Jira issue key, and not the run\'s own issue_key');
+        fail('blocked_by must be a Jira issue key different from issue_key');
       }
       text(value.reason, 'reason', 500);
       if (value.reason.length === 0) fail('reason must not be empty');
