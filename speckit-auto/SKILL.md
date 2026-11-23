@@ -15,7 +15,7 @@ license: MIT
 allowed-tools: bash glob grep view create edit skill ask_user
 metadata:
   author: Alex Nguyen
-  version: "0.8.4"
+  version: "0.9.0"
 ---
 
 # Speckit Auto
@@ -41,8 +41,15 @@ needed for that gate. Failure handling (including YOLO and Stage 03) is in
    - `--pr-fix <absolute GitHub PR URL>` → existing-PR fix intent. Require a non-empty fix
      request as well; reject missing/invalid values and combinations with `--issue` or
      `--integration` before changing anything. Treat the PR URL as identity, not requirement text.
-     Capture an explicitly supplied worktree path and branch from the caller's invocation text
-     as structured run state; if none is supplied, use the manual creation path.
+     A worktree and branch come from `--worktree`/`--branch` or, for older callers, from the
+     invocation text naming them; capture them as structured run state. If none is supplied,
+     use the manual creation path.
+   - `--worktree <path> --branch <name>` → optional caller-chosen worktree and branch for any
+     pipeline intent. Accept only as a pair. A relative path resolves against the primary
+     checkout; the resolved path must sit directly under `<repo-root>/.worktrees/`, and the
+     branch must pass `git check-ref-format --branch`. Reject anything else as an invocation
+     error before changing anything. Retain both across resumes; never replace them mid-run.
+     Stage 01 reuses that worktree when it exists and creates it when it does not.
    - `--yolo` → mode = yolo (else default)
    - `--run-id <uuid>` / `--run-id=<uuid>` → optional attempt identity, not requirement text.
      Missing/invalid UUID → explicit invocation error. Preserve it across resumes; never

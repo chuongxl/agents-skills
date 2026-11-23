@@ -37,3 +37,8 @@ Scope: validate Stage 01 worktree-based isolation, branch/worktree alignment, an
   feature key; PR-fix runs retain their resolved worktree and branch instead.
 - Reruns remain stable (reuse branch/worktree/artifact identity) and never create duplicate suffix branches for the same feature.
 - Both providers follow the same shared worktree contract, differing only in provider-specific preflight checks.
+| WT22 | Supplied worktree created | `--worktree .worktrees/x-r1 --branch agentops/x-r1`; neither exists | Run `--issue` or requirement pipeline | Picks and syncs base (`develop` → `main` → `master`), creates that worktree and branch from it, never renames or moves them after intake | Both |
+| WT23 | Supplied worktree reused | Same flags; the worktree exists on that branch | Re-run (resume) | Reuses the worktree as is; no new worktree, no branch reset | Both |
+| WT24 | Supplied worktree conflict | Same flags; path exists as another worktree/folder, or branch exists without it | Run pipeline | Stops with an explicit error before provider or intake; touches nothing | Both |
+| WT25 | Invalid flags | Only one of `--worktree`/`--branch`, a path outside `.worktrees/`, or an invalid ref name | Run pipeline | Invocation error before any change | Both |
+| PF-WT04 | Supplied PR worktree created | `--pr-fix <PR URL> --worktree .worktrees/pr-42-fix-r1 --branch agentops/pr-42-fix-r1`; neither exists | Run PR-fix intake | Creates that worktree and branch at the fetched PR head; treats them as created by this run for stop cleanup | Both |

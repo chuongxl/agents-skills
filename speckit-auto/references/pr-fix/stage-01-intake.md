@@ -17,7 +17,9 @@ ordinary branch rename or create a feature artifact folder.
    and accept only trusted GitHub HTTPS or SSH transports; pass them as arguments, not shell
    fragments. If the head moves during intake, stop and retry instead of using stale identity.
    Never change existing remotes.
-3. If a worktree and branch were supplied, confirm that path is a registered linked worktree in
+3. If a worktree and branch were supplied whose path and branch both do not exist yet, create
+   them from the fetched head SHA: `git worktree add -b <branch> <path> <head SHA>`. Treat them
+   as created by this run. If the path exists, confirm that path is a registered linked worktree in
    this repository, its current branch equals the supplied branch, and the fetched head SHA is
    an ancestor of its HEAD. If it contains additional unpublished commits, stop unless the invocation
    explicitly says to include them; Stage 06 lists them at the `pr-publish` gate. Otherwise stop on mismatch. Reuse it exactly:
@@ -43,7 +45,7 @@ ordinary branch rename or create a feature artifact folder.
    Only a successful tool result opens the gate; on denial or failure stop as run-events.md directs.
    On any stop after step 3 creates a worktree, first remove only the worktree and local branch
    this run created (`git worktree remove` without `--force`, then `git branch -d`), run from the
-   source repository and verify each is gone. Never remove a supplied worktree or branch. If cleanup
+   source repository and verify each is gone. Never remove a supplied worktree or branch that this run did not create. If cleanup
    fails or the worktree holds changes, keep it and report its path and the reason.
    Then run the provider gate below, and Stage 01's shared guidelines and scratch hygiene.
    Emit `stage_finished` for `01-intake`, and enter Stage 02. Do not infer a Jira issue from the

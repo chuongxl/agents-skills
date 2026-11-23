@@ -44,6 +44,17 @@ run state/discovery, never replace it with the current linked worktree's root.
    final `<issue_id>-<short_title>` / `<NNN>-<slug>` and it differs, run `git branch -m
    <final-name>` and, when safe, `git worktree move` to the canonical path. Local-only, safe
    before any push.
+   **Caller-supplied worktree** (`--worktree` and `--branch` in run state): steps 1–3 still run
+   (this skill chooses and syncs the base), then instead of the rest of step 4 and step 5:
+   - the path is a registered linked worktree with the supplied branch checked out → reuse it
+     as is (a resume of the same run);
+   - neither the path nor the branch exists → `git worktree add -b <branch> <path> <base_branch>`;
+   - anything else (the path exists as something else, or the branch exists without that
+     worktree) → stop with an explicit error; never overwrite, reset, or switch its branch.
+
+   The supplied path and branch are final: no provisional name, no `git branch -m`, no
+   `git worktree move`. Artifact identity (§5) still names the `specs/` folder. Mirror run config
+   as above.
 6. Confirm the branch is checked out in the worktree; set `branch_created: true`, `branch_name`,
    `worktree_path` in run state. Every later step runs **from this worktree**.
 
@@ -185,7 +196,7 @@ stage genuinely needs a detail the brief dropped.
 reruns:** before deriving a new slug, search for an existing artifact starting with `<issue_id>-`
 — exactly one match → reuse its `short_title` verbatim (even if the Jira title changed); several →
 use the most recent and log the ambiguity; none → derive fresh. This is where the provisional
-branch gets renamed (§1.5).
+branch gets renamed (§1.5), unless the caller supplied the worktree and branch.
 
 ## 6. Artifact Path + Stage 02 Entry
 
