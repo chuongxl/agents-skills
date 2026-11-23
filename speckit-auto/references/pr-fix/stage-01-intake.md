@@ -28,9 +28,11 @@ ordinary branch rename or create a feature artifact folder.
 4. Record `pr_url`, `pr_base_repository`, `base_branch`, fetched `base_sha`, `pr_head_repository`,
    `pr_head_branch`, `pr_head_sha`, authenticated `pr_push_url`, `worktree_path`, actual
    `branch_name`, `source_repo_path`, `requirement_text`, and the run ID. Record the initial
-   worktree status and staged paths so later commits cannot include pre-existing edits. Preserve
-   these values across resumes. If the supplied worktree has any tracked or untracked changes,
-   stop without modifying them; the spec reviewer otherwise includes them in its review scope.
+   worktree status and staged paths, including untracked paths, plus enough baseline information
+   to verify their index and worktree contents remain unchanged. Keep this information private
+   and preserve it across resumes. A dirty supplied worktree is not itself a blocker. Do not edit
+   an initially changed path when the fix cannot be separated from the existing edits safely;
+   stop and report that path instead.
    Derive `source_repo_path` from the primary checkout registered in the common Git repository,
    even when invocation starts in a supplied linked worktree.
 5. Mirror integration config only when absent in the worktree; never overwrite existing config.

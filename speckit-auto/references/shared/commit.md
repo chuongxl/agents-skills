@@ -19,7 +19,14 @@ For a PR fix use the PR number as the message scope; no artifact folder is requi
 ## Existing PR push (`--pr-fix` only)
 
 Apply staging and conditional-commit rules to this run's paths only. If initial changes cannot be
-separated safely, stop with `policy_blocked`. Defer all pushes at commit gates; Stage 06 uses
+separated safely, stop with `policy_blocked`. Exclude unrelated paths recorded at intake from
+the unaccounted-for-path check below, but retain the credential and scratch-path stop. Keep their
+existing index entries intact: stage only this run's paths and commit with an explicit path list
+(`git commit --only ... -- <paths>`), never a plain `git commit` that includes other staged work.
+Do not include an initially dirty path in that list: `--only` commits its full worktree content,
+not just selected hunks. Stop if the fix needs such a path and no safe separation is available.
+If there are no run-owned paths to commit, skip the commit even when initial edits remain. Defer
+all pushes at commit gates; Stage 06 uses
 [../pr-fix/stage-06-finish.md](../pr-fix/stage-06-finish.md) after authorization instead of
 Branch Sync + Push below. Never pull, rebase or force-push a PR head.
 

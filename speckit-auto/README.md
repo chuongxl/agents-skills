@@ -1,8 +1,8 @@
 # Speckit Auto — Spec-Driven Delivery Pipeline
 
-![Version](https://img.shields.io/badge/version-0.8.3-blue)
+![Version](https://img.shields.io/badge/version-0.8.4-blue)
 
-**Version**: 0.8.3
+**Version**: 0.8.4
 **Author**: Alex Nguyen
 
 ## Overview
@@ -145,7 +145,8 @@ flags in the trigger message (e.g. a Slack thread `@hermes start DEMO-42 --issue
 worktree or creates one from the PR head, reuses a relevant spec when available, and reviews the
 PR directly when none exists. Default mode asks before updating the PR; `--yolo` authorizes the
 update. The pipeline pushes only to the resolved PR head, never force-pushes, and never opens a
-second PR. A dirty supplied worktree or inaccessible head stops safely.
+second PR. Unrelated edits in a supplied worktree are preserved and excluded from the fix; an
+inaccessible head or edits that cannot be separated safely stop the run.
 
 ### Provider setup (one-time)
 

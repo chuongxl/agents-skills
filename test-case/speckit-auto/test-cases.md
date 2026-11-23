@@ -54,7 +54,7 @@ all three host agents (GitHub Copilot, Claude Code, OpenCode).
 | PF06 | No relevant spec | No matching spec exists | Run PR fix | Review the PR diff and request directly; never invent a spec or claim a spec-based review passed | Both |
 | PF07 | Concurrent update | Another clone advances the PR head during the run | Reach a push | Never force push or discard commits; stop if the current remote head is not an ancestor of local HEAD | Both |
 | PF08 | Push denied | Remote rejects a required push | Finish PR fix | Emit `run_failed` with `git_error`; never emit completion or create another PR | Both |
-| PF09 | Existing dirty changes | Supplied worktree has unrelated edits | Run PR fix | Preserve them, never stage them; stop if edits cannot be separated safely | Both |
+| PF09 | Existing dirty changes | Supplied worktree has unrelated staged, unstaged, and untracked files, including `.github/copilot-instructions.md` | Run PR fix through verified push | Continue past intake and commit; preserve all initial contents and index entries, exclude them from review and commits, and push only the fix | Both |
 | PF10 | Existing format failure | Full format check fails before the run on unrelated files | Run changed-file and full checks | Changed files must pass; classify a full-check failure as pre-existing only after reproducing at baseline | Both |
 | PF11 | Verification and gates | Repeat with default/YOLO and verification enabled/disabled/unavailable | Run PR fix | Preserve applicable approval and verification behavior, record actual review/check outcomes, update only the existing PR | Both |
 | PF12 | Provider config in source checkout | Fresh supplied worktree has no `.speckit/integration.json`; primary checkout has a valid config | Run PR fix from the supplied worktree | Resolve the existing provider from the primary checkout before intake, then mirror config without overwriting | Both |
@@ -66,6 +66,9 @@ all three host agents (GitHub Copilot, Claude Code, OpenCode).
 | PF18 | Event initialization denied | Use a clean supplied PR worktree and deny the event `init` tool call in an unattended YOLO run | Run a fix whose fixture and PR head are still unchanged; inspect the tool trace, worktree and remote head | No implementation edit or later stage before successful `init`; on denial stop immediately, report the error, and do not commit, push or claim completion | Both |
 | PF19 | Event emission denied | Start an initialized PR-fix run and deny a required `emit` call in Stage 03 | Inspect the tool trace and PR head after the denial | Stop despite the NO-STOP ZONE; do not retry through another tool, commit, push, emit completion or claim success | Both |
 | PF20 | Init failure cleanup | Run PR fix with no supplied worktree, then deny or fail event `init` | Inspect `git worktree list` and local branches | Only the worktree and branch this run created are removed; a supplied worktree/branch is never removed; a cleanup failure is reported with path and reason | Both |
+| PF21 | Dirty file overlaps fix | Supplied worktree has a staged or unstaged edit in a file needed by the fix | Run PR fix | Stop before editing that file when the changes cannot be separated safely; preserve the file and index | Both |
+| PF22 | Dirty file overlaps PR diff | A file changed in the PR also has an unrelated initial worktree edit; a matching spec exists | Run spec-based review | Review the committed PR version, not the initial edit; exclude the initial edit from the commit | Both |
+| PF23 | New unrelated changes | A new unrelated file appears after dirty-worktree intake | Reach the staging safety check | Stop and report the new path; do not stage or push it | Both |
 
 ## Host-specific checks
 
