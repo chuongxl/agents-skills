@@ -11,7 +11,10 @@ the requested fix and changed paths rather than a tasks artifact, and apply the 
 pre-flight and safe submodule rules to those workspaces.
 
 When Stage 02 identified a relevant spec, invoke `speckit-code-review` inline with that spec and
-the merge-base `base_ref`. Also check that the fix request is addressed. With no matching spec,
+the merge-base `base_ref`, passing the initial dirty paths as `exclude_worktree_paths`. When there
+are initial dirty paths, confirm that the installed reviewer supports that input; if not, stop
+with an actionable diagnostic to update `speckit-code-review`, rather than treating an unscoped
+review as passing. Also check that the fix request is addressed. With no matching spec,
 perform a direct line-by-line review against the PR description, request and existing behavior,
 including correctness, security and regression tests. Record `review: direct` and its actual
 findings; never claim `speckit-code-review` passed. Fix blocking findings and repeat the same

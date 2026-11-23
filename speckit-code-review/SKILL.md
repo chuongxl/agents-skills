@@ -13,7 +13,7 @@ metadata:
   specification: agentskills.io/specification
   output_contract: strict-json
   author: Alex Nguyen
-  version: "0.0.4"
+  version: "0.0.5"
 ---
 
 # Speckit Code Review
@@ -39,6 +39,11 @@ Claude Code and OpenCode expose the same capabilities under their own names (`Ba
   working-tree change set, so committed feature work is reviewed even when the tree is clean.
   `speckit-auto` always passes this. When invoked from `speckit-auto`, the caller must run this
   skill inline from inside the Stage 01 linked worktree, never from the base checkout.
+- Optional `exclude_worktree_paths`: exact paths of unrelated changes that existed before a PR-fix
+  run. Exclude only their staged, unstaged and untracked changes, not their committed changes in
+  `base_ref...HEAD`. For a path in both sets, review the committed `HEAD` version rather than
+  the dirty worktree version. Apply the same rule to expanded submodule paths. Do not use this
+  input to exclude a path modified by the current run.
 - **Submodule expansion (mandatory when `.gitmodules` exists):** a top-level `git diff`/`git
   status` only ever shows a changed submodule as a single gitlink entry (mode `160000`), never the
   files changed inside it — reviewing that entry alone is reviewing nothing. Resolve every area's
@@ -93,7 +98,8 @@ testable requirements to the spec. Never return `pass` against an empty checklis
 
 1. Build the requirement checklist (see above).
 2. Resolve the git change set as review scope (union with `git diff <base_ref>...HEAD` when a
-   `base_ref` was passed), applying the Submodule Expansion rules above when `.gitmodules` exists.
+   `base_ref` was passed), applying `exclude_worktree_paths` and the Submodule Expansion rules
+   above when supplied and when `.gitmodules` exists, respectively.
    This expanded set is what every area below means by "the git change set" — no area re-derives
    it independently.
 3. **Project guidelines (conditional)** — if `docs/guidelines/architecture.md` exists, load

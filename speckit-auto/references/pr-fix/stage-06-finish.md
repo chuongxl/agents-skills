@@ -8,7 +8,9 @@ commits, marking any commit that is neither in the fetched PR head nor made by t
 update without a wait. Never call `gh pr create` or fan out new PRs in this mode.
 
 Immediately before the push, re-query the open PR and verify its head repository and ref still
-match intake. Fetch that exact head into a private temporary ref, confirm the fetched SHA matches
+match intake. Verify that unrelated initial paths still have their original index and worktree
+contents; if not, stop and report the paths without printing their contents. Fetch that exact head
+into a private temporary ref, confirm the fetched SHA matches
 the API head, and require it to be an ancestor of local HEAD. If it is not, stop with `git_error`;
 do not overwrite remote work. Push `HEAD` to `refs/heads/<pr_head_branch>` at the authenticated
 resolved head-repository URL using an ordinary non-force push, then fetch again and verify its
