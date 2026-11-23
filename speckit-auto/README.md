@@ -1,8 +1,8 @@
 # Speckit Auto — Spec-Driven Delivery Pipeline
 
-![Version](https://img.shields.io/badge/version-0.8.4-blue)
+![Version](https://img.shields.io/badge/version-0.9.0-blue)
 
-**Version**: 0.8.4
+**Version**: 0.9.0
 **Author**: Alex Nguyen
 
 ## Overview
@@ -132,12 +132,26 @@ skill speckit-auto --yolo --issue https://jira.example.com/browse/PROJ-456
 # Optional caller-supplied attempt UUID, retained on resume
 skill speckit-auto --run-id 123e4567-e89b-42d3-a456-426614174000 --issue https://jira.example.com/browse/PROJ-123
 
+# Caller-chosen worktree and branch (reused if present, created if not)
+skill speckit-auto --run-id 123e4567-e89b-42d3-a456-426614174000 --worktree .worktrees/proj-123-run1 --branch agentops/proj-123-run1 --issue https://jira.example.com/browse/PROJ-123
+
 # Fix an existing open PR without creating another one
 skill speckit-auto --pr-fix https://github.com/owner/repo/pull/42 "Fix the failing test"
 ```
 
 On Copilot/Claude Code invoke as `/speckit-auto <flags>`; on OpenCode and Hermes Agent embed the
 flags in the trigger message (e.g. a Slack thread `@hermes start DEMO-42 --issue <url>`).
+
+### Caller-chosen worktree
+
+`--worktree <path> --branch <name>` (always together) names the worktree and branch the run uses.
+The path must sit directly under `<repo-root>/.worktrees/`; a relative path resolves against the
+primary checkout. If that worktree exists with that branch, the run reuses it; if neither exists,
+the run creates it. Anything in between stops the run. For `--issue` and requirement runs the
+skill still chooses and syncs the base branch, but it never renames or moves a supplied branch or
+worktree. For `--pr-fix` a new worktree starts at the verified PR head. Without the flags the
+run picks its own worktree as before. On reuse, config is merged by key: the primary checkout wins
+conflicts, and worktree-only keys are retained.
 
 ### Fix an existing PR
 
