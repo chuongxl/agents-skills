@@ -150,7 +150,8 @@ primary checkout. If that worktree exists with that branch, the run reuses it; i
 the run creates it. Anything in between stops the run. For `--issue` and requirement runs the
 skill still chooses and syncs the base branch, but it never renames or moves a supplied branch or
 worktree. For `--pr-fix` a new worktree starts at the verified PR head. Without the flags the
-run picks its own worktree as before.
+run picks its own worktree as before. On reuse, config is merged by key: the primary checkout wins
+conflicts, and worktree-only keys are retained.
 
 ### Fix an existing PR
 

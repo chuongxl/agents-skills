@@ -7,8 +7,8 @@ Scope: validate Stage 01 worktree-based isolation, branch/worktree alignment, an
 | WT01 | Stage 01 creates linked worktree | Inside git repo; no existing feature branch/worktree | Run `/speckit-auto "<requirement>"` | Creates branch and linked worktree at `<repo-root>/.worktrees/<branch-name>` before any provider preflight/intake | Both |
 | WT02 | Stage 01 reuses existing branch + worktree on rerun | Branch and canonical worktree already exist | Re-run same feature command | Reuses existing linked worktree, does not create suffix branch, continues pipeline | Both |
 | WT03 | Existing branch without linked worktree | Feature branch exists; no linked worktree for it | Run same feature command | Adds linked worktree at canonical path and continues on it | Both |
-| WT04 | Canonical worktree path ignore enforcement | `.gitignore` exists and misses `.worktrees/` | Run Stage 01 | Appends `.worktrees/` to `.gitignore` (no separate commit step) | Both |
-| WT05 | `.gitignore` bootstrap for worktree root | `.gitignore` absent | Run Stage 01 | Creates `.gitignore` containing `.worktrees/` and proceeds | Both |
+| WT04 | Canonical worktree path local exclusion | `git rev-parse --git-path info/exclude` exists and misses `.worktrees/` | Run Stage 01 | Appends `.worktrees/` to the local exclude file; leaves tracked `.gitignore` unchanged | Both |
+| WT05 | Local exclude bootstrap for worktree root | `git rev-parse --git-path info/exclude` does not exist | Run Stage 01 | Creates the local exclude file containing `.worktrees/` and proceeds | Both |
 | WT06 | Base branch resolution priority | Multiple base branches available | Run Stage 01 | Selects base in order: `develop` → `main` → `master` | Both |
 | WT07 | Base sync fallback | Fetch/pull fails (offline/no remote/conflict) | Run Stage 01 | Logs warning and continues from local base copy (not a hard stop) | Both |
 | WT08 | Missing base branch hard failure | None of `develop/main/master` exist | Run Stage 01 | Stops with explicit missing base branch error | Both |
@@ -29,6 +29,12 @@ Scope: validate Stage 01 worktree-based isolation, branch/worktree alignment, an
 | PF-WT02 | Manual PR fix | Open PR; no worktree supplied; local PR head branch already checked out elsewhere | Run with `--pr-fix <PR URL>` and a fix request | Create an isolated linked worktree with a distinct local branch at the fetched PR head; leave the occupied branch alone | Both |
 | PF-WT03 | Invalid identity | Missing URL or request, closed PR, mismatched supplied worktree, inaccessible fork or unwritable head | Run PR-fix intake | Stop with a diagnostic before modifying files or creating a worktree; never guess a push destination | Both |
 | PF-WT04 | Feature regression | No `--pr-fix` | Run feature and Jira intake | Existing feature branch and worktree behavior remains unchanged | Both |
+| WT22 | Supplied worktree created | `--worktree .worktrees/x-r1 --branch agentops/x-r1`; neither exists | Run `--issue` or requirement pipeline | Picks and syncs base (`develop` → `main` → `master`), creates that worktree and branch from it, never renames or moves them after intake | Both |
+| WT23 | Supplied worktree reused | Same flags; the worktree exists on that branch | Re-run (resume) | Reuses the worktree as is; no new worktree, no branch reset | Both |
+| WT24 | Supplied worktree conflict | Same flags; path exists as another worktree/folder, or branch exists without it | Run pipeline | Stops with an explicit error before provider or intake; touches nothing | Both |
+| WT25 | Invalid flags | Only one of `--worktree`/`--branch`, a path outside `.worktrees/`, or an invalid ref name | Run pipeline | Invocation error before any change | Both |
+| PF-WT05 | Supplied PR worktree created | `--pr-fix <PR URL> --worktree .worktrees/pr-42-fix-r1 --branch agentops/pr-42-fix-r1`; neither exists | Run PR-fix intake | Creates that worktree and branch at the fetched PR head; treats them as created by this run for stop cleanup | Both |
+| WT26 | Existing worktree config merge | Reused worktree config has a conflicting value and a worktree-only key | Run with `--worktree` and `--branch` | Merges automatically; primary config wins conflicts, worktree-only keys remain, JSON stays valid, and the run continues without asking | Both |
 
 ## Minimum pass criteria
 
@@ -37,8 +43,3 @@ Scope: validate Stage 01 worktree-based isolation, branch/worktree alignment, an
   feature key; PR-fix runs retain their resolved worktree and branch instead.
 - Reruns remain stable (reuse branch/worktree/artifact identity) and never create duplicate suffix branches for the same feature.
 - Both providers follow the same shared worktree contract, differing only in provider-specific preflight checks.
-| WT22 | Supplied worktree created | `--worktree .worktrees/x-r1 --branch agentops/x-r1`; neither exists | Run `--issue` or requirement pipeline | Picks and syncs base (`develop` → `main` → `master`), creates that worktree and branch from it, never renames or moves them after intake | Both |
-| WT23 | Supplied worktree reused | Same flags; the worktree exists on that branch | Re-run (resume) | Reuses the worktree as is; no new worktree, no branch reset | Both |
-| WT24 | Supplied worktree conflict | Same flags; path exists as another worktree/folder, or branch exists without it | Run pipeline | Stops with an explicit error before provider or intake; touches nothing | Both |
-| WT25 | Invalid flags | Only one of `--worktree`/`--branch`, a path outside `.worktrees/`, or an invalid ref name | Run pipeline | Invocation error before any change | Both |
-| PF-WT04 | Supplied PR worktree created | `--pr-fix <PR URL> --worktree .worktrees/pr-42-fix-r1 --branch agentops/pr-42-fix-r1`; neither exists | Run PR-fix intake | Creates that worktree and branch at the fetched PR head; treats them as created by this run for stop cleanup | Both |

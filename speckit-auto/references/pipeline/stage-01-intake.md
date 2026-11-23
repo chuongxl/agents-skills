@@ -28,17 +28,24 @@ run state/discovery, never replace it with the current linked worktree's root.
 2. Sync base best-effort: `git fetch origin <base>` → `git checkout <base>` →
    `git pull origin <base>` (fast-forward). Failure → log a warning and continue with the local
    copy; never a stop.
-3. Ensure `<repo-root>/.worktrees/` is git-ignored (append to `.gitignore`, creating it only if
-   absent; part of the feature commit, no separate commit).
+3. Keep `<repo-root>/.worktrees/` out of status using the repository-local exclude file. Resolve
+   it with `git -C <repo-root> rev-parse --git-path info/exclude`, create it if absent, and append
+   `.worktrees/` only if the pattern is missing. Do not change tracked `.gitignore`; worktree paths
+   are local scratch state.
 4. Create or reuse a linked worktree at `<repo-root>/.worktrees/<branch-name>`: reuse if the
    branch's worktree exists, else `git worktree add` creating the branch from the synced base. On
    reruns, resolve the existing artifact folder first (§5 Artifact identity) and use that name
    directly.
 
-   **Mandatory — mirror run config into the worktree** on every entry to this stage (not only on
-   creation), because a fresh worktree has none of the source checkout's untracked files:
-   `mkdir -p <worktree>/.speckit && cp <repo-root>/.speckit/integration.json <worktree>/.speckit/`.
-   Source file absent → skip the copy; the provider is already in run state.
+   **Mandatory — synchronize run config into the worktree** on every entry to this stage (not only
+   on creation), because a fresh worktree has none of the source checkout's untracked files. If
+   the source file is absent, skip synchronization; the provider is already in run state. If the
+   destination is absent, copy the source file. If both files exist, parse them as JSON objects and
+   merge their top-level keys as `{ ...worktreeConfig, ...sourceConfig }`: source values win on
+   conflicts, and worktree-only keys are retained. Write the merged JSON to a temporary file and
+   rename it over the destination; continue without asking when valid files differ. The primary
+   checkout remains the sole provider source. Invalid JSON or a non-object config is an explicit
+   configuration error; do not silently replace it.
 5. Before intake the final branch name may be unknown — use a provisional branch (`<issue_id>` in
    `--issue` mode, a requirement slug otherwise; no timestamps). As soon as intake resolves the
    final `<issue_id>-<short_title>` / `<NNN>-<slug>` and it differs, run `git branch -m
@@ -53,8 +60,8 @@ run state/discovery, never replace it with the current linked worktree's root.
      worktree) → stop with an explicit error; never overwrite, reset, or switch its branch.
 
    The supplied path and branch are final: no provisional name, no `git branch -m`, no
-   `git worktree move`. Artifact identity (§5) still names the `specs/` folder. Mirror run config
-   as above.
+   `git worktree move`. Artifact identity (§5) still names the `specs/` folder. Synchronize run
+   config as above.
 6. Confirm the branch is checked out in the worktree; set `branch_created: true`, `branch_name`,
    `worktree_path` in run state. Every later step runs **from this worktree**.
 
