@@ -69,6 +69,7 @@ all three host agents (GitHub Copilot, Claude Code, OpenCode).
 | PF21 | Dirty file overlaps fix | Supplied worktree has a staged or unstaged edit in a file needed by the fix | Run PR fix | Stop before editing that file when the changes cannot be separated safely; preserve the file and index | Both |
 | PF22 | Dirty file overlaps PR diff | A file changed in the PR also has an unrelated initial worktree edit; a matching spec exists | Run spec-based review | Review the committed PR version, not the initial edit; exclude the initial edit from the commit | Both |
 | PF23 | New unrelated changes | A new unrelated file appears after dirty-worktree intake | Reach the staging safety check | Stop and report the new path; do not stage or push it | Both |
+| PF24 | Reviewer lacks dirty-path support | Initial dirty paths exist; installed `speckit-code-review/SKILL.md` has no `exclude_worktree_paths` input | Reach Stage 03 spec-based review | Stop with the "update speckit-code-review to v0.0.5+" diagnostic; do not review, commit or push an unscoped change set | Both |
 
 ## Host-specific checks
 
