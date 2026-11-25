@@ -124,7 +124,7 @@ Reviewers iterate on fixes via `speckit-auto` without re-invoking `speckit-code-
 
 1. **Parse Requirements** — Extract or synthesize the requirement checklist from `specs/<feature>/spec.md`. If no requirement IDs exist, generate FR-*/NFR-* identifiers synthetically (see Requirement ID Synthesis above).
 
-2. **Define Scope** — Identify changed files from git (staged + unstaged), expanding any changed git submodule gitlink into its own file-level diff so submodule changes are actually reviewed, not skipped. This defines which code paths require review.
+2. **Define Scope** — Identify changed files from git (staged + unstaged), expanding any changed git submodule gitlink into its own file-level diff so submodule changes are actually reviewed, not skipped. With `base_ref`, scope is the union of `git diff <base_ref>...HEAD` and the working-tree change set. `exclude_worktree_paths` drops only the staged, unstaged and untracked changes of pre-existing unrelated paths — never their committed `base_ref...HEAD` changes; a path in both sets is reviewed at its committed `HEAD` version. This defines which code paths require review.
 
 3. **Load Guidelines** — Optionally load project-specific reference files (architecture.md, code-style.md, etc.) to incorporate team-defined standards. Each reference file is discarded after use to avoid context bloat.
 
@@ -487,7 +487,7 @@ A: Load project security guidelines to enhance the review. Create `references/se
 
 ---
 
-**Version:** 0.0.2  
+**Version:** 0.0.5
 **Author:** Alex Nguyen  
 **Spec:** agentskills.io/specification  
 **License:** See repository LICENSE
