@@ -1,8 +1,8 @@
 # Speckit Auto — Spec-Driven Delivery Pipeline
 
-![Version](https://img.shields.io/badge/version-0.10.0-blue)
+![Version](https://img.shields.io/badge/version-0.10.1-blue)
 
-**Version**: 0.10.0
+**Version**: 0.10.1
 **Author**: Alex Nguyen
 
 ## Overview
@@ -192,19 +192,24 @@ project's root `AGENTS.md`, which coding agents load in every session:
   small — between `speckit-auto:coding-rules` markers.
 - **How:** `scripts/agents-rules.mjs` creates `AGENTS.md` when it is missing, appends the block
   when the file has none, refreshes the block when it is older or was edited, and otherwise does
-  nothing. Text outside the markers is never touched, and re-running setup is safe.
+  nothing. It splices only the marker-to-marker slice: line endings, trailing whitespace and all
+  other bytes outside the block are preserved. Re-running setup is safe.
 - **Claude Code:** it loads `CLAUDE.md`, so on that host setup also makes `CLAUDE.md` import the
   file with an `@AGENTS.md` line.
-- **Your part:** setup drafts a `## Preferred libraries` table (concern → library) from the
-  dependency manifests, outside the block. It is yours to edit and is never overwritten.
+- **Your part:** setup drafts a `## Preferred libraries` table (concern → library) deterministically
+  from **declared, non-dev** dependencies through a fixed catalog of unambiguous concerns, capped
+  at 12 rows. It is yours to edit and is never overwritten; `agents-rules.mjs libraries validate`
+  rejects hand-edited rows that are guessed, undeclared or misclassified.
 - **Commit:** `chore(agents): add speckit-auto coding rules`, separate from any feature work and
   not pushed. Merge it into the base branch — pipeline worktrees are cut from there.
-- **Opt out:** set `"coding_rules": false` in `.speckit/integration.json`.
+- **Opt out / back in:** set `"coding_rules": false` in `.speckit/integration.json`, or re-enable
+  with `/speckit-auto --integration <provider> --coding-rules true`.
 
-With the block in place the pipeline enforces it: the plan must carry a `Reuse & dependencies`
-section (approving the plan approves the new dependencies it lists), the implementer receives the
-rules, and `speckit-code-review` fails the review on reinvented code or a dependency the plan does
-not declare. Without the block, none of this runs.
+Stage 01 validates the block with `agents-rules.mjs check`; only a valid, supported block is passed
+downstream as `coding_rules`. With one, the plan must carry a `Reuse & dependencies` section
+(approving the plan approves the new dependencies it lists), the implementer and reviewer receive
+the cached object, and `speckit-code-review` **v0.0.7+** fails the review on reinvented code or an
+undeclared dependency. Without a valid block, none of this runs.
 
 ## Project Context
 
@@ -289,7 +294,8 @@ or prove compliance by a live host. Record manual results separately.
 | Event initialization/write error | Repair the reported cause and validate existing history before resume; never delete/truncate events to continue |
 | Missing/old Node | Install Node.js >=22.13 before a pipeline run; no third-party emitter packages are needed |
 | `[Preflight] coding rules: none` | The `AGENTS.md` block is not on the base branch: run `--integration <provider>` and merge its `chore(agents)` commit |
-| Setup reports a malformed coding-rules block | Someone removed or duplicated a marker in `AGENTS.md`; restore one start and one end marker (or delete both) and re-run setup |
+| `[Preflight] coding rules: skipped (<status>)` | The block is legacy, malformed, unsupported or written by a newer skill; rules are not enforced. Restore one valid `v1` block via setup, or delete its markers |
+| `update speckit-code-review to v0.0.7+ to use coding rules` | The installed reviewer predates the `coding_rules` input; upgrade it before running with rules enabled |
 | Review loops on an `ARCH-*` "declare dependency" fix | The implementation added a library the plan never listed; the loop regenerates the plan to declare it, or removes it |
 
 ## Notes

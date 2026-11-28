@@ -132,7 +132,7 @@ Reviewers iterate on fixes via `speckit-auto` without re-invoking `speckit-code-
 
 5. **Advanced Project Guidelines Pass** — If project guidelines were loaded, run one additional pass per guideline file to catch cross-cutting concerns.
 
-   **Reuse & Dependencies Pass (conditional)** — If the repository's root `AGENTS.md` carries the `speckit-auto:coding-rules` block (written by `speckit-auto --integration`), check the change set for hand-written code that a declared dependency or an existing in-repo module already provides, for never-hand-write concerns (crypto, auth protocols, date math, standard-format parsers, retry, validation), and for new dependencies that `plan.md`'s `Reuse & dependencies` section does not list. Findings are blocking and use the existing prefixes: `CODE-*` when the fix is "use what the project already has", `ARCH-*` when the plan must choose or declare a library. Each carries `rule_source`. Skipped silently when the block is absent, so repositories that have not opted in see no change.
+   **Reuse & Dependencies Pass (conditional)** — Runs only when `speckit-auto` passes a validated `coding_rules` object (`status: valid`), or, for a standalone invocation, when the root `AGENTS.md` carries a valid, supported `speckit-auto:coding-rules` block. A bare marker or an unsupported/legacy/malformed block does not activate it. Check the change set for hand-written code that a declared dependency or an existing in-repo module already provides, for never-hand-write concerns (crypto, auth protocols, date math, standard-format parsers, retry, validation), and for new dependencies that `plan.md`'s `Reuse & dependencies` section does not list. Findings are blocking and use the existing prefixes: `CODE-*` when the fix is "use what the project already has", `ARCH-*` when the plan must choose or declare a library. Each carries `rule_source`. Skipped silently in every other case, so repositories that have not opted in see no change.
 
 6. **Compute Coverage** — Calculate `Business cover = (covered_requirements / total_requirements) * 100`, rounded to whole percent.
 
@@ -489,7 +489,7 @@ A: Load project security guidelines to enhance the review. Create `references/se
 
 ---
 
-**Version:** 0.0.6
+**Version:** 0.0.7
 **Author:** Alex Nguyen  
 **Spec:** agentskills.io/specification  
 **License:** See repository LICENSE
