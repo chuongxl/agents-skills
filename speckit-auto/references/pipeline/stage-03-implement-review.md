@@ -28,8 +28,9 @@ until the authoritative review passes.
 
 Before the implementation step, inject into its input: the Stage 01 Project Context `summary`,
 the `repo_map` (so each file lands in the right workspace), any relevant guideline from
-`loaded_guidelines` matched by task topic (load + cache now if matched but not yet cached), and —
-superpowers — the plan path `specs/<feature_folder>/plan.md`. Nothing else.
+`loaded_guidelines` matched by task topic (load + cache now if matched but not yet cached),
+`coding_rules` when set (with the plan's `Reuse & dependencies` section as the list of libraries
+to use), and — superpowers — the plan path `specs/<feature_folder>/plan.md`. Nothing else.
 
 ## Invocation
 
@@ -157,7 +158,9 @@ PHASE 2 — Code review loop
        rebuild the next attempt from state_file + fixes[].
   R4 — Build the corrective action list from fixes[]:
        classify each entry by ID prefix — FR-*/NFR-*: business gap; ARCH-*: architecture;
-       SEC-*/CODE-*: code-level; TEST-*: missing test. If an entry's action is unclear, load ONLY
+       SEC-*/CODE-*: code-level; TEST-*: missing test. Reuse findings need no extra route:
+       "replace with an existing dependency" arrives as CODE-*, a library choice or an undeclared
+       new dependency arrives as ARCH-* and so regenerates the plan. If an entry's action is unclear, load ONLY
        the matching category file from detail_files (business-gap / architecture / security /
        code-quality / unit-tests). Never load a category file you don't need.
   R5 — Route:

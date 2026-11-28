@@ -65,6 +65,15 @@ Repo-aware assignment: every task in the plan/tasks output **must** carry a `wor
 from `repo_map` (backend/frontend/bff/database/shared; `.` for single-repo). Never assign a task
 without consulting `repo_map`.
 
+Reuse-aware planning (feature runs with `coding_rules` set): append `coding_rules` to the `plan` /
+`writing-plans` prompt and to the task-breakdown prompt, and require `plan.md` to contain a
+`Reuse & dependencies` section naming, per generic concern the feature touches, the existing
+dependency or in-repo module that covers it; every **new** dependency with its name, purpose,
+license, and why nothing existing fits; and what will be written by hand and why. The section is
+produced by the provider step, never hand-authored. In default mode the `plan-approval` gate is
+the human approval of those new dependencies; in YOLO the autonomous review gate rejects a new
+dependency that lacks any of the four fields.
+
 ## Artifact Path Guard (superpowers only)
 
 Applies after each `brainstorming` / `writing-plans` call — see the adapter's "Artifact Path
@@ -109,6 +118,9 @@ Read-only check on the produced artifacts — not an interview:
 2. **Spec coverage** — every requirement in the spec maps to at least one task in the plan/tasks.
 3. **Placeholder scan** — no `TODO`, `TBD`, `...`, or stub content in spec/plan/tasks.
 4. **Workspace assignment** — every task carries a valid `repo_map` workspace.
+5. **Reuse & dependencies** (feature runs with `coding_rules` set; never for `--pr-fix`) —
+   `plan.md` has the section, every new dependency carries all four fields, and no task
+   hand-writes a concern the section assigns to a library.
 
 Fix failures at the source (re-invoke the corresponding provider step), re-run `analyze` /
 self-review, and re-verify. Re-run the gate after **any** Stage 02 artifact regeneration,
@@ -161,6 +173,7 @@ Do **not** skip this gate. Instead, delegate the review and approval to the agen
    - Every task has a valid `workspace` from `repo_map`.
    - No conflicts or ambiguities flagged by the last `analyze` / self-review.
    - Acceptance criteria in the spec are testable and unambiguous.
+   - With `coding_rules` set: the plan's `Reuse & dependencies` section is complete (check 5).
 3. **If all criteria pass** → auto-approve: log `[YOLO] Spec/plan self-approved — no gaps found`
    and proceed to Spec/Plan Commit + Push Gate below.
 4. **If any criterion fails** → do not auto-approve yet. Fix the gap at its source (re-invoke
