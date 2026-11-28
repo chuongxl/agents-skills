@@ -153,6 +153,12 @@ the meta-repo root instead of their real submodule.
    (usually empty at this point) and `git status --porcelain -- .github/skills .agents/skills` in the
    worktree. Any listed path is a skill file this run did not install: log
    `[Preflight] tracked skill files differ from <base_branch>: <paths>`.
+8. **Coding rules** (runs whether or not `architecture.md` exists). If the worktree's root
+   `AGENTS.md` has a `<!-- speckit-auto:coding-rules:start` line, read only the lines between that
+   marker and its end marker, plus the `## Preferred libraries` section when present, into the
+   Project Context as `coding_rules`. Absent → `coding_rules: none`; nothing later depends on it.
+   Log `[Preflight] coding rules: v<n>` or `[Preflight] coding rules: none on <base_branch> (run
+   --integration, then merge its AGENTS.md commit)`. Never write `AGENTS.md` during a pipeline run.
 
 ## 4. Scratch Hygiene
 

@@ -15,7 +15,7 @@ license: MIT
 allowed-tools: bash glob grep view create edit skill ask_user
 metadata:
   author: Alex Nguyen
-  version: "0.9.0"
+  version: "0.10.0"
 ---
 
 # Speckit Auto
@@ -159,6 +159,15 @@ conditional on the `verification` opt-in persisted at `--integration` setup time
 ([shared/integration-setup.md](references/shared/integration-setup.md)); the other two run on
 every pipeline invocation except a PR fix without a matching spec, which uses direct review.
 
+## Project Coding Rules
+
+`--integration` setup writes a managed block from `assets/coding-rules.md` into the project's root
+`AGENTS.md` with `scripts/agents-rules.mjs` (reuse existing libraries, no unapproved dependency).
+When that block is present, Stage 01 caches it as `coding_rules`, Stage 02 requires a
+`Reuse & dependencies` section in the plan, Stage 03 passes the rules to the implementer, and
+`speckit-code-review` blocks on reinvented code and undeclared dependencies. No block → every one
+of those steps is skipped silently.
+
 ## Required Inputs
 
 - Requirement text, or a Jira issue link via `--issue <jira link>`
@@ -174,7 +183,8 @@ stage. At completion (Stage 06), report: resolved provider, `speckit-code-review
 (`pass`), verification outcome (`skipped`, `passed` or `unavailable`, plus investigate-loop count if any),
 implementation commit status/hash, the verification-artifact commit (if any), the spec completion
 commit hash, pushed branches, and per-repo PR outcomes. For a setup invocation (`--integration`),
-report: resolved provider, verification opt-in result, file written, scope, and the next command.
+report: resolved provider, verification opt-in result, coding-rules result, file written, scope, and
+the next command.
 For a PR fix with no matching spec, report direct-review evidence instead of a spec review status
 or spec completion commit, and report the existing PR URL and verified head SHA.
 
@@ -185,6 +195,7 @@ capabilities under their own names (`Bash`, `Read`, `Edit`, `Write`, `Glob`, `Gr
 Hermes Agent exposes the same capabilities as `terminal`, `read_file`, `write_file`, `patch`,
 `search_files`, `skill_view` (see references/shared/host-adaptation.md).
 Never refuse to act because a tool is named differently.
-Resolve `scripts/run-events.mjs` relative to this loaded skill's folder, not the project cwd.
+Resolve `scripts/run-events.mjs` and `scripts/agents-rules.mjs` relative to this loaded skill's
+folder, not the project cwd.
 Structured events use only Node builtins on every host; invoke the emitter with JSON stdin,
 never shell-interpolated JSON.

@@ -39,3 +39,6 @@ jobs:
 
       - name: Structured event producer tests
         run: node --test tools/test_run_events.mjs
+
+      - name: AGENTS.md coding-rules writer tests
+        run: node --test tools/test_agents_rules.mjs

@@ -13,7 +13,7 @@ metadata:
   specification: agentskills.io/specification
   output_contract: strict-json
   author: Alex Nguyen
-  version: "0.0.5"
+  version: "0.0.6"
 ---
 
 # Speckit Code Review
@@ -120,6 +120,11 @@ testable requirements to the spec. Never return `pass` against an empty checklis
 5. If guideline files were loaded in step 3, run the advanced pass (Step 5 of
    project-guidelines-review.md) and merge its findings into the standard results, tagging each with
    `guideline_source`.
+5a. **Reuse & dependencies (conditional)** — if the repository's root `AGENTS.md` contains a line
+   starting `<!-- speckit-auto:coding-rules:start`, load
+   [references/reuse-dependencies.md](references/reuse-dependencies.md) and merge its `CODE-*` /
+   `ARCH-*` findings (reinvented library code, undeclared new dependencies) into the standard
+   results. Skip silently when the file or the marker is absent.
 6. `Business cover = round(covered / total * 100)`.
 7. Write `state_file`, plus one detail file **per category that has issues**. Skip empty categories;
    on `pass` write only `state_file`.

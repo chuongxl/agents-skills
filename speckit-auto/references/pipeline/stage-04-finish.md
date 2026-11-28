@@ -14,7 +14,8 @@ PR push until Stage 06. Report the actual review type and do not claim a push he
 
 ## Default Mode — Human Manual Review Gate
 
-1. Present a concise summary from spec + plan: key use cases, expected usage scenarios.
+1. Present a concise summary from spec + plan: key use cases, expected usage scenarios, and every
+   dependency the change adds to a manifest (name + purpose), so approving here approves them.
 2. Recommend the reviewer run the app / execute manual self-tests for those scenarios.
 3. Ask via the host ask tool: `Approve implementation` / `Request changes`.
    Immediately before asking emit `gate_waiting` with `stage: "04-finish"` and

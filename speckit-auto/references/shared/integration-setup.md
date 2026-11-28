@@ -13,7 +13,7 @@ TURN (the one legitimate no-pipeline turn end in the whole skill). Never enter t
    writing nothing. No value → ask the user once, then continue in the same turn.
 
 2. **Persist** `{"integration": "<value>", "verification": <bool>, "verification_yolo": <bool>,
-   "commit_ticket": <bool>, "updated_at": "<ISO-8601>", "set_by": "speckit-auto"}` to `<repo-root>/.speckit/integration.json` (`mkdir -p` first; root
+   "commit_ticket": <bool>, "coding_rules": <bool>, "updated_at": "<ISO-8601>", "set_by": "speckit-auto"}` to `<repo-root>/.speckit/integration.json` (`mkdir -p` first; root
    from `git rev-parse --show-toplevel`). This repo-local file is the **only** provider and
    verification-opt-in source — there is no global state. If the cwd is not inside a git repo,
    stop and tell the user to re-run from the target repository. Overwrite silently; report the
@@ -31,6 +31,8 @@ TURN (the one legitimate no-pipeline turn end in the whole skill). Never enter t
    answer → `false`. `commit_ticket` is `true` unless the user already set it to `false` in the existing file — keep
    an existing `false`; it keeps the Jira snapshot (`ticket.md`) out of commits (Stage 01, "Ticket snapshot
    rules"). Preserve both existing values when re-running setup without a new answer.
+   `coding_rules` follows the same pattern: `true` unless the existing file already has it `false` — keep
+   an existing `false`; it is the project's opt-out from step 3a and is never asked about.
 
 2a. **If verification = true, generate the project's verification skill now:**
    1. Invoke the `skill` tool with name `create-verification-skill`, in **create mode** (no
@@ -91,6 +93,35 @@ TURN (the one legitimate no-pipeline turn end in the whole skill). Never enter t
       5. If any install step fails → stop, report the exact error, and tell the user to fix it
          manually before re-running `/speckit-auto --integration <value>`.
 
+3a. **Project coding rules (`AGENTS.md`)** — runs after step 3 whether or not an install ran, on
+   whatever branch step 3 left checked out, so a provider install that rewrites agent files cannot
+   drop the block. Skip entirely when `coding_rules` is `false`.
+
+   1. Record `git -C <repo-root> status --porcelain -- AGENTS.md CLAUDE.md`; any output is a
+      pre-existing edit (used in sub-step 4).
+   2. Run the bundled helper, resolved relative to this skill's folder and passed as an argument
+      vector, never interpolated into a shell string:
+      `node <skill-dir>/scripts/agents-rules.mjs apply --repo <repo-root>` — add `--claude-import`
+      only when the host is Claude Code, which loads `CLAUDE.md` rather than `AGENTS.md`. It
+      inserts or refreshes the block from `assets/coding-rules.md` between its
+      `speckit-auto:coding-rules` markers, touches nothing outside them, and prints one JSON line
+      with `action` = `created` (no `AGENTS.md` existed) | `appended` | `updated` | `unchanged` |
+      `newer` (the repo already carries a later block; left alone), plus `claude_md` when asked.
+      Never write or repair the block by hand.
+   3. If `AGENTS.md` has no `## Preferred libraries` heading and the repo has dependency manifests,
+      append that section **after** the end marker: a `Concern | Library` table of at most 12 rows,
+      listing only libraries the manifests declare and whose concern is unambiguous (dates,
+      validation, HTTP client, data access, auth, logging, testing). No versions, no library that is
+      not declared, no guessed concern; nothing unambiguous → add no section. An existing section
+      belongs to the team and is never edited.
+   4. Commit only what this step wrote. Sub-step 1 found pre-existing edits → leave the files
+      uncommitted and say so. Otherwise, when anything changed:
+      `git add -- AGENTS.md` (and `CLAUDE.md` when `claude_md` is `created` or `import_added`), then
+      `git commit -m "chore(agents): add speckit-auto coding rules" -- <those paths>`. No push.
+      `unchanged` / `newer` with no section added → nothing to commit.
+   5. Any failure here (Node.js unavailable, helper exit 2 for malformed markers or a non-regular
+      `AGENTS.md`) is reported with the helper's error quoted and does **not** abort setup.
+
 4. **Post-setup message** (always shown — whether install ran or was skipped):
 
    - **github-speckit:**
@@ -121,5 +152,14 @@ TURN (the one legitimate no-pipeline turn end in the whole skill). Never enter t
      > Verification is disabled — Stage 05 will be skipped on every run until you re-run
      > `/speckit-auto --integration <value>` and opt in.
 
+   - **Both providers**, when step 3a ran:
+     > Coding rules: `AGENTS.md` `<action>` (commit `<hash>`, or "left uncommitted"). Pipeline
+     > worktrees are cut from the base branch, so merge this commit there before the next run.
+     > Review the `## Preferred libraries` table — it is yours to edit.
+
+     When `coding_rules` is `false`:
+     > Coding rules are disabled for this project (`"coding_rules": false`).
+
 5. Report: resolved provider, verification opt-in result (enabled/disabled, and the generated
-   skill's commit hash if enabled), and file path written. **END TURN.**
+   skill's commit hash if enabled), the coding-rules result (helper `action`, `claude_md` when
+   requested, commit hash or the reason nothing was committed), and file path written. **END TURN.**
