@@ -65,8 +65,9 @@ Repo-aware assignment: every task in the plan/tasks output **must** carry a `wor
 from `repo_map` (backend/frontend/bff/database/shared; `.` for single-repo). Never assign a task
 without consulting `repo_map`.
 
-Reuse-aware planning (feature runs with `coding_rules` set): append `coding_rules` to the `plan` /
-`writing-plans` prompt and to the task-breakdown prompt, and require `plan.md` to contain a
+Reuse-aware planning (feature runs with a **validated** `coding_rules` object from Stage 01): append
+`coding_rules.body` and `coding_rules.preferred_libraries` to the `plan` / `writing-plans` prompt and
+to the task-breakdown prompt, and require `plan.md` to contain a
 `Reuse & dependencies` section naming, per generic concern the feature touches, the existing
 dependency or in-repo module that covers it; every **new** dependency with its name, purpose,
 license, and why nothing existing fits; and what will be written by hand and why. The section is

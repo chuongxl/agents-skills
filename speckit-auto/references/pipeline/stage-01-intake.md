@@ -153,12 +153,22 @@ the meta-repo root instead of their real submodule.
    (usually empty at this point) and `git status --porcelain -- .github/skills .agents/skills` in the
    worktree. Any listed path is a skill file this run did not install: log
    `[Preflight] tracked skill files differ from <base_branch>: <paths>`.
-8. **Coding rules** (runs whether or not `architecture.md` exists). If the worktree's root
-   `AGENTS.md` has a `<!-- speckit-auto:coding-rules:start` line, read only the lines between that
-   marker and its end marker, plus the `## Preferred libraries` section when present, into the
-   Project Context as `coding_rules`. Absent → `coding_rules: none`; nothing later depends on it.
-   Log `[Preflight] coding rules: v<n>` or `[Preflight] coding rules: none on <base_branch> (run
-   --integration, then merge its AGENTS.md commit)`. Never write `AGENTS.md` during a pipeline run.
+8. **Coding rules** (runs whether or not `architecture.md` exists). Run the bundled helper,
+   resolved relative to this loaded skill's folder and passed as an argument vector, never
+   interpolated into a shell string:
+   `node <skill-dir>/scripts/agents-rules.mjs check --repo <worktree>`. Read the single JSON line;
+   never grep or parse `AGENTS.md` yourself.
+   - `status: valid` and `supported: true` → cache `coding_rules = { status: 'valid', version,
+     body, preferred_libraries }` in the Project Context; log `[Preflight] coding rules: v<version>`.
+   - `status: none` → `coding_rules: none`; log `[Preflight] coding rules: none on <base_branch>
+     (run --integration, then merge its AGENTS.md commit)`.
+   - `legacy`, `unsupported`, `newer`, `malformed`, or a non-zero helper exit → `coding_rules: none`;
+     log `[Preflight] coding rules: skipped (<status>) on <base_branch> — run --integration, then
+     merge its AGENTS.md commit`. Never enforce a block the installed skill cannot parse.
+   When `coding_rules` is set, also verify the installed `speckit-code-review/SKILL.md` declares the
+   `coding_rules` input. If it does not, stop with "update `speckit-code-review` to v0.0.7+ to use
+   coding rules" — a stale reviewer must not silently drop the reuse pass.
+   Never write `AGENTS.md` during a pipeline run.
 
 ## 4. Scratch Hygiene
 

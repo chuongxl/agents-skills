@@ -15,7 +15,7 @@ license: MIT
 allowed-tools: bash glob grep view create edit skill ask_user
 metadata:
   author: Alex Nguyen
-  version: "0.10.0"
+  version: "0.10.1"
 ---
 
 # Speckit Auto
@@ -37,6 +37,8 @@ needed for that gate. Failure handling (including YOLO and Stage 03) is in
 1. **Parse the invocation text** (slash-command body on Copilot/Claude Code; the natural-language
    trigger message on OpenCode and Hermes Agent — flags may be embedded anywhere):
    - `--integration <value>` → setup intent (setup ONLY, no pipeline)
+   - `--coding-rules <true|false>` → optional setup-only override of the persisted `coding_rules`
+     flag (re-enable an opted-out project); invalid outside `--integration` → report and stop
    - `--issue <url>` → Jira pipeline intent
    - `--pr-fix <absolute GitHub PR URL>` → existing-PR fix intent. Require a non-empty fix
      request as well; reject missing/invalid values and combinations with `--issue` or
@@ -162,11 +164,13 @@ every pipeline invocation except a PR fix without a matching spec, which uses di
 ## Project Coding Rules
 
 `--integration` setup writes a managed block from `assets/coding-rules.md` into the project's root
-`AGENTS.md` with `scripts/agents-rules.mjs` (reuse existing libraries, no unapproved dependency).
-When that block is present, Stage 01 caches it as `coding_rules`, Stage 02 requires a
-`Reuse & dependencies` section in the plan, Stage 03 passes the rules to the implementer, and
-`speckit-code-review` blocks on reinvented code and undeclared dependencies. No block → every one
-of those steps is skipped silently.
+`AGENTS.md` with `scripts/agents-rules.mjs` (reuse existing libraries, no unapproved dependency)
+and drafts a deterministic `Preferred libraries` table from declared dependencies. Stage 01 runs
+`scripts/agents-rules.mjs check`; only a `valid`, supported block becomes the cached `coding_rules`
+object — legacy, malformed, unsupported or newer blocks are logged and skipped. Stage 02 requires a
+`Reuse & dependencies` section in the plan, Stage 03 passes the cached object to the implementer
+and reviewer, and `speckit-code-review` v0.0.7+ blocks on reinvented code and undeclared
+dependencies. No valid block → every one of those steps is skipped silently.
 
 ## Required Inputs
 

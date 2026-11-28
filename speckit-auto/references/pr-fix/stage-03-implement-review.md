@@ -9,7 +9,8 @@ When no matching spec or tasks exist, give the implementer the PR/request basis,
 and relevant project context instead of a nonexistent plan path. Identify touched workspaces from
 the requested fix and changed paths rather than a tasks artifact, and apply the shared workspace
 pre-flight and safe submodule rules to those workspaces. Pass `coding_rules` to the implementer
-when Stage 01 set it; a PR fix adds no dependency the PR or request does not call for.
+and to `speckit-code-review` when Stage 01 set it; a PR fix adds no dependency the PR or request
+does not call for.
 
 When Stage 02 identified a relevant spec, invoke `speckit-code-review` inline with that spec and
 the merge-base `base_ref`, passing the initial dirty paths as `exclude_worktree_paths`. When there

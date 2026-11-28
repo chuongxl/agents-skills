@@ -11,6 +11,9 @@ TURN (the one legitimate no-pipeline turn end in the whole skill). Never enter t
 
    Unsupported value → report the two valid providers (`github-speckit`, `superpowers`) and stop,
    writing nothing. No value → ask the user once, then continue in the same turn.
+   Optional `--coding-rules <true|false>` overrides the existing flag for this setup run and is
+   persisted below; any other
+   value → report the valid values and stop, writing nothing.
 
 2. **Persist** `{"integration": "<value>", "verification": <bool>, "verification_yolo": <bool>,
    "commit_ticket": <bool>, "coding_rules": <bool>, "updated_at": "<ISO-8601>", "set_by": "speckit-auto"}` to `<repo-root>/.speckit/integration.json` (`mkdir -p` first; root
@@ -32,7 +35,8 @@ TURN (the one legitimate no-pipeline turn end in the whole skill). Never enter t
    an existing `false`; it keeps the Jira snapshot (`ticket.md`) out of commits (Stage 01, "Ticket snapshot
    rules"). Preserve both existing values when re-running setup without a new answer.
    `coding_rules` follows the same pattern: `true` unless the existing file already has it `false` — keep
-   an existing `false`; it is the project's opt-out from step 3a and is never asked about.
+   an existing `false`; it is the project's opt-out from step 3a and is never asked about. An explicit
+   `--coding-rules <true|false>` wins over the existing value, so opting back in has a setup path.
 
 2a. **If verification = true, generate the project's verification skill now:**
    1. Invoke the `skill` tool with name `create-verification-skill`, in **create mode** (no
@@ -106,21 +110,28 @@ TURN (the one legitimate no-pipeline turn end in the whole skill). Never enter t
       inserts or refreshes the block from `assets/coding-rules.md` between its
       `speckit-auto:coding-rules` markers, touches nothing outside them, and prints one JSON line
       with `action` = `created` (no `AGENTS.md` existed) | `appended` | `updated` | `unchanged` |
-      `newer` (the repo already carries a later block; left alone), plus `claude_md` when asked.
-      Never write or repair the block by hand.
-   3. If `AGENTS.md` has no `## Preferred libraries` heading and the repo has dependency manifests,
-      append that section **after** the end marker: a `Concern | Library` table of at most 12 rows,
-      listing only libraries the manifests declare and whose concern is unambiguous (dates,
-      validation, HTTP client, data access, auth, logging, testing). No versions, no library that is
-      not declared, no guessed concern; nothing unambiguous → add no section. An existing section
-      belongs to the team and is never edited.
+      `newer` (the repo already carries a later block; left alone). It also prints `status`
+      (`none` / `valid` / `legacy` / `unsupported` / `newer` / `malformed`), `supported`,
+      `rules` (the validated block body) and `preferred_libraries`, plus `claude_md` when asked.
+      Text outside the markers is preserved byte for byte, including mixed line endings and
+      trailing whitespace. Never write or repair the block by hand.
+   3. Generate or validate the team-owned `## Preferred libraries` table with the same helper —
+      never author it from memory:
+      `node <skill-dir>/scripts/agents-rules.mjs libraries draft --repo <repo-root> --apply`.
+      It reads declared dependencies (excluding dev-only dependencies), maps them through a fixed
+      catalog of unambiguous concerns, emits at most 12 `Concern | Library` rows, and appends the
+      section after the block only when none exists. `action` is `draft` / `added` / `existing` /
+      `none`. An existing section belongs to the team and is never edited.
+      Then run `node <skill-dir>/scripts/agents-rules.mjs libraries validate --repo <repo-root>`;
+      exit 2 with a JSON error means a hand-edited table has a guessed, undeclared or misclassified
+      row — report it and leave the table uncommitted.
    4. Commit only what this step wrote. Sub-step 1 found pre-existing edits → leave the files
       uncommitted and say so. Otherwise, when anything changed:
       `git add -- AGENTS.md` (and `CLAUDE.md` when `claude_md` is `created` or `import_added`), then
       `git commit -m "chore(agents): add speckit-auto coding rules" -- <those paths>`. No push.
       `unchanged` / `newer` with no section added → nothing to commit.
-   5. Any failure here (Node.js unavailable, helper exit 2 for malformed markers or a non-regular
-      `AGENTS.md`) is reported with the helper's error quoted and does **not** abort setup.
+   5. Any failure here (Node.js unavailable, helper exit 2 for malformed markers, an invalid `Preferred libraries`
+      table, or a non-regular `AGENTS.md`) is reported with the helper's error quoted and does **not** abort setup.
 
 4. **Post-setup message** (always shown — whether install ran or was skipped):
 
@@ -158,7 +169,8 @@ TURN (the one legitimate no-pipeline turn end in the whole skill). Never enter t
      > Review the `## Preferred libraries` table — it is yours to edit.
 
      When `coding_rules` is `false`:
-     > Coding rules are disabled for this project (`"coding_rules": false`).
+     > Coding rules are disabled for this project (`"coding_rules": false`). Re-enable with
+     > `/speckit-auto --integration <provider> --coding-rules true`.
 
 5. Report: resolved provider, verification opt-in result (enabled/disabled, and the generated
    skill's commit hash if enabled), the coding-rules result (helper `action`, `claude_md` when

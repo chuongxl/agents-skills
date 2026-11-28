@@ -13,7 +13,7 @@ metadata:
   specification: agentskills.io/specification
   output_contract: strict-json
   author: Alex Nguyen
-  version: "0.0.6"
+  version: "0.0.7"
 ---
 
 # Speckit Code Review
@@ -44,6 +44,12 @@ Claude Code and OpenCode expose the same capabilities under their own names (`Ba
   `base_ref...HEAD`. For a path in both sets, review the committed `HEAD` version rather than
   the dirty worktree version. Apply the same rule to expanded submodule paths. Do not use this
   input to exclude a path modified by the current run.
+- Optional `coding_rules`: the validated object cached by `speckit-auto` Stage 01
+  (`{ status, version, body, preferred_libraries }`). When present with `status: valid`, it is the
+  only opt-in signal for the reuse pass and is authoritative for the rules text; do not re-read
+  `AGENTS.md` during a pipeline review. When absent (standalone invocation), load the root
+  `AGENTS.md` and apply the strict validation in
+  [references/reuse-dependencies.md](references/reuse-dependencies.md); skip on any other state.
 - **Submodule expansion (mandatory when `.gitmodules` exists):** a top-level `git diff`/`git
   status` only ever shows a changed submodule as a single gitlink entry (mode `160000`), never the
   files changed inside it — reviewing that entry alone is reviewing nothing. Resolve every area's
@@ -120,11 +126,12 @@ testable requirements to the spec. Never return `pass` against an empty checklis
 5. If guideline files were loaded in step 3, run the advanced pass (Step 5 of
    project-guidelines-review.md) and merge its findings into the standard results, tagging each with
    `guideline_source`.
-5a. **Reuse & dependencies (conditional)** — if the repository's root `AGENTS.md` contains a line
-   starting `<!-- speckit-auto:coding-rules:start`, load
-   [references/reuse-dependencies.md](references/reuse-dependencies.md) and merge its `CODE-*` /
-   `ARCH-*` findings (reinvented library code, undeclared new dependencies) into the standard
-   results. Skip silently when the file or the marker is absent.
+5a. **Reuse & dependencies (conditional)** — run only when `coding_rules` was passed with
+   `status: valid`; in a standalone invocation, run it only when the root `AGENTS.md` passes the
+   strict validation in [references/reuse-dependencies.md](references/reuse-dependencies.md).
+   Load that reference and merge its `CODE-*` / `ARCH-*` findings (reinvented library code,
+   undeclared new dependencies) into the standard results. Never activate on a bare marker or on a
+   block whose version this skill does not support; skip silently in every other case.
 6. `Business cover = round(covered / total * 100)`.
 7. Write `state_file`, plus one detail file **per category that has issues**. Skip empty categories;
    on `pass` write only `state_file`.

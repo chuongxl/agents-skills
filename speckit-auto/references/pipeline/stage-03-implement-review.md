@@ -29,15 +29,18 @@ until the authoritative review passes.
 Before the implementation step, inject into its input: the Stage 01 Project Context `summary`,
 the `repo_map` (so each file lands in the right workspace), any relevant guideline from
 `loaded_guidelines` matched by task topic (load + cache now if matched but not yet cached),
-`coding_rules` when set (with the plan's `Reuse & dependencies` section as the list of libraries
-to use), and — superpowers — the plan path `specs/<feature_folder>/plan.md`. Nothing else.
+`coding_rules.body` and `coding_rules.preferred_libraries` when set (with the plan's
+`Reuse & dependencies` section as the list of libraries to use), and — superpowers — the plan path
+`specs/<feature_folder>/plan.md`. Nothing else.
 
 ## Invocation
 
 Every step goes through the `skill` tool (run contract, Invocation Channel); after each call apply
 the adapter's Step Completion Protocol before continuing the loop. `speckit-code-review` runs
 **inline** via the `skill` tool — never as a background agent — and always with the spec path
-passed explicitly (`specs/<feature_folder>/spec.md`). An unresolvable skill is a provider
+passed explicitly (`specs/<feature_folder>/spec.md`). When `coding_rules` is set, also pass it
+as the `coding_rules` input so the review uses the block cached at Stage 01, not a file that may
+have changed mid-run. An unresolvable skill is a provider
 validation failure → adapter install recovery, not a stop.
 
 ## Large Scope (condensed)
